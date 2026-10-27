@@ -12,7 +12,7 @@
 ## Version history (this branch)
 - `1510b86` — v1.0.0-gold (campaign, boss, all core systems).
 - `8a0b62c` — v1.1.0-beta (golem flight segment, challenge trials).
-- next commit — v1.2.0-beta (swept golem collision, golem audio, audio balance pass, manifest registration of v1.1 assets, audio level meter). Code edits confined to `ArcaneGolem.ts`, `game.ts`, `assets_manifest.json` (additive), tests and docs; `Engine.ts`, `AudioEngine.ts` and save keys untouched.
+- `4a64f2f`…`e3872a5` — v1.2.0-beta (swept golem collision, golem audio, audio balance pass, manifest registration of v1.1 assets, audio level meter). Code edits confined to `ArcaneGolem.ts`, `game.ts`, `assets_manifest.json` (additive), tests and docs; `Engine.ts`, `AudioEngine.ts` and save keys untouched.
 
 ## In progress / unfinished
 - Nothing half-done in code. Still owed (cannot be done in the cloud container): real-device FPS, Firefox/Safari/Edge, physical gamepad/touch, listening to the mix, human balance of trial stars — see `TODO.md` and `TESTING.md`.
