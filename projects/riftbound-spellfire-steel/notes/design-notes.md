@@ -10,3 +10,46 @@
 - **Golem summons:** the rescued sorcerer and the Sector 3 catalyst defence summon an allied Arcane Golem (scripted defence event).
 - **Challenge trials (v1.0):** sector speedruns with a timer; the dedicated trials are the v1.1 task.
 - **Difficulty knobs:** `World.difficultyHp / difficultyDmg / difficultySpread` (all 1.0 in the campaign).
+
+## v1.2 — Golem collision response
+- **Swept circle by conservative advancement.** Each frame the golem's displacement is split into sub-steps no longer than a quarter of its radius (≤ 0.35 m at the 22 m/s dash). Each sub-step is pushed out of `CF.FLY` colliders (spires, hangars, tall walls, zone gates), clamped into the flight corridor (now a union of two rectangles, `CORRIDOR`, so the inside corner at x 45.5 / z 62 has a proper normal), and resolved against `CF.FLY` once more. If the result is still invalid the golem stays where it was — its previous position is always valid, so it can never end a frame inside geometry or outside the corridor.
+- **Response:** the push direction is the contact normal; the normal velocity is reflected with restitution 0.35 and the tangential velocity keeps 85% (scrape). Knockback (explosions, barrier shocks) is folded into the flight velocity so it is swept too, instead of moving the golem with the ground (MOVE) resolver.
+- **Feel:** impacts above 3.5 m/s normal speed give a camera bump (0.12–0.42 trauma, off in Reduced Motion), stone chips + arcane sparks and a `golemScrape` crunch (louder / lower with speed). Above 12 m/s (only reachable while dashing) the golem chips itself for 2.2 HP per m/s over the threshold, ×0.3 while bracing, never below 1 HP. A head-on dash typically costs 5–15 armour.
+- **Measured** (probe, 345 runs / 11 478 frames at dash speed into every corridor edge, the inside corner, every reachable FLY collider and 300 random dashes): v1.1 = 21 frames grazing up to 0.07 m into geometry; v1.2 = 0 frames inside geometry or outside the corridor.
+
+## v1.2 — Golem audio
+- `loop/golemHum` is now an engine rumble: sawtooth + octave sub through a resonant low-pass, plus a band-passed "stone/air grind" noise. `tuneEngine()` follows speed every frame (pitch 44→68 Hz, filter 230→1050 Hz, grind up) and Stone Brace (lower pitch, darker filter, more grind).
+- `loop/golemBeam` pitch and band rise with heat; `sfx/golemCharge` plays during a 0.15 s charge-up before the beam fires (core flares, sparks converge), `sfx/golemLaser` is the ignition crack, `sfx/golemHeatWarn` ticks faster above 80% heat, `sfx/golemOverheat` is a steam hiss with venting particles during the lock.
+- `sfx/golemStomp` ×2 (two feet, 190 ms apart) + dust ring + small camera bump when the golem settles after a dismount, and when a destroyed golem re-forms (it now drops onto its shrine from 4.5 m).
+- The AA **lock warning** now sounds inside the golem (non-positional) instead of at the tower, so it is audible at any lock range.
+
+## v1.2 — Audio mix
+The mix is now **measured**, not guessed: `tests/audio-levels.mjs` renders every recipe offline (seeded noise) and meters the live buses in headless Chromium. Levels are approximately K-weighted (BS.1770 pre-filter via biquads), "M100" = loudest 100 ms window; "phone" adds a 24 dB/oct high-pass at 350 Hz as a crude small-speaker proxy; "game" applies each sound's in-game volume and distance attenuation.
+
+Changes live in two places, both inside the allowed files:
+- `src/game.ts` → `AUDIO_MIX`: dB trims layered over the public `AudioEngine.play` / `loopVolume` / `setVolumes` (synthesis code untouched). Music bus **+4.5 dB**; Arcane Bolt **+5**, Flame Burst cast **+4**, Blink / Ward up / Snap / potion **+2**, player hurt **+3**, bolt impact **+3**, enemy rifle **−1.5**; rain loop **−14**, rift drone **−8**.
+- `src/entities/ArcaneGolem.ts`: golem recipe/loop levels (engine rumble −8 dB and a lower in-game volume, beam loop +12 dB, charge +6, lock warning +15 and non-positional, heat warning +16, overheat hiss −3, mid-range "click/crunch" layers on stomp, dash and stone hits so they survive phone speakers).
+
+| Measure (dB, K-weighted) | v1.1 | v1.2 |
+|---|---|---|
+| Arcane Bolt cast (M100, in game) | −26.9 | −21.9 |
+| Flame Burst cast | −24.2 | −20.2 |
+| Chain Lightning | −19.8 | −19.8 |
+| Blink | −22.4 | −20.5 |
+| Enemy rifle shot @ 14 m | −30.4 | −32.3 |
+| Rain bed, Sector 2 (rain 1.0) | −13.6 | −27.4 |
+| Rift drone | −24.9 | −32.9 |
+| Sector 1 ambient bus (live mean) | −17.8 | −29.7 |
+| Music, calm / combat (live mean, Sector 1) | −36.3 / −29.9 | −31.8 / −25.5 |
+| Golem engine rumble (idle, in-game volume) | −16.6 | −28.6 |
+| Golem beam loop | −32.1 | −19.7 |
+| AA lock warning (v1.1: at the tower, 14 m) | −49.7 | −23.7 |
+
+Targets checked by the tool (v1.1 → v1.2: 4/11 → 11/11 pass):
+- **T1** each player cast (Bolt, Flame Burst, Lightning, Blink) ≥ 6 dB over one rifle shot at 14 m, on full-range and phone proxies (v1.2: +10.3 / +12.1 / +12.5 / +11.7 dB; phone +7.8 dB or more).
+- **T2** the heaviest rain bed sits under the Arcane Bolt (−27.4 vs −21.9).
+- **T3** calm music within ±4 dB of the ambient bed (−2.1), combat music ≥ 3 dB over it (+4.4), and the bolt ≥ 2 dB over combat music (+3.6).
+- **T4** golem beam ≥ 4 dB over the engine rumble (+8.9); lock warning no more than 6 dB under it (+4.9).
+- **T5** no in-game one-shot peaks above −1 dBFS before the master compressor.
+
+Limits: these are objective proxies. Nobody has listened to the mix on desktop speakers or phone speakers yet — that remains a manual check (TESTING.md). The rumble is measured at idle; at full speed it is estimated (not measured) to rise ~4–5 dB, which would shrink the beam's lead to ~4 dB while flying flat out.

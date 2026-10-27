@@ -27,6 +27,35 @@ import { VERSION } from './config/version';
 
 const QUALITY: Record<string, QualityLevel> = { high: 2, medium: 1, low: 0 };
 
+/**
+ * v1.2 audio balance pass: dB trims layered over the synthesized recipes / loops and the music bus
+ * through AudioEngine's public API, so the synthesis code itself stays untouched. Levels were measured
+ * with `tests/audio-levels.mjs`; targets and results are in notes/design-notes.md ("Audio mix").
+ */
+export const AUDIO_MIX = {
+  music: 4.5,
+  recipes: {
+    bolt: 5, fireCast: 4, blink: 2, wardUp: 2, snap: 2, potion: 2, playerHurt: 3, boltHit: 3,
+    gunshot: -1.5,
+  } as Record<string, number>,
+  loops: { rain: -14, rift: -8 } as Record<string, number>,
+};
+
+const dbGain = (db: number): number => Math.pow(10, db / 20);
+
+function installAudioMix(audio: AudioEngine): void {
+  const play = audio.play.bind(audio);
+  audio.play = (name, opts = {}) => {
+    const t = AUDIO_MIX.recipes[name];
+    play(name, t ? { ...opts, vol: (opts.vol !== undefined ? opts.vol : 1) * dbGain(t) } : opts);
+  };
+  const loop = audio.loopVolume.bind(audio);
+  audio.loopVolume = (name, vol, build) => {
+    const t = AUDIO_MIX.loops[name];
+    loop(name, t ? vol * dbGain(t) : vol, build);
+  };
+}
+
 export class Game implements UiGame, MissionHost, DevHost {
   services: Services;
   levels: LevelData[] = [sector1, sector2, sector3, sector4] as unknown as LevelData[];
@@ -37,6 +66,8 @@ export class Game implements UiGame, MissionHost, DevHost {
   mission: MissionScene;
   story: StoryScene;
   challenge: ChallengeScene;
+  /** v1.2 mix table (read by tests/audio-levels.mjs). */
+  readonly audioMix = AUDIO_MIX;
   /** v1.1 Arcane Golem flight segment, attached to Sector 2 mission worlds. */
   private golemSeg: GolemSegment | null = null;
   private golemWorld: World | null = null;
@@ -49,6 +80,7 @@ export class Game implements UiGame, MissionHost, DevHost {
     const engine = new Engine(stage, canvas);
     const input = new Input(stage);
     const audio = new AudioEngine();
+    installAudioMix(audio);
     const music = new Music(audio);
     const dev: DevFlags = { god: false, infiniteMana: false, noCooldowns: false, allSpells: false, colliders: false, nav: false, los: false };
     const svc = {
@@ -150,7 +182,7 @@ export class Game implements UiGame, MissionHost, DevHost {
   applySettings(): void {
     const s = this.services.settings;
     const { engine, input, audio } = this.services;
-    audio.setVolumes({ master: s.master, sfx: s.sfx, music: s.music, voice: s.voice });
+    audio.setVolumes({ master: s.master, sfx: s.sfx, music: s.music * dbGain(AUDIO_MIX.music), voice: s.voice });
     input.scheme = s.controlScheme;
     input.hapticsEnabled = s.haptics;
     if (engine.pixelStyle !== s.pixelStyle) engine.setPixelStyle(s.pixelStyle);
