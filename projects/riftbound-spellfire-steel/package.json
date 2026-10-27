@@ -1,6 +1,6 @@
 {
   "name": "riftbound-spellfire-steel",
-  "version": "1.3.0-beta",
+  "version": "1.4.0-beta",
   "private": true,
   "description": "Riftbound: Spellfire & Steel — top-down pseudo-isometric spell-slinger vs. modern military tactical shooter (static web game).",
   "license": "MIT",
@@ -12,6 +12,7 @@
     "test:logic": "node tests/logic.test.mjs",
     "test:smoke": "node tests/smoke.mjs",
     "test:audio": "node tests/audio-levels.mjs",
+    "playtest:summary": "node tests/playtest-summary.mjs",
     "serve": "node scripts/serve.mjs"
   },
   "dependencies": {

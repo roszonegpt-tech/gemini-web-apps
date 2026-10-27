@@ -437,6 +437,50 @@ await step('v1.3: settings reset confirms inside the page', async () => {
   if (after !== 0) throw new Error(`reset did not run (${after})`);
 });
 
+await step('v1.4: portrait phone layout (390×844): view on top, status + controls below, menus full screen', async () => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await wait(600);
+  await game(() => { const g = window.riftbound; g.services.save.campaign.introSeen = true; g.services.save.settings.touchMode = 'on'; g.services.dev.god = true; g.uiAction('deploy', 0); });
+  await wait(1500);
+  const r = await game(() => {
+    const box = (q) => { const e = document.querySelector(q); if (!e) return null; const b = e.getBoundingClientRect(); return { l: b.left, t: b.top, r: b.right, b: b.bottom }; };
+    return {
+      portrait: window.riftbound.ui.portrait, stage: box('#stage'), pad: box('#portrait-pad'),
+      touchIn: document.getElementById('touch').parentElement.className, bars: box('.pp-top .hud-tl'), blink: box('.tbtn[data-action="blink"]'),
+      scrollW: document.documentElement.scrollWidth,
+    };
+  });
+  await shot('70-portrait-game');
+  const ok = r.portrait && r.stage.t === 0 && Math.abs(r.pad.t - r.stage.b) < 2 && r.touchIn === 'pp-controls'
+    && r.bars && r.bars.t >= r.stage.b && r.blink && r.blink.t > r.stage.b && r.blink.b <= 844 && r.scrollW <= 390;
+  if (!ok) throw new Error(JSON.stringify(r));
+  await game(() => window.riftbound.uiAction('pause'));
+  await wait(500);
+  const menu = await game(() => { const e = document.querySelector('.screen .panel'); const b = e.getBoundingClientRect(); return { inBody: document.getElementById('screens').parentElement === document.body, t: b.top, b: b.bottom }; });
+  await shot('71-portrait-pause');
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await wait(600);
+  const back = await game(() => ({ portrait: window.riftbound.ui.portrait, touch: document.getElementById('touch').parentElement.id, screens: document.getElementById('screens').parentElement.id }));
+  await game(() => { window.riftbound.services.save.settings.touchMode = 'auto'; window.riftbound.uiAction('mainMenu'); });
+  if (!(menu.inBody && menu.t >= 0 && menu.b <= 844)) throw new Error(`pause ${JSON.stringify(menu)}`);
+  if (!(back.portrait === false && back.touch === 'stage' && back.screens === 'stage')) throw new Error(`landscape restore ${JSON.stringify(back)}`);
+});
+
+await step('v1.4: export panel (copyable text + download) for playtest records', async () => {
+  await game(() => { const s = window.riftbound.services.save; s.stats.playtest = [{ kind: 'trial', id: 'targetRun', at: 1, version: 'smoke', outcome: 'complete', time: 50, damage: 3 }]; window.riftbound.ui.go('settings', 'title'); });
+  await wait(400);
+  await page.click('[data-act="ptexport"]');
+  await wait(400);
+  const r = await game(() => ({ cur: window.riftbound.ui.current, text: document.getElementById('export-text').value }));
+  const parsed = JSON.parse(r.text);
+  if (!(r.cur === 'export' && parsed.runs.length === 1 && parsed.runs[0].version === 'smoke')) throw new Error(JSON.stringify(r).slice(0, 200));
+  await page.click('[data-act="back"]');
+  await wait(300);
+  const cur = await game(() => window.riftbound.ui.current);
+  if (cur !== 'settings') throw new Error(`Back went to ${cur}`);
+  await game(() => { window.riftbound.services.save.stats.playtest = []; });
+});
+
 const perf = await game(() => window.riftbound.perfText());
 console.log(results.join('\n'));
 console.log('--- perf (headless SwiftShader, not representative of real GPUs) ---\n' + perf);
