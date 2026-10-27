@@ -1,0 +1,94 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "riftbound.save.v1",
+  "title": "Riftbound save data (LocalStorage key: riftbound.save.v1)",
+  "description": "KEY NAMES ARE FROZEN. Later builds may add keys but must not rename or repurpose existing ones. Missing keys are filled from defaults on load (src/core/Save.ts).",
+  "type": "object",
+  "required": ["schema", "campaign", "shards", "upgrades", "spells", "settings"],
+  "properties": {
+    "schema": { "type": "integer", "const": 1 },
+    "campaign": {
+      "type": "object",
+      "properties": {
+        "unlocked": { "type": "integer", "minimum": 1, "maximum": 4, "description": "Number of sectors unlocked" },
+        "completed": { "type": "array", "items": { "type": "boolean" }, "minItems": 4, "maxItems": 4 },
+        "stars": { "type": "array", "items": { "type": "integer", "minimum": 0, "maximum": 3 } },
+        "bestTimes": { "type": "array", "items": { "type": ["number", "null"] }, "description": "Best clear time per sector (seconds)" },
+        "bestRatings": { "type": "array", "items": { "type": ["string", "null"], "enum": ["S", "A", "B", "C", "D", null] } },
+        "checkpoint": {
+          "type": ["object", "null"],
+          "description": "Last reached mission checkpoint. v1.3 also stores stats, consumables and savedAt so a reload can resume (Continue).",
+          "properties": {
+            "sector": { "type": "integer" }, "zone": { "type": "integer" },
+            "stats": { "type": "object", "description": "v1.3: mission stats snapshot (numbers)" },
+            "consumables": { "type": ["object", "null"], "properties": { "hp": { "type": "integer" }, "mp": { "type": "integer" }, "bombs": { "type": "integer" } } },
+            "savedAt": { "type": "number", "description": "v1.3: epoch ms" }
+          }
+        },
+        "introSeen": { "type": "boolean" }
+      }
+    },
+    "shards": { "type": "integer", "minimum": 0, "description": "Spendable Crystal Shards" },
+    "shardsEarnedTotal": { "type": "integer", "minimum": 0 },
+    "upgrades": {
+      "type": "object",
+      "description": "Grimoire Sanctum ranks 0-5",
+      "properties": {
+        "spellPower": { "type": "integer" }, "maxMana": { "type": "integer" }, "maxHealth": { "type": "integer" },
+        "manaRegen": { "type": "integer" }, "blink": { "type": "integer" }, "wardResist": { "type": "integer" }, "elemDuration": { "type": "integer" }
+      }
+    },
+    "spells": {
+      "type": "object",
+      "properties": {
+        "unlocked": { "type": "array", "items": { "enum": ["arcaneBolt", "flameBurst", "chainLightning", "vortexSurge", "meteorStrike"] } },
+        "loadout": { "type": "array", "minItems": 4, "maxItems": 4, "items": { "enum": ["flameBurst", "chainLightning", "vortexSurge", "meteorStrike"] } },
+        "inferno": { "type": "boolean", "description": "Flame Burst upgraded to Inferno Fireball" }
+      }
+    },
+    "cosmetics": { "type": "object", "properties": { "robeGlow": { "enum": ["violet", "azure", "ember", "verdant", "celestial"] } } },
+    "challenges": {
+      "type": "object",
+      "description": "Challenge trial records keyed by trial id",
+      "additionalProperties": {
+        "type": "object",
+        "properties": { "bestTime": { "type": ["number", "null"] }, "bestScore": { "type": "number" }, "stars": { "type": "integer", "minimum": 0, "maximum": 3 } }
+      }
+    },
+    "settings": {
+      "type": "object",
+      "properties": {
+        "master": { "type": "number" }, "sfx": { "type": "number" }, "music": { "type": "number" }, "voice": { "type": "number" },
+        "controlScheme": { "enum": ["default", "swapped"] },
+        "touchOpacity": { "type": "number" }, "touchMode": { "enum": ["auto", "on", "off"] },
+        "reducedMotion": { "type": "boolean" }, "aimAssist": { "type": "number" },
+        "colorblind": { "enum": ["none", "deuteranopia", "protanopia", "tritanopia"] },
+        "quality": { "enum": ["auto", "high", "medium", "low"] }, "pixelStyle": { "enum": ["crisp", "classic", "chunky"] },
+        "narration": { "type": "boolean" }, "subtitles": { "type": "boolean" }, "showFps": { "type": "boolean" },
+        "speedrunTimer": { "type": "boolean" }, "haptics": { "type": "boolean" },
+        "touchSize": { "enum": ["small", "medium", "large"], "description": "v1.3: touch button scale" },
+        "touchHanded": { "enum": ["right", "left"], "description": "v1.3: left = mirrored touch layout" },
+        "playtestRecords": { "type": "boolean", "description": "v1.3: opt-in local playtest records (default false)" }
+      }
+    },
+    "stats": {
+      "type": "object",
+      "properties": {
+        "kills": { "type": "integer" }, "deaths": { "type": "integer" }, "playTime": { "type": "number" }, "missions": { "type": "integer" },
+        "playtest": {
+          "type": "array", "maxItems": 50,
+          "description": "v1.3: opt-in local playtest records (newest last, capped at 50). Never sent anywhere.",
+          "items": {
+            "type": "object",
+            "required": ["kind", "id", "at", "version", "outcome", "time", "damage"],
+            "properties": {
+              "kind": { "enum": ["trial", "golem"] }, "id": { "type": "string" }, "at": { "type": "number" }, "version": { "type": "string" },
+              "outcome": { "type": "string" }, "time": { "type": "number" }, "damage": { "type": "number" }
+            },
+            "additionalProperties": { "type": ["number", "string"] }
+          }
+        }
+      }
+    }
+  }
+}

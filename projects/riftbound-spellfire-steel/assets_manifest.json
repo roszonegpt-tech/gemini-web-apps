@@ -1,0 +1,962 @@
+{
+  "project": "Riftbound: Spellfire & Steel",
+  "note": "All assets are generated procedurally at runtime \u2014 there are no binary asset files. IDs follow the frozen convention '<category>/<name>' and map to the generator listed in 'source'. Do not rename existing IDs; add new ones.",
+  "namingConvention": "<category>/<camelCaseName>  (categories: model, prop, texture, groundMaterial, sfx, loop, music, level, icon)",
+  "universalAssets": "None imported. If assets from 'Universal Assets' are added later, copy them into assets/<type>/ and record the source path / asset ID here.",
+  "assets": [
+    {
+      "id": "model/mage",
+      "source": "src/utils/models.ts#buildMage",
+      "type": "procedural-mesh"
+    },
+    {
+      "id": "model/soldier",
+      "source": "src/utils/models.ts#buildSoldier",
+      "type": "procedural-mesh"
+    },
+    {
+      "id": "model/drone",
+      "source": "src/utils/models.ts#buildDrone",
+      "type": "procedural-mesh"
+    },
+    {
+      "id": "model/helicopter",
+      "source": "src/utils/models.ts#buildHelicopter",
+      "type": "procedural-mesh"
+    },
+    {
+      "id": "model/dropship",
+      "source": "src/utils/models.ts#buildDropship",
+      "type": "procedural-mesh"
+    },
+    {
+      "id": "model/goliathTank",
+      "source": "src/utils/models.ts#buildTank",
+      "type": "procedural-mesh"
+    },
+    {
+      "id": "model/shieldPylon",
+      "source": "src/utils/models.ts#buildShieldPylon",
+      "type": "procedural-mesh"
+    },
+    {
+      "id": "model/arcaneGolem",
+      "source": "src/utils/models.ts#buildGolem",
+      "type": "procedural-mesh"
+    },
+    {
+      "id": "model/sentryTurret",
+      "source": "src/utils/models.ts#buildTurret",
+      "type": "procedural-mesh"
+    },
+    {
+      "id": "model/mortar",
+      "source": "src/utils/models.ts#buildMortar",
+      "type": "procedural-mesh"
+    },
+    {
+      "id": "model/radioJammer",
+      "source": "src/utils/models.ts#buildJammer",
+      "type": "procedural-mesh"
+    },
+    {
+      "id": "model/ammoDepot",
+      "source": "src/utils/models.ts#buildDepot",
+      "type": "procedural-mesh"
+    },
+    {
+      "id": "model/generator",
+      "source": "src/utils/models.ts#buildGenerator",
+      "type": "procedural-mesh"
+    },
+    {
+      "id": "model/riftAnchor",
+      "source": "src/utils/models.ts#buildAnchor",
+      "type": "procedural-mesh"
+    },
+    {
+      "id": "model/manaWell",
+      "source": "src/utils/models.ts#buildWell",
+      "type": "procedural-mesh"
+    },
+    {
+      "id": "model/arcaneChest",
+      "source": "src/utils/models.ts#buildChest",
+      "type": "procedural-mesh"
+    },
+    {
+      "id": "model/riftCatalyst",
+      "source": "src/utils/models.ts#buildCatalyst",
+      "type": "procedural-mesh"
+    },
+    {
+      "id": "model/prisonCage",
+      "source": "src/utils/models.ts#buildCage",
+      "type": "procedural-mesh"
+    },
+    {
+      "id": "model/riftGate",
+      "source": "src/utils/models.ts#buildPortal",
+      "type": "procedural-mesh"
+    },
+    {
+      "id": "model/watchtower",
+      "source": "src/utils/models.ts#buildWatchtower",
+      "type": "procedural-mesh"
+    },
+    {
+      "id": "model/searchlight",
+      "source": "src/utils/models.ts#buildSearchlight",
+      "type": "procedural-mesh"
+    },
+    {
+      "id": "model/floatingIsland",
+      "source": "src/utils/models.ts#buildIsland",
+      "type": "procedural-mesh"
+    },
+    {
+      "id": "model/tree",
+      "source": "src/utils/models.ts#buildTreeMesh",
+      "type": "procedural-mesh"
+    },
+    {
+      "id": "model/vehicleWreck",
+      "source": "src/utils/models.ts#buildWreck",
+      "type": "procedural-mesh"
+    },
+    {
+      "id": "model/hangar",
+      "source": "src/utils/models.ts#buildHangar",
+      "type": "procedural-mesh"
+    },
+    {
+      "id": "model/arcaneGolemFlyer",
+      "source": "src/entities/ArcaneGolem.ts#ArcaneGolem (src/utils/models.ts#buildGolem \u00d71.25 + thruster rings + chest beam)",
+      "type": "procedural-mesh",
+      "since": "1.1.0-beta"
+    },
+    {
+      "id": "model/aaTower",
+      "source": "src/entities/ArcaneGolem.ts#AATower",
+      "type": "procedural-mesh",
+      "since": "1.1.0-beta"
+    },
+    {
+      "id": "model/radarMine",
+      "source": "src/entities/ArcaneGolem.ts#RadarMine",
+      "type": "procedural-mesh",
+      "since": "1.1.0-beta"
+    },
+    {
+      "id": "model/barrierPylon",
+      "source": "src/entities/ArcaneGolem.ts#BarrierPylon",
+      "type": "procedural-mesh",
+      "since": "1.1.0-beta"
+    },
+    {
+      "id": "model/emplacement",
+      "source": "src/entities/ArcaneGolem.ts#Emplacement",
+      "type": "procedural-mesh",
+      "since": "1.1.0-beta"
+    },
+    {
+      "id": "model/golemShrine",
+      "source": "src/entities/ArcaneGolem.ts#GolemShrine",
+      "type": "procedural-mesh",
+      "since": "1.1.0-beta"
+    },
+    {
+      "id": "model/targetDummy",
+      "source": "src/scenes/ChallengeScene.ts#TargetDummy",
+      "type": "procedural-mesh",
+      "since": "1.1.0-beta"
+    },
+    {
+      "id": "model/minigunNest",
+      "source": "src/scenes/ChallengeScene.ts#MinigunNest",
+      "type": "procedural-mesh",
+      "since": "1.1.0-beta"
+    },
+    {
+      "id": "prop/sandbag",
+      "source": "src/utils/models.ts#propParts",
+      "type": "instanced-mesh"
+    },
+    {
+      "id": "prop/concrete",
+      "source": "src/utils/models.ts#propParts",
+      "type": "instanced-mesh"
+    },
+    {
+      "id": "prop/crate",
+      "source": "src/utils/models.ts#propParts",
+      "type": "instanced-mesh"
+    },
+    {
+      "id": "prop/ammo",
+      "source": "src/utils/models.ts#propParts",
+      "type": "instanced-mesh"
+    },
+    {
+      "id": "prop/barrel",
+      "source": "src/utils/models.ts#propParts",
+      "type": "instanced-mesh"
+    },
+    {
+      "id": "prop/tree",
+      "source": "src/utils/models.ts#propParts",
+      "type": "instanced-mesh"
+    },
+    {
+      "id": "prop/pine",
+      "source": "src/utils/models.ts#propParts",
+      "type": "instanced-mesh"
+    },
+    {
+      "id": "prop/bush",
+      "source": "src/utils/models.ts#propParts",
+      "type": "instanced-mesh"
+    },
+    {
+      "id": "prop/pyramid",
+      "source": "src/utils/models.ts#propParts",
+      "type": "instanced-mesh"
+    },
+    {
+      "id": "prop/rock",
+      "source": "src/utils/models.ts#propParts",
+      "type": "instanced-mesh"
+    },
+    {
+      "id": "prop/pylon",
+      "source": "src/utils/models.ts#propParts",
+      "type": "instanced-mesh"
+    },
+    {
+      "id": "prop/pillar",
+      "source": "src/utils/models.ts#propParts",
+      "type": "instanced-mesh"
+    },
+    {
+      "id": "prop/wall",
+      "source": "src/utils/models.ts#propParts",
+      "type": "instanced-mesh"
+    },
+    {
+      "id": "prop/crystal",
+      "source": "src/utils/models.ts#propParts",
+      "type": "instanced-mesh"
+    },
+    {
+      "id": "prop/spire",
+      "source": "src/utils/models.ts#propParts",
+      "type": "instanced-mesh"
+    },
+    {
+      "id": "prop/grass",
+      "source": "src/utils/models.ts#propParts",
+      "type": "instanced-mesh"
+    },
+    {
+      "id": "prop/wire",
+      "source": "src/utils/models.ts#propParts",
+      "type": "instanced-mesh"
+    },
+    {
+      "id": "prop/fence",
+      "source": "src/utils/models.ts#propParts",
+      "type": "instanced-mesh"
+    },
+    {
+      "id": "prop/lamp",
+      "source": "src/utils/models.ts#propParts",
+      "type": "instanced-mesh"
+    },
+    {
+      "id": "prop/flower",
+      "source": "src/utils/models.ts#propParts",
+      "type": "instanced-mesh"
+    },
+    {
+      "id": "texture/ground",
+      "source": "src/utils/textures.ts",
+      "type": "canvas-texture"
+    },
+    {
+      "id": "texture/rune",
+      "source": "src/utils/textures.ts",
+      "type": "canvas-texture"
+    },
+    {
+      "id": "texture/blob",
+      "source": "src/utils/textures.ts",
+      "type": "canvas-texture"
+    },
+    {
+      "id": "texture/hex",
+      "source": "src/utils/textures.ts",
+      "type": "canvas-texture"
+    },
+    {
+      "id": "texture/sky",
+      "source": "src/utils/textures.ts",
+      "type": "canvas-texture"
+    },
+    {
+      "id": "texture/prop-wood",
+      "source": "src/utils/textures.ts",
+      "type": "canvas-texture"
+    },
+    {
+      "id": "texture/prop-crate",
+      "source": "src/utils/textures.ts",
+      "type": "canvas-texture"
+    },
+    {
+      "id": "texture/prop-sandbag",
+      "source": "src/utils/textures.ts",
+      "type": "canvas-texture"
+    },
+    {
+      "id": "texture/prop-hazard",
+      "source": "src/utils/textures.ts",
+      "type": "canvas-texture"
+    },
+    {
+      "id": "texture/prop-metal",
+      "source": "src/utils/textures.ts",
+      "type": "canvas-texture"
+    },
+    {
+      "id": "texture/prop-camo",
+      "source": "src/utils/textures.ts",
+      "type": "canvas-texture"
+    },
+    {
+      "id": "texture/prop-cliff",
+      "source": "src/utils/textures.ts",
+      "type": "canvas-texture"
+    },
+    {
+      "id": "texture/prop-brick",
+      "source": "src/utils/textures.ts",
+      "type": "canvas-texture"
+    },
+    {
+      "id": "texture/prop-robe",
+      "source": "src/utils/textures.ts",
+      "type": "canvas-texture"
+    },
+    {
+      "id": "groundMaterial/grass",
+      "source": "src/utils/textures.ts#MATS",
+      "type": "palette"
+    },
+    {
+      "id": "groundMaterial/darkgrass",
+      "source": "src/utils/textures.ts#MATS",
+      "type": "palette"
+    },
+    {
+      "id": "groundMaterial/dirt",
+      "source": "src/utils/textures.ts#MATS",
+      "type": "palette"
+    },
+    {
+      "id": "groundMaterial/mud",
+      "source": "src/utils/textures.ts#MATS",
+      "type": "palette"
+    },
+    {
+      "id": "groundMaterial/asphalt",
+      "source": "src/utils/textures.ts#MATS",
+      "type": "palette"
+    },
+    {
+      "id": "groundMaterial/concrete",
+      "source": "src/utils/textures.ts#MATS",
+      "type": "palette"
+    },
+    {
+      "id": "groundMaterial/stone",
+      "source": "src/utils/textures.ts#MATS",
+      "type": "palette"
+    },
+    {
+      "id": "groundMaterial/sand",
+      "source": "src/utils/textures.ts#MATS",
+      "type": "palette"
+    },
+    {
+      "id": "groundMaterial/crystal",
+      "source": "src/utils/textures.ts#MATS",
+      "type": "palette"
+    },
+    {
+      "id": "groundMaterial/scorched",
+      "source": "src/utils/textures.ts#MATS",
+      "type": "palette"
+    },
+    {
+      "id": "groundMaterial/rift",
+      "source": "src/utils/textures.ts#MATS",
+      "type": "palette"
+    },
+    {
+      "id": "groundMaterial/paintY",
+      "source": "src/utils/textures.ts#MATS",
+      "type": "palette"
+    },
+    {
+      "id": "groundMaterial/paintW",
+      "source": "src/utils/textures.ts#MATS",
+      "type": "palette"
+    },
+    {
+      "id": "groundMaterial/hazard",
+      "source": "src/utils/textures.ts#MATS",
+      "type": "palette"
+    },
+    {
+      "id": "groundMaterial/helipad",
+      "source": "src/utils/textures.ts#MATS",
+      "type": "palette"
+    },
+    {
+      "id": "sfx/bolt",
+      "source": "src/audio/AudioEngine.ts#registerDefaultRecipes",
+      "type": "web-audio-recipe"
+    },
+    {
+      "id": "sfx/boltHit",
+      "source": "src/audio/AudioEngine.ts#registerDefaultRecipes",
+      "type": "web-audio-recipe"
+    },
+    {
+      "id": "sfx/fireCast",
+      "source": "src/audio/AudioEngine.ts#registerDefaultRecipes",
+      "type": "web-audio-recipe"
+    },
+    {
+      "id": "sfx/fireBoom",
+      "source": "src/audio/AudioEngine.ts#registerDefaultRecipes",
+      "type": "web-audio-recipe"
+    },
+    {
+      "id": "sfx/lightning",
+      "source": "src/audio/AudioEngine.ts#registerDefaultRecipes",
+      "type": "web-audio-recipe"
+    },
+    {
+      "id": "sfx/vortex",
+      "source": "src/audio/AudioEngine.ts#registerDefaultRecipes",
+      "type": "web-audio-recipe"
+    },
+    {
+      "id": "sfx/firestorm",
+      "source": "src/audio/AudioEngine.ts#registerDefaultRecipes",
+      "type": "web-audio-recipe"
+    },
+    {
+      "id": "sfx/meteorFall",
+      "source": "src/audio/AudioEngine.ts#registerDefaultRecipes",
+      "type": "web-audio-recipe"
+    },
+    {
+      "id": "sfx/meteorImpact",
+      "source": "src/audio/AudioEngine.ts#registerDefaultRecipes",
+      "type": "web-audio-recipe"
+    },
+    {
+      "id": "sfx/blink",
+      "source": "src/audio/AudioEngine.ts#registerDefaultRecipes",
+      "type": "web-audio-recipe"
+    },
+    {
+      "id": "sfx/wardUp",
+      "source": "src/audio/AudioEngine.ts#registerDefaultRecipes",
+      "type": "web-audio-recipe"
+    },
+    {
+      "id": "sfx/wardHit",
+      "source": "src/audio/AudioEngine.ts#registerDefaultRecipes",
+      "type": "web-audio-recipe"
+    },
+    {
+      "id": "sfx/wardBreak",
+      "source": "src/audio/AudioEngine.ts#registerDefaultRecipes",
+      "type": "web-audio-recipe"
+    },
+    {
+      "id": "sfx/snap",
+      "source": "src/audio/AudioEngine.ts#registerDefaultRecipes",
+      "type": "web-audio-recipe"
+    },
+    {
+      "id": "sfx/freeze",
+      "source": "src/audio/AudioEngine.ts#registerDefaultRecipes",
+      "type": "web-audio-recipe"
+    },
+    {
+      "id": "sfx/shatter",
+      "source": "src/audio/AudioEngine.ts#registerDefaultRecipes",
+      "type": "web-audio-recipe"
+    },
+    {
+      "id": "sfx/shockwave",
+      "source": "src/audio/AudioEngine.ts#registerDefaultRecipes",
+      "type": "web-audio-recipe"
+    },
+    {
+      "id": "sfx/throw",
+      "source": "src/audio/AudioEngine.ts#registerDefaultRecipes",
+      "type": "web-audio-recipe"
+    },
+    {
+      "id": "sfx/potion",
+      "source": "src/audio/AudioEngine.ts#registerDefaultRecipes",
+      "type": "web-audio-recipe"
+    },
+    {
+      "id": "sfx/pickup",
+      "source": "src/audio/AudioEngine.ts#registerDefaultRecipes",
+      "type": "web-audio-recipe"
+    },
+    {
+      "id": "sfx/channelDone",
+      "source": "src/audio/AudioEngine.ts#registerDefaultRecipes",
+      "type": "web-audio-recipe"
+    },
+    {
+      "id": "sfx/seal",
+      "source": "src/audio/AudioEngine.ts#registerDefaultRecipes",
+      "type": "web-audio-recipe"
+    },
+    {
+      "id": "sfx/turretHack",
+      "source": "src/audio/AudioEngine.ts#registerDefaultRecipes",
+      "type": "web-audio-recipe"
+    },
+    {
+      "id": "sfx/gunshot",
+      "source": "src/audio/AudioEngine.ts#registerDefaultRecipes",
+      "type": "web-audio-recipe"
+    },
+    {
+      "id": "sfx/pistol",
+      "source": "src/audio/AudioEngine.ts#registerDefaultRecipes",
+      "type": "web-audio-recipe"
+    },
+    {
+      "id": "sfx/minigunShot",
+      "source": "src/audio/AudioEngine.ts#registerDefaultRecipes",
+      "type": "web-audio-recipe"
+    },
+    {
+      "id": "sfx/spinUp",
+      "source": "src/audio/AudioEngine.ts#registerDefaultRecipes",
+      "type": "web-audio-recipe"
+    },
+    {
+      "id": "sfx/sniper",
+      "source": "src/audio/AudioEngine.ts#registerDefaultRecipes",
+      "type": "web-audio-recipe"
+    },
+    {
+      "id": "sfx/laserCharge",
+      "source": "src/audio/AudioEngine.ts#registerDefaultRecipes",
+      "type": "web-audio-recipe"
+    },
+    {
+      "id": "sfx/laserShot",
+      "source": "src/audio/AudioEngine.ts#registerDefaultRecipes",
+      "type": "web-audio-recipe"
+    },
+    {
+      "id": "sfx/ricochet",
+      "source": "src/audio/AudioEngine.ts#registerDefaultRecipes",
+      "type": "web-audio-recipe"
+    },
+    {
+      "id": "sfx/impact",
+      "source": "src/audio/AudioEngine.ts#registerDefaultRecipes",
+      "type": "web-audio-recipe"
+    },
+    {
+      "id": "sfx/coverHit",
+      "source": "src/audio/AudioEngine.ts#registerDefaultRecipes",
+      "type": "web-audio-recipe"
+    },
+    {
+      "id": "sfx/explosion",
+      "source": "src/audio/AudioEngine.ts#registerDefaultRecipes",
+      "type": "web-audio-recipe"
+    },
+    {
+      "id": "sfx/distantBoom",
+      "source": "src/audio/AudioEngine.ts#registerDefaultRecipes",
+      "type": "web-audio-recipe"
+    },
+    {
+      "id": "sfx/grenadeBeep",
+      "source": "src/audio/AudioEngine.ts#registerDefaultRecipes",
+      "type": "web-audio-recipe"
+    },
+    {
+      "id": "sfx/mortarWhistle",
+      "source": "src/audio/AudioEngine.ts#registerDefaultRecipes",
+      "type": "web-audio-recipe"
+    },
+    {
+      "id": "sfx/mortarLaunch",
+      "source": "src/audio/AudioEngine.ts#registerDefaultRecipes",
+      "type": "web-audio-recipe"
+    },
+    {
+      "id": "sfx/rocket",
+      "source": "src/audio/AudioEngine.ts#registerDefaultRecipes",
+      "type": "web-audio-recipe"
+    },
+    {
+      "id": "sfx/cannon",
+      "source": "src/audio/AudioEngine.ts#registerDefaultRecipes",
+      "type": "web-audio-recipe"
+    },
+    {
+      "id": "sfx/enemyHurt",
+      "source": "src/audio/AudioEngine.ts#registerDefaultRecipes",
+      "type": "web-audio-recipe"
+    },
+    {
+      "id": "sfx/enemyDie",
+      "source": "src/audio/AudioEngine.ts#registerDefaultRecipes",
+      "type": "web-audio-recipe"
+    },
+    {
+      "id": "sfx/metalHit",
+      "source": "src/audio/AudioEngine.ts#registerDefaultRecipes",
+      "type": "web-audio-recipe"
+    },
+    {
+      "id": "sfx/shieldHit",
+      "source": "src/audio/AudioEngine.ts#registerDefaultRecipes",
+      "type": "web-audio-recipe"
+    },
+    {
+      "id": "sfx/playerHurt",
+      "source": "src/audio/AudioEngine.ts#registerDefaultRecipes",
+      "type": "web-audio-recipe"
+    },
+    {
+      "id": "sfx/alarm",
+      "source": "src/audio/AudioEngine.ts#registerDefaultRecipes",
+      "type": "web-audio-recipe"
+    },
+    {
+      "id": "sfx/radio",
+      "source": "src/audio/AudioEngine.ts#registerDefaultRecipes",
+      "type": "web-audio-recipe"
+    },
+    {
+      "id": "sfx/dropship",
+      "source": "src/audio/AudioEngine.ts#registerDefaultRecipes",
+      "type": "web-audio-recipe"
+    },
+    {
+      "id": "sfx/c4Beep",
+      "source": "src/audio/AudioEngine.ts#registerDefaultRecipes",
+      "type": "web-audio-recipe"
+    },
+    {
+      "id": "sfx/uiHover",
+      "source": "src/audio/AudioEngine.ts#registerDefaultRecipes",
+      "type": "web-audio-recipe"
+    },
+    {
+      "id": "sfx/uiClick",
+      "source": "src/audio/AudioEngine.ts#registerDefaultRecipes",
+      "type": "web-audio-recipe"
+    },
+    {
+      "id": "sfx/uiBack",
+      "source": "src/audio/AudioEngine.ts#registerDefaultRecipes",
+      "type": "web-audio-recipe"
+    },
+    {
+      "id": "sfx/uiDeny",
+      "source": "src/audio/AudioEngine.ts#registerDefaultRecipes",
+      "type": "web-audio-recipe"
+    },
+    {
+      "id": "sfx/chime",
+      "source": "src/audio/AudioEngine.ts#registerDefaultRecipes",
+      "type": "web-audio-recipe"
+    },
+    {
+      "id": "sfx/objective",
+      "source": "src/audio/AudioEngine.ts#registerDefaultRecipes",
+      "type": "web-audio-recipe"
+    },
+    {
+      "id": "sfx/lowMana",
+      "source": "src/audio/AudioEngine.ts#registerDefaultRecipes",
+      "type": "web-audio-recipe"
+    },
+    {
+      "id": "sfx/upgrade",
+      "source": "src/audio/AudioEngine.ts#registerDefaultRecipes",
+      "type": "web-audio-recipe"
+    },
+    {
+      "id": "sfx/portalOpen",
+      "source": "src/audio/AudioEngine.ts#registerDefaultRecipes",
+      "type": "web-audio-recipe"
+    },
+    {
+      "id": "sfx/heartbeat",
+      "source": "src/audio/AudioEngine.ts#registerDefaultRecipes",
+      "type": "web-audio-recipe"
+    },
+    {
+      "id": "sfx/golemLaser",
+      "source": "src/entities/ArcaneGolem.ts#registerSounds",
+      "type": "web-audio-recipe",
+      "since": "1.1.0-beta"
+    },
+    {
+      "id": "sfx/golemAwaken",
+      "source": "src/entities/ArcaneGolem.ts#registerSounds",
+      "type": "web-audio-recipe",
+      "since": "1.1.0-beta"
+    },
+    {
+      "id": "sfx/golemDash",
+      "source": "src/entities/ArcaneGolem.ts#registerSounds",
+      "type": "web-audio-recipe",
+      "since": "1.1.0-beta"
+    },
+    {
+      "id": "sfx/aaLaunch",
+      "source": "src/entities/ArcaneGolem.ts#registerSounds",
+      "type": "web-audio-recipe",
+      "since": "1.1.0-beta"
+    },
+    {
+      "id": "sfx/lockTone",
+      "source": "src/entities/ArcaneGolem.ts#registerSounds",
+      "type": "web-audio-recipe",
+      "since": "1.1.0-beta"
+    },
+    {
+      "id": "sfx/stoneHit",
+      "source": "src/entities/ArcaneGolem.ts#registerSounds",
+      "type": "web-audio-recipe",
+      "since": "1.1.0-beta"
+    },
+    {
+      "id": "sfx/golemScrape",
+      "source": "src/entities/ArcaneGolem.ts#registerSounds",
+      "type": "web-audio-recipe",
+      "since": "1.2.0-beta"
+    },
+    {
+      "id": "sfx/golemStomp",
+      "source": "src/entities/ArcaneGolem.ts#registerSounds",
+      "type": "web-audio-recipe",
+      "since": "1.2.0-beta"
+    },
+    {
+      "id": "sfx/golemCharge",
+      "source": "src/entities/ArcaneGolem.ts#registerSounds",
+      "type": "web-audio-recipe",
+      "since": "1.2.0-beta"
+    },
+    {
+      "id": "sfx/golemOverheat",
+      "source": "src/entities/ArcaneGolem.ts#registerSounds",
+      "type": "web-audio-recipe",
+      "since": "1.2.0-beta"
+    },
+    {
+      "id": "sfx/golemHeatWarn",
+      "source": "src/entities/ArcaneGolem.ts#registerSounds",
+      "type": "web-audio-recipe",
+      "since": "1.2.0-beta"
+    },
+    {
+      "id": "loop/rain",
+      "source": "src/audio/AudioEngine.ts#LOOP_BUILDERS",
+      "type": "web-audio-loop"
+    },
+    {
+      "id": "loop/rift",
+      "source": "src/audio/AudioEngine.ts#LOOP_BUILDERS",
+      "type": "web-audio-loop"
+    },
+    {
+      "id": "loop/ward",
+      "source": "src/audio/AudioEngine.ts#LOOP_BUILDERS",
+      "type": "web-audio-loop"
+    },
+    {
+      "id": "loop/channel",
+      "source": "src/audio/AudioEngine.ts#LOOP_BUILDERS",
+      "type": "web-audio-loop"
+    },
+    {
+      "id": "loop/minigun",
+      "source": "src/audio/AudioEngine.ts#LOOP_BUILDERS",
+      "type": "web-audio-loop"
+    },
+    {
+      "id": "loop/engine",
+      "source": "src/audio/AudioEngine.ts#LOOP_BUILDERS",
+      "type": "web-audio-loop"
+    },
+    {
+      "id": "loop/rotor",
+      "source": "src/audio/AudioEngine.ts#LOOP_BUILDERS",
+      "type": "web-audio-loop"
+    },
+    {
+      "id": "loop/portal",
+      "source": "src/audio/AudioEngine.ts#LOOP_BUILDERS",
+      "type": "web-audio-loop"
+    },
+    {
+      "id": "loop/golemHum",
+      "source": "src/entities/ArcaneGolem.ts#humLoop (pitch / filter follow speed + brace via tuneEngine)",
+      "type": "web-audio-loop",
+      "since": "1.1.0-beta"
+    },
+    {
+      "id": "loop/golemBeam",
+      "source": "src/entities/ArcaneGolem.ts#beamLoop (pitch follows heat via tuneBeam)",
+      "type": "web-audio-loop",
+      "since": "1.1.0-beta"
+    },
+    {
+      "id": "music/title",
+      "source": "src/audio/Music.ts",
+      "type": "procedural-music"
+    },
+    {
+      "id": "music/explore",
+      "source": "src/audio/Music.ts",
+      "type": "procedural-music"
+    },
+    {
+      "id": "music/boss",
+      "source": "src/audio/Music.ts",
+      "type": "procedural-music"
+    },
+    {
+      "id": "music/victory",
+      "source": "src/audio/Music.ts",
+      "type": "procedural-music"
+    },
+    {
+      "id": "level/sector1",
+      "source": "levels/sector1.json",
+      "type": "level-json"
+    },
+    {
+      "id": "level/sector2",
+      "source": "levels/sector2.json",
+      "type": "level-json"
+    },
+    {
+      "id": "level/sector3",
+      "source": "levels/sector3.json",
+      "type": "level-json"
+    },
+    {
+      "id": "level/sector4",
+      "source": "levels/sector4.json",
+      "type": "level-json"
+    },
+    {
+      "id": "level/trial-targetRun",
+      "source": "src/scenes/ChallengeScene.ts#arena",
+      "type": "level-inline",
+      "since": "1.1.0-beta"
+    },
+    {
+      "id": "level/trial-barrierSurvival",
+      "source": "src/scenes/ChallengeScene.ts#arena",
+      "type": "level-inline",
+      "since": "1.1.0-beta"
+    },
+    {
+      "id": "level/trial-riftOnslaught",
+      "source": "src/scenes/ChallengeScene.ts#arena",
+      "type": "level-inline",
+      "since": "1.1.0-beta"
+    },
+    {
+      "id": "icon/arcaneBolt",
+      "source": "src/ui/icons.ts",
+      "type": "inline-svg"
+    },
+    {
+      "id": "icon/flameBurst",
+      "source": "src/ui/icons.ts",
+      "type": "inline-svg"
+    },
+    {
+      "id": "icon/inferno",
+      "source": "src/ui/icons.ts",
+      "type": "inline-svg"
+    },
+    {
+      "id": "icon/chainLightning",
+      "source": "src/ui/icons.ts",
+      "type": "inline-svg"
+    },
+    {
+      "id": "icon/vortexSurge",
+      "source": "src/ui/icons.ts",
+      "type": "inline-svg"
+    },
+    {
+      "id": "icon/meteorStrike",
+      "source": "src/ui/icons.ts",
+      "type": "inline-svg"
+    },
+    {
+      "id": "icon/blink",
+      "source": "src/ui/icons.ts",
+      "type": "inline-svg"
+    },
+    {
+      "id": "icon/ward",
+      "source": "src/ui/icons.ts",
+      "type": "inline-svg"
+    },
+    {
+      "id": "icon/hpPotion",
+      "source": "src/ui/icons.ts",
+      "type": "inline-svg"
+    },
+    {
+      "id": "icon/mpPotion",
+      "source": "src/ui/icons.ts",
+      "type": "inline-svg"
+    },
+    {
+      "id": "icon/bomb",
+      "source": "src/ui/icons.ts",
+      "type": "inline-svg"
+    },
+    {
+      "id": "icon/lock",
+      "source": "src/ui/icons.ts",
+      "type": "inline-svg"
+    },
+    {
+      "id": "icon/portrait",
+      "source": "src/ui/icons.ts",
+      "type": "inline-svg"
+    }
+  ]
+}

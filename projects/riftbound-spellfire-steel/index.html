@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0b0614">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="description" content="Riftbound: Spellfire &amp; Steel — a pseudo-isometric spell-slinger vs. modern military tactical shooter. Plays offline in the browser.">
+<title>Riftbound: Spellfire &amp; Steel</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%230b0614'/%3E%3Cpath d='M16 3 L22 16 L16 29 L10 16 Z' fill='%23b36bff'/%3E%3Ccircle cx='16' cy='16' r='4' fill='%23ffd84a'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+<div id="stage" class="ui-root">
+  <canvas id="game-canvas" aria-label="Riftbound game view"></canvas>
+  <canvas id="fx2d" aria-hidden="true"></canvas>
+  <div id="vignette" aria-hidden="true"></div>
+  <div id="hud" class="hidden" aria-live="polite"></div>
+  <div id="touch" class="hidden"></div>
+  <div id="banner-area" aria-live="assertive"></div>
+  <div id="subtitles" aria-live="polite"></div>
+  <div id="screens"></div>
+  <div id="flash" aria-hidden="true"></div>
+  <div id="dev" class="hidden ui-interactive"></div>
+  <div id="boot" class="boot">
+    <div class="boot-title">RIFTBOUND</div>
+    <div class="boot-sub">Spellfire &amp; Steel</div>
+    <div class="boot-msg" id="boot-msg">Opening the rift…</div>
+  </div>
+  <noscript><div class="boot"><div class="boot-msg">Riftbound needs JavaScript enabled.</div></div></noscript>
+</div>
+<div id="rotate-hint">Rotate your device to landscape for the best view</div>
+<script src="assets/js/riftbound.js"></script>
+</body>
+</html>

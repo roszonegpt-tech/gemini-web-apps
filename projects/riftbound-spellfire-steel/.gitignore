@@ -1,0 +1,17 @@
+# Dependencies (reinstall with `npm install`)
+node_modules/
+
+# Test / capture output
+tests/output/
+*.log
+
+# Editor / OS clutter
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+*.swp
+
+# NOTE: assets/js/riftbound.js and dist/ are committed on purpose so the game
+# stays playable on GitHub Pages / iPad / iPhone without running a build.
