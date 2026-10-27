@@ -20,6 +20,8 @@ export class Overlay2D {
   w = 1;
   h = 1;
   dpr = 1;
+  /** v1.4: HUD rectangles (stage px) that labels must not cover — set by UISystem. */
+  keepOut: { x: number; y: number; w: number; h: number }[] = [];
   hits: HitInd[] = [];
   private spin = 0;
   private pt = { x: 0, y: 0 };
@@ -202,6 +204,15 @@ export class Overlay2D {
     // keep clear of the HUD: top band (bars / slots / tracker) and bottom corners
     x = Math.max(tw / 2 + this.w * 0.17, Math.min(this.w - tw / 2 - this.w * 0.17, x));
     y = Math.max(this.h * 0.2, Math.min(this.h * 0.8, y));
+    // v1.4: step out of any HUD box (moved touch-mode objectives, gauges, buttons)
+    for (let i = 0; i < 4; i++) {
+      const bx = x - tw / 2 - 6, by = y - 11, bw = tw + 12, bh = 22;
+      const r = this.keepOut.find((k) => bx < k.x + k.w && bx + bw > k.x && by < k.y + k.h && by + bh > k.y);
+      if (!r) break;
+      const below = r.y + r.h + 14;
+      if (below < this.h * 0.85) y = below;
+      else x = r.x + r.w / 2 < this.w / 2 ? r.x + r.w + tw / 2 + 10 : r.x - tw / 2 - 10;
+    }
     c.fillStyle = 'rgba(10,6,20,0.75)';
     c.fillRect(x - tw / 2 - 6, y - 11, tw + 12, 22);
     c.strokeStyle = color;

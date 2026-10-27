@@ -21,7 +21,7 @@ import { MissionScene, type MissionHost } from './scenes/MissionScene';
 import { StoryScene } from './scenes/StoryScene';
 import { TitleScene } from './scenes/TitleScene';
 import { emptyStats, type World } from './scenes/World';
-import { DevTools, downloadText, pickFile, type DevHost } from './systems/DevTools';
+import { DevTools, pickFile, type DevHost } from './systems/DevTools';
 import { UISystem, type UiGame } from './systems/UISystem';
 import { VERSION } from './config/version';
 
@@ -284,7 +284,7 @@ export class Game implements UiGame, MissionHost, DevHost {
         this.toggleFullscreen();
         break;
       case 'exportPlaytest':
-        downloadText(`riftbound-playtest-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify({ game: 'riftbound', version: VERSION, runs: save.stats.playtest || [] }, null, 1));
+        this.ui.openExport('Playtest Records', `riftbound-playtest-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify({ game: 'riftbound', version: VERSION, runs: save.stats.playtest || [] }, null, 1));
         break;
       case 'resetSave': {
         this.services.save = resetSave(this.services.settings);
@@ -448,10 +448,10 @@ export class Game implements UiGame, MissionHost, DevHost {
         this.screenshot();
         break;
       case 'exportStats':
-        if (w) downloadText(`riftbound-stats-${w.level.id}-${Date.now()}.json`, JSON.stringify({ version: VERSION, level: w.level.id, zone: w.activeZone, stats: w.stats, fps: this.services.engine.fps }, null, 2));
+        if (w) this.ui.openExport('Mission Stats', `riftbound-stats-${w.level.id}-${Date.now()}.json`, JSON.stringify({ version: VERSION, level: w.level.id, zone: w.activeZone, stats: w.stats, fps: this.services.engine.fps }, null, 2));
         break;
       case 'exportSave':
-        downloadText(`riftbound-save-${Date.now()}.json`, JSON.stringify(this.services.save, null, 2));
+        this.ui.openExport('Save Data', `riftbound-save-${Date.now()}.json`, JSON.stringify(this.services.save, null, 2));
         break;
       case 'importSave':
         pickFile('application/json,.json', (text) => {

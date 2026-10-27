@@ -17,6 +17,7 @@ import {
   sanctumScreen, settingsScreen, titleScreen, type ResultsData, type ScreenHost,
 } from '../ui/Screens';
 import { TouchControls, type TouchContext } from '../ui/TouchControls';
+import { downloadText } from './DevTools';
 import { escapeHtml } from '../ui/Hud';
 
 export interface UiGame {
@@ -26,6 +27,17 @@ export interface UiGame {
   currentWorld(): World | null;
   /** v1.3: touch-control rules of the running Challenge Trial (null outside trials). */
   trialTouchRules?(): { hide: Action[]; aim: Action | null } | null;
+}
+
+/** v1.4: phones / small tablets held upright get the portrait layout. */
+export const PORTRAIT_QUERY = '(orientation: portrait) and (max-width: 900px)';
+
+/** v1.4: data for the export panel (copyable text + download). */
+export interface ExportData {
+  title: string;
+  file: string;
+  text: string;
+  back: { screen: string | null; data: unknown };
 }
 
 /** v1.3: short SPELL-button labels for the secondary spells. */
@@ -58,6 +70,15 @@ export class UISystem implements ScreenHost {
   private lastBanner = '';
   private lastBannerT = 0;
   private heartbeatT = 0;
+  // v1.4 portrait layout: the 16:9 view sits at the top, status + controls fill the space below
+  portrait = false;
+  private portraitMq: MediaQueryList;
+  private portraitPad: HTMLElement;
+  private ppTop: HTMLElement;
+  private ppControls: HTMLElement;
+  private hudTl: HTMLElement;
+  private hudTc: HTMLElement;
+  private keepOutT = 0;
   private golemHud: HTMLElement;
   private golemArmor: HTMLElement;
   private golemHeat: HTMLElement;
@@ -104,6 +125,24 @@ export class UISystem implements ScreenHost {
       }
     });
     window.addEventListener('keydown', (e) => this.onKey(e));
+    // v1.4: portrait pad (status strip + controls) and the export panel
+    this.hudTl = this.hudEl.querySelector('.hud-tl') as HTMLElement;
+    this.hudTc = this.hudEl.querySelector('.hud-tc') as HTMLElement;
+    this.portraitPad = document.createElement('div');
+    this.portraitPad.id = 'portrait-pad';
+    this.portraitPad.className = 'hidden';
+    this.ppTop = document.createElement('div');
+    this.ppTop.className = 'pp-top hidden';
+    this.ppControls = document.createElement('div');
+    this.ppControls.className = 'pp-controls';
+    this.portraitPad.append(this.ppTop, this.ppControls);
+    document.body.appendChild(this.portraitPad);
+    this.portraitMq = window.matchMedia(PORTRAIT_QUERY);
+    const onChange = () => this.applyPortrait();
+    if (this.portraitMq.addEventListener) this.portraitMq.addEventListener('change', onChange);
+    else this.portraitMq.addListener(onChange);
+    this.applyPortrait();
+    this.extraScreens.set('export', (ui, data) => ui.exportScreen(data as ExportData));
   }
 
   // ------------------------------------------------------------ ScreenHost
@@ -226,6 +265,7 @@ export class UISystem implements ScreenHost {
 
   showHud(on: boolean): void {
     this.hudEl.classList.toggle('hidden', !on);
+    this.ppTop.classList.toggle('hidden', !on);
     if (!on) {
       this.overlay.clear();
       this.vignetteEl.className = '';
@@ -318,6 +358,7 @@ export class UISystem implements ScreenHost {
     this.updateTouchVisibility(gameplay && !!w);
     if (!w) return;
     if (this.touch.visible) this.touch.setContext(this.touchContext(w));
+    if (gameplay) this.updateKeepOut(dt);
     if (!gameplay) {
       this.overlay.clear();
       return;
@@ -443,6 +484,102 @@ export class UISystem implements ScreenHost {
   resize(): void {
     const eng = this.game.services.engine;
     this.overlay.resize(eng.width, eng.height);
+    this.applyPortrait();
+  }
+
+  /**
+   * v1.4 portrait phones: the engine keeps its 16:9 view, so it is pinned to the top of the screen and the
+   * space below becomes a handheld-style pad — status bars, objectives and subtitles in a strip, then the
+   * sticks and buttons. Menus move out of the small view and fill the screen. Landscape is unchanged.
+   */
+  applyPortrait(): void {
+    const on = this.portraitMq.matches;
+    if (on === this.portrait && this.portraitPad.parentElement) return;
+    this.portrait = on;
+    document.body.classList.toggle('portrait-mode', on);
+    this.portraitPad.classList.toggle('hidden', !on);
+    const put = (el: HTMLElement, parent: HTMLElement) => { if (el.parentElement !== parent) parent.appendChild(el); };
+    if (on) {
+      put(this.hudTl, this.ppTop);
+      put(this.hudTc, this.ppTop);
+      put(this.subsEl, this.ppTop);
+      put(this.touch.root, this.ppControls);
+      put(this.screensEl, document.body);
+    } else {
+      put(this.hudTl, this.hudEl);
+      put(this.hudTc, this.hudEl);
+      put(this.subsEl, this.stage);
+      put(this.touch.root, this.stage);
+      put(this.screensEl, this.stage);
+    }
+  }
+
+  /** v1.4: opens the export panel (selectable text, Copy, Download) and returns to the current screen. */
+  openExport(title: string, file: string, text: string): void {
+    this.go('export', { title, file, text, back: { screen: this.current, data: this.currentData } } as ExportData);
+  }
+
+  exportScreen(d: ExportData): HTMLElement {
+    const root = document.createElement('div');
+    root.className = 'screen cosmic';
+    root.dataset.back = 'x';
+    root.innerHTML = `<div class="panel export-panel">
+        <h2>${escapeHtml(d.title)}</h2>
+        <p>Copy the text below or download it as a file. Embedded viewers (such as the claude.ai artifact) block downloads — use Copy there.</p>
+        <textarea id="export-text" class="export-text" readonly rows="9" spellcheck="false"></textarea>
+        <p class="export-status" aria-live="polite"></p>
+        <div class="btn-row">
+          <button class="btn primary" data-act="copy" data-autofocus>Copy</button>
+          <button class="btn" data-act="download">Download ${escapeHtml(d.file.replace(/^.*\./, '.'))}</button>
+          <button class="btn" data-act="back">Back</button>
+        </div>
+      </div>`;
+    const ta = root.querySelector('textarea') as HTMLTextAreaElement;
+    ta.value = d.text;
+    const status = root.querySelector('.export-status') as HTMLElement;
+    const act = (name: string, fn: () => void) => (root.querySelector(`[data-act="${name}"]`) as HTMLElement).addEventListener('click', () => { this.playUi('uiClick'); fn(); });
+    const selectAll = () => { ta.focus(); ta.select(); };
+    act('copy', () => {
+      const fallback = () => {
+        selectAll();
+        let ok = false;
+        try { ok = document.execCommand('copy'); } catch { ok = false; }
+        status.textContent = ok ? 'Copied.' : 'Copy is blocked here — the text is selected, copy it manually.';
+      };
+      try {
+        navigator.clipboard.writeText(d.text).then(() => { status.textContent = 'Copied to the clipboard.'; }, fallback);
+      } catch {
+        fallback();
+      }
+    });
+    act('download', () => {
+      downloadText(d.file, d.text);
+      status.textContent = `Saving ${d.file}… if nothing appears, use Copy.`;
+    });
+    act('back', () => {
+      if (d.back.screen && d.back.screen !== 'export') this.go(d.back.screen, d.back.data);
+      else this.hideScreens();
+    });
+    return root;
+  }
+
+  /** v1.4: HUD boxes the overlay's objective labels must avoid (stage coordinates). */
+  private updateKeepOut(dt: number): void {
+    this.keepOutT -= dt;
+    if (this.keepOutT > 0) return;
+    this.keepOutT = 0.25;
+    const sr = this.stage.getBoundingClientRect();
+    const out: { x: number; y: number; w: number; h: number }[] = [];
+    const sel = ['.objectives', '.hud-tl', '.hud-tr', '.hud-bl', '.golem-hud', '.boss-bar', '#touch .tbtn'];
+    for (const q of sel) {
+      this.stage.querySelectorAll<HTMLElement>(q).forEach((el) => {
+        if (!el.offsetParent) return;
+        const r = el.getBoundingClientRect();
+        if (r.width < 1 || r.height < 1) return;
+        out.push({ x: r.left - sr.left, y: r.top - sr.top, w: r.width, h: r.height });
+      });
+    }
+    this.overlay.keepOut = out;
   }
 
   /** Brief "screenshot saved" style toast. */

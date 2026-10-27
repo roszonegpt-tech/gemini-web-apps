@@ -446,3 +446,46 @@ html, body {
   .sector-grid { grid-template-columns: repeat(2, 1fr); }
   .briefing { grid-template-columns: 1fr; }
 }
+
+/* ------------------------------------------------------------------ v1.4 portrait phones
+   The engine keeps its 16:9 view; in portrait it is pinned to the top and the space below becomes a
+   handheld-style pad: status strip (bars, objectives, subtitles), then sticks and buttons.
+   Menus leave the small view and fill the screen. (UISystem.applyPortrait moves the elements.) */
+#portrait-pad {
+  position: fixed; left: 0; right: 0; bottom: 0; top: calc(56.25vw + env(safe-area-inset-top, 0px));
+  display: flex; flex-direction: column; z-index: 5;
+  background: radial-gradient(ellipse at 50% 0%, #1c0f36 0%, var(--bg) 70%);
+  font: 15px/1.35 var(--font); color: var(--text);
+  border-top: 1px solid var(--line-soft);
+}
+#portrait-pad.hidden { display: none; }
+body.portrait-mode #stage { top: env(safe-area-inset-top, 0px) !important; }
+body.portrait-mode #rotate-hint { display: none !important; }
+.pp-top {
+  display: flex; flex-wrap: wrap; align-items: flex-start; gap: 0.5em 0.8em;
+  padding: 0.6em max(0.8em, env(safe-area-inset-right, 0px)) 0 max(0.8em, env(safe-area-inset-left, 0px));
+}
+.pp-top .hud-tl, .pp-top .hud-tc { position: static; transform: none; width: auto; max-width: none; text-align: left; }
+.pp-top .hud-tl .bars { width: 10.5em; }
+.pp-top .hud-tl .portrait { width: 3em; height: 3em; }
+.pp-top .hud-tc { flex: 1 1 11em; min-width: 0; }
+.pp-top .objectives { font-size: 0.8em; display: block; }
+.pp-top #subtitles { position: static; flex: 1 1 100%; font-size: 0.85em; }
+.pp-controls { position: relative; flex: 1; min-height: 0; }
+.pp-controls #touch { position: absolute; inset: 0; }
+body.portrait-mode .stick-zone { height: 100%; }
+body.portrait-mode #screens { position: fixed; inset: 0; z-index: 30; font-size: 16px; }
+body.portrait-mode #hud { font-size: 0.7em; } /* what stays in the small view: slots, minimap, gauges, prompt */
+body.portrait-mode #banner-area { font-size: 0.65em; }
+body.portrait-mode .title-logo .t1 { font-size: 2.3em; letter-spacing: 0.14em; }
+body.portrait-mode .title-logo .t2 { font-size: 0.9em; letter-spacing: 0.3em; }
+body.portrait-mode .screen.title { justify-content: flex-end; padding-bottom: 6vh; }
+
+/* v1.4 export panel */
+.export-panel { width: 38em; }
+.export-text {
+  width: 100%; box-sizing: border-box; font: 0.75em/1.4 monospace; color: var(--text);
+  background: rgba(6, 3, 12, 0.85); border: 1px solid var(--line); border-radius: 0.3em; padding: 0.6em;
+  resize: vertical; user-select: text; -webkit-user-select: text;
+}
+.export-status { min-height: 1.3em; font-size: 0.85em; }
