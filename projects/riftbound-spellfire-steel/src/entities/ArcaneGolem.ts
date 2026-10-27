@@ -39,13 +39,38 @@ export const GOLEM = {
   dashCd: 2.2,
   dashSpeed: 22,
   respawn: 8,
+  // v1.2 collision response
+  restitution: 0.35, // share of the normal speed kept after a bounce
+  scrapeFriction: 0.85, // tangential speed kept on contact
+  impactFx: 3.5, // normal speed (m/s) above which an impact shakes the camera + throws stone chips
+  impactDamage: 12, // normal speed above which the golem chips itself (only dashes get there)
+  impactDamagePerMs: 2.2,
+  chargeTime: 0.15, // beam charge-up before it fires
 };
 
-/** Flight bounds for Sector 2: the flooded strip (z ≥ 62) plus the zone-B ground area. */
+/**
+ * Flight corridor for Sector 2 as a union of rectangles [x0, z0, x1, z1] that bound the golem's
+ * centre: the flooded strip (z ≥ 62) plus the zone-B ground area.
+ */
+const CORRIDOR: [number, number, number, number][] = [
+  [3, 62, 86.5, 79],
+  [45.5, 2, 86.5, 62],
+];
+
 function allowed(x: number, z: number): boolean {
-  if (x < 3 || x > 86.5 || z > 79 || z < 2) return false;
-  if (z >= 62) return true;
-  return x >= 45.5;
+  for (const [x0, z0, x1, z1] of CORRIDOR) if (x >= x0 && x <= x1 && z >= z0 && z <= z1) return true;
+  return false;
+}
+
+/** Nearest point of the corridor to (x, z) (the point itself when inside). */
+function clampToCorridor(x: number, z: number, out: { x: number; z: number }): { x: number; z: number } {
+  let best = Infinity;
+  for (const [x0, z0, x1, z1] of CORRIDOR) {
+    const cx = clamp(x, x0, x1), cz = clamp(z, z0, z1);
+    const d = (cx - x) * (cx - x) + (cz - z) * (cz - z);
+    if (d < best) { best = d; out.x = cx; out.z = cz; }
+  }
+  return out;
 }
 
 // ------------------------------------------------------------------ sounds (registered once)
@@ -65,30 +90,71 @@ function registerSounds(w: World): void {
     [196, 294, 392].forEach((f, i) => e.tone(o, { type: 'triangle', f0: f, dur: 1.5, vol: 0.1, delay: 0.3 + i * 0.08 }));
   });
   a.registerRecipe('golemDash', (e, o) => {
-    e.noise(o, { dur: 0.35, vol: 0.3, filter: 'bandpass', f0: 300, f1: 1400, q: 1.5 });
+    e.noise(o, { dur: 0.35, vol: 0.34, filter: 'bandpass', f0: 500, f1: 2200, q: 1.3 });
     e.tone(o, { type: 'sine', f0: 90, f1: 40, dur: 0.3, vol: 0.3 });
   });
   a.registerRecipe('aaLaunch', (e, o) => {
-    e.noise(o, { dur: 0.6, vol: 0.3, filter: 'bandpass', f0: 900, f1: 2200, q: 1.2 });
-    e.tone(o, { type: 'square', f0: 900, f1: 1300, dur: 0.15, vol: 0.06 });
+    e.noise(o, { dur: 0.6, vol: 0.45, filter: 'bandpass', f0: 900, f1: 2200, q: 1.2 });
+    e.tone(o, { type: 'square', f0: 900, f1: 1300, dur: 0.15, vol: 0.1 });
   });
-  a.registerRecipe('lockTone', (e, o) => e.tone(o, { type: 'square', f0: 1500, dur: 0.06, vol: 0.05 }));
+  // missile lock warning: must cut through the engine rumble and the beam (v1.2: longer + louder)
+  a.registerRecipe('lockTone', (e, o) => {
+    e.tone(o, { type: 'square', f0: 1500, dur: 0.11, vol: 0.22 });
+    e.tone(o, { type: 'triangle', f0: 3000, dur: 0.08, vol: 0.08 });
+  });
   a.registerRecipe('stoneHit', (e, o) => {
     e.noise(o, { dur: 0.12, vol: 0.25, filter: 'lowpass', f0: 800, f1: 200, q: 0.8 });
     e.tone(o, { type: 'sine', f0: 140, f1: 70, dur: 0.12, vol: 0.2 });
+    e.noise(o, { dur: 0.05, vol: 0.16, filter: 'bandpass', f0: 1600, q: 1.5 }); // phone-speaker click
   });
+  // v1.2
+  a.registerRecipe('golemScrape', (e, o, p) => {
+    e.noise(o, { dur: 0.4, vol: 0.32, filter: 'bandpass', f0: 1100 * p, f1: 260, q: 1.4 });
+    e.tone(o, { type: 'sine', f0: 95 * p, f1: 38, dur: 0.28, vol: 0.38 });
+    e.noise(o, { dur: 0.07, vol: 0.14, filter: 'highpass', f0: 2200, q: 0.6 });
+    for (let i = 0; i < 3; i++) e.noise(o, { dur: 0.04, vol: 0.08, filter: 'bandpass', f0: 1800 + i * 500, q: 3, delay: 0.06 + i * 0.05 });
+  });
+  a.registerRecipe('golemStomp', (e, o, p) => {
+    e.tone(o, { type: 'sine', f0: 72 * p, f1: 34, dur: 0.32, vol: 0.5 });
+    e.noise(o, { dur: 0.36, vol: 0.3, filter: 'lowpass', f0: 520, f1: 80, q: 0.8 });
+    e.noise(o, { dur: 0.16, vol: 0.2, filter: 'bandpass', f0: 750, f1: 300, q: 1.1 }); // stone crunch
+    e.noise(o, { dur: 0.06, vol: 0.22, filter: 'bandpass', f0: 1300, q: 1.2 });
+  });
+  a.registerRecipe('golemCharge', (e, o) => {
+    e.tone(o, { type: 'sawtooth', f0: 140, f1: 520, dur: GOLEM.chargeTime + 0.06, vol: 0.14, attack: 0.04 });
+    e.tone(o, { type: 'sine', f0: 600, f1: 1500, dur: GOLEM.chargeTime + 0.04, vol: 0.12, attack: 0.03 });
+  });
+  a.registerRecipe('golemOverheat', (e, o) => {
+    e.noise(o, { dur: 1.7, vol: 0.18, filter: 'highpass', f0: 3200, q: 0.5, attack: 0.02 });
+    e.noise(o, { dur: 1.1, vol: 0.14, filter: 'bandpass', f0: 1400, f1: 500, q: 0.8 });
+    e.tone(o, { type: 'square', f0: 240, f1: 120, dur: 0.22, vol: 0.06 });
+  });
+  a.registerRecipe('golemHeatWarn', (e, o) => e.tone(o, { type: 'square', f0: 2000, dur: 0.06, vol: 0.2 }));
 }
 
+// Loop nodes are kept so their pitch / filter can follow the golem every frame. AudioEngine owns
+// the loops (one per name); the builders refresh these handles whenever it (re)builds them.
+let engineNodes: { saw: OscillatorNode; sub: OscillatorNode; lp: BiquadFilterNode; grind: GainNode; grindF: BiquadFilterNode } | null = null;
+let beamNodes: { o: OscillatorNode; o2: OscillatorNode; bp: BiquadFilterNode } | null = null;
+
+/** Engine rumble (loop/golemHum): sawtooth + sub through a lowpass, plus a stone/air grind band. */
 const humLoop = (a: World['audio'], out: GainNode): AudioScheduledSourceNode[] => {
   const ctx = a.ctx as AudioContext;
-  const o = ctx.createOscillator(); o.type = 'sawtooth'; o.frequency.value = 48;
-  const o2 = ctx.createOscillator(); o2.type = 'sine'; o2.frequency.value = 96;
-  const f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 220;
-  const g = ctx.createGain(); g.gain.value = 0.5;
-  o.connect(f); o2.connect(f); f.connect(g); g.connect(out); o.start(); o2.start();
-  return [o, o2];
+  const saw = ctx.createOscillator(); saw.type = 'sawtooth'; saw.frequency.value = 46;
+  const sub = ctx.createOscillator(); sub.type = 'sine'; sub.frequency.value = 92;
+  const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 240; lp.Q.value = 2.5;
+  const g = ctx.createGain(); g.gain.value = 0.2;
+  saw.connect(lp); sub.connect(lp); lp.connect(g); g.connect(out);
+  const n = a.noiseSource() as AudioBufferSourceNode;
+  const grindF = ctx.createBiquadFilter(); grindF.type = 'bandpass'; grindF.frequency.value = 420; grindF.Q.value = 1.1;
+  const grind = ctx.createGain(); grind.gain.value = 0.07;
+  n.connect(grindF); grindF.connect(grind); grind.connect(out);
+  saw.start(); sub.start(); n.start();
+  engineNodes = { saw, sub, lp, grind, grindF };
+  return [saw, sub, n];
 };
 
+/** Chest-beam loop (loop/golemBeam): detuned saw/square through a bandpass; pitch rises with heat. */
 const beamLoop = (a: World['audio'], out: GainNode): AudioScheduledSourceNode[] => {
   const ctx = a.ctx as AudioContext;
   const o = ctx.createOscillator(); o.type = 'sawtooth'; o.frequency.value = 330;
@@ -96,11 +162,34 @@ const beamLoop = (a: World['audio'], out: GainNode): AudioScheduledSourceNode[] 
   const lfo = ctx.createOscillator(); lfo.frequency.value = 18;
   const lg = ctx.createGain(); lg.gain.value = 40;
   lfo.connect(lg); lg.connect(o.frequency);
-  const f = ctx.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = 1200; f.Q.value = 2;
-  const g = ctx.createGain(); g.gain.value = 0.18;
-  o.connect(f); o2.connect(f); f.connect(g); g.connect(out); o.start(); o2.start(); lfo.start();
+  const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 1200; bp.Q.value = 2;
+  const g = ctx.createGain(); g.gain.value = 0.75;
+  o.connect(bp); o2.connect(bp); bp.connect(g); g.connect(out); o.start(); o2.start(); lfo.start();
+  beamNodes = { o, o2, bp };
   return [o, o2, lfo];
 };
+
+/** Engine pitch / filter / grind follow speed (0–1, >1 while dashing) and Stone Brace. */
+function tuneEngine(a: World['audio'], speed: number, brace: boolean): void {
+  if (!engineNodes || !a.ctx) return;
+  const t = a.ctx.currentTime;
+  const s = clamp(speed, 0, 1.6);
+  const f = 44 + 24 * s - (brace ? 9 : 0);
+  engineNodes.saw.frequency.setTargetAtTime(f, t, 0.12);
+  engineNodes.sub.frequency.setTargetAtTime(f * 2, t, 0.12);
+  engineNodes.lp.frequency.setTargetAtTime((brace ? 170 : 230) + 820 * s, t, 0.1);
+  engineNodes.grind.gain.setTargetAtTime(0.07 + 0.22 * s + (brace ? 0.09 : 0), t, 0.15);
+  engineNodes.grindF.frequency.setTargetAtTime((brace ? 300 : 380) + 900 * s, t, 0.15);
+}
+
+function tuneBeam(a: World['audio'], heat: number): void {
+  if (!beamNodes || !a.ctx) return;
+  const t = a.ctx.currentTime;
+  const f = 300 + heat * 240;
+  beamNodes.o.frequency.setTargetAtTime(f, t, 0.08);
+  beamNodes.o2.frequency.setTargetAtTime(f * 1.005, t, 0.08);
+  beamNodes.bp.frequency.setTargetAtTime(1100 + heat * 900, t, 0.08);
+}
 
 // ------------------------------------------------------------------ the golem
 
@@ -119,10 +208,18 @@ export class ArcaneGolem extends Actor {
   bracing = false;
   animT = 0;
   hurtT = 0;
+  chargeT = 0;
+  /** True while descending onto the ground after a dismount / re-forming (stomps on touchdown). */
+  landing = false;
+  /** Count of hard impacts and the last impact's normal speed (read by tests / dev tools). */
+  impacts = 0;
+  lastImpact = 0;
   readonly beamMat: THREE.MeshBasicMaterial;
   private beam: THREE.Mesh;
   private rings: THREE.Object3D[] = [];
   private flyOut = { x: 0, z: 0 };
+  private impactCd = 0;
+  private heatWarnT = 0;
 
   constructor(world: World, x: number, z: number) {
     super(world, 'mage');
@@ -205,8 +302,10 @@ export class ArcaneGolem extends Actor {
     if (!p) return;
     this.rider = null;
     this.parked = true;
+    this.landing = true;
     this.targetable = false;
     this.firing = false;
+    this.chargeT = 0;
     this.beam.visible = false;
     p.mounted = false;
     p.targetable = true;
@@ -244,6 +343,7 @@ export class ArcaneGolem extends Actor {
     if (!this.rider) {
       // dormant statue on its shrine
       this.y = damp(this.y, 0.25, 3, dt);
+      if (this.landing && this.y < 0.6) this.touchDown();
       m.core.emissiveIntensity = 0.5 + Math.sin(this.animT * 2) * 0.3;
       for (const r of this.rings) r.visible = false;
       this.syncRoot();
@@ -279,19 +379,10 @@ export class ArcaneGolem extends Actor {
     const sp = Math.hypot(this.vx, this.vz);
     const maxSp = this.dashT > 0 ? GOLEM.dashSpeed : GOLEM.maxSpeed * (this.bracing ? GOLEM.braceMul + 0.2 : 1);
     if (sp > maxSp) { this.vx *= maxSp / sp; this.vz *= maxSp / sp; }
-    // move with collision against tall geometry (FLY), then keep inside the flight bounds
-    const nx = this.x + this.vx * dt, nz = this.z + this.vz * dt;
-    w.phys.resolveCircle(nx, nz, this.radius, CF.FLY, this.flyOut);
-    let fx = this.flyOut.x, fz = this.flyOut.z;
-    if (!allowed(fx, fz)) {
-      // bounce off the edge of the flight corridor
-      if (allowed(fx, this.z)) { fz = this.z; this.vz *= -0.4; }
-      else if (allowed(this.x, fz)) { fx = this.x; this.vx *= -0.4; }
-      else { fx = this.x; fz = this.z; this.vx *= -0.4; this.vz *= -0.4; }
-    }
-    this.x = fx;
-    this.z = fz;
+    // swept move against tall geometry (FLY) and the flight corridor; knockback joins the velocity
     this.applyKnock(dt);
+    if (this.impactCd > 0) this.impactCd -= dt;
+    this.moveSwept(dt);
     // facing follows the aim
     const aimX = w.aimX, aimZ = w.aimZ;
     this.facing = turnToward(this.facing, heading(aimX - this.x, aimZ - this.z), dt * 5);
@@ -307,18 +398,38 @@ export class ArcaneGolem extends Actor {
       this.overheat -= dt;
       this.heat = Math.max(0, this.heat - GOLEM.coolRate * dt);
     }
-    this.firing = inp.isDown('fire1') && this.overheat <= 0 && !w.cinematicLock;
+    // short charge-up before the beam fires (audible + visible telegraph)
+    const wantFire = inp.isDown('fire1') && this.overheat <= 0 && !w.cinematicLock;
+    if (wantFire) {
+      if (this.chargeT === 0) w.audio.play('golemCharge', { x: this.x, z: this.z, throttle: 0.1 });
+      this.chargeT += dt;
+    } else {
+      this.chargeT = 0;
+    }
+    const wasFiring = this.firing;
+    this.firing = wantFire && this.chargeT >= GOLEM.chargeTime;
+    if (this.firing && !wasFiring) w.audio.play('golemLaser', { x: this.x, z: this.z, throttle: 0.1 }); // ignition crack
     if (this.firing) {
       this.heat += GOLEM.heatRate * dt;
+      if (this.heat > 0.8) {
+        this.heatWarnT -= dt;
+        if (this.heatWarnT <= 0) { this.heatWarnT = 0.32 - (this.heat - 0.8) * 0.9; w.audio.play('golemHeatWarn', { throttle: 0.1 }); }
+      }
       if (this.heat >= 1) {
         this.heat = 1;
         this.overheat = GOLEM.overheatLock;
         this.firing = false;
+        this.chargeT = 0;
         w.floatText(this.x, this.y + 3, this.z, 'BEAM OVERHEATED', '#ffb04a');
-        w.audio.play('uiDeny');
+        w.audio.play('golemOverheat', { x: this.x, z: this.z });
+        w.particles.smoke(this.x + Math.sin(this.facing), this.y + 2, this.z + Math.cos(this.facing), 10, 0xd8d4d0, 0.8);
       }
     } else if (this.overheat <= 0) {
       this.heat = Math.max(0, this.heat - GOLEM.coolRate * dt);
+    }
+    if (this.overheat > 0 && Math.random() < dt * 14) {
+      // venting steam while locked
+      w.particles.emit({ x: this.x + rand(-0.5, 0.5), y: this.y + 2.2, z: this.z + rand(-0.5, 0.5), count: 1, color: [0xe8e4e0, 0xffb04a], speed: [1, 2.5], life: [0.4, 0.8], size: [0.2, 0.35], dir: [0, 1, 0], spread: 0.5, additive: false, alpha: 0.5 });
     }
     this.updateBeam(dt, aimX, aimZ);
     // ---- Stone Volley (secondary)
@@ -339,14 +450,109 @@ export class ArcaneGolem extends Actor {
     m.body.rotation.x = lean * 0.25;
     m.armL.rotation.x = damp(m.armL.rotation.x, this.firing ? -1.2 : this.bracing ? -2.2 : -0.3, 10, dt);
     m.armR.rotation.x = damp(m.armR.rotation.x, this.firing ? -1.2 : this.bracing ? -2.2 : -0.3, 10, dt);
-    m.core.emissiveIntensity = this.firing ? 3 : 1.2 + this.heat;
+    const charging = !this.firing && this.chargeT > 0;
+    m.core.emissiveIntensity = this.firing ? 3 : 1.2 + this.heat + (charging ? 1.6 : 0);
     m.core.emissive.setHex(this.overheat > 0 ? 0xff5a2a : this.heat > 0.7 ? 0xffb04a : 0x4fc8ff);
+    if (charging && Math.random() < dt * 40) {
+      const a = rand(0, Math.PI * 2);
+      const cx = this.x + Math.sin(this.facing) * 1.1, cz = this.z + Math.cos(this.facing) * 1.1;
+      w.particles.emit({ x: cx + Math.sin(a) * 1.2, y: this.y + 2, z: cz + Math.cos(a) * 1.2, count: 1, color: [0x9cf6ff, 0xffffff], speed: [3, 4], life: [0.1, 0.18], size: [0.12, 0.22], dir: [-Math.sin(a), 0, -Math.cos(a)], spread: 0.1 });
+    }
     for (let i = 0; i < this.rings.length; i++) this.rings[i].rotation.z += dt * (i ? -3 : 4);
     if (Math.random() < dt * 30) w.particles.emit({ x: this.x + rand(-0.8, 0.8), y: this.y - 0.3, z: this.z + rand(-0.8, 0.8), count: 1, color: [0x7fd8ff, 0xffffff], speed: [1, 3], life: [0.2, 0.5], size: [0.15, 0.3], dir: [0, -1, 0], spread: 0.3 });
-    w.lights.request(this.x, this.y + 1.5, this.z, 0x7fd8ff, this.firing ? 14 : 5, 9);
-    w.audio.loopVolume('golemHum', 0.35, humLoop);
-    w.audio.loopVolume('golemBeam', this.firing ? 0.4 : 0, beamLoop);
+    w.lights.request(this.x, this.y + 1.5, this.z, 0x7fd8ff, this.firing ? 14 : charging ? 9 : 5, 9);
+    const speed = Math.hypot(this.vx, this.vz) / GOLEM.maxSpeed;
+    w.audio.loopVolume('golemHum', 0.22 + clamp(speed, 0, 1.5) * 0.08 + (this.bracing ? 0.05 : 0), humLoop);
+    tuneEngine(w.audio, speed, this.bracing);
+    w.audio.loopVolume('golemBeam', this.firing ? 0.38 : 0, beamLoop);
+    if (this.firing) tuneBeam(w.audio, this.heat);
     this.syncRoot();
+  }
+
+  /** Converts knockback (explosions, barrier shocks) into flight velocity, so it is swept too. */
+  override applyKnock(_dt: number): void {
+    if (Math.abs(this.knockX) + Math.abs(this.knockZ) < 0.01) return;
+    this.vx += this.knockX * 1.2;
+    this.vz += this.knockZ * 1.2;
+    this.knockX = this.knockZ = 0;
+  }
+
+  private valid(x: number, z: number): boolean {
+    return allowed(x, z) && this.world.phys.circleFree(x, z, this.radius - 0.02, CF.FLY);
+  }
+
+  /**
+   * Swept circle movement: the step is split so no sub-step is longer than a quarter of the golem's
+   * radius (≤ 0.35 m at dash speed), each sub-step is pushed out of FLY colliders and then clamped into
+   * the corridor, and the velocity is reflected about the contact normal with damping. The golem's
+   * previous position is always valid, so it can never end a frame inside geometry or outside the corridor.
+   */
+  private moveSwept(dt: number): void {
+    const w = this.world;
+    const len = Math.hypot(this.vx, this.vz) * dt;
+    const steps = Math.min(16, Math.max(1, Math.ceil(len / (this.radius * 0.25))));
+    const h = dt / steps;
+    const o = this.flyOut;
+    let impact = 0, inx = 0, inz = 0;
+    for (let i = 0; i < steps; i++) {
+      const px = this.x + this.vx * h, pz = this.z + this.vz * h;
+      w.phys.resolveCircle(px, pz, this.radius, CF.FLY, o);
+      clampToCorridor(o.x, o.z, o);
+      // the corridor clamp may push back into a spire / gate: resolve once more
+      w.phys.resolveCircle(o.x, o.z, this.radius, CF.FLY, o);
+      let nx = o.x, nz = o.z;
+      if (!this.valid(nx, nz) && this.valid(this.x, this.z)) { nx = this.x; nz = this.z; }
+      // contact normal = direction the constraints pushed us
+      let cx = nx - px, cz = nz - pz;
+      const cl = Math.hypot(cx, cz);
+      if (cl > 1e-5) {
+        cx /= cl; cz /= cl;
+        const vn = this.vx * cx + this.vz * cz;
+        if (vn < 0) {
+          const tx = this.vx - vn * cx, tz = this.vz - vn * cz;
+          this.vx = tx * GOLEM.scrapeFriction - vn * GOLEM.restitution * cx;
+          this.vz = tz * GOLEM.scrapeFriction - vn * GOLEM.restitution * cz;
+          if (-vn > impact) { impact = -vn; inx = cx; inz = cz; }
+        }
+      }
+      this.x = nx;
+      this.z = nz;
+    }
+    if (impact > GOLEM.impactFx && this.impactCd <= 0) this.onImpact(impact, inx, inz);
+  }
+
+  private onImpact(speed: number, nx: number, nz: number): void {
+    const w = this.world;
+    this.impactCd = 0.2;
+    this.impacts++;
+    this.lastImpact = speed;
+    const k = clamp((speed - GOLEM.impactFx) / (GOLEM.dashSpeed - GOLEM.impactFx), 0, 1);
+    w.camRig.addTrauma(0.12 + k * 0.3);
+    const ix = this.x - nx * this.radius, iz = this.z - nz * this.radius;
+    w.particles.emit({ x: ix, y: this.y + 0.8, z: iz, count: 10 + Math.round(k * 22), color: [0x8a8496, 0x6a6478, 0xb8b0a0], speed: [2, 5 + k * 5], life: [0.3, 0.8], size: [0.15, 0.35], dir: [nx, 0.6, nz], spread: 0.8, gravity: 14, additive: false });
+    w.particles.emit({ x: ix, y: this.y + 0.8, z: iz, count: 4 + Math.round(k * 8), color: [0x7fd8ff, 0xffffff], speed: [3, 7], life: [0.1, 0.3], size: [0.1, 0.2], dir: [nx, 0.3, nz], spread: 0.9 });
+    w.audio.play('golemScrape', { x: this.x, z: this.z, vol: 0.55 + k * 0.45, pitch: 1.1 - k * 0.25, throttle: 0.12 });
+    if (speed > GOLEM.impactDamage) {
+      // light, never lethal self-damage for slamming into terrain at dash speed (bracing softens it)
+      const dmg = (speed - GOLEM.impactDamage) * GOLEM.impactDamagePerMs * (this.bracing ? 0.3 : 1);
+      this.hp = Math.max(Math.min(this.hp, 1), this.hp - dmg);
+      this.hurtT = 0.3;
+      if (this.rider) this.rider.hurtT = 0.3;
+      w.floatText(this.x, this.y + 3, this.z, `-${Math.round(dmg)}`, '#b8b0a0');
+    }
+  }
+
+  /** Two heavy stone footfalls as the golem settles onto the ground. */
+  private touchDown(): void {
+    const w = this.world;
+    this.landing = false;
+    w.audio.play('golemStomp', { x: this.x, z: this.z, throttle: 0 });
+    setTimeout(() => {
+      if (!w.disposed && this.alive) w.audio.play('golemStomp', { x: this.x, z: this.z, pitch: 0.9, throttle: 0 });
+    }, 190);
+    w.camRig.addTrauma(0.18);
+    w.fx.shockwave(this.x, this.z, 3.2, 0xb8b0a0, 0.35);
+    w.particles.emit({ x: this.x, y: 0.3, z: this.z, count: 28, color: [0xb8b0a0, 0x8a8496, 0x6f6a5a], speed: [1.5, 4], life: [0.4, 0.9], size: [0.2, 0.4], dir: [0, 0.4, 0], spread: 1, gravity: 6, additive: false, jitter: 1.4 });
   }
 
   private updateBeam(dt: number, aimX: number, aimZ: number): void {
@@ -457,7 +663,8 @@ class AATower extends Actor {
     this.lockT += dt;
     const blink = Math.floor(this.lockT * (this.cd < 1 ? 12 : 4)) % 2 === 0;
     this.light.emissiveIntensity = blink ? 2 : 0.3;
-    if (this.cd < 1 && blink && Math.random() < dt * 8) w.audio.play('lockTone', { x: this.x, z: this.z, vol: 0.6, throttle: 0.12 });
+    // lock warning sounds inside the golem (not at the tower), so it is heard at any lock range
+    if (this.cd < 1 && blink && Math.random() < dt * 8) w.audio.play('lockTone', { vol: 0.9, throttle: 0.12 });
     if (this.cd <= 0) {
       this.cd = rand(3.2, 4.2);
       launchMissile(w, this.x, this.z, this);
@@ -793,8 +1000,13 @@ export class GolemSegment {
     return this.towers.every((t) => !t.alive);
   }
 
-  private spawnGolem(): void {
+  private spawnGolem(drop = false): void {
     const g = new ArcaneGolem(this.world, this.shrine.x, this.shrine.z);
+    if (drop) {
+      // re-forms in the air above the shrine and stomps down onto it
+      g.y = 4.5;
+      g.landing = true;
+    }
     this.world.addActor(g);
     this.world.allies.push(g);
     this.golem = g;
@@ -871,7 +1083,7 @@ export class GolemSegment {
       this.respawnT -= dt;
       if (this.respawnT <= 0) {
         g.removed = true;
-        this.spawnGolem();
+        this.spawnGolem(true);
         w.banner('THE GOLEM RE-FORMS AT ITS SHRINE', 'info');
       }
     }
