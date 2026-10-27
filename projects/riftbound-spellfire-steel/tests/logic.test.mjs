@@ -1,10 +1,12 @@
 // Fast logic tests (no browser): bundles pure modules with esbuild and checks collision,
-// raycasting with the low-cover rule, A* pathfinding, save defaults/migration and maths.
+// raycasting with the low-cover rule, A* pathfinding, save defaults/migration, maths and
+// (v1.2) that the asset manifest registers every synthesized sound / v1.1 asset.
 //   node tests/logic.test.mjs
 import * as esbuild from 'esbuild';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const entry = `
@@ -100,6 +102,23 @@ test('old / partial saves are merged with defaults', () => {
   assert.equal(s.upgrades.maxMana, 0);
   assert.ok(s.spells.unlocked.includes('arcaneBolt'));
   assert.equal(importSave('not json'), null);
+});
+
+test('asset manifest: unique IDs in the <category>/<name> convention, v1.1 assets registered', () => {
+  const m = JSON.parse(readFileSync(join(root, 'assets_manifest.json'), 'utf8'));
+  const ids = m.assets.map((x) => x.id);
+  assert.equal(new Set(ids).size, ids.length, 'duplicate IDs');
+  const cats = ['model', 'prop', 'texture', 'groundMaterial', 'sfx', 'loop', 'music', 'level', 'icon'];
+  for (const id of ids) assert.ok(cats.includes(id.split('/')[0]) && /^[a-zA-Z]+\/[a-zA-Z0-9-]+$/.test(id), `bad id ${id}`);
+  const v11 = ['model/arcaneGolemFlyer', 'model/aaTower', 'model/radarMine', 'model/barrierPylon', 'model/emplacement', 'model/golemShrine',
+    'model/targetDummy', 'model/minigunNest', 'sfx/golemLaser', 'sfx/golemAwaken', 'sfx/golemDash', 'sfx/aaLaunch', 'sfx/lockTone', 'sfx/stoneHit',
+    'loop/golemHum', 'loop/golemBeam', 'level/trial-targetRun', 'level/trial-barrierSurvival', 'level/trial-riftOnslaught'];
+  for (const id of v11) assert.ok(ids.includes(id), `missing ${id}`);
+  // every synthesized recipe in the codebase has an sfx/ entry
+  const src = readFileSync(join(root, 'src/audio/AudioEngine.ts'), 'utf8') + readFileSync(join(root, 'src/entities/ArcaneGolem.ts'), 'utf8');
+  const names = [...src.matchAll(/(?:\br|registerRecipe)\('([a-zA-Z]+)'/g)].map((x) => x[1]);
+  assert.ok(names.length > 60, `only ${names.length} recipes found`);
+  for (const n of names) assert.ok(ids.includes(`sfx/${n}`), `recipe ${n} not in manifest`);
 });
 
 console.log(`${passed} logic tests passed`);

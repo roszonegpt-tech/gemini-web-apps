@@ -130,6 +130,54 @@
       "type": "procedural-mesh"
     },
     {
+      "id": "model/arcaneGolemFlyer",
+      "source": "src/entities/ArcaneGolem.ts#ArcaneGolem (src/utils/models.ts#buildGolem \u00d71.25 + thruster rings + chest beam)",
+      "type": "procedural-mesh",
+      "since": "1.1.0-beta"
+    },
+    {
+      "id": "model/aaTower",
+      "source": "src/entities/ArcaneGolem.ts#AATower",
+      "type": "procedural-mesh",
+      "since": "1.1.0-beta"
+    },
+    {
+      "id": "model/radarMine",
+      "source": "src/entities/ArcaneGolem.ts#RadarMine",
+      "type": "procedural-mesh",
+      "since": "1.1.0-beta"
+    },
+    {
+      "id": "model/barrierPylon",
+      "source": "src/entities/ArcaneGolem.ts#BarrierPylon",
+      "type": "procedural-mesh",
+      "since": "1.1.0-beta"
+    },
+    {
+      "id": "model/emplacement",
+      "source": "src/entities/ArcaneGolem.ts#Emplacement",
+      "type": "procedural-mesh",
+      "since": "1.1.0-beta"
+    },
+    {
+      "id": "model/golemShrine",
+      "source": "src/entities/ArcaneGolem.ts#GolemShrine",
+      "type": "procedural-mesh",
+      "since": "1.1.0-beta"
+    },
+    {
+      "id": "model/targetDummy",
+      "source": "src/scenes/ChallengeScene.ts#TargetDummy",
+      "type": "procedural-mesh",
+      "since": "1.1.0-beta"
+    },
+    {
+      "id": "model/minigunNest",
+      "source": "src/scenes/ChallengeScene.ts#MinigunNest",
+      "type": "procedural-mesh",
+      "since": "1.1.0-beta"
+    },
+    {
       "id": "prop/sandbag",
       "source": "src/utils/models.ts#propParts",
       "type": "instanced-mesh"
@@ -670,6 +718,72 @@
       "type": "web-audio-recipe"
     },
     {
+      "id": "sfx/golemLaser",
+      "source": "src/entities/ArcaneGolem.ts#registerSounds",
+      "type": "web-audio-recipe",
+      "since": "1.1.0-beta"
+    },
+    {
+      "id": "sfx/golemAwaken",
+      "source": "src/entities/ArcaneGolem.ts#registerSounds",
+      "type": "web-audio-recipe",
+      "since": "1.1.0-beta"
+    },
+    {
+      "id": "sfx/golemDash",
+      "source": "src/entities/ArcaneGolem.ts#registerSounds",
+      "type": "web-audio-recipe",
+      "since": "1.1.0-beta"
+    },
+    {
+      "id": "sfx/aaLaunch",
+      "source": "src/entities/ArcaneGolem.ts#registerSounds",
+      "type": "web-audio-recipe",
+      "since": "1.1.0-beta"
+    },
+    {
+      "id": "sfx/lockTone",
+      "source": "src/entities/ArcaneGolem.ts#registerSounds",
+      "type": "web-audio-recipe",
+      "since": "1.1.0-beta"
+    },
+    {
+      "id": "sfx/stoneHit",
+      "source": "src/entities/ArcaneGolem.ts#registerSounds",
+      "type": "web-audio-recipe",
+      "since": "1.1.0-beta"
+    },
+    {
+      "id": "sfx/golemScrape",
+      "source": "src/entities/ArcaneGolem.ts#registerSounds",
+      "type": "web-audio-recipe",
+      "since": "1.2.0-beta"
+    },
+    {
+      "id": "sfx/golemStomp",
+      "source": "src/entities/ArcaneGolem.ts#registerSounds",
+      "type": "web-audio-recipe",
+      "since": "1.2.0-beta"
+    },
+    {
+      "id": "sfx/golemCharge",
+      "source": "src/entities/ArcaneGolem.ts#registerSounds",
+      "type": "web-audio-recipe",
+      "since": "1.2.0-beta"
+    },
+    {
+      "id": "sfx/golemOverheat",
+      "source": "src/entities/ArcaneGolem.ts#registerSounds",
+      "type": "web-audio-recipe",
+      "since": "1.2.0-beta"
+    },
+    {
+      "id": "sfx/golemHeatWarn",
+      "source": "src/entities/ArcaneGolem.ts#registerSounds",
+      "type": "web-audio-recipe",
+      "since": "1.2.0-beta"
+    },
+    {
       "id": "loop/rain",
       "source": "src/audio/AudioEngine.ts#LOOP_BUILDERS",
       "type": "web-audio-loop"
@@ -710,6 +824,18 @@
       "type": "web-audio-loop"
     },
     {
+      "id": "loop/golemHum",
+      "source": "src/entities/ArcaneGolem.ts#humLoop (pitch / filter follow speed + brace via tuneEngine)",
+      "type": "web-audio-loop",
+      "since": "1.1.0-beta"
+    },
+    {
+      "id": "loop/golemBeam",
+      "source": "src/entities/ArcaneGolem.ts#beamLoop (pitch follows heat via tuneBeam)",
+      "type": "web-audio-loop",
+      "since": "1.1.0-beta"
+    },
+    {
       "id": "music/title",
       "source": "src/audio/Music.ts",
       "type": "procedural-music"
@@ -748,6 +874,24 @@
       "id": "level/sector4",
       "source": "levels/sector4.json",
       "type": "level-json"
+    },
+    {
+      "id": "level/trial-targetRun",
+      "source": "src/scenes/ChallengeScene.ts#arena",
+      "type": "level-inline",
+      "since": "1.1.0-beta"
+    },
+    {
+      "id": "level/trial-barrierSurvival",
+      "source": "src/scenes/ChallengeScene.ts#arena",
+      "type": "level-inline",
+      "since": "1.1.0-beta"
+    },
+    {
+      "id": "level/trial-riftOnslaught",
+      "source": "src/scenes/ChallengeScene.ts#arena",
+      "type": "level-inline",
+      "since": "1.1.0-beta"
     },
     {
       "id": "icon/arcaneBolt",

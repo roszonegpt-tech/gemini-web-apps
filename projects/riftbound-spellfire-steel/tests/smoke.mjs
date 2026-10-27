@@ -233,6 +233,74 @@ await step('v1.1: golem flight segment installed in sector 2 + mount works', asy
   await shot('50-golem');
 });
 
+await step('v1.2: golem swept collision at dash speed (corridor + tall geometry)', async () => {
+  const r = await game(() => {
+    const w = window.riftbound.currentWorld();
+    const g = w.mountTarget;
+    for (const a of w.actors) if (a.faction === 'army') { a.alive = false; a.removed = true; }
+    const R = g.radius;
+    const rects = [[3, 62, 86.5, 79], [45.5, 2, 86.5, 62]];
+    const outside = (x, z) => Math.min(...rects.map(([x0, z0, x1, z1]) => Math.hypot(Math.max(x0, Math.min(x1, x)) - x, Math.max(z0, Math.min(z1, z)) - z)));
+    const cols = new Set();
+    for (const cell of w.phys.grid) if (cell) for (const c of cell) if ((c.flags & 16) && c.active) cols.add(c);
+    const pen = (x, z) => {
+      let worst = 0;
+      for (const c of cols) {
+        let d;
+        if (c.shape === 'circle') d = Math.hypot(x - c.x, z - c.z) - c.r;
+        else if (Math.abs(x - c.x) <= c.hw && Math.abs(z - c.z) <= c.hd) d = -Math.min(c.hw - Math.abs(x - c.x), c.hd - Math.abs(z - c.z));
+        else d = Math.hypot(x - Math.max(c.x - c.hw, Math.min(x, c.x + c.hw)), z - Math.max(c.z - c.hd, Math.min(z, c.z + c.hd)));
+        worst = Math.max(worst, R - d);
+      }
+      return worst;
+    };
+    let frames = 0, bad = 0, runs = 0;
+    const imp0 = g.impacts;
+    const run = (x, z, dx, dz, n) => {
+      if (outside(x, z) > 0 || pen(x, z) > 0) return;
+      const l = Math.hypot(dx, dz);
+      g.x = x; g.z = z; runs++;
+      for (let i = 0; i < n; i++) {
+        g.vx = (dx / l) * 22; g.vz = (dz / l) * 22; g.dashT = 0.35; g.hp = g.maxHp;
+        g.update(1 / 60);
+        frames++;
+        if (pen(g.x, g.z) > 0.05 || outside(g.x, g.z) > 0.05) bad++;
+      }
+    };
+    const D = Math.SQRT1_2;
+    for (const [x, z, dx, dz] of [[30, 72, 0, 1], [20, 66, 0, -1], [8, 70, -1, 0], [80, 70, 1, 0], [65, 8, 0, -1], [50, 29, -1, 0], [82, 33, 1, 0], [40, 67, D, -D], [50, 57, -D, D], [8, 74, -D, D]]) run(x, z, dx, dz, 60);
+    let seed = 7;
+    const rnd = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296);
+    for (let i = 0; i < 1500 && runs < 120; i++) { const a = rnd() * Math.PI * 2; run(3 + rnd() * 83.5, 2 + rnd() * 77, Math.sin(a), Math.cos(a), 30); }
+    // one undriven dash into the north edge: bounces back, chips the golem, shakes the camera
+    w.camRig.trauma = 0;
+    g.impactCd = 0;
+    g.x = 30; g.z = 76; g.vx = 0; g.vz = 22; g.dashT = 0.35; g.hp = g.maxHp;
+    for (let i = 0; i < 20; i++) g.update(1 / 60);
+    return { frames, bad, runs, impacts: g.impacts - imp0, vz: g.vz, hp: g.hp, maxHp: g.maxHp, trauma: w.camRig.trauma };
+  });
+  if (r.bad) throw new Error(`${r.bad}/${r.frames} frames clipped or left the corridor`);
+  if (r.runs < 100 || r.impacts < 20) throw new Error(`stress too small: ${JSON.stringify(r)}`);
+  if (!(r.vz < 0 && r.hp < r.maxHp && r.hp > r.maxHp * 0.9 && r.trauma > 0.1)) throw new Error(`impact response: ${JSON.stringify(r)}`);
+});
+
+await step('v1.2: golem audio recipes, landing stomp + audio mix table', async () => {
+  const r = await game(() => {
+    const g = window.riftbound;
+    const a = g.services.audio;
+    const w = g.currentWorld();
+    const golem = w.mountTarget;
+    golem.x = 52; golem.z = 29; golem.vx = golem.vz = 0; // zone-B checkpoint area (walkable)
+    const recipes = ['golemScrape', 'golemStomp', 'golemCharge', 'golemOverheat', 'golemHeatWarn', 'golemLaser', 'lockTone'].every((n) => a.hasRecipe(n));
+    const canLand = golem.canDismount();
+    golem.dismount();
+    return { recipes, canLand, landing: golem.landing, mix: !!g.audioMix && g.audioMix.loops.rain < 0 && g.audioMix.recipes.bolt > 0 };
+  });
+  if (!(r.recipes && r.canLand && r.landing && r.mix)) throw new Error(JSON.stringify(r));
+  await page.waitForFunction(() => { const w = window.riftbound.currentWorld(); const gl = w.actors.find((x) => x.kind === 'arcaneGolem'); return gl && !gl.landing && gl.y < 0.6; }, null, { timeout: 15000 });
+  await shot('53-golem-landed');
+});
+
 await step('v1.1: challenge trials menu + trial start', async () => {
   await game(() => window.riftbound.uiAction('mainMenu'));
   await wait(600);
