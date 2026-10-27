@@ -186,6 +186,7 @@ html, body {
 .btn.small { padding: 0.35em 0.8em; font-size: 0.9em; }
 .btn.center { text-align: center; }
 .btn.center::before { display: none; }
+.btn.danger { border-color: var(--danger); box-shadow: 0 0 0.8em rgba(255, 74, 74, 0.45); }
 .btn[disabled] { opacity: 0.45; cursor: not-allowed; transform: none; box-shadow: none; }
 .btn-row { display: flex; flex-wrap: wrap; justify-content: center; margin-top: 0.8em; }
 .btn-row .btn { margin: 0.25em; }
@@ -346,8 +347,11 @@ html, body {
 /* ------------------------------------------------------------------ touch controls */
 #touch { position: absolute; inset: 0; z-index: 15; pointer-events: none; }
 .stick-zone { position: absolute; bottom: 0; height: 62%; pointer-events: auto; }
-.stick-zone.left { left: 0; width: 42%; }
-.stick-zone.right { right: 0; width: 40%; }
+.stick-zone.move { left: 0; width: 42%; }
+.stick-zone.aim { right: 0; width: 40%; }
+/* v1.3 left-handed layout: move stick on the right, aim stick + buttons on the left */
+#touch.lefty .stick-zone.move { left: auto; right: 0; }
+#touch.lefty .stick-zone.aim { right: auto; left: 0; }
 .stick-base {
   position: absolute; width: 7.5em; height: 7.5em; margin: -3.75em 0 0 -3.75em; border-radius: 50%;
   border: 2px solid rgba(255, 255, 255, 0.5); background: rgba(40, 20, 80, 0.3); pointer-events: none;
@@ -364,12 +368,40 @@ html, body {
 }
 .tbtn.big { width: 4.6em; height: 4.6em; font-size: 0.8em; }
 .tbtn.on { background: rgba(179, 107, 255, 0.85); }
-.tbtn.pause { width: 2.8em; height: 2.8em; border-radius: 0.4em; }
-/* touch mode: move the minimap to the top-left so the left stick has room */
-#stage.touch-mode .hud-bl { left: 0.8em; top: 5.2em; bottom: auto; }
-#stage.touch-mode #minimap { width: 7em; height: 7em; }
+.tbtn.top { width: 2.8em; height: 2.8em; border-radius: 0.4em; }
+.tbtn.top.map { width: 3.6em; }
+.tbtn > span { position: relative; z-index: 1; }
+/* v1.3 cooldown sweep: --cd is the remaining share (0–1) */
+.tbtn::after {
+  content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+  background: conic-gradient(rgba(6, 3, 12, 0.62) calc(var(--cd, 0) * 360deg), transparent 0);
+}
+/* touch mode (v1.3): the bottom corners belong to the sticks and buttons. Status top-left with the
+   objectives under it, compact spell slots + minimap top-right, pause / map top-centre, golem and
+   boss gauges below them. Consumable counts move onto the POTION / BOMB buttons. */
+.tbtn.top { top: 0.6em; left: 50%; }
+.tbtn.top.pause { margin-left: -52px; }
+.tbtn.top.map { margin-left: 4px; }
+.tbtn .n {
+  position: absolute; right: -0.2em; top: -0.2em; z-index: 2; min-width: 1.5em; padding: 0 0.25em; border-radius: 0.8em;
+  background: var(--gold); color: #1a0f00; font-size: 0.85em; line-height: 1.5em;
+}
+.tbtn .n:empty { display: none; }
+.golem-hud { position: absolute; left: 50%; bottom: 0.9em; transform: translateX(-50%); width: 32em; max-width: 54%; text-align: center; pointer-events: none; }
+#stage.touch-mode .hud-tc { left: 0.8em; top: 4.6em; transform: none; width: auto; max-width: 32%; text-align: left; }
+#stage.touch-mode .objectives { font-size: 0.72em; }
+#stage.touch-mode .hud-bl { left: auto; right: 0.8em; top: 4em; bottom: auto; }
+#stage.touch-mode #minimap { width: 6.5em; height: 6.5em; }
+#stage.touch-mode .sp-slot { width: 2.5em; height: 2.5em; }
+#stage.touch-mode .sp-slot.primary { width: 2.9em; height: 2.9em; }
+#stage.touch-mode .consumables, #stage.touch-mode .spell-name { display: none; }
 #stage.touch-mode .hud-br { right: 50%; transform: translateX(50%); bottom: 7.5em; }
 #stage.touch-mode #subtitles { bottom: 11em; }
+#stage.touch-mode .golem-hud { bottom: auto; top: 4.2em; max-width: 30%; }
+#stage.touch-mode .golem-hud .golem-name { display: none; } /* the touch buttons are labelled */
+#stage.touch-mode #banner-area { top: 30%; }
+#stage.touch-mode .boss-bar { top: 4.2em; max-width: 30%; }
+#stage.touch-mode .fps { top: 11em; }
 
 /* ------------------------------------------------------------------ story / cinematic */
 .story { position: absolute; inset: 0; background: #05020a; z-index: 30; pointer-events: auto; }
@@ -389,6 +421,26 @@ html, body {
 #dev button { font: inherit; background: #132; color: #cfc; border: 1px solid #3a3; margin: 0.15em; padding: 0.3em 0.5em; cursor: pointer; min-height: 32px; }
 #dev label { display: block; cursor: pointer; padding: 0.1em 0; }
 #dev .log { max-height: 8em; overflow: auto; color: #f99; white-space: pre-wrap; }
+
+/* v1.3: phones in landscape (short viewports) — compact menus so everything fits without overlap */
+.panel { touch-action: pan-y; -webkit-overflow-scrolling: touch; }
+#stage { -webkit-touch-callout: none; }
+@media (max-height: 500px) {
+  /* phones: the HUD scales down a step so status, objectives and slots do not collide */
+  #hud { font-size: 0.85em; }
+  #subtitles, #banner-area { font-size: 0.85em; }
+  .screen.title { flex-direction: row; gap: 2.2em; }
+  .screen.title .title-logo { margin-bottom: 0; }
+  .title-logo .t1 { font-size: 2.4em; }
+  .title-logo .t2 { font-size: 0.95em; letter-spacing: 0.4em; }
+  .title-logo .t3 { font-size: 0.8em; }
+  .menu .btn { margin: 0.12em 0; min-height: 44px; padding: 0.35em 1em; }
+  .menu.cols-short { display: grid; grid-template-columns: 1fr 1fr; column-gap: 0.5em; }
+  .panel { padding: 0.7em 0.9em; max-height: 96%; }
+  .panel h2 { font-size: 1.3em; margin-bottom: 0.3em; }
+  .footer-note { bottom: 0.25em; font-size: 0.65em; }
+  .magic-circle { display: none; }
+}
 
 @media (max-width: 760px) {
   .sector-grid { grid-template-columns: repeat(2, 1fr); }

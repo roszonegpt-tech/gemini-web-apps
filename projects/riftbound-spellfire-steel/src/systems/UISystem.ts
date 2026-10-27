@@ -3,6 +3,7 @@
 // screen flashes. Game logic talks to the UI only through this class.
 import { SECTORS } from '../config/balance';
 import type { LevelData } from '../config/types';
+import type { Action } from '../core/Input';
 import type { Services } from '../core/Services';
 import { ArcaneGolem, GOLEM } from '../entities/ArcaneGolem';
 import { FIRST_CLEAR_SHARDS, SHARDS_PER_STAR, TRIALS, totalTrialStars, type TrialResult } from '../scenes/ChallengeScene';
@@ -15,7 +16,7 @@ import {
   briefingScreen, campaignScreen, creditsScreen, defeatScreen, mapScreen, pauseScreen, resultsScreen,
   sanctumScreen, settingsScreen, titleScreen, type ResultsData, type ScreenHost,
 } from '../ui/Screens';
-import { TouchControls } from '../ui/TouchControls';
+import { TouchControls, type TouchContext } from '../ui/TouchControls';
 import { escapeHtml } from '../ui/Hud';
 
 export interface UiGame {
@@ -23,7 +24,12 @@ export interface UiGame {
   levels: LevelData[];
   uiAction(name: string, data?: unknown): void;
   currentWorld(): World | null;
+  /** v1.3: touch-control rules of the running Challenge Trial (null outside trials). */
+  trialTouchRules?(): { hide: Action[]; aim: Action | null } | null;
 }
+
+/** v1.3: short SPELL-button labels for the secondary spells. */
+const SPELL_SHORT: Record<string, string> = { flameBurst: 'FLAME', chainLightning: 'CHAIN', vortexSurge: 'VORTEX', meteorStrike: 'METEOR' };
 
 /** Extra screen builders registered by later modules (v1.1 challenge trials …). */
 export type ScreenBuilder = (ui: UISystem, data: unknown) => HTMLElement;
@@ -74,8 +80,7 @@ export class UISystem implements ScreenHost {
     this.touch.onPause = () => game.uiAction('pause');
     // v1.1: Arcane Golem armour + beam heat gauges (shown while mounted)
     this.golemHud = document.createElement('div');
-    this.golemHud.className = 'hidden';
-    this.golemHud.style.cssText = 'position:absolute;left:50%;bottom:0.9em;transform:translateX(-50%);width:32em;max-width:54%;text-align:center;pointer-events:none';
+    this.golemHud.className = 'golem-hud hidden';
     this.golemHud.innerHTML = '<div class="golem-name" style="font-size:0.8em;letter-spacing:0.15em;color:#9cf6ff;text-shadow:0 1px 2px #000">ARCANE GOLEM</div>'
       + '<div class="bar"><div class="fill" data-g="armor" style="background:linear-gradient(90deg,#6a6478,#b2acc6)"></div><div class="txt" data-g="txt"></div></div>'
       + '<div class="bar" style="height:0.6em"><div class="fill" data-g="heat" style="background:linear-gradient(90deg,#4fc8ff,#ffb04a,#ff4a2a)"></div></div>';
@@ -233,7 +238,33 @@ export class UISystem implements ScreenHost {
     const inp = this.game.services.input;
     const want = gameplay && (s.touchMode === 'on' || (s.touchMode === 'auto' && (inp.lastDevice === 'touch' || (this.game.services.engine.isMobile && inp.lastDevice !== 'pad' && inp.lastDevice !== 'kbm'))));
     if (want !== this.touch.visible) this.touch.show(want, s.touchOpacity);
-    else if (want) this.touch.root.style.opacity = String(s.touchOpacity);
+    if (want) this.touch.configure(s.touchSize, s.touchHanded, s.touchOpacity);
+  }
+
+  /** v1.3: builds the touch button context — riding the golem, trial rules, current spell, cooldowns. */
+  private touchContext(w: World): TouchContext {
+    const p = w.player;
+    const g = w.mountTarget;
+    if (g instanceof ArcaneGolem && g.alive && p.mounted) {
+      return {
+        mode: 'golem',
+        hide: g.canDismount() ? [] : ['interact'],
+        aim: 'fire1',
+        spell: '',
+        cooldown: { blink: g.dashCd / GOLEM.dashCd, fire2: g.volleyCd / GOLEM.volleyCd },
+        badge: {},
+      };
+    }
+    const rules = this.game.trialTouchRules ? this.game.trialTouchRules() : null;
+    const sec = p.secondary;
+    return {
+      mode: 'foot',
+      hide: rules ? rules.hide : [],
+      aim: rules ? rules.aim : 'fire1',
+      spell: sec === 'flameBurst' && w.services.save.spells.inferno ? 'INFERNO' : SPELL_SHORT[sec] || 'SPELL',
+      cooldown: { blink: p.cooldownFrac('blink'), fire2: p.cooldownFrac(sec) },
+      badge: { potion: String(p.hpPotions + p.manaPotions), bomb: String(p.bombs) },
+    };
   }
 
   banner(text: string, kind = 'info'): void {
@@ -286,6 +317,7 @@ export class UISystem implements ScreenHost {
     this.stage.classList.toggle('reduced-motion', svc.settings.reducedMotion);
     this.updateTouchVisibility(gameplay && !!w);
     if (!w) return;
+    if (this.touch.visible) this.touch.setContext(this.touchContext(w));
     if (!gameplay) {
       this.overlay.clear();
       return;
@@ -311,7 +343,7 @@ export class UISystem implements ScreenHost {
       this.golemHud.classList.remove('hidden');
       this.golemArmor.style.width = `${Math.max(0, (g.hp / g.maxHp) * 100).toFixed(1)}%`;
       this.golemHeat.style.width = `${(g.heat * 100).toFixed(1)}%`;
-      const keys = svc.input.lastDevice === 'pad' ? ['R2', 'R1', 'A', 'L2'] : svc.input.lastDevice === 'touch' ? ['AIM', 'SPELL', 'BLINK', 'WARD'] : ['LMB', 'RMB', 'SPACE', 'SHIFT'];
+      const keys = svc.input.lastDevice === 'pad' ? ['R2', 'R1', 'A', 'L2'] : svc.input.lastDevice === 'touch' ? ['AIM', 'VOLLEY', 'DASH', 'BRACE'] : ['LMB', 'RMB', 'SPACE', 'SHIFT'];
       const t = `STONE ARMOUR ${Math.ceil(g.hp)} / ${GOLEM.hp}${g.overheat > 0 ? ' · BEAM OVERHEATED' : ''}`;
       if (this.golemText.textContent !== t) this.golemText.textContent = t;
       const n = `ARCANE GOLEM · ${keys[0]} beam · ${keys[1]} volley · ${keys[2]} dash · ${keys[3]} brace`;
