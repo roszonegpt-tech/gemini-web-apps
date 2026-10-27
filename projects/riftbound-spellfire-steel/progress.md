@@ -1,5 +1,14 @@
 # Progress Log
 
+## 2026-10-27 — v1.3.0-beta (Claude Code)
+- Rebuilt the touch controls around a context: on foot / riding the golem / trial rules (hidden locked actions, retargeted aim stick), current-spell label, cooldown sweeps, potion / bomb badges, MAP button, size and left-handed settings, fullscreen toggle.
+- Found and fixed lost quick taps on slow frames; reworked the phone-landscape title, menus and touch-mode HUD after screenshot review at 844×390.
+- Checkpoints now persist in `campaign.checkpoint` and the title / campaign screens offer Continue after a reload.
+- Added opt-in local playtest records for trials and the golem segment (copy / export / clear in Settings).
+- Metered the golem engine rumble live at top speed (+2.5 dB over idle; beam leads by 6.4 dB) — closes BUGS #16.
+- Removed the superseded `challengeScreen`; reset now confirms inside the page. Balance numbers unchanged (no human data).
+- Tests: 12 logic, smoke extended with five v1.3 steps; full regression on folder + standalone builds.
+
 ## 2026-10-27 — v1.2.0-beta (Claude Code)
 - Replaced the golem's axis-separated corridor bounce with swept sub-stepped collision against `CF.FLY` geometry and a two-rectangle corridor; normal reflection with damping, scrape friction, impact camera bump / particles / sound, non-lethal self-damage above 12 m/s; knockback folded into velocity.
 - Stress-probed collision (345 runs, 11 478 frames at dash speed): v1.1 21 grazing frames → v1.2 0.

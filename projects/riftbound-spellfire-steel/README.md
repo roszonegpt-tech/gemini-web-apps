@@ -9,7 +9,7 @@ fused warzone of floating crystal islands, muddy trenches, airfields and bunkers
 - **Tech:** TypeScript + three.js (WebGL), Web Audio synthesis, Canvas 2D. No external assets:
   every model, texture, sound effect and music track is generated at runtime.
 - **Offline:** 100% offline after load. Ships as a static folder *and* a single standalone HTML file.
-- **Version:** 1.2.0-beta — see [`VERSION.md`](VERSION.md) · history in [`CHANGELOG.md`](CHANGELOG.md).
+- **Version:** 1.3.0-beta — see [`VERSION.md`](VERSION.md) · history in [`CHANGELOG.md`](CHANGELOG.md).
 
 ## Play
 
@@ -26,20 +26,32 @@ Supported: Chrome/Edge 90+, Firefox 88+, Safari 14.1+ (desktop, iPad, iPhone, An
 
 | Action | Keyboard & mouse | Gamepad (standard) | Touch |
 |---|---|---|---|
-| Move | WASD / arrows | Left stick | Left joystick |
+| Move | WASD / arrows | Left stick | Left joystick (right one in left-handed mode) |
 | Aim | Mouse (magic reticle, lock-on) | Right stick (aim assist) | Right joystick (auto-casts) |
 | Arcane Bolt (primary, hold) | LMB | R2 | Right joystick |
-| Secondary spell | RMB | R1 | SPELL |
+| Secondary spell | RMB | R1 | SPELL (labelled with the spell, e.g. FLAME) |
 | Select spell slot 1–4 | 1–4 / mouse wheel | D-pad / Y cycles | CYCLE |
 | Teleport Blink | Space | A / Cross | BLINK |
 | Arcane Ward (hold; raise just before a hit to **reflect**) | Shift | L2 | WARD |
 | Interact / channel mana well | E / R (hold) | X / Square | USE |
 | Frost Bomb | Q | L1 | BOMB |
 | Health / mana potion | F / G | B / Circle (smart) | POTION (smart) |
-| Pause · map | Esc / P · Tab | Start · Select | ❚❚ |
+| Pause · map | Esc / P · Tab | Start · Select | ❚❚ · MAP |
 | Dev console · free cam · orbit cam · screenshot | ` (tilde) · F8 · F7 · F12/F9 | — | — |
 
-"Control mapping" in Settings swaps Space/Shift. Menus support Tab / arrow keys / Enter / Esc and the D-pad + A/B.
+Riding the Arcane Golem on touch: aim stick = beam, VOLLEY, DASH, BRACE, LAND (dismount). "Control mapping" in Settings swaps Space/Shift. Menus support Tab / arrow keys / Enter / Esc and the D-pad + A/B.
+
+## New in v1.3.0-beta
+
+- **Mobile controls:** the touch buttons change with what you are doing — on the Arcane Golem they become VOLLEY,
+  DASH, BRACE and LAND (the aim stick fires the beam); Challenge Trials hide the actions their rules lock. The SPELL
+  button shows your selected spell, BLINK / SPELL show cooldown sweeps, potion and bomb counts sit on their buttons,
+  and a MAP button joins pause. Settings add button size (small / medium / large) and a mirrored left-handed layout;
+  Pause and Settings offer fullscreen where the browser allows it.
+- **Phone landscape:** title, menus and the in-game HUD are rearranged so nothing overlaps on ~390 px-tall screens.
+- **Continue:** close the page mid-mission and pick up from the last checkpoint ("Continue" on the title screen).
+- **Playtest records (opt-in):** Settings → "Record playtest runs" keeps your last 50 trial runs and golem flights on
+  this device; copy or export them to help tune star thresholds and the golem segment.
 
 ## New in v1.2.0-beta
 
@@ -146,7 +158,7 @@ riftbound-spellfire-steel/
 ├─ tests/                     # logic.test.mjs, smoke.mjs, audio-levels.mjs (output/ is git-ignored)
 ├─ notes/                     # design notes, reference-look analysis
 ├─ docs/                      # extra documentation
-├─ prompts/                   # next-build.md (v1.3) + archive/ (v1.1, v1.2 prompts)
+├─ prompts/                   # next-build.md (v1.4) + archive/ (v1.1–v1.3 prompts)
 └─ scripts/                   # build.mjs, serve.mjs
 ```
 

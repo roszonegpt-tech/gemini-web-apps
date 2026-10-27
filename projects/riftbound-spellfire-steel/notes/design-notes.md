@@ -53,3 +53,19 @@ Targets checked by the tool (v1.1 → v1.2: 4/11 → 11/11 pass):
 - **T5** no in-game one-shot peaks above −1 dBFS before the master compressor.
 
 Limits: these are objective proxies. Nobody has listened to the mix on desktop speakers or phone speakers yet — that remains a manual check (TESTING.md). The rumble is measured at idle; at full speed it is estimated (not measured) to rise ~4–5 dB, which would shrink the beam's lead to ~4 dB while flying flat out.
+
+## v1.3 — Mobile controls
+- **One button table, three contexts.** On foot: BLINK, WARD, SPELL, USE, POTION, BOMB, CYCLE. Riding the golem the same thumb positions become DASH, WARD→BRACE, SPELL→VOLLEY, USE→LAND (shown only where dismounting is possible); POTION / BOMB / CYCLE disappear because they do nothing in the air. Trials hide what their rules lock, and the aim stick casts the one allowed attack (Target Run: Flame Burst; Barrier Survival: nothing), so a phone player never presses a dead button.
+- **Information on the buttons instead of in text lists.** SPELL shows the selected spell, BLINK / SPELL (DASH / VOLLEY) show a cooldown sweep, POTION / BOMB carry count badges; the keyboard-oriented consumables list and spell hint are hidden in touch mode.
+- **Phone landscape (≤ 500 px tall).** The stage font cannot go below 16 px (Engine.ts, unchanged), so on a 390 px-tall phone the HUD alone filled the screen. The HUD subtree drops one step (0.85em ≈ 13.6 px); status + objectives sit top-left, compact slots + minimap top-right, pause / MAP top-centre (fixed 48 px targets), gauges under them. Title switches to logo-beside-menu; pause uses two columns.
+- **Presets:** button size small / medium / large = 0.85 / 1 / 1.2 × (all positions are in em, so the whole cluster scales); left-handed mirrors sticks and buttons.
+- **Taps:** non-hold buttons stay pressed until two animation frames and ≥ 90 ms have passed, so a tap cannot fall between two input polls on a slow phone (this happened in headless testing at ~15 FPS).
+
+## v1.3 — Checkpoints and playtest records
+- Reaching a zone checkpoint saves `{sector, zone, stats, consumables, savedAt}` into the existing `campaign.checkpoint` key; Continue rebuilds the World exactly like "Restart from Checkpoint". Fresh deploys and completed missions clear it; speedruns never write one (their timer would be meaningless).
+- Playtest records are off by default and local only (`stats.playtest`, newest 50). Each record carries the build version so data from different balance versions can be separated.
+- **Balance:** no human runs exist yet, so trial star thresholds (`TRIALS`) and `GOLEM` numbers are unchanged. Suggested procedure: collect ≥ 10 runs per trial from at least three players, set 2★ near the median and 3★ near the best quartile.
+
+## v1.3 — Golem rumble at speed
+- Metered live on the ambient bus (minus the rain / rift baseline): idle −29.1, top speed (9.1 m/s) −26.6, bracing −26.4 dB; the beam measures −20.2 dB, i.e. +6.4 dB over the full-speed rumble (target ≥ 4). The v1.2 estimate of +4–5 dB at speed was pessimistic; the measured rise is ~2.5 dB.
+

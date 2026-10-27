@@ -69,6 +69,12 @@ main.ts ─► Game (game.ts)
 - `game.ts` → `AUDIO_MIX` + `installAudioMix()` — wraps the AudioEngine instance's `play` / `loopVolume` once at startup to apply per-sound / per-loop dB trims, and trims the music volume passed to `setVolumes`. `Game.audioMix` exposes the table to tests.
 - `tests/audio-levels.mjs` — renders each recipe in an `OfflineAudioContext` (seeded noise), meters K-weighted/phone-proxy levels and the live buses, and checks the mix targets.
 
+## v1.3 additions
+- `ui/TouchControls.ts` — button table (`BUTTONS`) with on-foot / golem labels; `setContext(TouchContext)` hides locked actions, retargets the aim stick, sets the spell label, cooldown sweeps (`--cd`) and badges; `configure(size, handed, opacity)`; taps are held until the loop has polled input (`releaseAfterPoll`). `UISystem.touchContext(world)` builds the context; `Game.trialTouchRules()` → `ChallengeScene.touchRules()`.
+- Phone layout: `#stage.touch-mode …` rules and `@media (max-height: 500px)` at the end of `assets/css/style.css`.
+- Checkpoint resume: `MissionScene.persistCheckpoint()` writes `campaign.checkpoint` (sector, zone, stats, consumables); `Game.uiAction('continueCheckpoint')` rebuilds the World at that zone; `Save.sanitize` drops malformed checkpoints.
+- Playtest records: `recordPlaytest(save, run)` (opt-in, capped at 50) in `core/Save.ts`; written by `ChallengeScene.record()` (complete / failed / quit / restart) and `GolemSegment.recordRun()` on dispose. Settings → Copy / Export / Clear.
+
 ## Extension points (used by later builds)
 - `World.updaters` — per-frame hooks (e.g. vehicles, trial logic) without editing `World`.
 - `World.cameraFocus`, `World.mountTarget` — camera follow override and enemy target override.
@@ -84,6 +90,7 @@ main.ts ─► Game (game.ts)
 | `src/game.ts` | Wires everything; UI actions; dev actions; screenshots; auto-pause |
 | `src/core/Engine.ts` | Renderer, 16:9 stage, pixel scale, loop, FPS, auto-quality, error guard |
 | `src/core/Input.ts` | Keyboard/mouse/touch/gamepad → actions |
+| `src/ui/TouchControls.ts` | Touch sticks + context-aware buttons (v1.3) |
 | `src/core/StateManager.ts` | Game state switching |
 | `src/core/Save.ts` | LocalStorage schema, defaults, migration, import |
 | `src/core/Physics.ts` | Collision world, raycasts, nav grid, A* |

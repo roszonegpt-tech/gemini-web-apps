@@ -3,13 +3,36 @@
 ## How to run
 ```bash
 npm run typecheck                 # strict TypeScript, 0 errors expected
-npm run test:logic                # 10 node logic tests (no browser)
+npm run test:logic                # 12 node logic tests (no browser)
 npm run test:smoke                # headless Chromium end-to-end (needs Playwright: npm i -D playwright)
 SMOKE_TARGET=dist npm run test:smoke   # same, against the standalone dist/index.html
 npm run test:audio                # v1.2 audio level meter + mix targets (exits 1 if a target fails)
 AUDIO_TARGET=dist/releases/riftbound-v1.1.0-beta.html npm run test:audio   # meter an archived build
 ```
 Screenshots from the smoke run land in `tests/output/` (git-ignored).
+
+## Results — v1.3.0-beta (2026-10-27, Linux, headless Chromium + SwiftShader)
+
+### Verified (automated)
+| Check | How | Result |
+|---|---|---|
+| Typecheck + build (`dist/releases/riftbound-v1.3.0-beta.html`) | `tsc`, `npm run build` | ✅ |
+| Logic tests incl. new save keys, checkpoint sanitizing, playtest opt-in + cap | `tests/logic.test.mjs` | ✅ 12/12 |
+| Full regression + v1.2 golem steps + five new v1.3 steps | `tests/smoke.mjs` (folder **and** `SMOKE_TARGET=dist`) | ✅ 22/22 each |
+| Touch: on foot (FLAME label, BOMB/POTION), golem (DASH/BRACE/VOLLEY/LAND, potion/bomb/cycle hidden), Barrier Survival (SPELL/BOMB/POTION/CYCLE hidden, aim stick inert), Target Run (aim stick casts Flame Burst), left-handed + large preset | smoke + probe (emulated touch screen 844×390, `page.touchscreen.tap` on BLINK) | ✅ |
+| Phone-landscape title fits (last menu button above the footer) | smoke at 844×390 + screenshots of title, foot, golem, trial, pause | ✅ |
+| Checkpoint saved at zone 2 → page reload → title shows "Continue · Sector 1 · checkpoint 2" → resumes zone 2 with stats kept; fresh deploy clears it | smoke | ✅ |
+| Playtest records: nothing recorded while off; trial quit + golem segment recorded when on | smoke | ✅ |
+| Reset Save Data needs a second tap and then resets | smoke | ✅ |
+| Golem flow, collision stress (0 bad frames), trials I–III | probes | ✅ golem flow 7/7 · collision 0 bad frames / 11 478 · trials 7/7 |
+| Audio mix targets incl. live golem rumble at 9.1 m/s (beam +6.4 dB over it) | `npm run test:audio` | ✅ 12/12 |
+
+Found and fixed during this pass: the first full run failed "casting did not fire" in sectors 2–4. Hiding the touch layer released its aim action through `Input.setVirtual()`, which also marks the device as touch, so a mouse session switched into touch mode and the aim-stick zone covered the mouse. Releases now happen only for actions that are actually pressed; the full suite then passed. In the emulated-touch probe, one of four runs of a real `touchscreen.tap` on BLINK did not register (the other three did, and a traced tap showed the press held until the game polled it); not reproduced since — watch for it on devices.
+
+### Not verified (v1.3) — needs real hardware / a person
+- The new touch controls on physical phones and tablets (thumb reach, button sizes, left-handed layout, haptics).
+- Fullscreen + landscape lock on real Android Chrome; iOS Safari has no fullscreen API.
+- Everything listed under v1.2 "Not verified" below still applies (real-GPU FPS, Firefox/Safari/Edge, gamepad, listening to the mix, human balance).
 
 ## Results — v1.2.0-beta (2026-10-27, Linux, headless Chromium + SwiftShader)
 

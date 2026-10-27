@@ -7,6 +7,57 @@ Git commits (and tags, once merged) are the authoritative history.
 ## [Unreleased]
 - Nothing yet.
 
+## [1.3.0-beta] — 2026-10-27
+Implements `prompts/archive/v1.3.0-beta.md` plus the requested **mobile controls** pass. Code changes stay in the
+prompt's files (`MissionScene.ts`, `ChallengeScene.ts`, `ArcaneGolem.ts`, `UISystem.ts`, `Screens.ts`, `game.ts`,
+`Save.ts` — added keys only) plus, for the mobile work, `src/ui/TouchControls.ts` and `assets/css/style.css`.
+`Engine.ts`, `AudioEngine.ts`, `World.ts`, existing save key names and asset IDs are unchanged.
+
+### Added
+- **Context-aware touch controls:** riding the Arcane Golem relabels the buttons (VOLLEY / DASH / BRACE / LAND, the aim
+  stick fires the beam; LAND only shows over solid ground); Challenge Trials hide the actions their rules lock and
+  retarget the aim stick (Target Run: aim stick casts Flame Burst; Barrier Survival: aim only).
+- SPELL button shows the selected spell (FLAME / CHAIN / VORTEX / METEOR / INFERNO); cooldown sweeps on BLINK / SPELL
+  (DASH / VOLLEY on the golem); potion and bomb counts as badges; a **MAP** button next to pause.
+- Settings: **Touch button size** (small / medium / large) and **Touch layout** (right- or left-handed, mirrored).
+- **Toggle Fullscreen** in Pause and Settings where the browser supports it (locks landscape on Android).
+- **Continue from checkpoint:** reaching a zone checkpoint saves sector, zone, mission stats and consumables to
+  `campaign.checkpoint`; the title and campaign screens offer "Continue · Sector N · checkpoint M" after a reload.
+  A fresh deploy or a completed mission clears it; speedruns never save one.
+- **Opt-in local playtest records** (Settings → "Record playtest runs", off by default): every trial run (complete /
+  failed / quit / restart: time, damage, stars, kills, score) and every flown golem segment (time mounted, armour lost,
+  impacts, overheats, missiles shot down, crashes, towers left). Newest 50 kept in `stats.playtest`; Copy / Export
+  (.json) / Clear in Settings. Nothing is sent anywhere.
+- `npm run test:audio` meters the golem engine live at top speed and while bracing (new target: beam ≥ 4 dB over the
+  rumble at full speed — measured +6.4 dB at 9.1 m/s).
+- Tests: logic tests for the new save keys / checkpoint sanitizing / playtest cap; smoke steps for touch contexts and a
+  real BLINK button press, the phone-landscape title fit, checkpoint → page reload → Continue, playtest records and the
+  in-page reset confirmation.
+
+### Changed
+- Phone landscape (viewport height ≤ 500 px): title logo beside the menu, compact menus, two-column pause menu, HUD and
+  banners one step smaller.
+- Touch-mode HUD: status + objectives top-left, compact spell slots + minimap top-right, pause / map top-centre, golem
+  and boss gauges below them, consumable list replaced by button badges; banners sit lower.
+- Reset Save Data asks for a second tap inside the page instead of a browser `confirm()` dialog (which embedded views
+  such as the claude.ai artifact block).
+- `package.json` version → 1.3.0-beta; new standalone build `dist/releases/riftbound-v1.3.0-beta.html`.
+
+### Fixed
+- Quick taps on touch buttons (BLINK, POTION, BOMB, CYCLE, MAP) could be lost on slow devices when the press and
+  release both happened between two frames; taps now hold until the game has polled input.
+- Hiding the touch layer could switch a mouse/keyboard session into touch mode (a release through `Input.setVirtual()`
+  marks the device), letting the aim-stick zone cover the mouse — caught by the smoke suite before release.
+- Phone landscape: the title menu's last button overlapped the footer, and the touch pause button overlapped the
+  objective panel and spell slots.
+
+### Removed
+- The superseded sector-speedrun `challengeScreen` from `src/ui/Screens.ts` (BUGS #15).
+
+### Balance
+- Trial star thresholds and golem numbers are **unchanged**: no human playtest data exists yet. The new playtest
+  records are the way to collect it.
+
 ## [1.2.0-beta] — 2026-10-27
 Implements `prompts/archive/v1.2.0-beta.md`. Code changes are confined to the files that prompt allows
 (`src/entities/ArcaneGolem.ts`, `src/game.ts`, `assets_manifest.json` — additive only — plus tests and docs);
