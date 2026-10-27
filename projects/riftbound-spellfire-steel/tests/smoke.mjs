@@ -324,6 +324,119 @@ await step('touch layout renders', async () => {
   await game(() => { window.riftbound.services.save.settings.touchMode = 'auto'; });
 });
 
+await step('v1.3: touch controls follow the context (on foot / golem / trial rules / left-handed)', async () => {
+  const labels = () => game(() => {
+    const t = window.riftbound.ui.touch;
+    return { visible: t.visible, mode: t.mode, aim: t.aimAction, lefty: t.lefty, size: document.getElementById('touch').style.fontSize, l: Object.fromEntries(['blink', 'ward', 'fire2', 'interact', 'potion', 'bomb', 'cycle'].map((a) => [a, t.labelOf(a)])) };
+  });
+  await game(() => { const g = window.riftbound; g.services.save.settings.touchMode = 'on'; g.services.dev.god = true; g.uiAction('deploy', 1); });
+  await wait(1500);
+  const foot = await labels();
+  if (!(foot.visible && foot.mode === 'foot' && foot.aim === 'fire1' && foot.l.blink === 'BLINK' && foot.l.fire2 === 'FLAME' && foot.l.bomb === 'BOMB')) throw new Error(`foot ${JSON.stringify(foot)}`);
+  // a pointer press on BLINK drives the 'blink' action
+  const blinked = await game(async () => {
+    const w = window.riftbound.currentWorld();
+    const b = document.querySelector('.tbtn[data-action="blink"]');
+    const x0 = w.player.x, z0 = w.player.z;
+    b.dispatchEvent(new PointerEvent('pointerdown', { pointerId: 9, bubbles: true }));
+    await new Promise((r) => setTimeout(r, 700));
+    b.dispatchEvent(new PointerEvent('pointerup', { pointerId: 9, bubbles: true }));
+    return Math.hypot(w.player.x - x0, w.player.z - z0) > 1 || w.player.cooldownFrac('blink') > 0;
+  });
+  if (!blinked) throw new Error('BLINK button did not blink');
+  await game(() => { const w = window.riftbound.currentWorld(); w.actors.find((a) => a.kind === 'arcaneGolem').mount(w.player); });
+  await wait(600);
+  const golem = await labels();
+  if (!(golem.mode === 'golem' && golem.l.blink === 'DASH' && golem.l.ward === 'BRACE' && golem.l.fire2 === 'VOLLEY' && golem.l.potion === '' && golem.l.cycle === '')) throw new Error(`golem ${JSON.stringify(golem)}`);
+  await game(() => window.riftbound.uiAction('trial', 'barrierSurvival'));
+  await wait(1500);
+  const barrier = await labels();
+  if (!(barrier.aim === null && barrier.l.fire2 === '' && barrier.l.bomb === '' && barrier.l.potion === '' && barrier.l.ward === 'WARD')) throw new Error(`barrier ${JSON.stringify(barrier)}`);
+  await game(() => window.riftbound.uiAction('trial', 'targetRun'));
+  await wait(1500);
+  await game(() => { const s = window.riftbound.services.save.settings; s.touchHanded = 'left'; s.touchSize = 'large'; });
+  await wait(500);
+  const lefty = await labels();
+  if (!(lefty.aim === 'fire2' && lefty.l.fire2 === 'FLAME' && lefty.l.bomb === '' && lefty.lefty && lefty.size === '1.2em')) throw new Error(`targetRun/lefty ${JSON.stringify(lefty)}`);
+  await shot('60-touch-lefty-trial');
+  await game(() => { const s = window.riftbound.services.save.settings; s.touchHanded = 'right'; s.touchSize = 'medium'; s.touchMode = 'auto'; });
+});
+
+await step('v1.3: phone-landscape title menu fits (844×390)', async () => {
+  await page.setViewportSize({ width: 844, height: 390 });
+  await game(() => window.riftbound.uiAction('mainMenu'));
+  await wait(800);
+  const r = await game(() => {
+    const btns = [...document.querySelectorAll('.screen.title .menu .btn')].map((b) => b.getBoundingClientRect());
+    const foot = document.querySelector('.screen.title .footer-note').getBoundingClientRect();
+    const stage = document.getElementById('stage').getBoundingClientRect();
+    return { last: btns[btns.length - 1].bottom, first: btns[0].top, foot: foot.top, stageTop: stage.top, stageBottom: stage.bottom };
+  });
+  await shot('61-title-phone');
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await wait(400);
+  if (!(r.last <= r.foot && r.first >= r.stageTop)) throw new Error(JSON.stringify(r));
+});
+
+await step('v1.3: checkpoint survives a page reload → Continue', async () => {
+  await game(() => { const g = window.riftbound; g.services.dev.god = true; g.uiAction('deploy', 0); });
+  await wait(1200);
+  await game(() => { const w = window.riftbound.currentWorld(); w.stats.kills = 5; window.riftbound.devAction('completeZone'); });
+  await wait(800);
+  await game(() => { const w = window.riftbound.currentWorld(); const n = w.level.zones[1]; w.player.x = n.checkpoint[0]; w.player.z = n.checkpoint[1]; });
+  await page.waitForFunction(() => { try { const s = JSON.parse(localStorage.getItem('riftbound.save.v1')); return s.campaign.checkpoint && s.campaign.checkpoint.zone === 1; } catch { return false; } }, null, { timeout: 15000 });
+  await page.reload();
+  await page.waitForFunction(() => !!window.riftbound, null, { timeout: 20000 });
+  await wait(1500);
+  if (!(await page.isVisible('text=Continue · Sector 1'))) throw new Error('no Continue button on the title screen');
+  await page.click('text=Continue · Sector 1');
+  await wait(1500);
+  const r = await game(() => { const w = window.riftbound.currentWorld(); return w ? { sector: w.level.id, zone: w.activeZone, kills: w.stats.kills } : null; });
+  if (!(r && r.sector === 'sector1' && r.zone === 1 && r.kills >= 5)) throw new Error(JSON.stringify(r));
+  // a fresh deploy replaces the saved checkpoint
+  await game(() => window.riftbound.uiAction('deploy', 2));
+  await wait(800);
+  const cp = await game(() => window.riftbound.services.save.campaign.checkpoint);
+  if (cp !== null) throw new Error(`checkpoint not cleared: ${JSON.stringify(cp)}`);
+});
+
+await step('v1.3: opt-in playtest records (trial + golem segment)', async () => {
+  const trialTime = (sec) => page.waitForFunction((t) => window.riftbound.challenge.t > t, sec, { timeout: 30000 });
+  await game(() => { const s = window.riftbound.services.save; s.settings.playtestRecords = false; s.stats.playtest = []; window.riftbound.uiAction('trial', 'targetRun'); });
+  await trialTime(1.5);
+  await game(() => window.riftbound.uiAction('mainMenu'));
+  await wait(500);
+  const off = await game(() => window.riftbound.services.save.stats.playtest.length);
+  if (off !== 0) throw new Error('recorded while disabled');
+  await game(() => { window.riftbound.services.save.settings.playtestRecords = true; window.riftbound.uiAction('trial', 'targetRun'); });
+  await trialTime(1.5);
+  await game(() => window.riftbound.uiAction('mainMenu'));
+  await wait(500);
+  await game(() => { const g = window.riftbound; g.services.dev.god = true; g.uiAction('deploy', 1); });
+  await wait(1200);
+  const t0 = await game(() => { const w = window.riftbound.currentWorld(); w.actors.find((a) => a.kind === 'arcaneGolem').mount(w.player); return w.time; });
+  await page.waitForFunction((t) => window.riftbound.currentWorld().time > t + 1.6, t0, { timeout: 30000 });
+  await game(() => window.riftbound.uiAction('mainMenu'));
+  await wait(800);
+  const runs = await game(() => window.riftbound.services.save.stats.playtest);
+  const kinds = runs.map((r) => `${r.kind}:${r.id}:${r.outcome}`);
+  if (!(runs.length === 2 && kinds[0] === 'trial:targetRun:quit' && kinds[1].startsWith('golem:sector2-golem:') && runs[1].time >= 1)) throw new Error(JSON.stringify(kinds));
+  await game(() => { const s = window.riftbound.services.save; s.settings.playtestRecords = false; });
+});
+
+await step('v1.3: settings reset confirms inside the page', async () => {
+  await game(() => { window.riftbound.services.save.shards = 99; window.riftbound.ui.go('settings', 'title'); });
+  await wait(400);
+  await page.click('[data-act="reset"]');
+  await wait(200);
+  const mid = await game(() => ({ shards: window.riftbound.services.save.shards, label: document.querySelector('[data-act="reset"]').textContent }));
+  if (!(mid.shards === 99 && /Tap again/.test(mid.label))) throw new Error(JSON.stringify(mid));
+  await page.click('[data-act="reset"]');
+  await wait(400);
+  const after = await game(() => window.riftbound.services.save.shards);
+  if (after !== 0) throw new Error(`reset did not run (${after})`);
+});
+
 const perf = await game(() => window.riftbound.perfText());
 console.log(results.join('\n'));
 console.log('--- perf (headless SwiftShader, not representative of real GPUs) ---\n' + perf);

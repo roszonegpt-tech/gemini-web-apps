@@ -12,11 +12,11 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const entry = `
 export * from './src/core/Physics';
 export * as math from './src/utils/math';
-export { defaultSave, importSave } from './src/core/Save';
+export { defaultSave, importSave, recordPlaytest, PLAYTEST_CAP } from './src/core/Save';
 `;
 const res = await esbuild.build({ stdin: { contents: entry, resolveDir: root, loader: 'ts' }, bundle: true, format: 'esm', write: false, platform: 'node' });
 const mod = await import(`data:text/javascript;base64,${Buffer.from(res.outputFiles[0].text).toString('base64')}`);
-const { CollisionWorld, NavGrid, CF, math, defaultSave, importSave } = mod;
+const { CollisionWorld, NavGrid, CF, math, defaultSave, importSave, recordPlaytest, PLAYTEST_CAP } = mod;
 
 let passed = 0;
 const test = (name, fn) => {
@@ -102,6 +102,30 @@ test('old / partial saves are merged with defaults', () => {
   assert.equal(s.upgrades.maxMana, 0);
   assert.ok(s.spells.unlocked.includes('arcaneBolt'));
   assert.equal(importSave('not json'), null);
+});
+
+test('v1.3 save keys: old saves gain touch / playtest defaults; malformed checkpoints are dropped', () => {
+  const s = importSave(JSON.stringify({ schema: 1, campaign: { unlocked: 2, checkpoint: { sector: 1, zone: 2, stats: { kills: 7 } } }, stats: { kills: 3 } }));
+  assert.equal(s.settings.touchSize, 'medium');
+  assert.equal(s.settings.touchHanded, 'right');
+  assert.equal(s.settings.playtestRecords, false);
+  assert.deepEqual(s.stats.playtest, []);
+  assert.equal(s.campaign.checkpoint.zone, 2);
+  assert.equal(s.campaign.checkpoint.stats.kills, 7);
+  const bad = importSave(JSON.stringify({ schema: 1, campaign: { checkpoint: { sector: 9, zone: 'x' } } }));
+  assert.equal(bad.campaign.checkpoint, null);
+});
+
+test('v1.3 playtest records are opt-in and capped', () => {
+  const s = defaultSave();
+  const run = (i) => ({ kind: 'trial', id: 'targetRun', at: i, version: 'test', outcome: 'complete', time: i, damage: 0 });
+  assert.equal(recordPlaytest(s, run(0)), false);
+  assert.equal(s.stats.playtest.length, 0);
+  s.settings.playtestRecords = true;
+  for (let i = 0; i < PLAYTEST_CAP + 7; i++) recordPlaytest(s, run(i));
+  assert.equal(s.stats.playtest.length, PLAYTEST_CAP);
+  assert.equal(s.stats.playtest[0].at, 7);
+  assert.equal(s.stats.playtest[PLAYTEST_CAP - 1].at, PLAYTEST_CAP + 6);
 });
 
 test('asset manifest: unique IDs in the <category>/<name> convention, v1.1 assets registered', () => {

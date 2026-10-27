@@ -202,7 +202,52 @@ const liveLv = await page.evaluate(async () => {
   await new Promise((r) => setTimeout(r, 3000));
   const combat = await sample(4);
   m.setIntensity = setI;
+  window.__meter = { sample };
   return { state: a.ctx.state, calm, combat };
+});
+
+// v1.3: golem engine rumble live, at idle / full speed / bracing, and the beam over it (BUGS #16).
+// Measured on the ambient bus (where loops play) as power differences against the parked baseline.
+const golemLv = liveLv.error ? null : await page.evaluate(async () => {
+  const g = window.riftbound;
+  const inp = g.services.input;
+  const { sample } = window.__meter;
+  const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+  g.services.dev.god = true;
+  g.uiAction('deploy', 1);
+  await wait(1500);
+  const w = g.currentWorld();
+  const golem = w.actors.find((x) => x.kind === 'arcaneGolem');
+  const clear = () => { for (const x of w.actors) if (x.faction === 'army') { x.alive = false; x.removed = true; } };
+  const reset = () => { golem.x = 86; golem.z = 70.5; golem.vx = golem.vz = 0; golem.hp = golem.maxHp; golem.heat = 0; golem.overheat = 0; };
+  await wait(1500);
+  const base = (await sample(2)).ambient;
+  golem.mount(w.player);
+  await wait(300);
+  clear();
+  reset();
+  await wait(1500);
+  const idle = (await sample(1.5)).ambient;
+  reset();
+  inp.touchMoveX = -1;
+  // accelerate until the golem is at (near) top speed — the headless sim can run slower than real time
+  for (let i = 0; i < 40 && Math.hypot(golem.vx, golem.vz) < 9; i++) await wait(100);
+  const speedV = Math.hypot(golem.vx, golem.vz);
+  const speed = (await sample(1.2)).ambient;
+  reset();
+  inp.setVirtual('fire1', true);
+  await wait(1200);
+  const firing = (await sample(1.0)).ambient;
+  inp.setVirtual('fire1', false);
+  reset();
+  inp.setVirtual('ward', true);
+  await wait(1200);
+  const brace = (await sample(1.2)).ambient;
+  inp.setVirtual('ward', false);
+  inp.touchMoveX = 0;
+  const p = (db) => Math.pow(10, db / 10);
+  const minus = (a, b) => 10 * Math.log10(Math.max(1e-12, p(a) - p(b)));
+  return { base, speedV, hum: { idle: minus(idle, base), speed: minus(speed, base), brace: minus(brace, base) }, beam: minus(firing, speed) };
 });
 
 const f = (v) => (v === null || v === undefined ? '   —  ' : (v >= 0 ? ' ' : '') + v.toFixed(1).padStart(5));
@@ -220,6 +265,7 @@ if (liveLv.error) lines.push(`live: ${liveLv.error}`);
 else {
   lines.push(`live sector 1 (ctx ${liveLv.state}), K-weighted mean RMS dB   music   sfx  ambient master`);
   for (const k of ['calm', 'combat']) lines.push(`  ${k.padEnd(28)} ${f(liveLv[k].music)} ${f(liveLv[k].sfx)} ${f(liveLv[k].ambient)} ${f(liveLv[k].master)}`);
+  if (golemLv) lines.push(`live golem (ambient bus, minus rain/rift baseline): rumble idle ${f(golemLv.hum.idle)} · full speed ${f(golemLv.hum.speed)} · bracing ${f(golemLv.hum.brace)} · beam ${f(golemLv.beam)} dB`);
 }
 // balance targets (notes/design-notes.md → "Audio mix")
 const R = Object.fromEntries(offline.recipes.map((r) => [r.name, r]));
@@ -239,6 +285,9 @@ if (!liveLv.error) {
   chk('T3 Arcane Bolt over combat music', db >= 2, `${db.toFixed(1)} dB, need ≥ 2`);
 }
 chk('T4 golem beam over engine rumble', Lp.golemBeam.m100 - Lp.golemHum.m100 >= 4, `${(Lp.golemBeam.m100 - Lp.golemHum.m100).toFixed(1)} dB, need ≥ 4`);
+if (golemLv) {
+  chk('T4 golem beam over engine rumble at full speed (live)', golemLv.beam - golemLv.hum.speed >= 4, `${(golemLv.beam - golemLv.hum.speed).toFixed(1)} dB at ${golemLv.speedV.toFixed(1)} m/s, need ≥ 4`);
+}
 chk('T4 AA lock warning vs engine rumble', R.lockTone.game - Lp.golemHum.m100 >= -6, `${(R.lockTone.game - Lp.golemHum.m100).toFixed(1)} dB, need ≥ -6`);
 const hot = offline.recipes.filter((r) => r.ctx && r.peak + (r.game - r.m100) > -1);
 chk('T5 no in-game one-shot peaks above -1 dBFS (pre-compressor)', hot.length === 0, hot.map((r) => r.name).join(', ') || 'none');
@@ -246,7 +295,7 @@ lines.push('', `music bus trim ${offline.mixMusic > 0 ? '+' : ''}${offline.mixMu
 console.log(lines.join('\n'));
 if (process.env.AUDIO_JSON) {
   await mkdir(join(root, 'tests/output'), { recursive: true });
-  await writeFile(join(root, 'tests/output/audio-levels.json'), JSON.stringify({ offline, live: liveLv }, null, 1));
+  await writeFile(join(root, 'tests/output/audio-levels.json'), JSON.stringify({ offline, live: liveLv, golem: golemLv }, null, 1));
 }
 if (errors.length) console.log('--- page errors ---\n' + errors.join('\n'));
 await browser.close();
