@@ -18,7 +18,7 @@
 - `8a0b62c` — v1.1.0-beta (golem flight segment, challenge trials).
 - `4a64f2f`…`16c0d87` — v1.2.0-beta (swept golem collision, golem audio, audio balance pass, manifest registration of v1.1 assets, audio level meter). Code edits confined to `ArcaneGolem.ts`, `game.ts`, `assets_manifest.json` (additive), tests and docs; `Engine.ts`, `AudioEngine.ts` and save keys untouched.
 - `28deaf4`…`dbc7a4e` — v1.3.0-beta (mobile controls, phone layout, checkpoint resume, playtest records, live golem rumble meter, `challengeScreen` removed). `Engine.ts`, `AudioEngine.ts`, `World.ts`, save key names and asset IDs untouched.
-- next commits — v1.4.0-beta (portrait phones, export panel, overlay keep-out, playtest summary). Same protected files untouched.
+- `c9f85cc`…`d835c45` — v1.4.0-beta (portrait phones, export panel, overlay keep-out, playtest summary). Same protected files untouched.
 
 ## In progress / unfinished
 - Nothing half-done in code. Still owed (cannot be done in the cloud container): real-device FPS, Firefox/Safari/Edge, physical gamepad/touch, listening to the mix, human balance of trial stars — see `TODO.md` and `TESTING.md`.
