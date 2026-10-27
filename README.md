@@ -11,6 +11,12 @@ A centralized index of all web apps built across my 4 Gemini accounts.
 | Account 3 | Gemini-3 | [/accounts/gemini-3](/accounts/gemini-3/README.md) |
 | Account 4 | Gemini-4 | [/accounts/gemini-4](/accounts/gemini-4/README.md) |
 
+## Projects in this repo
+
+| Project | Description | Play | Status |
+|---------|-------------|------|--------|
+| [Riftbound: Spellfire & Steel](projects/riftbound-spellfire-steel/README.md) | Pseudo-isometric pixel-3D spell-slinger vs. modern military tactical shooter (TypeScript + three.js) | [`index.html`](projects/riftbound-spellfire-steel/index.html) · standalone [`dist/index.html`](projects/riftbound-spellfire-steel/dist/index.html) | 🟢 Active |
+
 ## About
 
 Each account folder contains a `README.md` listing all web apps with:

@@ -1,0 +1,24 @@
+{
+  "schema": 1,
+  "campaign": {
+    "unlocked": 3,
+    "completed": [true, true, false, false],
+    "stars": [3, 2, 0, 0],
+    "bestTimes": [251.4, 402.9, null, null],
+    "bestRatings": ["A", "B", null, null],
+    "checkpoint": null,
+    "introSeen": true
+  },
+  "shards": 185,
+  "shardsEarnedTotal": 545,
+  "upgrades": { "spellPower": 2, "maxMana": 1, "maxHealth": 1, "manaRegen": 0, "blink": 1, "wardResist": 0, "elemDuration": 0 },
+  "spells": { "unlocked": ["arcaneBolt", "flameBurst", "chainLightning", "vortexSurge"], "loadout": ["flameBurst", "chainLightning", "vortexSurge", "meteorStrike"], "inferno": false },
+  "cosmetics": { "robeGlow": "azure" },
+  "challenges": {},
+  "settings": {
+    "master": 0.8, "sfx": 0.8, "music": 0.55, "voice": 0.8, "controlScheme": "default", "touchOpacity": 0.55, "touchMode": "auto",
+    "reducedMotion": false, "aimAssist": 0.5, "colorblind": "none", "quality": "auto", "pixelStyle": "classic",
+    "narration": true, "subtitles": true, "showFps": false, "speedrunTimer": false, "haptics": true
+  },
+  "stats": { "kills": 61, "deaths": 2, "playTime": 1104.5, "missions": 2 }
+}

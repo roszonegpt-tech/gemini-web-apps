@@ -1,0 +1,124 @@
+{
+  "id": "sector4",
+  "index": 3,
+  "name": "The Rift Heart",
+  "subtitle": "This is the epicentre, Valerius. Vance is here — and so is his Goliath.",
+  "size": [96, 96],
+  "player": [48, 90],
+  "parTime": 420,
+  "music": "explore",
+  "briefing": [
+    "The dimensional epicentre: cracked earth floating in raw rift light, sweeping portal beams and the wrecks of a broken convoy.",
+    "Break through the Vanguard's last line, then face General Vance and the Iron Goliath — a dual-cannon tank protected by three shield pylons.",
+    "Destroy the pylons to drop the shield, then hit the hull. Mana wells at the arena's edge will keep you casting."
+  ],
+  "theme": {
+    "sky": "#3a0a50", "fog": "#2a0a3a", "fogNear": 50, "fogFar": 115,
+    "hemiSky": "#e6c4ff", "hemiGround": "#40204a", "hemiIntensity": 1.35,
+    "sun": "#ffe0f4", "sunIntensity": 1.55, "rain": 0,
+    "ground": "crystal", "cliff": "#3a2050", "riftColor": "#ff7bf2"
+  },
+  "ground": [
+    { "m": "scorched", "shape": "circle", "x": 30, "z": 80, "r": 6 },
+    { "m": "dirt", "shape": "path", "pts": [[48, 96], [48, 64]], "width": 4.5 },
+    { "m": "rift", "shape": "path", "pts": [[4, 70], [20, 76], [30, 72], [44, 78]], "width": 1.3, "edge": 0.3 },
+    { "m": "rift", "shape": "path", "pts": [[92, 88], [76, 80], [62, 84]], "width": 1.2, "edge": 0.3 },
+    { "m": "asphalt", "shape": "rect", "x": 34, "z": 66, "w": 28, "d": 30, "edge": 1.4 },
+    { "m": "stone", "shape": "circle", "x": 48, "z": 32, "r": 21, "edge": 0.6 },
+    { "m": "crystal", "shape": "ring", "x": 48, "z": 32, "r": 23, "r2": 21 },
+    { "m": "rift", "shape": "path", "pts": [[48, 32], [30, 14], [14, 6]], "width": 1.6, "edge": 0.4 },
+    { "m": "rift", "shape": "path", "pts": [[48, 32], [70, 20], [90, 12]], "width": 1.6, "edge": 0.4 },
+    { "m": "rift", "shape": "path", "pts": [[48, 32], [62, 50], [80, 58]], "width": 1.3, "edge": 0.4 },
+    { "m": "scorched", "shape": "circle", "x": 48, "z": 32, "r": 5 }
+  ],
+  "zones": [
+    {
+      "id": "A", "name": "The Last Line", "rect": [0, 64, 96, 96], "checkpoint": [48, 90],
+      "objectives": [{ "id": "line", "type": "eliminate", "text": "Break the Vanguard's last line" }],
+      "gate": { "type": "barrier", "a": [42, 64], "b": [54, 64] },
+      "enemies": [
+        { "k": "trooper", "x": 40, "z": 70.5 },
+        { "k": "trooper", "x": 56, "z": 70.5 },
+        { "k": "trooper", "x": 46, "z": 75 },
+        { "k": "trooper", "x": 30, "z": 78 },
+        { "k": "heavy", "x": 61, "z": 73 },
+        { "k": "drone", "x": 36, "z": 84 },
+        { "k": "drone", "x": 64, "z": 84 },
+        { "k": "sniper", "x": 80, "z": 70, "perch": true }
+      ],
+      "events": [
+        { "on": "enter", "delay": 4, "do": "subtitle", "who": "High Priestess Lyra", "text": "Feel that pull? The Heart is just beyond their barricade." }
+      ]
+    },
+    {
+      "id": "B", "name": "The Rift Heart", "rect": [0, 0, 96, 64], "checkpoint": [48, 60],
+      "objectives": [
+        { "id": "goliath", "type": "destroy", "tag": "goliath", "text": "Destroy the Iron Goliath" },
+        { "id": "vance", "type": "boss", "tag": "vance", "text": "Defeat General Vance" }
+      ],
+      "enemies": [],
+      "events": [
+        { "on": "enter", "delay": 0.6, "do": "bossIntro" }
+      ]
+    }
+  ],
+  "props": [
+    { "t": "barriers", "a": [36, 72], "b": [42, 72] },
+    { "t": "barriers", "a": [54, 72], "b": [60, 72] },
+    { "t": "barriers", "a": [54, 84], "b": [60, 84] },
+    { "t": "sandbags", "a": [27, 76], "b": [27, 82] },
+    { "t": "sandbags", "a": [44, 77], "b": [49, 77] },
+    { "t": "wreck", "x": 38, "z": 84, "rot": 90, "mat": "truck" },
+    { "t": "wreck", "x": 58, "z": 78, "rot": 0, "mat": "jeep" },
+    { "t": "tower", "x": 80, "z": 70 },
+    { "t": "barrels", "x": 66, "z": 68, "n": 3 },
+    { "t": "crates", "x": 22, "z": 70, "n": 2 },
+    { "t": "riftHazard", "x": 22, "z": 86, "r": 3 },
+    { "t": "well", "x": 14, "z": 88 },
+    { "t": "chest", "x": 86, "z": 90, "loot": "mixed" },
+    { "t": "spire", "x": 6, "z": 76, "r": 1.2 },
+    { "t": "spire", "x": 90, "z": 78, "r": 1.4 },
+    { "t": "crystal", "x": 32, "z": 90 },
+    { "t": "crystal", "x": 70, "z": 92 },
+    { "t": "rock", "x": 12, "z": 72, "r": 1.4 },
+    { "t": "rock", "x": 74, "z": 86, "r": 1.2 },
+    { "t": "island", "x": -6, "z": 84, "h": 12, "r": 4 },
+    { "t": "island", "x": 102, "z": 70, "h": 14, "r": 5 },
+    { "t": "wall", "a": [0, 64], "b": [42, 64], "h": 3, "mat": "stone" },
+    { "t": "wall", "a": [54, 64], "b": [96, 64], "h": 3, "mat": "stone" },
+
+    { "t": "goliath", "x": 48, "z": 28, "tag": "goliath" },
+    { "t": "shieldPylon", "x": 20, "z": 16, "tag": "pylon" },
+    { "t": "shieldPylon", "x": 76, "z": 16, "tag": "pylon" },
+    { "t": "shieldPylon", "x": 48, "z": 54, "tag": "pylon" },
+    { "t": "barriers", "a": [28, 42], "b": [34, 42] },
+    { "t": "barriers", "a": [62, 42], "b": [68, 42] },
+    { "t": "barriers", "a": [44, 8], "b": [52, 8] },
+    { "t": "sandbags", "a": [14, 30], "b": [14, 36] },
+    { "t": "sandbags", "a": [82, 30], "b": [82, 36] },
+    { "t": "rock", "x": 30, "z": 52, "r": 1.4 },
+    { "t": "rock", "x": 66, "z": 52, "r": 1.4 },
+    { "t": "rock", "x": 24, "z": 30, "r": 1.2 },
+    { "t": "rock", "x": 72, "z": 30, "r": 1.2 },
+    { "t": "wreck", "x": 10, "z": 22, "rot": 90, "mat": "truck" },
+    { "t": "wreck", "x": 86, "z": 22, "rot": 0, "mat": "jeep" },
+    { "t": "crystal", "x": 26, "z": 22 },
+    { "t": "crystal", "x": 70, "z": 22 },
+    { "t": "crystal", "x": 38, "z": 50 },
+    { "t": "crystal", "x": 58, "z": 50 },
+    { "t": "spire", "x": 6, "z": 6, "r": 1.6 },
+    { "t": "spire", "x": 90, "z": 6, "r": 1.6 },
+    { "t": "spire", "x": 6, "z": 54, "r": 1.3 },
+    { "t": "spire", "x": 90, "z": 54, "r": 1.3 },
+    { "t": "beam", "x": 48, "z": 32, "r": 24, "n": 0.8 },
+    { "t": "beam", "x": 48, "z": 32, "r": 14, "n": -1.3 },
+    { "t": "riftHazard", "x": 18, "z": 48, "r": 3 },
+    { "t": "riftHazard", "x": 78, "z": 48, "r": 3 },
+    { "t": "well", "x": 7, "z": 38 },
+    { "t": "well", "x": 89, "z": 38 },
+    { "t": "glyph", "x": 48, "z": 32, "r": 9, "n": 0 },
+    { "t": "island", "x": 20, "z": -6, "h": 14, "r": 5 },
+    { "t": "island", "x": 78, "z": -5, "h": 12, "r": 4 },
+    { "t": "island", "x": 104, "z": 30, "h": 16, "r": 4 }
+  ]
+}

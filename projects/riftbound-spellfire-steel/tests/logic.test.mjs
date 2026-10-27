@@ -1,0 +1,105 @@
+// Fast logic tests (no browser): bundles pure modules with esbuild and checks collision,
+// raycasting with the low-cover rule, A* pathfinding, save defaults/migration and maths.
+//   node tests/logic.test.mjs
+import * as esbuild from 'esbuild';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import assert from 'node:assert/strict';
+
+const root = join(dirname(fileURLToPath(import.meta.url)), '..');
+const entry = `
+export * from './src/core/Physics';
+export * as math from './src/utils/math';
+export { defaultSave, importSave } from './src/core/Save';
+`;
+const res = await esbuild.build({ stdin: { contents: entry, resolveDir: root, loader: 'ts' }, bundle: true, format: 'esm', write: false, platform: 'node' });
+const mod = await import(`data:text/javascript;base64,${Buffer.from(res.outputFiles[0].text).toString('base64')}`);
+const { CollisionWorld, NavGrid, CF, math, defaultSave, importSave } = mod;
+
+let passed = 0;
+const test = (name, fn) => {
+  try { fn(); passed++; console.log(`PASS ${name}`); } catch (e) { console.log(`FAIL ${name}: ${e.message}`); process.exitCode = 1; }
+};
+
+test('circle push-out from box', () => {
+  const w = new CollisionWorld(0, 0, 40, 40);
+  w.addBox(10, 10, 2, 2, CF.MOVE);
+  const out = w.resolveCircle(11.5, 10, 0.5, CF.MOVE, { x: 0, z: 0 });
+  assert.ok(out.x >= 12.49, `x=${out.x}`);
+});
+
+test('raycast hits nearest collider', () => {
+  const w = new CollisionWorld(0, 0, 40, 40);
+  w.addCircle(10, 5, 1, CF.SHOT);
+  w.addCircle(20, 5, 1, CF.SHOT);
+  const h = w.raycast(0, 5, 30, 5, CF.SHOT);
+  assert.ok(h && Math.abs(h.x - 9) < 0.01, JSON.stringify(h));
+});
+
+test('low cover next to the shooter is ignored, next to the target protects', () => {
+  const w = new CollisionWorld(0, 0, 40, 40);
+  w.addCircle(5, 10, 0.5, CF.SHOT | CF.LOW);
+  // shooter hugging the sandbag fires over it
+  assert.equal(w.raycast(4, 10, 20, 10, CF.SHOT, { sx: 4, sz: 10 }), null);
+  // a shot from far away at someone hiding behind it is blocked
+  assert.ok(w.raycast(20, 10, 4, 10, CF.SHOT, { sx: 20, sz: 10, tx: 4, tz: 10, targetExposed: false }));
+  // …unless the target is peeking (exposed)
+  assert.equal(w.raycast(20, 10, 4, 10, CF.SHOT, { sx: 20, sz: 10, tx: 4, tz: 10, targetExposed: true }), null);
+});
+
+test('tall walls block line of sight, low cover does not', () => {
+  const w = new CollisionWorld(0, 0, 40, 40);
+  w.addBox(10, 10, 0.4, 5, CF.MOVE | CF.SHOT | CF.SIGHT);
+  w.addCircle(20, 30, 0.5, CF.MOVE | CF.SHOT | CF.LOW);
+  assert.equal(w.lineOfSight(5, 10, 15, 10), false);
+  assert.equal(w.lineOfSight(15, 30, 25, 30), true);
+});
+
+test('A* routes around a wall', () => {
+  const w = new CollisionWorld(0, 0, 40, 40);
+  w.addBox(20, 15, 0.5, 14, CF.MOVE);
+  const nav = new NavGrid(0, 0, 40, 40);
+  nav.rebuild(w);
+  const path = nav.findPath(10, 15, 30, 15, w);
+  assert.ok(path && path.length >= 2, 'no path');
+  // every waypoint is walkable and the route goes around the end of the wall
+  for (let i = 0; i < path.length; i += 2) assert.ok(nav.walkable(path[i], path[i + 1]));
+  assert.ok(path.some((v, i) => i % 2 === 1 && (v > 29 || v < 1.5)), JSON.stringify(path));
+});
+
+test('nav grid updates when cover is destroyed', () => {
+  const w = new CollisionWorld(0, 0, 20, 20);
+  const c = w.addCircle(10, 10, 1, CF.MOVE);
+  const nav = new NavGrid(0, 0, 20, 20);
+  nav.rebuild(w);
+  assert.equal(nav.walkable(10, 10), false);
+  w.remove(c);
+  nav.updateRect(w, 8, 8, 12, 12);
+  assert.equal(nav.walkable(10, 10), true);
+});
+
+test('segment maths', () => {
+  assert.ok(Math.abs(math.segCircle(0, 0, 10, 0, 5, 0, 1) - 0.4) < 1e-6);
+  assert.equal(math.segAABB(0, 5, 10, 5, 2, 0, 3, 4), -1);
+  assert.ok(Math.abs(math.wrapAngle(Math.PI * 3) - Math.PI) < 1e-9);
+  assert.equal(math.formatTime(75.25), '1:15.3');
+});
+
+test('save defaults use the frozen schema keys', () => {
+  const s = defaultSave();
+  for (const k of ['schema', 'campaign', 'shards', 'shardsEarnedTotal', 'upgrades', 'spells', 'cosmetics', 'challenges', 'settings', 'stats']) assert.ok(k in s, k);
+  assert.deepEqual(Object.keys(s.upgrades).sort(), ['blink', 'elemDuration', 'manaRegen', 'maxHealth', 'maxMana', 'spellPower', 'wardResist']);
+});
+
+test('old / partial saves are merged with defaults', () => {
+  const s = importSave(JSON.stringify({ schema: 1, shards: 42, campaign: { unlocked: 3 }, upgrades: { spellPower: 2 } }));
+  assert.equal(s.shards, 42);
+  assert.equal(s.campaign.unlocked, 3);
+  assert.equal(s.campaign.completed.length, 4);
+  assert.equal(s.upgrades.spellPower, 2);
+  assert.equal(s.upgrades.maxMana, 0);
+  assert.ok(s.spells.unlocked.includes('arcaneBolt'));
+  assert.equal(importSave('not json'), null);
+});
+
+console.log(`${passed} logic tests passed`);
