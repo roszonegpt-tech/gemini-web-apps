@@ -9,7 +9,9 @@
 // (`updaters`, `cameraFocus`, `mountTarget`, `PlayerMage.mounted`) — no core files change.
 import * as THREE from 'three';
 import type { DamageInfo } from '../config/types';
+import { VERSION } from '../config/version';
 import { CF } from '../core/Physics';
+import { recordPlaytest } from '../core/Save';
 import type { World } from '../scenes/World';
 import { box, buildGolem, cyl, glowMat, mat, mesh, octa, torus, COL } from '../utils/models';
 import { propTexture, runeTexture } from '../utils/textures';
@@ -214,6 +216,7 @@ export class ArcaneGolem extends Actor {
   /** Count of hard impacts and the last impact's normal speed (read by tests / dev tools). */
   impacts = 0;
   lastImpact = 0;
+  overheats = 0;
   readonly beamMat: THREE.MeshBasicMaterial;
   private beam: THREE.Mesh;
   private rings: THREE.Object3D[] = [];
@@ -418,6 +421,7 @@ export class ArcaneGolem extends Actor {
       if (this.heat >= 1) {
         this.heat = 1;
         this.overheat = GOLEM.overheatLock;
+        this.overheats++;
         this.firing = false;
         this.chargeT = 0;
         w.floatText(this.x, this.y + 3, this.z, 'BEAM OVERHEATED', '#ffb04a');
@@ -968,6 +972,9 @@ export class GolemSegment {
   private dismountUi: DismountPrompt;
   private hinted = false;
   private disposed = false;
+  // v1.3 playtest metrics (recorded on dispose when the player opted in)
+  private metrics = { mounted: 0, armourLost: 0, impacts: 0, overheats: 0, missilesDown: 0, crashes: 0 };
+  private lastHp = GOLEM.hp;
 
   constructor(world: World) {
     this.world = world;
@@ -1046,6 +1053,8 @@ export class GolemSegment {
       }, 9000);
     }
     if (g && g.mounted) {
+      this.metrics.mounted += dt;
+      if (g.hp < this.lastHp) this.metrics.armourLost += this.lastHp - g.hp;
       if (!this.spawned) this.spawnCourse();
       p.focus = this.dismountUi;
       if (w.input.pressed('interact') && g.canDismount()) g.dismount();
@@ -1059,9 +1068,11 @@ export class GolemSegment {
         w.subtitle('High Priestess Lyra', 'The battery is silent! Bring the golem back over solid ground and dismount.', 4);
       }
     }
+    if (g) this.lastHp = g.hp;
     // golem destroyed → crash, rider thrown clear, golem re-forms at the shrine
     if (g && !g.alive) {
       if (g.rider) {
+        this.metrics.crashes++;
         const r = g.rider;
         g.rider = null;
         r.mounted = false;
@@ -1082,6 +1093,8 @@ export class GolemSegment {
       }
       this.respawnT -= dt;
       if (this.respawnT <= 0) {
+        this.metrics.impacts += g.impacts;
+        this.metrics.overheats += g.overheats;
         g.removed = true;
         this.spawnGolem(true);
         w.banner('THE GOLEM RE-FORMS AT ITS SHRINE', 'info');
@@ -1133,6 +1146,7 @@ export class GolemSegment {
       if (pointSegDist(m.x, m.z, ox, oz, ex, ez) < 0.9) {
         m.alive = false;
         m.mesh.removeFromParent();
+        this.metrics.missilesDown++;
         this.world.explode(m.x, m.z, 1.6, 0, 'explosive', null, { faction: 'neutral', shake: 0.1, small: true });
         this.world.floatText(m.x, m.y + 0.5, m.z, 'MISSILE DOWN', '#9cf6ff');
       }
@@ -1158,7 +1172,24 @@ export class GolemSegment {
     }
   }
 
+  /** v1.3: opt-in local playtest record of this golem segment (only if the golem was flown). */
+  recordRun(): void {
+    const m = this.metrics;
+    if (m.mounted < 1) return;
+    const g = this.golem;
+    const save = this.world.services.save;
+    const ok = recordPlaytest(save, {
+      kind: 'golem', id: 'sector2-golem', at: Date.now(), version: VERSION,
+      outcome: this.aaDone() ? 'aa-destroyed' : 'incomplete',
+      time: Math.round(m.mounted * 10) / 10, damage: Math.round(m.armourLost),
+      impacts: m.impacts + (g ? g.impacts : 0), overheats: m.overheats + (g ? g.overheats : 0),
+      missilesDown: m.missilesDown, crashes: m.crashes, towersLeft: this.towers.filter((t) => t.alive).length,
+    });
+    if (ok) this.world.services.persist();
+  }
+
   dispose(): void {
+    if (!this.disposed) this.recordRun();
     this.disposed = true;
     for (const m of this.missiles) m.mesh.removeFromParent();
     this.missiles = [];

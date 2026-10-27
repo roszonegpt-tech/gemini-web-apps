@@ -1,5 +1,6 @@
 // Menu screens (DOM): title, campaign rift map, briefing + loadout, Grimoire Upgrade
-// Sanctum, settings, credits, challenge trials, pause, dimensional map, results, defeat.
+// Sanctum, settings, credits, pause, dimensional map, results, defeat.
+// (Challenge Trials live in UISystem since v1.1.)
 import { INFERNO_COST, ROBE_GLOWS, SECONDARY_SPELLS, SECTORS, SPELLS, UPGRADE_COSTS, UPGRADE_MAX, UPGRADES } from '../config/balance';
 import type { LevelData, SecondarySpellId, SpellId } from '../config/types';
 import { GAME_TITLE, VERSION } from '../config/version';
@@ -59,10 +60,23 @@ function bind(root: HTMLElement, host: ScreenHost, map: Record<string, () => voi
 
 // ------------------------------------------------------------------ title
 
+/** v1.3: label for the saved checkpoint, or null when there is nothing to continue. */
+export function checkpointLabel(save: SaveData, levels: LevelData[]): string | null {
+  const cp = save.campaign.checkpoint;
+  if (!cp || !levels[cp.sector] || cp.zone <= 0 || cp.zone >= levels[cp.sector].zones.length) return null;
+  return `Sector ${cp.sector + 1} · checkpoint ${cp.zone + 1}`;
+}
+
+/** v1.3: true when the browser can enter fullscreen (not iPhone Safari). */
+export function canFullscreen(): boolean {
+  return !!(document.fullscreenEnabled && document.documentElement.requestFullscreen);
+}
+
 export function titleScreen(host: ScreenHost): HTMLElement {
   const s = host.save;
+  const cont = checkpointLabel(s, host.levels);
   const root = h(`
-    <div class="screen" data-back="none">
+    <div class="screen title" data-back="none">
       <div class="magic-circle"></div>
       <div class="title-logo">
         <div class="t1">RIFTBOUND</div>
@@ -70,7 +84,8 @@ export function titleScreen(host: ScreenHost): HTMLElement {
         <div class="t3">Chapter One · The Shattered Threshold</div>
       </div>
       <div class="menu" role="menu">
-        <button class="btn primary" data-act="play" role="menuitem">Play Campaign</button>
+        ${cont ? `<button class="btn primary" data-act="continue" role="menuitem">Continue · ${cont}</button>` : ''}
+        <button class="btn${cont ? '' : ' primary'}" data-act="play" role="menuitem">Play Campaign</button>
         <button class="btn" data-act="challenges" role="menuitem">Challenge Trials</button>
         <button class="btn" data-act="sanctum" role="menuitem">Spell Grimoire</button>
         <button class="btn" data-act="settings" role="menuitem">Settings</button>
@@ -79,6 +94,7 @@ export function titleScreen(host: ScreenHost): HTMLElement {
       <div class="footer-note">v${VERSION} · <span class="shards">${s.shards}</span> Crystal Shards · Progress saves automatically</div>
     </div>`);
   bind(root, host, {
+    continue: () => host.action('continueCheckpoint'),
     play: () => host.action('playCampaign'),
     challenges: () => host.go('challenges'),
     sanctum: () => host.go('sanctum', 'title'),
@@ -92,6 +108,7 @@ export function titleScreen(host: ScreenHost): HTMLElement {
 
 export function campaignScreen(host: ScreenHost): HTMLElement {
   const c = host.save.campaign;
+  const cont = checkpointLabel(host.save, host.levels);
   const cards = SECTORS.map((m, i) => {
     const locked = i >= c.unlocked;
     const best = c.bestTimes[i];
@@ -108,6 +125,7 @@ export function campaignScreen(host: ScreenHost): HTMLElement {
         <p>Four sectors of the fused warzone stand between you and General Vance. Clear each to unseal the next.</p>
         <div class="sector-grid">${cards}</div>
         <div class="btn-row">
+          ${cont ? `<button class="btn primary" data-act="continue">Continue · ${cont}</button>` : ''}
           <button class="btn" data-act="intro">Replay Rift Briefing</button>
           <button class="btn" data-act="sanctum">Grimoire Sanctum</button>
           <button class="btn" data-act="back">Back</button>
@@ -123,6 +141,7 @@ export function campaignScreen(host: ScreenHost): HTMLElement {
     });
   });
   bind(root, host, {
+    continue: () => host.action('continueCheckpoint'),
     intro: () => host.action('intro'),
     sanctum: () => host.go('sanctum', 'campaign'),
     back: () => host.go('title'),
@@ -357,6 +376,8 @@ const SETTING_SPECS: SettingSpec[] = [
   { key: 'aimAssist', label: 'Aim-assist strength', type: 'range', min: 0, max: 1, step: 0.1 },
   { key: 'touchMode', label: 'Touch controls', type: 'select', options: [['auto', 'Automatic'], ['on', 'Always on'], ['off', 'Off']] },
   { key: 'touchOpacity', label: 'Touch control opacity', type: 'range', min: 0.15, max: 1, step: 0.05 },
+  { key: 'touchSize', label: 'Touch button size', type: 'select', options: [['small', 'Small'], ['medium', 'Medium'], ['large', 'Large']] },
+  { key: 'touchHanded', label: 'Touch layout', type: 'select', options: [['right', 'Right-handed (aim + buttons right)'], ['left', 'Left-handed (mirrored)']] },
   { key: 'haptics', label: 'Haptic feedback', type: 'check' },
   { key: 'reducedMotion', label: 'Reduced motion (no shake / flashes / tilt)', type: 'check' },
   { key: 'colorblind', label: 'Colour-blind mode', type: 'select', options: [['none', 'Off'], ['deuteranopia', 'Deuteranopia'], ['protanopia', 'Protanopia'], ['tritanopia', 'Tritanopia']] },
@@ -366,6 +387,7 @@ const SETTING_SPECS: SettingSpec[] = [
   { key: 'narration', label: 'Narrated briefings (offline system voice)', type: 'check' },
   { key: 'speedrunTimer', label: 'Speedrun timer', type: 'check' },
   { key: 'showFps', label: 'Show FPS', type: 'check' },
+  { key: 'playtestRecords', label: 'Record playtest runs (stays on this device)', type: 'check' },
 ];
 
 export function settingsScreen(host: ScreenHost, back: unknown): HTMLElement {
@@ -387,8 +409,16 @@ export function settingsScreen(host: ScreenHost, back: unknown): HTMLElement {
         <h3>Controls</h3>
         <p style="font-size:0.85em"><b>Keyboard &amp; mouse:</b> WASD / Arrows move · Mouse aims · LMB Arcane Bolt (hold) · RMB secondary spell · 1–4 / wheel select spell · Space Blink · Shift Ward (hold; raise just before a hit to reflect) · E interact / R channel · Q Frost Bomb · F Health / G Mana potion · Esc pause · Tab map · ~ dev console · F8 free camera · F7 orbit camera · F12 / F9 screenshot</p>
         <p style="font-size:0.85em"><b>Gamepad:</b> L-stick move · R-stick aim · R2 Arcane Bolt · R1 secondary · L2 Ward · A Blink · X Channel / interact · B Potion · Y cycle spell · L1 Frost Bomb · D-pad spell slots · Start pause</p>
-        <p style="font-size:0.85em"><b>Touch:</b> left stick move · right stick aim + auto-cast · BLINK · WARD (hold) · SPELL · USE · POTION · BOMB · CYCLE</p>
+        <p style="font-size:0.85em"><b>Touch:</b> left stick move · right stick aim + auto-cast · BLINK · WARD (hold) · SPELL (shows the selected spell) · USE · POTION · BOMB · CYCLE · MAP. On the Arcane Golem: aim = beam · VOLLEY · DASH · BRACE · LAND. Trials hide the actions their rules lock. Left-handed mode mirrors the layout.</p>
+        <h3>Playtest records</h3>
+        <p style="font-size:0.85em" class="pt-count">${(host.save.stats.playtest || []).length} run(s) recorded (newest 50 kept). Records list trial and golem-segment runs (time, damage, stars, impacts…) and never leave this device unless you copy or export them.</p>
         <div class="btn-row">
+          <button class="btn small" data-act="ptcopy">Copy records</button>
+          <button class="btn small" data-act="ptexport">Export records (.json)</button>
+          <button class="btn small" data-act="ptclear">Clear records</button>
+        </div>
+        <div class="btn-row">
+          ${canFullscreen() ? '<button class="btn" data-act="fullscreen">Toggle Fullscreen</button>' : ''}
           <button class="btn" data-act="reset">Reset Save Data…</button>
           <button class="btn primary" data-act="back" data-autofocus>Done</button>
         </div>
@@ -407,8 +437,36 @@ export function settingsScreen(host: ScreenHost, back: unknown): HTMLElement {
   });
   bind(root, host, {
     back: () => goBack(host, back),
+    // v1.3: confirm inside the page (browser dialogs are blocked in embedded views)
     reset: () => {
-      if (window.confirm('Erase all campaign progress, shards and upgrades? Settings are kept.')) host.action('resetSave');
+      const b = root.querySelector('[data-act="reset"]') as HTMLButtonElement;
+      if (b.dataset.armed === '1') { host.action('resetSave'); return; }
+      b.dataset.armed = '1';
+      b.textContent = 'Tap again to erase all progress (settings are kept)';
+      b.classList.add('danger');
+      setTimeout(() => {
+        if (!b.isConnected) return;
+        b.dataset.armed = '';
+        b.textContent = 'Reset Save Data…';
+        b.classList.remove('danger');
+      }, 4000);
+    },
+    fullscreen: () => host.action('fullscreen'),
+    ptcopy: () => {
+      const text = JSON.stringify(host.save.stats.playtest || [], null, 1);
+      const note = root.querySelector('.pt-count') as HTMLElement;
+      const done = (msg: string) => { note.textContent = msg; };
+      try {
+        navigator.clipboard.writeText(text).then(() => done(`Copied ${(host.save.stats.playtest || []).length} run(s) to the clipboard.`), () => done('Copy was blocked here — use Export instead.'));
+      } catch {
+        done('Copy is not available here — use Export instead.');
+      }
+    },
+    ptexport: () => host.action('exportPlaytest'),
+    ptclear: () => {
+      host.save.stats.playtest = [];
+      host.persist();
+      (root.querySelector('.pt-count') as HTMLElement).textContent = '0 run(s) recorded.';
     },
   });
   return root;
@@ -433,33 +491,6 @@ export function creditsScreen(host: ScreenHost): HTMLElement {
   return root;
 }
 
-// ------------------------------------------------------------------ challenges (sector speedruns)
-
-export function challengeScreen(host: ScreenHost): HTMLElement {
-  const c = host.save.campaign;
-  const rows = SECTORS.map((m, i) => {
-    const ok = c.completed[i];
-    const best = c.bestTimes[i];
-    return `<div class="up-row"><div><b>Speedrun · Sector ${i + 1}: ${m.name}</b><div class="desc">${ok ? `Best clear: ${best ? formatTime(best) : '—'}` : 'Complete this sector in the campaign to unlock.'}</div></div><div>${starsHtml(c.stars[i])}</div>
-      <button class="btn small center" data-run="${i}" ${ok ? '' : 'disabled'}>Run</button></div>`;
-  }).join('');
-  const root = h(`
-    <div class="screen cosmic" data-back="title">
-      <div class="panel sanctum">
-        <h2>Challenge Trials</h2>
-        <p>Replay any cleared sector against the clock. The speedrun timer is shown on the HUD and best times are saved.</p>
-        ${rows}
-        <div class="btn-row"><button class="btn primary" data-act="back" data-autofocus>Back</button></div>
-      </div>
-    </div>`);
-  root.querySelectorAll<HTMLButtonElement>('[data-run]').forEach((b) => b.addEventListener('click', () => {
-    host.playUi('uiClick');
-    host.action('speedrun', Number(b.dataset.run));
-  }));
-  bind(root, host, { back: () => host.go('title') });
-  return root;
-}
-
 // ------------------------------------------------------------------ pause & map
 
 export function pauseScreen(host: ScreenHost): HTMLElement {
@@ -468,17 +499,19 @@ export function pauseScreen(host: ScreenHost): HTMLElement {
       <div class="magic-circle"></div>
       <div class="panel" style="min-width:20em">
         <h2>Paused</h2>
-        <div class="menu">
+        <div class="menu cols-short">
           <button class="btn primary" data-act="resume" data-autofocus>Resume</button>
           <button class="btn" data-act="map">Dimensional Map &amp; Objectives</button>
           <button class="btn" data-act="settings">Controls / Audio Settings</button>
           <button class="btn" data-act="checkpoint">Restart from Checkpoint</button>
           <button class="btn" data-act="restart">Restart Mission</button>
           <button class="btn" data-act="menu">Main Menu</button>
+          ${canFullscreen() ? '<button class="btn" data-act="fullscreen">Toggle Fullscreen</button>' : ''}
         </div>
       </div>
     </div>`);
   bind(root, host, {
+    fullscreen: () => host.action('fullscreen'),
     resume: () => host.action('resume'),
     map: () => host.go('map'),
     settings: () => host.go('settings', 'pause'),

@@ -15,7 +15,16 @@
         "stars": { "type": "array", "items": { "type": "integer", "minimum": 0, "maximum": 3 } },
         "bestTimes": { "type": "array", "items": { "type": ["number", "null"] }, "description": "Best clear time per sector (seconds)" },
         "bestRatings": { "type": "array", "items": { "type": ["string", "null"], "enum": ["S", "A", "B", "C", "D", null] } },
-        "checkpoint": { "type": ["object", "null"], "properties": { "sector": { "type": "integer" }, "zone": { "type": "integer" } } },
+        "checkpoint": {
+          "type": ["object", "null"],
+          "description": "Last reached mission checkpoint. v1.3 also stores stats, consumables and savedAt so a reload can resume (Continue).",
+          "properties": {
+            "sector": { "type": "integer" }, "zone": { "type": "integer" },
+            "stats": { "type": "object", "description": "v1.3: mission stats snapshot (numbers)" },
+            "consumables": { "type": ["object", "null"], "properties": { "hp": { "type": "integer" }, "mp": { "type": "integer" }, "bombs": { "type": "integer" } } },
+            "savedAt": { "type": "number", "description": "v1.3: epoch ms" }
+          }
+        },
         "introSeen": { "type": "boolean" }
       }
     },
@@ -56,12 +65,30 @@
         "colorblind": { "enum": ["none", "deuteranopia", "protanopia", "tritanopia"] },
         "quality": { "enum": ["auto", "high", "medium", "low"] }, "pixelStyle": { "enum": ["crisp", "classic", "chunky"] },
         "narration": { "type": "boolean" }, "subtitles": { "type": "boolean" }, "showFps": { "type": "boolean" },
-        "speedrunTimer": { "type": "boolean" }, "haptics": { "type": "boolean" }
+        "speedrunTimer": { "type": "boolean" }, "haptics": { "type": "boolean" },
+        "touchSize": { "enum": ["small", "medium", "large"], "description": "v1.3: touch button scale" },
+        "touchHanded": { "enum": ["right", "left"], "description": "v1.3: left = mirrored touch layout" },
+        "playtestRecords": { "type": "boolean", "description": "v1.3: opt-in local playtest records (default false)" }
       }
     },
     "stats": {
       "type": "object",
-      "properties": { "kills": { "type": "integer" }, "deaths": { "type": "integer" }, "playTime": { "type": "number" }, "missions": { "type": "integer" } }
+      "properties": {
+        "kills": { "type": "integer" }, "deaths": { "type": "integer" }, "playTime": { "type": "number" }, "missions": { "type": "integer" },
+        "playtest": {
+          "type": "array", "maxItems": 50,
+          "description": "v1.3: opt-in local playtest records (newest last, capped at 50). Never sent anywhere.",
+          "items": {
+            "type": "object",
+            "required": ["kind", "id", "at", "version", "outcome", "time", "damage"],
+            "properties": {
+              "kind": { "enum": ["trial", "golem"] }, "id": { "type": "string" }, "at": { "type": "number" }, "version": { "type": "string" },
+              "outcome": { "type": "string" }, "time": { "type": "number" }, "damage": { "type": "number" }
+            },
+            "additionalProperties": { "type": ["number", "string"] }
+          }
+        }
+      }
     }
   }
 }

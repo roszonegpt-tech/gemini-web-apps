@@ -8,7 +8,7 @@ import { AudioEngine } from './audio/AudioEngine';
 import { Music } from './audio/Music';
 import type { EnemyKind, LevelData } from './config/types';
 import { Engine, type QualityLevel } from './core/Engine';
-import { Input } from './core/Input';
+import { Input, type Action } from './core/Input';
 import { importSave, loadSave, resetSave, writeSave, type SaveData } from './core/Save';
 import type { DevFlags, Services } from './core/Services';
 import { StateManager } from './core/StateManager';
@@ -20,7 +20,7 @@ import { ChallengeScene, type TrialId } from './scenes/ChallengeScene';
 import { MissionScene, type MissionHost } from './scenes/MissionScene';
 import { StoryScene } from './scenes/StoryScene';
 import { TitleScene } from './scenes/TitleScene';
-import type { World } from './scenes/World';
+import { emptyStats, type World } from './scenes/World';
 import { DevTools, downloadText, pickFile, type DevHost } from './systems/DevTools';
 import { UISystem, type UiGame } from './systems/UISystem';
 import { VERSION } from './config/version';
@@ -266,12 +266,50 @@ export class Game implements UiGame, MissionHost, DevHost {
       case 'applySettings':
         this.applySettings();
         break;
+      case 'continueCheckpoint': {
+        // v1.3: resume the checkpoint saved before the page was closed
+        const cp = save.campaign.checkpoint;
+        const level = cp ? this.levels[cp.sector] : null;
+        if (!cp || !level || cp.zone <= 0 || cp.zone >= level.zones.length) { this.ui.go('campaign'); break; }
+        this.ui.hideScreens();
+        this.states.change('mission', {
+          sector: cp.sector, startZone: cp.zone,
+          stats: { ...emptyStats(), ...(cp.stats || {}) },
+          consumables: cp.consumables || null,
+        });
+        this.ui.banner('CHECKPOINT RESTORED', 'checkpoint');
+        break;
+      }
+      case 'fullscreen':
+        this.toggleFullscreen();
+        break;
+      case 'exportPlaytest':
+        downloadText(`riftbound-playtest-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify({ game: 'riftbound', version: VERSION, runs: save.stats.playtest || [] }, null, 1));
+        break;
       case 'resetSave': {
         this.services.save = resetSave(this.services.settings);
         this.applySettings();
         this.ui.go('title');
         break;
       }
+    }
+  }
+
+  /** v1.3: fullscreen + landscape lock where the browser allows it (Android Chrome, desktop). */
+  private toggleFullscreen(): void {
+    const doc = document as Document & { webkitFullscreenElement?: Element };
+    try {
+      if (doc.fullscreenElement || doc.webkitFullscreenElement) {
+        void doc.exitFullscreen().catch(() => undefined);
+        return;
+      }
+      const req = document.documentElement.requestFullscreen({ navigationUI: 'hide' });
+      void req.then(() => {
+        const o = screen.orientation as ScreenOrientation & { lock?: (o: string) => Promise<void> };
+        if (o && o.lock) o.lock('landscape').catch(() => undefined);
+      }).catch(() => this.ui.toast('Fullscreen is not available in this view'));
+    } catch {
+      this.ui.toast('Fullscreen is not available in this view');
     }
   }
 
@@ -319,6 +357,10 @@ export class Game implements UiGame, MissionHost, DevHost {
 
   onMissionEnd(): void {
     /* results flow is handled by MissionScene */
+  }
+
+  trialTouchRules(): { hide: Action[]; aim: Action | null } | null {
+    return this.states.is('challenge') ? this.challenge.touchRules() : null;
   }
 
   handleGlobalKeys(w: World): void {

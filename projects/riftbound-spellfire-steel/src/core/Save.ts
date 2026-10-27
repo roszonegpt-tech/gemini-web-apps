@@ -22,7 +22,34 @@ export interface Settings {
   showFps: boolean;
   speedrunTimer: boolean;
   haptics: boolean;
+  // v1.3 (added keys)
+  touchSize: 'small' | 'medium' | 'large';
+  touchHanded: 'right' | 'left';
+  playtestRecords: boolean;
 }
+
+/** v1.3: a mission checkpoint that survives page reloads (stored in campaign.checkpoint). */
+export interface SavedCheckpoint {
+  sector: number;
+  zone: number;
+  stats?: Record<string, number>;
+  consumables?: { hp: number; mp: number; bombs: number } | null;
+  savedAt?: number;
+}
+
+/** v1.3: one opt-in, local-only playtest record (trial run or golem segment). */
+export interface PlaytestRun {
+  kind: 'trial' | 'golem';
+  id: string;
+  at: number;
+  version: string;
+  outcome: string;
+  time: number;
+  damage: number;
+  [metric: string]: string | number;
+}
+
+export const PLAYTEST_CAP = 50;
 
 export interface ChallengeRecord {
   bestTime: number | null;
@@ -38,7 +65,7 @@ export interface SaveData {
     stars: number[];
     bestTimes: (number | null)[];
     bestRatings: (string | null)[];
-    checkpoint: { sector: number; zone: number } | null;
+    checkpoint: SavedCheckpoint | null;
     introSeen: boolean;
   };
   shards: number;
@@ -52,7 +79,7 @@ export interface SaveData {
   cosmetics: { robeGlow: string };
   challenges: Record<string, ChallengeRecord>;
   settings: Settings;
-  stats: { kills: number; deaths: number; playTime: number; missions: number };
+  stats: { kills: number; deaths: number; playTime: number; missions: number; playtest: PlaytestRun[] };
 }
 
 export function defaultSettings(): Settings {
@@ -74,6 +101,9 @@ export function defaultSettings(): Settings {
     showFps: false,
     speedrunTimer: false,
     haptics: true,
+    touchSize: 'medium',
+    touchHanded: 'right',
+    playtestRecords: false,
   };
 }
 
@@ -96,7 +126,7 @@ export function defaultSave(): SaveData {
     cosmetics: { robeGlow: 'violet' },
     challenges: {},
     settings: defaultSettings(),
-    stats: { kills: 0, deaths: 0, playTime: 0, missions: 0 },
+    stats: { kills: 0, deaths: 0, playTime: 0, missions: 0, playtest: [] },
   };
 }
 
@@ -143,6 +173,10 @@ function sanitize(s: SaveData): SaveData {
   if (s.spells.unlocked.indexOf('arcaneBolt') < 0) s.spells.unlocked.unshift('arcaneBolt');
   if (s.spells.loadout.length !== 4) s.spells.loadout = defaultSave().spells.loadout;
   s.shards = Math.max(0, Math.floor(s.shards));
+  // v1.3: drop a malformed checkpoint instead of resuming into a broken mission
+  const cp = c.checkpoint;
+  if (cp && !(Number.isInteger(cp.sector) && cp.sector >= 0 && cp.sector < 4 && Number.isInteger(cp.zone) && cp.zone >= 0 && cp.zone < 8)) c.checkpoint = null;
+  if (!Array.isArray(s.stats.playtest)) s.stats.playtest = [];
   return s;
 }
 
@@ -177,4 +211,13 @@ export function importSave(json: string): SaveData | null {
   } catch {
     return null;
   }
+}
+
+/** v1.3: appends a playtest record (only when the player opted in), keeping the newest PLAYTEST_CAP. */
+export function recordPlaytest(save: SaveData, run: PlaytestRun): boolean {
+  if (!save.settings.playtestRecords) return false;
+  const list = Array.isArray(save.stats.playtest) ? save.stats.playtest : (save.stats.playtest = []);
+  list.push(run);
+  if (list.length > PLAYTEST_CAP) list.splice(0, list.length - PLAYTEST_CAP);
+  return true;
 }

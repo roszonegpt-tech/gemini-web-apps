@@ -7,6 +7,9 @@
 import * as THREE from 'three';
 import { SECONDARY_SPELLS } from '../config/balance';
 import type { DamageInfo, EnemyKind, LevelData } from '../config/types';
+import { VERSION } from '../config/version';
+import type { Action } from '../core/Input';
+import { recordPlaytest } from '../core/Save';
 import type { GameState } from '../core/StateManager';
 import type { Services } from '../core/Services';
 import { CF } from '../core/Physics';
@@ -416,7 +419,29 @@ export class ChallengeScene implements GameState {
     this.svc.engine.resetWarmup();
   }
 
+  /** v1.3: touch layout for this trial — locked actions are hidden, the aim stick casts the allowed spell. */
+  touchRules(): { hide: Action[]; aim: Action | null } {
+    if (this.trial.id === 'targetRun') return { hide: ['bomb', 'cycle'], aim: 'fire2' };
+    if (this.trial.id === 'barrierSurvival') return { hide: ['fire2', 'bomb', 'potion', 'cycle'], aim: null };
+    return { hide: [], aim: 'fire1' };
+  }
+
+  /** v1.3: opt-in local playtest record of this run (Settings → Record playtest runs). */
+  private record(outcome: string, res?: TrialResult): void {
+    const w = this.world;
+    if (!w) return;
+    const time = res ? res.time : this.t;
+    const ok = recordPlaytest(this.svc.save, {
+      kind: 'trial', id: this.trial.id, at: Date.now(), version: VERSION, outcome,
+      time: Math.round(time * 10) / 10, damage: Math.round(w.stats.damageTaken),
+      stars: res ? res.stars : 0, kills: w.stats.kills + this.destroyed, score: res ? res.score : 0,
+      targets: this.destroyed, wave: this.wave,
+    });
+    if (ok) this.svc.persist();
+  }
+
   exit(): void {
+    if (this.world && !this.ended && this.t > 1) this.record('quit');
     for (const n of this.nests) n.dispose();
     this.nests = [];
     if (this.world) this.world.dispose();
@@ -427,6 +452,7 @@ export class ChallengeScene implements GameState {
   }
 
   restart(): void {
+    if (this.world && !this.ended && this.t > 1) this.record('restart');
     for (const n of this.nests) n.dispose();
     if (this.world) this.world.dispose();
     this.world = null;
@@ -550,6 +576,7 @@ export class ChallengeScene implements GameState {
     this.svc.audio.stopAllLoops();
     const res = gradeTrial(this.trial, victory, reason, this.trial.id === 'barrierSurvival' ? Math.min(180, this.t) : this.t, w.stats.damageTaken, w.stats.kills + this.destroyed);
     applyTrialReward(this.svc, res);
+    this.record(victory ? 'complete' : reason, res);
     this.svc.music.play(victory ? 'victory' : 'none');
     setTimeout(() => {
       if (this.world !== w) return;

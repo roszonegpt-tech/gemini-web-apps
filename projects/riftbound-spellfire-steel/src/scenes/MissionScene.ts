@@ -62,12 +62,20 @@ export class MissionScene implements GameState {
       banner: (t, k) => ui.banner(t, k),
       subtitle: (who, t, d) => ui.subtitle(who, t, d),
       hit: (dir, amt) => ui.hit(dir, amt),
-      checkpoint: () => { this.checkpointCons = w.player.snapshotConsumables(); },
+      checkpoint: (zone) => {
+        this.checkpointCons = w.player.snapshotConsumables();
+        this.persistCheckpoint(zone);
+      },
       complete: () => this.onComplete(),
       failed: (reason) => this.onFailed(reason),
       bossIntro: () => this.bossIntro(),
       pan: (x, z, dur) => this.pan(x, z, dur),
     };
+    // v1.3: a fresh deploy replaces any saved checkpoint; resuming keeps it
+    if (!p.startZone && this.svc.save.campaign.checkpoint) {
+      this.svc.save.campaign.checkpoint = null;
+      this.svc.persist();
+    }
     this.svc.music.play('explore');
     this.svc.input.gameplayActive = true;
     ui.hideScreens();
@@ -104,6 +112,16 @@ export class MissionScene implements GameState {
     this.svc.input.gameplayActive = true;
     this.svc.input.clearAll();
     this.host.ui.hideScreens();
+  }
+
+  /** v1.3: stores the checkpoint (zone, stats, consumables) so a page reload can resume it. */
+  private persistCheckpoint(zone: number): void {
+    const w = this.world;
+    if (!w || this.params.speedrun || zone <= 0) return;
+    const stats: Record<string, number> = {};
+    for (const [k, v] of Object.entries(w.stats)) if (typeof v === 'number') stats[k] = v;
+    this.svc.save.campaign.checkpoint = { sector: this.params.sector, zone, stats, consumables: this.checkpointCons, savedAt: Date.now() };
+    this.svc.persist();
   }
 
   restartCheckpoint(): void {
