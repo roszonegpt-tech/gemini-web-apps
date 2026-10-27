@@ -63,10 +63,17 @@ main.ts ─► Game (game.ts)
 - `scenes/ChallengeScene.ts` — a GameState that builds a World from an inline arena `LevelData` (mode `challenge`), applies trial rules via `World.updaters` (loadout restrictions through cooldowns, target spawns, minigun nests, mortar barrages, wave director), grades stars, writes `SaveData.challenges[id]` and converts new stars into shards.
 - `systems/UISystem.ts` — overrides the `challenges` screen (trials + speedruns), adds `trialResults`, and the golem armour/heat gauges.
 
+## v1.2 additions
+- `ArcaneGolem.moveSwept()` — sub-stepped (≤ ¼ radius) swept circle against `CF.FLY` colliders and the `CORRIDOR` rectangle union; reflects velocity about the push normal; `onImpact()` handles camera trauma, particles, scrape sound and threshold self-damage. Golem knockback is folded into velocity (`applyKnock` override).
+- Golem loops keep handles to their nodes (`engineNodes`, `beamNodes`) so `tuneEngine()` / `tuneBeam()` can modulate pitch and filters every frame through plain Web Audio params — `AudioEngine` still owns the loops.
+- `game.ts` → `AUDIO_MIX` + `installAudioMix()` — wraps the AudioEngine instance's `play` / `loopVolume` once at startup to apply per-sound / per-loop dB trims, and trims the music volume passed to `setVolumes`. `Game.audioMix` exposes the table to tests.
+- `tests/audio-levels.mjs` — renders each recipe in an `OfflineAudioContext` (seeded noise), meters K-weighted/phone-proxy levels and the live buses, and checks the mix targets.
+
 ## Extension points (used by later builds)
 - `World.updaters` — per-frame hooks (e.g. vehicles, trial logic) without editing `World`.
 - `World.cameraFocus`, `World.mountTarget` — camera follow override and enemy target override.
 - `AudioEngine.registerRecipe(name, fn)` — new synthesized sounds.
+- `AUDIO_MIX` (`game.ts`) — mix trims in dB for recipes, loops and the music bus.
 - `UISystem.extraScreens` — register new menu screens.
 - `Game.uiAction` / `MissionScene` hooks — new flows.
 - `levels/*.json` — new props/zones/events without code changes.
@@ -88,5 +95,5 @@ main.ts ─► Game (game.ts)
 | `src/systems/ObjectiveSystem.ts` | Zone objectives, markers, checkpoints |
 | `src/entities/*` | Player, enemies, boss, interactables, allies |
 | `src/scenes/*` | World, mission/title/story/challenge states |
-| `src/entities/ArcaneGolem.ts` | v1.1 golem flight segment + aerial obstacles |
+| `src/entities/ArcaneGolem.ts` | v1.1 golem flight segment + aerial obstacles; v1.2 swept collision + golem audio |
 | `src/scenes/ChallengeScene.ts` | v1.1 challenge trials, grading, rewards |

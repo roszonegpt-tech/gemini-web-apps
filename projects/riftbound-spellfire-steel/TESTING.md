@@ -3,11 +3,38 @@
 ## How to run
 ```bash
 npm run typecheck                 # strict TypeScript, 0 errors expected
-npm run test:logic                # 9 node logic tests (no browser)
+npm run test:logic                # 10 node logic tests (no browser)
 npm run test:smoke                # headless Chromium end-to-end (needs Playwright: npm i -D playwright)
 SMOKE_TARGET=dist npm run test:smoke   # same, against the standalone dist/index.html
+npm run test:audio                # v1.2 audio level meter + mix targets (exits 1 if a target fails)
+AUDIO_TARGET=dist/releases/riftbound-v1.1.0-beta.html npm run test:audio   # meter an archived build
 ```
 Screenshots from the smoke run land in `tests/output/` (git-ignored).
+
+## Results — v1.2.0-beta (2026-10-27, Linux, headless Chromium + SwiftShader)
+
+### Verified (automated)
+| Check | How | Result |
+|---|---|---|
+| Typecheck + build (bundle 868 KB, standalone 890 KB, `dist/releases/riftbound-v1.2.0-beta.html`) | `tsc`, `npm run build` | ✅ |
+| Logic tests incl. new manifest consistency test (unique IDs, convention, 19 v1.1 IDs, every recipe registered) | `tests/logic.test.mjs` | ✅ 10/10 |
+| Full regression: all sectors, victory flow, ward 80%, pause/checkpoint, boss → ending → results, golem install + mount, trials start, touch layout | `tests/smoke.mjs` (folder build **and** `SMOKE_TARGET=dist`) | ✅ 17/17 each |
+| Golem never inside tall geometry or outside the corridor at dash speed: edges, inside corner, rift-wall and barrier gates, 120 seeded random dashes | smoke step | ✅ 0 bad frames |
+| Same, exhaustive: 345 runs / 11 478 frames incl. every reachable FLY collider from 8 directions + 300 random dashes | probe (v1.1 build for comparison: 21 grazing frames, max 0.07 m) | ✅ 0 bad frames |
+| Impact response: dash into the north edge bounces back (vz < 0), chips 5–25 armour (non-lethal), camera trauma 0.31 | smoke step + probe | ✅ |
+| Golem recipes registered; dismount on solid ground → landing → stomp (landing flag clears, golem settles) | smoke step | ✅ |
+| v1.1 golem flow still works with the beam charge-up: mount, fly over the fence, beam damages AA tower (300 → 187), course spawns, AA objective completes, dismount | probe | ✅ |
+| Trials I–III regression with the v1.2 mix (loadouts, barrage, 5 waves → results, records, star → shard conversion) | probe | ✅ 7/7 |
+| Audio mix targets T1–T5 (casts over rifle fire on full-range + phone proxy, rain under bolt, music vs ambient bed, golem beam / lock warning vs rumble, no hot peaks) | `npm run test:audio` (v1.1 build: 4/11) | ✅ 11/11 |
+| No console errors / no recovered runtime errors in any of the above | all | ✅ |
+
+### Not verified (v1.2) — could not be performed in the cloud container
+These items from the v1.2 prompt need real hardware or a person and remain open (see `TODO.md`):
+- **FPS at 1080p** on a desktop GPU, iPad and iPhone, and auto-quality behaviour on them. Only headless SwiftShader software rendering was available (14–17 FPS there; not representative).
+- **Firefox, Safari 14.1+ (macOS + iOS), Edge** manual passes — only Chromium is automated here.
+- **Real gamepad during golem flight** (stick drift, R2 beam, L2 brace, A dash) and **physical touch** play.
+- **Audio by ear** on desktop speakers and phone speakers — v1.2 balanced the mix against objective, approximately K-weighted measurements only.
+- **Human balance pass** of Challenge Trial star thresholds, golem beam/AA balance, impact self-damage and the 0.15 s beam charge-up.
 
 ## Results — v1.1.0-beta (2026-10-27, Linux, headless Chromium + SwiftShader)
 

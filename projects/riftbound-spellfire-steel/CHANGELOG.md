@@ -7,6 +7,42 @@ Git commits (and tags, once merged) are the authoritative history.
 ## [Unreleased]
 - Nothing yet.
 
+## [1.2.0-beta] — 2026-10-27
+Implements `prompts/archive/v1.2.0-beta.md`. Code changes are confined to the files that prompt allows
+(`src/entities/ArcaneGolem.ts`, `src/game.ts`, `assets_manifest.json` — additive only — plus tests and docs);
+`src/core/Engine.ts`, `src/audio/AudioEngine.ts` and the save schema are unchanged.
+
+### Added
+- **Swept golem collision response:** the flight step is split into sub-steps of ≤ ¼ radius (≤ 0.35 m at the 22 m/s
+  dash), each resolved against `CF.FLY` geometry (spires, hangars, tall walls, gates) and a two-rectangle flight
+  corridor with a correct inside corner; velocity reflects about the contact normal (restitution 0.35, scrape 0.85);
+  knockback is swept too. Hard impacts: camera bump, stone chips + sparks, `golemScrape` crunch; light, non-lethal
+  self-damage above 12 m/s (softened by Stone Brace).
+- **Golem audio:** engine rumble whose pitch / filter / grind follow speed and Stone Brace; beam pitch rising with
+  heat; 0.15 s beam charge-up (sound + core flare + converging sparks) and ignition crack; heat-warning ticks above
+  80%; overheat steam hiss + venting; twin stone footfalls + dust when the golem lands after a dismount or re-forms
+  (now dropping onto its shrine). New recipes: `golemScrape`, `golemStomp`, `golemCharge`, `golemOverheat`, `golemHeatWarn`.
+- **Audio balance pass:** `AUDIO_MIX` dB trims in `src/game.ts` layered over the public AudioEngine API (music bus +4.5,
+  player casts +2…+5, rifle −1.5, rain −14, rift drone −8) and rebalanced golem levels; measured before/after in
+  `notes/design-notes.md`.
+- `tests/audio-levels.mjs` (`npm run test:audio`): offline, seeded, approximately K-weighted level meter for every recipe
+  and loop + live bus meter + 11 mix-target checks (v1.1: 4/11 pass, v1.2: 11/11).
+- `assets_manifest.json`: 24 new IDs (the 19 v1.1 assets + 5 v1.2 golem sounds), with a `since` field; no IDs renamed.
+- Tests: logic test for manifest consistency (every synthesized recipe registered), smoke steps for dash-speed
+  collision (edges, inside corner, gates, 120 seeded random dashes) and for golem audio / landing / mix table.
+
+### Changed
+- The AA missile **lock warning** sounds inside the golem (non-positional) and is longer/louder, so it is heard at any
+  lock range over the engine and beam.
+- `package.json` (and the stale `package-lock.json` header) version → 1.2.0-beta; new standalone build
+  `dist/releases/riftbound-v1.2.0-beta.html`.
+
+### Fixed
+- Golem could graze up to 0.07 m into tall geometry at dash speed and stick on the corridor's inside corner
+  (BUGS #11): 0 penetrating frames in 11 478 dash-speed frames after the change (v1.1: 21).
+- Explosion knockback moved the airborne golem with the ground resolver (low cover could block it, and it could be
+  pushed past the corridor edge).
+
 ## [1.1.0-beta] — 2026-10-27
 Implements `prompts/archive/v1.1.0-beta.md`. Code changes are confined to the four files the prompt allows
 (`src/entities/ArcaneGolem.ts`, `src/scenes/ChallengeScene.ts`, `src/systems/UISystem.ts`, `src/game.ts`);

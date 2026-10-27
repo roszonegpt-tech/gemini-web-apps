@@ -9,7 +9,7 @@ fused warzone of floating crystal islands, muddy trenches, airfields and bunkers
 - **Tech:** TypeScript + three.js (WebGL), Web Audio synthesis, Canvas 2D. No external assets:
   every model, texture, sound effect and music track is generated at runtime.
 - **Offline:** 100% offline after load. Ships as a static folder *and* a single standalone HTML file.
-- **Version:** 1.1.0-beta — see [`VERSION.md`](VERSION.md) · history in [`CHANGELOG.md`](CHANGELOG.md).
+- **Version:** 1.2.0-beta — see [`VERSION.md`](VERSION.md) · history in [`CHANGELOG.md`](CHANGELOG.md).
 
 ## Play
 
@@ -40,6 +40,17 @@ Supported: Chrome/Edge 90+, Firefox 88+, Safari 14.1+ (desktop, iPad, iPhone, An
 | Dev console · free cam · orbit cam · screenshot | ` (tilde) · F8 · F7 · F12/F9 | — | — |
 
 "Control mapping" in Settings swaps Space/Shift. Menus support Tab / arrow keys / Enter / Esc and the D-pad + A/B.
+
+## New in v1.2.0-beta
+
+- **Golem flight polish:** the golem now glides and bounces cleanly off the flight-corridor edges, spires and gates at
+  full dash speed (swept collision), with a camera bump, stone chips and a scrape on hard impacts (slamming in at dash
+  speed chips a little armour; Stone Brace softens it).
+- **Golem sound:** a stone/arcane engine rumble that rises with speed and darkens while bracing, a beam charge-up and
+  ignition, beam pitch that climbs with heat, heat-warning ticks, an overheat steam hiss and heavy footfalls when it lands.
+  The AA missile lock warning now sounds inside the golem.
+- **Audio balance pass:** spells read clearly over gunfire, the rain and rift beds sit under the spells, and the music
+  is a little louder — measured with `npm run test:audio` (details in `notes/design-notes.md`).
 
 ## New in v1.1.0-beta
 
@@ -92,6 +103,7 @@ npm run build        # src/ → assets/js/riftbound.js + dist/index.html + dist/
 npm run typecheck    # tsc --noEmit (strict)
 npm run test:logic   # node logic tests (collision, low-cover rule, A*, save migration)
 npm run test:smoke   # headless Chromium end-to-end smoke test (needs Playwright)
+npm run test:audio   # audio level meter + mix-balance targets (needs Playwright)
 npm run serve        # static dev server on :8080
 ```
 
@@ -122,7 +134,7 @@ riftbound-spellfire-steel/
 │  ├─ systems/                # Spell, Projectile, Particle, Fx, LightPool, Prop, Camera, LevelBuilder,
 │  │                          #   Objective, UISystem, DevTools
 │  ├─ entities/               # Actor, PlayerMage, VanguardEnemy, Boss, Interactables, AllyGolem,
-│  │                          #   ArcaneGolem (v1.1 flight segment)
+│  │                          #   ArcaneGolem (v1.1 flight segment, v1.2 swept collision + audio)
 │  ├─ scenes/                 # World (mission sim), MissionScene, TitleScene, StoryScene,
 │  │                          #   ChallengeScene (v1.1 trials)
 │  ├─ ui/                     # Hud, Screens, Overlay2D, Minimap, TouchControls, icons
@@ -131,10 +143,10 @@ riftbound-spellfire-steel/
 ├─ levels/                    # sector1–4.json hand-crafted level data
 ├─ saves/                     # save-schema.json + example-save.json
 ├─ dist/                      # standalone single-file builds (index.html + releases/)
-├─ tests/                     # logic.test.mjs, smoke.mjs (output/ is git-ignored)
+├─ tests/                     # logic.test.mjs, smoke.mjs, audio-levels.mjs (output/ is git-ignored)
 ├─ notes/                     # design notes, reference-look analysis
 ├─ docs/                      # extra documentation
-├─ prompts/                   # next-build.md (v1.2) + archive/ (v1.1 prompt)
+├─ prompts/                   # next-build.md (v1.3) + archive/ (v1.1, v1.2 prompts)
 └─ scripts/                   # build.mjs, serve.mjs
 ```
 
