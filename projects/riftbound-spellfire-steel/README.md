@@ -9,7 +9,7 @@ fused warzone of floating crystal islands, muddy trenches, airfields and bunkers
 - **Tech:** TypeScript + three.js (WebGL), Web Audio synthesis, Canvas 2D. No external assets:
   every model, texture, sound effect and music track is generated at runtime.
 - **Offline:** 100% offline after load. Ships as a static folder *and* a single standalone HTML file.
-- **Version:** see [`VERSION.md`](VERSION.md) · history in [`CHANGELOG.md`](CHANGELOG.md).
+- **Version:** 1.1.0-beta — see [`VERSION.md`](VERSION.md) · history in [`CHANGELOG.md`](CHANGELOG.md).
 
 ## Play
 
@@ -40,6 +40,18 @@ Supported: Chrome/Edge 90+, Firefox 88+, Safari 14.1+ (desktop, iPad, iPhone, An
 | Dev console · free cam · orbit cam · screenshot | ` (tilde) · F8 · F7 · F12/F9 | — | — |
 
 "Control mapping" in Settings swaps Space/Shift. Menus support Tab / arrow keys / Enter / Esc and the D-pad + A/B.
+
+## New in v1.1.0-beta
+
+- **Arcane Golem flight (Sector 2):** awaken the golem at the shrine by the flooded trenches (hold **E**),
+  fly it over the fence into the flooded strip and destroy the Vanguard anti-air battery. LMB / R2 chest
+  beam (watch the heat gauge), RMB / R1 Stone Volley, Space / A Rift Dash, Shift / L2 Stone Brace,
+  **E** to dismount over solid ground. Obstacles: homing AA missiles (shoot them down with the beam),
+  radar mines, barrier-pylon fences, sandbag emplacements, an attack helicopter.
+- **Challenge Trials** (title → Challenge Trials): *Arcane Target Run* (25 targets, Flame Burst only, 90 s),
+  *Barrier Survival* (3 minutes of mortars + miniguns, Ward and Blink only), *Rift Onslaught* (5 waves incl.
+  helicopters, all spells). 1–3 stars on time and damage; each new star = 40 Crystal Shards (+25 first clear)
+  for the Grimoire Sanctum. Sector speedruns live on the same menu.
 
 ## Features (v1.0.0-gold)
 
@@ -109,8 +121,10 @@ riftbound-spellfire-steel/
 │  ├─ audio/                  # AudioEngine (SFX synth), Music (procedural soundtrack)
 │  ├─ systems/                # Spell, Projectile, Particle, Fx, LightPool, Prop, Camera, LevelBuilder,
 │  │                          #   Objective, UISystem, DevTools
-│  ├─ entities/               # Actor, PlayerMage, VanguardEnemy, Boss, Interactables, AllyGolem
-│  ├─ scenes/                 # World (mission sim), MissionScene, TitleScene, StoryScene
+│  ├─ entities/               # Actor, PlayerMage, VanguardEnemy, Boss, Interactables, AllyGolem,
+│  │                          #   ArcaneGolem (v1.1 flight segment)
+│  ├─ scenes/                 # World (mission sim), MissionScene, TitleScene, StoryScene,
+│  │                          #   ChallengeScene (v1.1 trials)
 │  ├─ ui/                     # Hud, Screens, Overlay2D, Minimap, TouchControls, icons
 │  ├─ config/                 # balance tables, shared types, version
 │  └─ utils/                  # math, rng, procedural textures + models
@@ -120,7 +134,7 @@ riftbound-spellfire-steel/
 ├─ tests/                     # logic.test.mjs, smoke.mjs (output/ is git-ignored)
 ├─ notes/                     # design notes, reference-look analysis
 ├─ docs/                      # extra documentation
-├─ prompts/                   # next-build.md (+ archive/)
+├─ prompts/                   # next-build.md (v1.2) + archive/ (v1.1 prompt)
 └─ scripts/                   # build.mjs, serve.mjs
 ```
 

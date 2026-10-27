@@ -7,7 +7,9 @@ main.ts ─► Game (game.ts)
             ├─ Services: Engine · Input · AudioEngine · Music · SaveData · DevFlags
             ├─ StateManager ── TitleScene  (3D diorama behind menus)
             │                ├ MissionScene (campaign gameplay → World)
+            │                ├ ChallengeScene (v1.1 trials → World with inline arena)
             │                └ StoryScene   (2D narrative: intro / ending)
+            ├─ GolemSegment (v1.1, installed into Sector 2 mission worlds by Game)
             ├─ UISystem ── Hud · Overlay2D · Minimap · TouchControls · Screens (DOM menus)
             └─ DevTools (~ console)
 ```
@@ -56,6 +58,11 @@ main.ts ─► Game (game.ts)
 ### Persistence
 - `core/Save.ts`, key `riftbound.save.v1`. Stored JSON is deep-merged over defaults (older/partial saves upgrade safely). **Key names are frozen.**
 
+## v1.1 additions
+- `entities/ArcaneGolem.ts` — `GolemSegment` is installed by `Game.attachGolemSegment()` whenever a Sector 2 mission World is (re)built. It adds the shrine + mount interactables, the AA towers, and a required zone-B objective, and registers its per-frame logic in `World.updaters`. Mounting sets `PlayerMage.mounted`, `World.cameraFocus` and `World.mountTarget` (enemies retarget the golem). Flight collides with `CF.FLY` geometry and a corridor test (`allowed()`); the beam is an XZ hitscan against actors, then `SIGHT|FLY` geometry, and also shoots down AA missiles. Sounds use `registerRecipe` / `loopVolume` builders.
+- `scenes/ChallengeScene.ts` — a GameState that builds a World from an inline arena `LevelData` (mode `challenge`), applies trial rules via `World.updaters` (loadout restrictions through cooldowns, target spawns, minigun nests, mortar barrages, wave director), grades stars, writes `SaveData.challenges[id]` and converts new stars into shards.
+- `systems/UISystem.ts` — overrides the `challenges` screen (trials + speedruns), adds `trialResults`, and the golem armour/heat gauges.
+
 ## Extension points (used by later builds)
 - `World.updaters` — per-frame hooks (e.g. vehicles, trial logic) without editing `World`.
 - `World.cameraFocus`, `World.mountTarget` — camera follow override and enemy target override.
@@ -80,4 +87,6 @@ main.ts ─► Game (game.ts)
 | `src/systems/LevelBuilder.ts` | Level JSON → world |
 | `src/systems/ObjectiveSystem.ts` | Zone objectives, markers, checkpoints |
 | `src/entities/*` | Player, enemies, boss, interactables, allies |
-| `src/scenes/*` | World, mission/title/story states |
+| `src/scenes/*` | World, mission/title/story/challenge states |
+| `src/entities/ArcaneGolem.ts` | v1.1 golem flight segment + aerial obstacles |
+| `src/scenes/ChallengeScene.ts` | v1.1 challenge trials, grading, rewards |

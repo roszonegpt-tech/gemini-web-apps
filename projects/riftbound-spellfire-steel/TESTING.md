@@ -9,6 +9,29 @@ SMOKE_TARGET=dist npm run test:smoke   # same, against the standalone dist/index
 ```
 Screenshots from the smoke run land in `tests/output/` (git-ignored).
 
+## Results — v1.1.0-beta (2026-10-27, Linux, headless Chromium + SwiftShader)
+
+### Verified (automated)
+| Check | How | Result |
+|---|---|---|
+| Typecheck + build (bundle 862 KB, standalone 884 KB) | `tsc`, `npm run build` | ✅ |
+| Logic tests | `tests/logic.test.mjs` | ✅ 9/9 |
+| Full v1.0 regression (all sectors, victory flow, ward 80%, pause/checkpoint, boss → ending → results, touch layout) | `tests/smoke.mjs` | ✅ 13/13 |
+| Golem segment installed only in Sector 2 (4 AA towers, AA objective, shrine) and mounting sets camera/target | smoke | ✅ |
+| Trials menu reachable from the title; all three trials start | smoke | ✅ |
+| Shrine prompt → hold E mounts; WASD flight with drift crosses the fence into the flooded strip; flight bounds hold | probe | ✅ |
+| Chest beam damages AA tower (300 → 48 HP in ~3 s) and heat builds (0.92); obstacles spawn (mines, 4 pylons, 3 emplacements) | probe | ✅ |
+| Destroying all AA towers completes the objective; dismount on solid ground restores the mage | probe | ✅ |
+| Trial I: Flame-Burst-only loadout, targets immune to non-fire damage, 25 targets → results, record saved, 3★ → +145 shards | probe | ✅ |
+| Trial II: spells/potions/bombs locked, minigun + mortar barrage active, survive 3:00 → results + record | probe (time fast-forwarded, god mode) | ✅ |
+| Trial III: waves 1→5 progress (dropships, drones, helicopters) → results + record | probe (dev kill-all between waves) | ✅ |
+| No console errors / no recovered runtime errors in any of the above | all | ✅ |
+
+### Not verified (v1.1)
+- Golem flight feel, beam/AA balance and trial star thresholds with a human player.
+- Gamepad during golem flight (only the stubbed Gamepad API was exercised, on foot).
+- Everything listed under v1.0 "Not verified" below still applies.
+
 ## Results — v1.0.0-gold (2026-10-27, Linux, headless Chromium + SwiftShader)
 
 ### Verified (automated)

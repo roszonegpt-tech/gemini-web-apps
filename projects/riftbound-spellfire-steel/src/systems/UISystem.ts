@@ -1,14 +1,18 @@
 // UI orchestration: menu screens with full keyboard / gamepad focus navigation and
 // hover sounds, the HUD, 2D overlay, minimap, touch controls, banners, subtitles and
 // screen flashes. Game logic talks to the UI only through this class.
+import { SECTORS } from '../config/balance';
 import type { LevelData } from '../config/types';
 import type { Services } from '../core/Services';
+import { ArcaneGolem, GOLEM } from '../entities/ArcaneGolem';
+import { FIRST_CLEAR_SHARDS, SHARDS_PER_STAR, TRIALS, totalTrialStars, type TrialResult } from '../scenes/ChallengeScene';
 import type { World } from '../scenes/World';
+import { formatTime } from '../utils/math';
 import { Hud } from '../ui/Hud';
 import { Minimap } from '../ui/Minimap';
 import { Overlay2D } from '../ui/Overlay2D';
 import {
-  briefingScreen, campaignScreen, challengeScreen, creditsScreen, defeatScreen, mapScreen, pauseScreen, resultsScreen,
+  briefingScreen, campaignScreen, creditsScreen, defeatScreen, mapScreen, pauseScreen, resultsScreen,
   sanctumScreen, settingsScreen, titleScreen, type ResultsData, type ScreenHost,
 } from '../ui/Screens';
 import { TouchControls } from '../ui/TouchControls';
@@ -48,6 +52,11 @@ export class UISystem implements ScreenHost {
   private lastBanner = '';
   private lastBannerT = 0;
   private heartbeatT = 0;
+  private golemHud: HTMLElement;
+  private golemArmor: HTMLElement;
+  private golemHeat: HTMLElement;
+  private golemText: HTMLElement;
+  private golemName: HTMLElement;
 
   constructor(game: UiGame) {
     this.game = game;
@@ -63,6 +72,18 @@ export class UISystem implements ScreenHost {
     this.minimap = new Minimap(this.hud.minimap);
     this.touch = new TouchControls(document.getElementById('touch') as HTMLElement, game.services.input);
     this.touch.onPause = () => game.uiAction('pause');
+    // v1.1: Arcane Golem armour + beam heat gauges (shown while mounted)
+    this.golemHud = document.createElement('div');
+    this.golemHud.className = 'hidden';
+    this.golemHud.style.cssText = 'position:absolute;left:50%;bottom:0.9em;transform:translateX(-50%);width:32em;max-width:54%;text-align:center;pointer-events:none';
+    this.golemHud.innerHTML = '<div class="golem-name" style="font-size:0.8em;letter-spacing:0.15em;color:#9cf6ff;text-shadow:0 1px 2px #000">ARCANE GOLEM</div>'
+      + '<div class="bar"><div class="fill" data-g="armor" style="background:linear-gradient(90deg,#6a6478,#b2acc6)"></div><div class="txt" data-g="txt"></div></div>'
+      + '<div class="bar" style="height:0.6em"><div class="fill" data-g="heat" style="background:linear-gradient(90deg,#4fc8ff,#ffb04a,#ff4a2a)"></div></div>';
+    this.hudEl.appendChild(this.golemHud);
+    this.golemArmor = this.golemHud.querySelector('[data-g="armor"]') as HTMLElement;
+    this.golemHeat = this.golemHud.querySelector('[data-g="heat"]') as HTMLElement;
+    this.golemText = this.golemHud.querySelector('[data-g="txt"]') as HTMLElement;
+    this.golemName = this.golemHud.querySelector('.golem-name') as HTMLElement;
     this.screensEl.addEventListener('mouseover', (e) => {
       const t = (e.target as HTMLElement).closest('.btn, .sector-card, .slot');
       if (t && performance.now() - this.lastHover > 60) {
@@ -109,7 +130,8 @@ export class UISystem implements ScreenHost {
       case 'sanctum': el = sanctumScreen(this, data); break;
       case 'settings': el = settingsScreen(this, data); break;
       case 'credits': el = creditsScreen(this); break;
-      case 'challenges': el = challengeScreen(this); break;
+      case 'challenges': el = this.trialsScreen(); break;
+      case 'trialResults': el = this.trialResultsScreen(data as TrialResult); break;
       case 'pause': el = pauseScreen(this); break;
       case 'map': {
         const w = this.game.currentWorld();
@@ -283,6 +305,107 @@ export class UISystem implements ScreenHost {
       if (this.heartbeatT <= 0) { this.heartbeatT = 1.0; svc.audio.play('heartbeat', { vol: 0.6 }); }
     }
     if (p.wardBreakFlash > 0.35) this.flash('ward');
+    // golem gauges
+    const g = w.mountTarget;
+    if (g instanceof ArcaneGolem && g.alive) {
+      this.golemHud.classList.remove('hidden');
+      this.golemArmor.style.width = `${Math.max(0, (g.hp / g.maxHp) * 100).toFixed(1)}%`;
+      this.golemHeat.style.width = `${(g.heat * 100).toFixed(1)}%`;
+      const keys = svc.input.lastDevice === 'pad' ? ['R2', 'R1', 'A', 'L2'] : svc.input.lastDevice === 'touch' ? ['AIM', 'SPELL', 'BLINK', 'WARD'] : ['LMB', 'RMB', 'SPACE', 'SHIFT'];
+      const t = `STONE ARMOUR ${Math.ceil(g.hp)} / ${GOLEM.hp}${g.overheat > 0 ? ' · BEAM OVERHEATED' : ''}`;
+      if (this.golemText.textContent !== t) this.golemText.textContent = t;
+      const n = `ARCANE GOLEM · ${keys[0]} beam · ${keys[1]} volley · ${keys[2]} dash · ${keys[3]} brace`;
+      if (this.golemName.textContent !== n) this.golemName.textContent = n;
+    } else if (!this.golemHud.classList.contains('hidden')) this.golemHud.classList.add('hidden');
+  }
+
+  // ------------------------------------------------------------ v1.1 challenge trial screens
+
+  private stars(n: number): string {
+    let s = '';
+    for (let i = 0; i < 3; i++) s += i < n ? '★' : '<span class="off">★</span>';
+    return `<span class="stars">${s}</span>`;
+  }
+
+  private trialsScreen(): HTMLElement {
+    const save = this.save;
+    const c = save.campaign;
+    const total = totalTrialStars(this.game.services);
+    const wrap = document.createElement('div');
+    wrap.className = 'screen cosmic';
+    wrap.dataset.back = 'title';
+    const trials = TRIALS.map((t) => {
+      const rec = save.challenges[t.id];
+      const best = rec ? `Best ${rec.bestTime !== null ? formatTime(rec.bestTime) : '—'} · score ${rec.bestScore}` : 'Not yet attempted';
+      return `<div class="up-row"><div><b>${t.short} · ${escapeHtml(t.name)}</b> <span style="color:var(--muted);font-size:0.8em">(${escapeHtml(t.rules)})</span>
+        <div class="desc">${escapeHtml(t.desc)}</div><div class="desc">★ ${t.stars.map(escapeHtml).join(' · ★ ')}</div><div class="desc">${best}</div></div>
+        <div>${this.stars(rec ? rec.stars : 0)}</div>
+        <button class="btn small center" data-trial="${t.id}">Play</button></div>`;
+    }).join('');
+    const runs = SECTORS.map((m, i) => {
+      const ok = c.completed[i];
+      const best = c.bestTimes[i];
+      return `<div class="up-row"><div><b>Speedrun · Sector ${i + 1}: ${m.name}</b><div class="desc">${ok ? `Best clear: ${best ? formatTime(best) : '—'}` : 'Complete this sector in the campaign to unlock.'}</div></div><div>${this.stars(c.stars[i])}</div>
+        <button class="btn small center" data-run="${i}" ${ok ? '' : 'disabled'}>Run</button></div>`;
+    }).join('');
+    wrap.innerHTML = `<div class="panel sanctum">
+        <h2>Challenge Trials</h2>
+        <p>Challenge Stars earned: <b style="color:var(--gold)">${total} / ${TRIALS.length * 3}</b> · every new star converts into <span class="shards">${SHARDS_PER_STAR}</span> Crystal Shards (+${FIRST_CLEAR_SHARDS} for a first clear) for the Grimoire Sanctum.</p>
+        ${trials}
+        <h3>Sector Speedruns</h3>${runs}
+        <div class="btn-row"><button class="btn primary" data-act="back" data-autofocus>Back</button></div>
+      </div>`;
+    wrap.querySelectorAll<HTMLButtonElement>('[data-trial]').forEach((b) => b.addEventListener('click', () => {
+      this.playUi('uiClick');
+      this.game.uiAction('trial', b.dataset.trial);
+    }));
+    wrap.querySelectorAll<HTMLButtonElement>('[data-run]').forEach((b) => b.addEventListener('click', () => {
+      this.playUi('uiClick');
+      this.game.uiAction('speedrun', Number(b.dataset.run));
+    }));
+    (wrap.querySelector('[data-act="back"]') as HTMLElement).addEventListener('click', () => { this.playUi('uiBack'); this.go('title'); });
+    return wrap;
+  }
+
+  private trialResultsScreen(r: TrialResult): HTMLElement {
+    const wrap = document.createElement('div');
+    wrap.className = 'screen cosmic';
+    wrap.dataset.back = 'none';
+    const reasons: Record<string, string> = { cleared: 'Trial cleared', survived: 'You survived the barrage', timeout: 'Time expired', fallen: 'Fallen in battle' };
+    const rows: [string, string][] = [
+      ['Result', reasons[r.reason] || r.reason],
+      [r.trial.id === 'barrierSurvival' ? 'Time survived' : 'Time', formatTime(r.time)],
+      ['Damage taken', String(Math.round(r.damage))],
+      [r.trial.id === 'targetRun' ? 'Targets / kills' : 'Kills', String(r.kills)],
+      ['Score', String(r.score)],
+    ];
+    wrap.innerHTML = `<div class="panel results">
+        <h2>${r.victory ? 'Trial Complete' : 'Trial Failed'}</h2>
+        <p>${escapeHtml(r.trial.short)} · ${escapeHtml(r.trial.name)}</p>
+        <div style="display:flex;justify-content:space-around;align-items:center;margin:0.6em 0">
+          <div><div style="color:var(--muted);font-size:0.8em">CHALLENGE STARS</div><div class="big-stars">${this.stars(r.stars)}</div></div>
+          <div><div style="color:var(--muted);font-size:0.8em">CRYSTAL SHARDS</div><div class="shards" style="font-size:1.8em">+${r.shards}</div></div>
+        </div>
+        ${r.victory && r.stars > r.prevStars ? `<p style="color:var(--ok)">${r.stars - r.prevStars} new Challenge Star${r.stars - r.prevStars > 1 ? 's' : ''} converted into Crystal Shards!</p>` : ''}
+        ${r.newBest ? '<p style="color:var(--arc)">New best score!</p>' : ''}
+        <p style="font-size:0.85em">★ ${r.trial.stars.map(escapeHtml).join(' · ★ ')}</p>
+        <div class="stat-grid">${rows.map(([a, b]) => `<div><span>${escapeHtml(a)}</span><b>${escapeHtml(b)}</b></div>`).join('')}</div>
+        <div class="btn-row">
+          <button class="btn primary" data-a="retry" data-autofocus>Retry</button>
+          <button class="btn" data-a="trials">Challenge Trials</button>
+          <button class="btn" data-a="sanctum">Grimoire Sanctum</button>
+          <button class="btn" data-a="menu">Main Menu</button>
+        </div>
+      </div>`;
+    const act = (a: string) => {
+      this.playUi('uiClick');
+      if (a === 'retry') this.game.uiAction('trial', r.trial.id);
+      else if (a === 'trials') this.game.uiAction('toTitleScreen', 'challenges');
+      else if (a === 'sanctum') this.game.uiAction('toTitleScreen', 'sanctum');
+      else this.game.uiAction('mainMenu');
+    };
+    wrap.querySelectorAll<HTMLButtonElement>('[data-a]').forEach((b) => b.addEventListener('click', () => act(b.dataset.a as string)));
+    return wrap;
   }
 
   resize(): void {

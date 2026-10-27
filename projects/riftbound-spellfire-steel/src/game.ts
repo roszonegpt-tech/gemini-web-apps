@@ -12,9 +12,11 @@ import { Input } from './core/Input';
 import { importSave, loadSave, resetSave, writeSave, type SaveData } from './core/Save';
 import type { DevFlags, Services } from './core/Services';
 import { StateManager } from './core/StateManager';
+import { installGolemSegment, type GolemSegment } from './entities/ArcaneGolem';
 import { GoliathTank } from './entities/Boss';
 import { Catalyst, ManaWell } from './entities/Interactables';
 import { VanguardEnemy } from './entities/VanguardEnemy';
+import { ChallengeScene, type TrialId } from './scenes/ChallengeScene';
 import { MissionScene, type MissionHost } from './scenes/MissionScene';
 import { StoryScene } from './scenes/StoryScene';
 import { TitleScene } from './scenes/TitleScene';
@@ -34,6 +36,10 @@ export class Game implements UiGame, MissionHost, DevHost {
   title: TitleScene;
   mission: MissionScene;
   story: StoryScene;
+  challenge: ChallengeScene;
+  /** v1.1 Arcane Golem flight segment, attached to Sector 2 mission worlds. */
+  private golemSeg: GolemSegment | null = null;
+  private golemWorld: World | null = null;
   private polled = false;
   private firstStep = false;
 
@@ -57,9 +63,11 @@ export class Game implements UiGame, MissionHost, DevHost {
     this.title = new TitleScene(svc);
     this.mission = new MissionScene(this);
     this.story = new StoryScene(svc);
+    this.challenge = new ChallengeScene(this);
     this.states.register(this.title);
     this.states.register(this.mission);
     this.states.register(this.story);
+    this.states.register(this.challenge);
     engine.onResize = () => this.ui.resize();
     engine.onQualityChange = (q, auto) => this.onQuality(q, auto);
     audio.onUnlock = () => music.resume();
@@ -96,10 +104,13 @@ export class Game implements UiGame, MissionHost, DevHost {
       this.polled = true;
       this.firstStep = true;
     }
+    this.attachGolemSegment();
     this.states.update(dt);
     if (this.firstStep) {
       if (inp.pressed('dev')) this.devTools.toggle();
-      if (!this.states.is('mission') || this.mission.pausedOverlay || this.mission.ended) this.ui.navUpdate();
+      const inMission = this.states.is('mission') && !this.mission.pausedOverlay && !this.mission.ended;
+      const inTrial = this.states.is('challenge') && !this.challenge.pausedOverlay && !this.challenge.ended;
+      if (!inMission && !inTrial) this.ui.navUpdate();
       this.devTools.update(dt);
       if (this.states.is('title')) this.ui.update(dt, null, false, null);
     }
@@ -114,7 +125,17 @@ export class Game implements UiGame, MissionHost, DevHost {
 
   currentWorld(): World | null {
     if (this.states.is('mission')) return this.mission.world;
+    if (this.states.is('challenge')) return this.challenge.world;
     return null;
+  }
+
+  /** Installs / removes the golem flight segment whenever the Sector 2 world is (re)built. */
+  private attachGolemSegment(): void {
+    const w = this.states.is('mission') ? this.mission.world : null;
+    if (w === this.golemWorld) return;
+    if (this.golemSeg) this.golemSeg.dispose();
+    this.golemSeg = w ? installGolemSegment(w) : null;
+    this.golemWorld = w;
   }
 
   persist(): void {
@@ -123,6 +144,7 @@ export class Game implements UiGame, MissionHost, DevHost {
 
   private autoPause(): void {
     if (this.states.is('mission') && !this.mission.ended && !this.mission.pausedOverlay) this.mission.pause();
+    if (this.states.is('challenge') && !this.challenge.ended && !this.challenge.pausedOverlay) this.challenge.pause();
   }
 
   applySettings(): void {
@@ -173,16 +195,30 @@ export class Game implements UiGame, MissionHost, DevHost {
         this.startMission(data as number, true);
         break;
       case 'pause':
-        this.mission.pause();
+        if (this.states.is('challenge')) this.challenge.pause();
+        else this.mission.pause();
         break;
       case 'resume':
-        this.mission.resume();
+        if (this.states.is('challenge')) this.challenge.resume();
+        else this.mission.resume();
         break;
       case 'restartCheckpoint':
-        if (this.states.is('mission')) { this.ui.hideScreens(); this.mission.restartCheckpoint(); }
-        break;
       case 'restartMission':
-        if (this.states.is('mission')) { this.ui.hideScreens(); this.mission.restartMission(); }
+        if (this.states.is('mission')) {
+          this.ui.hideScreens();
+          if (name === 'restartCheckpoint') this.mission.restartCheckpoint();
+          else this.mission.restartMission();
+        } else if (this.states.is('challenge')) {
+          this.ui.hideScreens();
+          this.challenge.restart();
+        }
+        break;
+      case 'trial':
+        this.ui.hideScreens();
+        this.states.change('challenge', { trial: data as TrialId });
+        break;
+      case 'toTitleScreen':
+        this.toTitle(data as string);
         break;
       case 'mainMenu':
         this.toTitle('title');

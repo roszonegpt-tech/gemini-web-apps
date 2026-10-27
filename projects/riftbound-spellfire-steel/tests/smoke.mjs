@@ -216,6 +216,39 @@ await step('boss fight completes (sector 4)', async () => {
   if (scr !== 'results') throw new Error(`expected results after boss, got ${scr}`);
 });
 
+await step('v1.1: golem flight segment installed in sector 2 + mount works', async () => {
+  await game(() => { window.riftbound.services.dev.god = true; window.riftbound.uiAction('deploy', 1); });
+  await wait(1500);
+  const r = await game(() => {
+    const w = window.riftbound.currentWorld();
+    const golem = w.actors.find((a) => a.kind === 'arcaneGolem');
+    const shrine = w.interactables.find((i) => i.kind === 'golemShrine');
+    golem.mount(w.player);
+    return { towers: w.actors.filter((a) => a.kind === 'aaTower').length, obj: w.objectives.zones[1].objs.some((o) => o.data.id === 'aa'), shrine: !!shrine, mounted: w.player.mounted, focus: w.cameraFocus === golem };
+  });
+  if (!(r.towers === 4 && r.obj && r.shrine && r.mounted && r.focus)) throw new Error(JSON.stringify(r));
+  await page.keyboard.down('KeyS');
+  await wait(1500);
+  await page.keyboard.up('KeyS');
+  await shot('50-golem');
+});
+
+await step('v1.1: challenge trials menu + trial start', async () => {
+  await game(() => window.riftbound.uiAction('mainMenu'));
+  await wait(600);
+  await page.click('text=Challenge Trials');
+  await wait(400);
+  if (!(await page.isVisible('text=Barrier Survival'))) throw new Error('trials menu missing');
+  await shot('51-trials-menu');
+  for (const id of ['targetRun', 'barrierSurvival', 'riftOnslaught']) {
+    await game((t) => window.riftbound.uiAction('trial', t), id);
+    await wait(2000);
+    const ok = await game(() => window.riftbound.states.is('challenge') && !!window.riftbound.currentWorld());
+    if (!ok) throw new Error(`trial ${id} did not start`);
+  }
+  await shot('52-trial');
+});
+
 await step('touch layout renders', async () => {
   await game(() => { window.riftbound.services.save.settings.touchMode = 'on'; window.riftbound.uiAction('deploy', 0); });
   await wait(1500);

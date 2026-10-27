@@ -7,6 +7,32 @@ Git commits (and tags, once merged) are the authoritative history.
 ## [Unreleased]
 - Nothing yet.
 
+## [1.1.0-beta] — 2026-10-27
+Implements `prompts/archive/v1.1.0-beta.md`. Code changes are confined to the four files the prompt allows
+(`src/entities/ArcaneGolem.ts`, `src/scenes/ChallengeScene.ts`, `src/systems/UISystem.ts`, `src/game.ts`);
+`src/core/Engine.ts`, `src/audio/AudioEngine.ts` and `assets_manifest.json` are unchanged.
+
+### Added
+- **Arcane Golem flight segment (Sector 2):** a golem shrine near the flooded trenches; hold E to awaken and
+  mount the golem, fly it with inertial drift over the fence into the flooded strip, sweep the chest laser
+  beam (heat gauge + overheat), Stone Volley (RMB), Rift Dash (Space), Stone Brace (Shift, −70% damage),
+  stone-armour durability; dismount anywhere on solid zone-B ground; parked golems can be re-mounted;
+  a destroyed golem throws the mage clear and re-forms at its shrine.
+- **Aerial obstacles:** anti-air missile towers (homing missiles the beam can shoot down), radar mines,
+  barrier-pylon energy fences, sandbag emplacements with troopers, and an attack helicopter.
+- New required Sector 2 objective "Arcane Golem: destroy the AA battery" (4 towers).
+- **Challenge Trials** (`ChallengeScene`): Arcane Target Run (25 targets, Flame Burst only, 90 s),
+  Barrier Survival (3 min of mortars + minigun nests, Ward + Blink only), Rift Onslaught (5 escalating
+  waves incl. drones and helicopters, all spells). 1–3 star grading on time and damage; records in
+  `SaveData.challenges`; each new star converts into 40 Crystal Shards (+25 on first clear).
+- Challenge Trials menu (trials + sector speedruns), trial results screen, golem armour/heat HUD.
+- Golem/AA sounds via `AudioEngine.registerRecipe` and loop builders (no engine changes).
+- Smoke test steps for the golem segment and trials.
+
+### Changed
+- `package.json` version → 1.1.0-beta; new standalone build `dist/releases/riftbound-v1.1.0-beta.html`.
+- Floating islands above the Sector 2 flight course are lifted out of the camera's way during the segment.
+
 ## [1.0.0-gold] — 2026-10-27
 First playable build (starting point: v0.1.0-alpha prompt spec; no prior code existed in this repo).
 

@@ -2,12 +2,12 @@
 
 | Field | Value |
 |---|---|
-| Current version | **1.0.0-gold** |
-| Build number | 1 |
+| Current version | **1.1.0-beta** |
+| Build number | 2 |
 | Last updated | 2026-10-27 |
-| Build output | `dist/index.html` (standalone) · `dist/releases/riftbound-v1.0.0-gold.html` · `assets/js/riftbound.js` |
+| Build output | `dist/index.html` (standalone) · `dist/releases/riftbound-v1.1.0-beta.html` (previous: `riftbound-v1.0.0-gold.html`) · `assets/js/riftbound.js` |
 | Source of version string | `package.json` → injected at build time (`src/config/version.ts`) |
-| Suggested git tag after merge | `riftbound-v1.0.0-gold` |
+| Suggested git tags after merge | `riftbound-v1.0.0-gold` (commit 1510b86), `riftbound-v1.1.0-beta` |
 
 Bump rules: PATCH = bug fixes, MINOR = new features, MAJOR = breaking changes (e.g. save-schema renames).
 Update `package.json` `version`, this file and `CHANGELOG.md`, then `npm run build`.

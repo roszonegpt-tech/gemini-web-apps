@@ -1,21 +1,22 @@
 # TODO
 
-## Next build (v1.1.0-beta) — see `prompts/next-build.md`
-- [ ] Arcane Golem mount + flight trench run in Sector 2 (flooded strip z≈63–80 is reserved).
-- [ ] Three Challenge Trials (Target Run, Barrier Survival, Rift Onslaught) with 1–3 star grading.
-- [ ] Challenge stars → Crystal Shards integration.
+## Next build (v1.2.0-beta) — see `prompts/next-build.md`
+- [ ] Swept-circle golem collision response (corridor edges, spires, gates) without clipping at dash speed.
+- [ ] Golem engine rumble tied to speed/brace, beam charge + overheat audio (via `registerRecipe`).
+- [ ] Register v1.1 procedural assets in `assets_manifest.json` (additive).
+- [ ] Audio balance pass (magic vs. gunfire vs. music; rain loop level).
 
-## Verification still owed (from v1.0)
-- [ ] Measure FPS on real hardware: desktop 1080p, iPad, iPhone, Android (target 60 FPS).
+## Verification still owed
+- [ ] FPS on real hardware: desktop 1080p, iPad, iPhone, Android (target 60 FPS).
 - [ ] Manual test in Firefox 88+, Safari 14.1+ (macOS + iOS), Edge.
-- [ ] Physical touch + real gamepad pass (rumble, deadzones).
-- [ ] Listen-through audio balance: magic vs. gunfire, music vs. SFX, rain loop level.
-- [ ] Human difficulty pass on all four sectors (enemy damage / spread multipliers live in `World.difficulty*`).
+- [ ] Physical touch + real gamepad pass (on foot and during golem flight).
+- [ ] Human difficulty pass: campaign sectors, golem segment, trial star thresholds.
 
 ## Nice to have
-- [ ] Voice line variety for radio chatter; more Lyra guidance lines.
-- [ ] Optional "Ray of Disintegration" channelled spell (prompt mentions channelled-spell slowdown; the held Arcane Bolt stream implements the slowdown for now).
-- [ ] Persist mid-mission checkpoint across page reloads (`campaign.checkpoint` key already exists, currently always null).
+- [ ] Remove the superseded `challengeScreen` from `src/ui/Screens.ts`.
+- [ ] More radio-chatter and Lyra guidance lines.
+- [ ] Optional channelled "Ray of Disintegration" spell.
+- [ ] Persist mid-mission checkpoints across page reloads (`campaign.checkpoint` key exists, currently always null).
 
 ## Blockers
 - None.
