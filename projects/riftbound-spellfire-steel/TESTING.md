@@ -7,9 +7,29 @@ npm run test:logic                # 12 node logic tests (no browser)
 npm run test:smoke                # headless Chromium end-to-end (needs Playwright: npm i -D playwright)
 SMOKE_TARGET=dist npm run test:smoke   # same, against the standalone dist/index.html
 npm run test:audio                # v1.2 audio level meter + mix targets (exits 1 if a target fails)
+npm run playtest:summary          # v1.4 summary of exported playtest records in notes/playtest/
 AUDIO_TARGET=dist/releases/riftbound-v1.1.0-beta.html npm run test:audio   # meter an archived build
 ```
 Screenshots from the smoke run land in `tests/output/` (git-ignored).
+
+## Results — v1.4.0-beta (2026-10-27, Linux, headless Chromium + SwiftShader)
+
+### Verified (automated)
+| Check | How | Result |
+|---|---|---|
+| Typecheck + build (`dist/releases/riftbound-v1.4.0-beta.html`) | `tsc`, `npm run build` | ✅ |
+| Logic tests | `tests/logic.test.mjs` | ✅ 12/12 |
+| Full regression incl. v1.2/v1.3 steps + two v1.4 steps | `tests/smoke.mjs` (folder **and** `SMOKE_TARGET=dist`) | ✅ 24/24 each |
+| Portrait 390×844: view at the top (0–219 px), pad below it, status bars and objectives under the view, touch controls in the pad within the screen, no horizontal scroll, pause menu full-screen; switching to landscape restores the v1.3 layout | smoke + probe (emulated touch, left-stick drag moves the mage) + screenshots of title, game, pause, export | ✅ |
+| Export panel: playtest JSON in a selectable text box, Back returns to Settings | smoke | ✅ |
+| Playtest summary: no files → "balance stays"; sample file → quartiles + "not enough data" | manual run | ✅ |
+| Audio mix targets (incl. live golem rumble at top speed) | `npm run test:audio` | ✅ 12/12 |
+| Golem flow, collision stress, trials I–III | probes | ✅ 14/14 · 0 bad frames / 11 478 |
+
+### Not verified (v1.4) — needs real hardware / a person
+- Portrait and landscape touch play on physical phones (thumb reach, safe areas / notches, iOS Safari toolbars resizing the viewport).
+- Copy-to-clipboard inside the real claude.ai app on iOS / Android.
+- No playtest records were collected, so no balance change; everything under v1.2 / v1.3 "Not verified" still applies.
 
 ## Results — v1.3.0-beta (2026-10-27, Linux, headless Chromium + SwiftShader)
 

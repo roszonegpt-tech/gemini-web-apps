@@ -69,3 +69,10 @@ Limits: these are objective proxies. Nobody has listened to the mix on desktop s
 ## v1.3 — Golem rumble at speed
 - Metered live on the ambient bus (minus the rain / rift baseline): idle −29.1, top speed (9.1 m/s) −26.6, bracing −26.4 dB; the beam measures −20.2 dB, i.e. +6.4 dB over the full-speed rumble (target ≥ 4). The v1.2 estimate of +4–5 dB at speed was pessimistic; the measured rise is ~2.5 dB.
 
+## v1.4 — Portrait phones
+- The engine always renders 16:9 and Engine.ts is off-limits, so portrait cannot have a taller view. Instead of a rotate hint the screen becomes a handheld: the view pinned to the top (390×219 on a typical phone), a status strip under it (bars, objectives, subtitles — 15 px, readable), and the remaining ~60% of the height as stick area with the button cluster at the bottom-right (mirrored in left-handed mode). Menus leave the small view and fill the screen.
+- Elements are moved, not duplicated: `applyPortrait()` re-parents the existing HUD nodes, so the Hud keeps updating them by reference and landscape is restored exactly on rotation.
+- What stays in the view (slots, minimap, interaction prompt, banners, golem/boss gauges) is scaled to 0.7em so the world remains visible.
+
+## v1.4 — Balance
+- `notes/playtest/` is empty, so `TRIALS` thresholds and `GOLEM` numbers are unchanged. `npm run playtest:summary` suggests thresholds only with ≥ 10 completed runs from ≥ 3 players (2★ ≈ median, 3★ ≈ best quartile of completed runs).

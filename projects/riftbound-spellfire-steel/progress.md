@@ -1,5 +1,12 @@
 # Progress Log
 
+## 2026-10-27 — v1.4.0-beta (Claude Code)
+- Portrait phones: pinned the 16:9 view to the top and built a handheld-style pad below it (status strip + sticks and buttons); menus fill the screen; verified at 390×844 with an emulated touch screen, including rotating back to landscape.
+- Export panel with Copy / Download for playtest records, save data and mission stats (works where downloads are blocked).
+- Objective labels now avoid HUD boxes (`Overlay2D.keepOut`).
+- `tests/playtest-summary.mjs` + `notes/playtest/`; no records exist yet, so balance is unchanged.
+- Tests: 12 logic, 24 smoke steps (folder + standalone), 12/12 audio targets.
+
 ## 2026-10-27 — v1.3.0-beta (Claude Code)
 - Rebuilt the touch controls around a context: on foot / riding the golem / trial rules (hidden locked actions, retargeted aim stick), current-spell label, cooldown sweeps, potion / bomb badges, MAP button, size and left-handed settings, fullscreen toggle.
 - Found and fixed lost quick taps on slow frames; reworked the phone-landscape title, menus and touch-mode HUD after screenshot review at 844×390.

@@ -9,11 +9,16 @@
 - [x] Golem engine rumble metered live at top speed (beam leads by 6.4 dB).
 - [x] Removed the superseded `challengeScreen`; in-page reset confirmation.
 
-## Next build (v1.4.0-beta) — see `prompts/next-build.md`
-- [ ] Balance pass from real playtest records (trial stars, golem beam / AA / armour) once someone has played.
-- [ ] Portrait-phone play (currently a "rotate your device" hint) or a dedicated portrait HUD.
-- [ ] Off-screen objective marker labels can overlap the touch-mode objectives box (Overlay2D margins).
-- [ ] Save files via the artifact `downloads` capability when running inside claude.ai (exports are inert there).
+## Done in v1.4.0-beta
+- [x] Portrait-phone layout (view on top, status strip + controls below, full-screen menus).
+- [x] Export panel with Copy / Download (works inside the artifact).
+- [x] Objective labels avoid HUD boxes.
+- [x] Playtest summary tool + `notes/playtest/` drop folder (no data yet → balance unchanged).
+
+## Next build (v1.5.0-beta) — see `prompts/next-build.md`
+- [ ] Balance pass once `notes/playtest/` has ≥ 10 completed runs per trial from ≥ 3 players.
+- [ ] Portrait: optional larger view (zoomed camera / taller 4:3 crop) — needs an Engine.ts change.
+- [ ] Installable PWA (manifest + offline service worker) for a home-screen icon and full-screen iPhone play.
 
 ## Verification still owed (needs real hardware / a person)
 - [ ] FPS on real hardware: desktop 1080p, iPad, iPhone, Android (target 60 FPS); confirm auto-quality steps down below 45 FPS.

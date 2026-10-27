@@ -75,6 +75,12 @@ main.ts ─► Game (game.ts)
 - Checkpoint resume: `MissionScene.persistCheckpoint()` writes `campaign.checkpoint` (sector, zone, stats, consumables); `Game.uiAction('continueCheckpoint')` rebuilds the World at that zone; `Save.sanitize` drops malformed checkpoints.
 - Playtest records: `recordPlaytest(save, run)` (opt-in, capped at 50) in `core/Save.ts`; written by `ChallengeScene.record()` (complete / failed / quit / restart) and `GolemSegment.recordRun()` on dispose. Settings → Copy / Export / Clear.
 
+## v1.4 additions
+- `UISystem.applyPortrait()` (matchMedia `PORTRAIT_QUERY`) moves `.hud-tl`, `.hud-tc`, `#subtitles`, `#touch` and `#screens` between the stage and `#portrait-pad` (`.pp-top` strip + `.pp-controls`); the stage is pinned to the top with CSS. Engine.ts is untouched — the view stays 16:9.
+- `UISystem.openExport(title, file, text)` → `export` screen (selectable text, Copy, Download, Back to the previous screen); used for playtest records, save and stats exports.
+- `Overlay2D.keepOut` — HUD rectangles (refreshed every 0.25 s by `UISystem.updateKeepOut`) that objective labels step out of.
+- `tests/playtest-summary.mjs` — reads `notes/playtest/*.json`, prints quartiles and threshold suggestions.
+
 ## Extension points (used by later builds)
 - `World.updaters` — per-frame hooks (e.g. vehicles, trial logic) without editing `World`.
 - `World.cameraFocus`, `World.mountTarget` — camera follow override and enemy target override.

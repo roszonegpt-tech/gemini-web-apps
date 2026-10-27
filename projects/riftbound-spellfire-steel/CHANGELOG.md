@@ -7,6 +7,34 @@ Git commits (and tags, once merged) are the authoritative history.
 ## [Unreleased]
 - Nothing yet.
 
+## [1.4.0-beta] — 2026-10-27
+Implements `prompts/archive/v1.4.0-beta.md`. Code changes stay in the prompt's files (`UISystem.ts`, `Overlay2D.ts`,
+`game.ts`, `assets/css/style.css`, tests, notes, docs). `Engine.ts`, `AudioEngine.ts`, `World.ts`, save keys and
+asset IDs are unchanged.
+
+### Added
+- **Portrait phones:** instead of a "rotate your device" hint, phones and small tablets held upright get a
+  handheld-style layout — the 16:9 game view pinned to the top, a status strip below it (health / mana / ward,
+  objectives, subtitles), then the sticks and buttons with the whole lower half as stick area. Menus fill the screen.
+  Rotating back to landscape restores the v1.3 layout instantly.
+- **Export panel:** playtest records, save data and mission stats open in a panel with the text selectable, a Copy
+  button (with a manual-select fallback) and Download — exports now work inside the claude.ai artifact, where
+  downloads are blocked (BUGS #22).
+- `npm run playtest:summary` (`tests/playtest-summary.mjs`) summarises exported records dropped into
+  `notes/playtest/` (runs, completion, median / quartiles of time and damage, golem medians) and suggests star
+  thresholds once there are ≥ 10 completed runs from ≥ 3 players.
+- Smoke steps for the portrait layout (and switching back) and the export panel.
+
+### Fixed
+- Off-screen objective labels no longer cover the touch-mode objectives box, gauges, slots or buttons; the overlay
+  steps labels out of HUD rectangles reported by `UISystem` (BUGS #21).
+
+### Balance
+- Unchanged: `notes/playtest/` has no records yet, so there is no data to tune from.
+
+### Changed
+- `package.json` version → 1.4.0-beta; new standalone build `dist/releases/riftbound-v1.4.0-beta.html`.
+
 ## [1.3.0-beta] — 2026-10-27
 Implements `prompts/archive/v1.3.0-beta.md` plus the requested **mobile controls** pass. Code changes stay in the
 prompt's files (`MissionScene.ts`, `ChallengeScene.ts`, `ArcaneGolem.ts`, `UISystem.ts`, `Screens.ts`, `game.ts`,

@@ -9,7 +9,7 @@ fused warzone of floating crystal islands, muddy trenches, airfields and bunkers
 - **Tech:** TypeScript + three.js (WebGL), Web Audio synthesis, Canvas 2D. No external assets:
   every model, texture, sound effect and music track is generated at runtime.
 - **Offline:** 100% offline after load. Ships as a static folder *and* a single standalone HTML file.
-- **Version:** 1.3.0-beta — see [`VERSION.md`](VERSION.md) · history in [`CHANGELOG.md`](CHANGELOG.md).
+- **Version:** 1.4.0-beta — see [`VERSION.md`](VERSION.md) · history in [`CHANGELOG.md`](CHANGELOG.md).
 
 ## Play
 
@@ -40,6 +40,15 @@ Supported: Chrome/Edge 90+, Firefox 88+, Safari 14.1+ (desktop, iPad, iPhone, An
 | Dev console · free cam · orbit cam · screenshot | ` (tilde) · F8 · F7 · F12/F9 | — | — |
 
 Riding the Arcane Golem on touch: aim stick = beam, VOLLEY, DASH, BRACE, LAND (dismount). "Control mapping" in Settings swaps Space/Shift. Menus support Tab / arrow keys / Enter / Esc and the D-pad + A/B.
+
+## New in v1.4.0-beta
+
+- **Play on a phone held upright:** the game view sits at the top, your health, objectives and story lines in a strip
+  below it, and the sticks and buttons fill the lower half — like a handheld console. Turn the phone sideways for the
+  full-width landscape layout.
+- **Exports that always work:** playtest records and save data open in a panel you can copy from (or download),
+  including inside the claude.ai artifact.
+- **Balance tooling:** drop exported playtest files into `notes/playtest/` and run `npm run playtest:summary`.
 
 ## New in v1.3.0-beta
 
@@ -156,9 +165,9 @@ riftbound-spellfire-steel/
 ├─ saves/                     # save-schema.json + example-save.json
 ├─ dist/                      # standalone single-file builds (index.html + releases/)
 ├─ tests/                     # logic.test.mjs, smoke.mjs, audio-levels.mjs (output/ is git-ignored)
-├─ notes/                     # design notes, reference-look analysis
+├─ notes/                     # design notes, reference-look analysis, playtest/ (exported records)
 ├─ docs/                      # extra documentation
-├─ prompts/                   # next-build.md (v1.4) + archive/ (v1.1–v1.3 prompts)
+├─ prompts/                   # next-build.md (v1.5) + archive/ (v1.1–v1.4 prompts)
 └─ scripts/                   # build.mjs, serve.mjs
 ```
 
