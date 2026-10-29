@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Moss & Moon — Cinematics demo</title>
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;background:#1b2622;color:#e9eedf;font:13px/1.4 ui-rounded,"Trebuchet MS",system-ui,sans-serif}
+  .shell{max-width:1100px;margin:auto;padding:18px}
+  h1{font:600 24px Georgia,serif;margin:0 0 10px}
+  .canvas-wrap{position:relative;aspect-ratio:8/5;overflow:hidden;background:#a7c5a3;border-radius:8px}
+  canvas{display:block;width:100%;height:100%;image-rendering:pixelated}
+  .hud{position:absolute;left:10px;top:10px;z-index:120;background:#f6f6e6e8;color:#263a37;padding:6px 9px;border-radius:6px;font-size:11px}
+  .bar{display:flex;flex-wrap:wrap;gap:6px;margin:12px 0}
+  .bar button{border:1px solid #6d8a74;background:#2e473f;color:#fff;border-radius:6px;padding:7px 10px;font:inherit;cursor:pointer}
+  label{margin-right:12px}
+  #log{white-space:pre-wrap;font:11px ui-monospace,monospace;background:#0f1614;padding:8px;border-radius:6px;max-height:160px;overflow:auto}
+</style>
+<script>
+  // Test instrumentation: count live listeners on window/document so the test can detect leaks.
+  (function () {
+    const live = new Map(); window.__listenerCount = () => { let n = 0; live.forEach(v => n += v); return n; };
+    const add = EventTarget.prototype.addEventListener, rem = EventTarget.prototype.removeEventListener, seen = new WeakMap();
+    EventTarget.prototype.addEventListener = function (type, fn, opts) {
+      if (this === window || this === document) { const cap = !!(typeof opts === 'object' ? opts && opts.capture : opts), key = type + '|' + cap; let m = seen.get(fn); if (!m) seen.set(fn, m = new Set()); if (!m.has(this === window ? 'w' + key : 'd' + key)) { m.add(this === window ? 'w' + key : 'd' + key); live.set(key, (live.get(key) || 0) + 1); } }
+      return add.call(this, type, fn, opts);
+    };
+    EventTarget.prototype.removeEventListener = function (type, fn, opts) {
+      if (this === window || this === document) { const cap = !!(typeof opts === 'object' ? opts && opts.capture : opts), key = type + '|' + cap, m = seen.get(fn), k2 = (this === window ? 'w' : 'd') + key; if (m && m.has(k2)) { m.delete(k2); live.set(key, live.get(key) - 1); } }
+      return rem.call(this, type, fn, opts);
+    };
+  })();
+</script>
+</head>
+<body>
+<main class="shell">
+  <h1>Moss &amp; Moon — cinematics</h1>
+  <div class="canvas-wrap">
+    <canvas id="scene" width="512" height="320"></canvas>
+    <div class="hud" id="hud">Game canvas (stand-in) · UI z-index 120</div>
+  </div>
+  <div class="bar" id="buttons"></div>
+  <div class="bar">
+    <label><input type="checkbox" id="subs" checked> Subtitles</label>
+    <label><input type="checkbox" id="rm"> Reduced motion</label>
+    <label>Speed <select id="speed"><option>1</option><option>2</option><option>4</option><option>8</option></select></label>
+  </div>
+  <div id="log"></div>
+</main>
+<script src="../assets/js/atlas-data.js"></script>
+<script src="../assets/js/cast-data.js"></script>
+<script>window.MM = window.MM || {}; MM.CINE_VIDEO_BASE = '../';</script>
+<script src="../src/systems/cinematics.js"></script>
+<script src="../src/config/cinematics.js"></script>
+<script>
+  // A stand-in "game" frame so the overlay has something to sit on top of.
+  (function () {
+    const g = document.getElementById('scene').getContext('2d');
+    g.fillStyle = '#9cc095'; g.fillRect(0, 0, 512, 320);
+    for (let y = 0; y < 20; y++) for (let x = 0; x < 32; x++) if ((x + y) % 2) { g.fillStyle = '#93b98c'; g.fillRect(x * 16, y * 16, 16, 16); }
+    g.fillStyle = '#56775a'; g.font = '16px Georgia'; g.fillText('(game view)', 210, 165);
+  })();
+  const log = m => { const el = document.getElementById('log'); el.textContent = m + '\n' + el.textContent; };
+  const bar = document.getElementById('buttons');
+  MM.cine.list().forEach(s => { const b = document.createElement('button'); b.textContent = '▶ ' + s.id; b.onclick = () => MM.cine.play(s.id).then(r => log(JSON.stringify(r))); bar.appendChild(b); });
+  document.getElementById('subs').onchange = e => MM.cine.setSubtitles(e.target.checked);
+  document.getElementById('rm').onchange = e => MM.cine.setReducedMotion(e.target.checked);
+  document.getElementById('speed').onchange = e => MM.cine.setTimeScale(+e.target.value);
+</script>
+</body>
+</html>

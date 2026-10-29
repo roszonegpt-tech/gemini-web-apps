@@ -143,7 +143,7 @@ for (const file of files) {
       const ms = it.durs[0];
       e.fps = Math.round(1000 / ms * 10) / 10;
       if (it.durs.some((d) => d !== ms)) e.durs = it.durs;
-      if ((cfg.once || []).includes(it.name)) e.loop = false;
+      const once = cfg.once; if (typeof once === 'function' ? once(it.name) : (once || []).includes(it.name)) e.loop = false;
     }
     frames[it.name] = e;
   }

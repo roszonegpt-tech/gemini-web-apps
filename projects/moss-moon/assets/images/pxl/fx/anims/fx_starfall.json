@@ -1,0 +1,169 @@
+{
+ "frames": {
+  "fx_starfall_0": {
+   "frame": {
+    "x": 0,
+    "y": 0,
+    "w": 25,
+    "h": 41
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 25,
+    "h": 41
+   },
+   "sourceSize": {
+    "w": 25,
+    "h": 41
+   },
+   "duration": 71
+  },
+  "fx_starfall_1": {
+   "frame": {
+    "x": 25,
+    "y": 0,
+    "w": 25,
+    "h": 41
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 25,
+    "h": 41
+   },
+   "sourceSize": {
+    "w": 25,
+    "h": 41
+   },
+   "duration": 71
+  },
+  "fx_starfall_2": {
+   "frame": {
+    "x": 50,
+    "y": 0,
+    "w": 25,
+    "h": 41
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 25,
+    "h": 41
+   },
+   "sourceSize": {
+    "w": 25,
+    "h": 41
+   },
+   "duration": 71
+  },
+  "fx_starfall_3": {
+   "frame": {
+    "x": 75,
+    "y": 0,
+    "w": 25,
+    "h": 41
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 25,
+    "h": 41
+   },
+   "sourceSize": {
+    "w": 25,
+    "h": 41
+   },
+   "duration": 71
+  },
+  "fx_starfall_4": {
+   "frame": {
+    "x": 100,
+    "y": 0,
+    "w": 25,
+    "h": 41
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 25,
+    "h": 41
+   },
+   "sourceSize": {
+    "w": 25,
+    "h": 41
+   },
+   "duration": 71
+  },
+  "fx_starfall_5": {
+   "frame": {
+    "x": 125,
+    "y": 0,
+    "w": 25,
+    "h": 41
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 25,
+    "h": 41
+   },
+   "sourceSize": {
+    "w": 25,
+    "h": 41
+   },
+   "duration": 71
+  },
+  "fx_starfall_6": {
+   "frame": {
+    "x": 150,
+    "y": 0,
+    "w": 25,
+    "h": 41
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 25,
+    "h": 41
+   },
+   "sourceSize": {
+    "w": 25,
+    "h": 41
+   },
+   "duration": 71
+  }
+ },
+ "meta": {
+  "app": "pxl",
+  "image": "fx_starfall.png",
+  "format": "RGBA8888",
+  "size": {
+   "w": 175,
+   "h": 41
+  },
+  "scale": "1",
+  "frameTags": [
+   {
+    "name": "fx_starfall",
+    "from": 0,
+    "to": 6,
+    "direction": "forward"
+   }
+  ]
+ }
+}

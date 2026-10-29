@@ -63,6 +63,17 @@ try{
     for(const group of ['skin','hair','outfit'])if(Object.hasOwn(PALETTES[group],saved[group]))chosenLook[group]=saved[group];
   }
 }catch(_error){} // Files opened in a private browser can disable localStorage.
+// ---- MM seam S0: helpers. Every "MM seam" below is a no-op when window.MM is absent (see notes/BASELINE_AUDIT.md §10).
+const UI_STUBS={};
+function uiEl(id,tag='div'){return document.getElementById(id)||UI_STUBS[id]||(UI_STUBS[id]=document.createElement(tag));}
+let mmQuiet=0; // >0 while restoring/starting an adventure: suppresses 'message' events (no toast spam)
+function mmEmit(name,data){if(name==='message'&&mmQuiet>0)return;try{window.MM?.bus?.emit?.(name,data);}catch(e){console.error('[MM emit]',name,e);}}
+function mmHook(name,...a){const f=window.MM?.hooks?.[name];if(typeof f==='function'){try{return f(...a);}catch(e){console.error('[MM hook]',name,e);}}}
+function mmPaused(){try{return !!window.MM?.isPaused?.();}catch(e){return false;}}
+function mmInputBlocked(){try{const i=window.MM?.input;return i?.isBlocked?!!i.isBlocked():mmPaused();}catch(e){return false;}}
+function mmSetting(key,fallback){try{const v=window.MM?.settings?.get?.(key);return v===undefined?fallback:v;}catch(e){return fallback;}}
+function mmArt(name,x,y,o){const a=window.MM?.art;if(!a?.has?.(name))return false;try{return a.draw(ctx,name,x,y,o)!==false;}catch(e){return false;}}
+// ---- end MM seam S0
 const canvas=document.getElementById('scene');
 const ctx=canvas.getContext('2d',{alpha:false}); ctx.imageSmoothingEnabled=false;
 const atlasImages={};
@@ -91,12 +102,13 @@ for(const style of Object.keys(ATLAS_DATA)){
   image.onload=()=>{if(chosenLook.style===style)buildColoredAtlas();};
   image.src=ATLAS_DATA[style];
 }
-const debug=document.getElementById('debug');
-const modeLabel=document.getElementById('modeLabel');
-const modeDetail=document.getElementById('modeDetail');
-const mountBtn=document.getElementById('mount');
-const touchMount=document.getElementById('touchMount');
-const toggleDebug=document.getElementById('debugToggle');
+// MM seam S1: null-safe DOM lookups (detached stubs when the legacy sidebar is absent).
+const debug=uiEl('debug');
+const modeLabel=uiEl('modeLabel');
+const modeDetail=uiEl('modeDetail');
+const mountBtn=uiEl('mount','button');
+const touchMount=uiEl('touchMount','button');
+const toggleDebug=uiEl('debugToggle','button');
 const keys=new Set();
 const touchDirections=new Map();
 const SCREEN_W=512,SCREEN_H=320,TILE_W=32,TILE_H=16,MAP_SIZE=20;
@@ -139,11 +151,12 @@ SPELLS.push(
  {id:'cloak',name:'Shadow Veil',school:'Shadow',kind:'summon',color:'#8066a5',core:'#e2d3f6',damage:0,hit:[.20],duration:1.0,cloak:true,description:'Hide from enemies for a short time.'},
  {id:'mirage',name:'Moon Mirage',school:'Moon',kind:'summon',color:'#aac6f3',core:'#f7f7ff',damage:0,hit:[.20],duration:1.0,summon:'mirage',description:'Create a decoy that distracts enemies.'}
 );
-const spellSelect=document.getElementById('spellSelect');
-const castButton=document.getElementById('castButton');
-const resetDummyButton=document.getElementById('resetDummy');
-const spellDesc=document.getElementById('spellDesc');
-const dummyStatus=document.getElementById('dummyStatus');
+// MM seam S1: null-safe DOM lookups.
+const spellSelect=uiEl('spellSelect','select');
+const castButton=uiEl('castButton','button');
+const resetDummyButton=uiEl('resetDummy','button');
+const spellDesc=uiEl('spellDesc');
+const dummyStatus=uiEl('dummyStatus');
 spellSelect.innerHTML=SPELLS.map((s,i)=>`<option value="${i}">${s.school} · ${s.name}</option>`).join('');
 let spellIndex=0;
 const dummy={x:12,y:9,maxHP:1200,hp:1200,status:{},flash:0,resetIn:0};
@@ -174,10 +187,12 @@ const castPages=CAST_PAGE_DATA.map(src=>{const im=new Image();im.src=src;return 
 const CAST_HEIGHT={keeper:37,skeleton:35,skeleton_ally:35,blight:40,ghost:36,spirit:36,slime:25,ice:29,golem:36,wisp:33,cat:20,raven:22,little_golem:21,dummy:38};
 function drawCastSprite(kind,pos,actor=null){
  const index=CAST_KINDS.indexOf(kind);if(index<0)return;
- const page=castPages[Math.floor(index/7)];if(!page.complete||!page.naturalWidth)return;
  const moving=(actor?.artMoving||0)>0,phase=actor?.artDistance||0;
  const frame=moving?Math.floor(phase/3)%8:Math.floor((game.elapsed+(actor?.id||0)*.17)*5)%8;
  const dir=Math.max(0,DIRS.indexOf(actor?.artFacing||'S'));
+ // MM seam S5: MM.art override — 'cast_<kind>_<idle|walk>_<DIR>' or 'cast_<kind>' (anchor = foot point).
+ if(window.MM?.art){const base='cast_'+kind,full=base+'_'+(moving?'walk':'idle')+'_'+DIRS[dir];if(mmArt(full,pos.x,pos.y,{frame})||mmArt(base,pos.x,pos.y,{frame}))return;}
+ const page=castPages[Math.floor(index/7)];if(!page.complete||!page.naturalWidth)return;
  const row=(index%7)*16+(moving?8:0)+dir;
  ctx.drawImage(page,frame*FRAME_W,row*FRAME_H,FRAME_W,FRAME_H,pos.x-FOOT_X,pos.y-FOOT_Y,FRAME_W,FRAME_H);
 }
@@ -220,7 +235,7 @@ const REGIONS={
 };
 const SEASONS=['Spring','Summer','Autumn','Winter'];
 const FAMILIARS={none:'No familiar',cat:'Lucky cat',raven:'Raven',golem:'Little golem'};
-const gameUI=id=>document.getElementById(id);
+const gameUI=id=>uiEl(id,/Select$|^p2(Class|Spell)$/.test(id)?'select':'div'); // MM seam S1
 const defaultPlots=()=>Array.from({length:6},(_,i)=>({x:7+(i%3),y:11+Math.floor(i/3),seed:null,growth:0,watered:false}));
 function newWorld(){return {
  cls:'grove',region:'grove',mode:'outside',floor:0,riftUnlocked:false,modifier:'',
@@ -242,15 +257,17 @@ function weatherFor(day){return ['Clear','Rain','Clear','Wind','Rain','Clear'][(
 function screenDistance(a,b){const p=project(a.x,a.y),q=project(b.x,b.y);return Math.hypot(q.x-p.x,q.y-p.y);}
 function awardXP(amount){
  world.xp+=amount;
- while(world.xp>=world.level*45){world.xp-=world.level*45;world.level++;world.points++;world.hp=heroMaxHP();message('Level '+world.level+'! A skill point is ready.');}
+ while(world.xp>=world.level*45){world.xp-=world.level*45;world.level++;world.points++;world.hp=heroMaxHP();mmEmit('levelup',{level:world.level});message('Level '+world.level+'! A skill point is ready.');} // MM seam S4
 }
 function addParticles(target,color,core,count=16,power=1){
+ const ps=window.MM?.settings?.particleScale?.()??1; // MM seam S7: settings-aware particle count and cap
+ count=Math.round(count*ps);
  for(let i=0;i<count;i++){
   const a=(i/count)*Math.PI*2+Math.random()*.3,s=(9+Math.random()*24)*power,life=.35+Math.random()*.45;
   particles.push({x:target.x,y:target.y,ox:0,oy:-18,vx:Math.cos(a)*s,vy:Math.sin(a)*s-8,life,ttl:life,color:i%3?color:core,size:i%4?2:3});
  }
- if(particles.length>220)particles.splice(0,particles.length-220);
- bursts.push({x:target.x,y:target.y,life:.46,ttl:.46,color,core});if(bursts.length>20)bursts.shift();
+ const cap=Math.round(220*ps);if(particles.length>cap)particles.splice(0,particles.length-cap); // MM seam S7
+ if(ps>0){bursts.push({x:target.x,y:target.y,life:.46,ttl:.46,color,core});if(bursts.length>Math.max(4,Math.round(20*ps)))bursts.shift();}
 }
 function spellMultiplier(spell,actor,target){
  const wizard=actor&&actor!==game?(WIZARDS.find(c=>c.id===actor.cls)||currentWizard()):currentWizard();
@@ -289,9 +306,12 @@ function hitEntity(target,amount,color,source=game){
  if(target===dummy){hitDummy(amount,color);return;}
  const hit=Math.max(1,Math.round(amount*(target.status.vulnerable?1.25:1)));
  target.hp=Math.max(0,target.hp-hit);target.flash=.18;
+ mmEmit('hit',{target,amount:hit,color,source,boss:!!target.boss}); // MM seam S4
  numbers.push({value:String(hit),color,life:.9,offset:(numbers.length%3-1)*5,x:target.x,y:target.y});
  if(numbers.length>40)numbers.shift();
- if(target.hp===0&&!target.dead){target.dead=true;world.kills++;awardXP(target.boss?55:12);dropReward(target,source);if(target.boss){world.riftUnlocked=true;message('Boss defeated! Rifts are now unlocked.');}}
+ if(target.hp===0&&!target.dead){target.dead=true;world.kills++;awardXP(target.boss?55:12);dropReward(target,source);
+  mmEmit('kill',{enemy:target,source,boss:!!target.boss}); // MM seam S4
+  if(target.boss){world.riftUnlocked=true;world.bossCleared=bossFloorKey();mmEmit('boss',{phase:'defeated',enemy:target});message('Boss defeated! Rifts are now unlocked.');}} // MM seam: bossCleared stops a saved boss floor from respawning its boss (audit §9 #14)
 }
 function dropReward(target,source){
  const equipped=world.gear[world.equipped-1],extra=(world.cls==='shadow'?1.3:1)*(world.familiar==='cat'?1.2:1)*(equipped?.affix==='Greed'?1.2:1),amount=Math.round((target.boss?42:8+world.level*2)*extra);
@@ -314,6 +334,7 @@ function pickup(drop,actor=game){
   if(world.lootMode==='individual'&&actor!==game){actor.power=Math.max(actor.power||0,drop.item.power);message('Player '+actor.id+' found '+drop.item.name);}
   else{world.gear.push(drop.item);if(world.gear.length>40){world.gear.shift();world.equipped=world.equipped>1?world.equipped-1:null;}message('Found '+drop.item.name);}
  }
+ mmEmit('pickup',{type:drop.type,amount:drop.amount,item:drop.item,actor}); // MM seam S4
  drop.life=0;
 }
 function makeEnemy(type,x,y,boss=false){
@@ -340,6 +361,7 @@ function spawnGroup(type,count,boss=false,raid=false){
   const a=(i/count)*Math.PI*2+Math.random()*.2,r=3+Math.random()*2;
   let x=clamp(10+Math.cos(a)*r,1,19),y=clamp(10+Math.sin(a)*r,1,19);if(blockedAt(x,y)){x=10+Math.cos(a)*2;y=10+Math.sin(a)*2;}
   const enemy=makeEnemy(type,x,y,boss&&i===0);enemy.raid=raid;enemies.push(enemy);
+  if(enemy.boss)mmEmit('boss',{phase:'spawn',enemy,restored:mmQuiet>0}); // MM seam S4
  }
 }
 function spawnAlly(type,owner=game){
@@ -349,10 +371,17 @@ function spawnAlly(type,owner=game){
  message((type==='skeleton'?'Skeleton':type==='wisp'?'Wisp':type==='mirage'?'Moon mirage':'Golem')+' joined you');
 }
 function resetPlayer(){
- world.gold=Math.max(0,world.gold-12);world.hp=heroMaxHP();world.mana=100;
+ // MM seam S4/defeat: with MM, death enters the 'defeat' state and MM.game.respawnHome() -> respawnAtHome() recovers.
+ if(mmPaused())return; // already defeated (or paused) earlier this frame
+ mmEmit('death',{region:world.region,mode:world.mode,floor:world.floor});
+ if(window.MM?.game?.handleDeath?.()===true)return;
+ respawnAtHome(12);message('You wake at the farm. Lost 12 gold.');
+}
+function respawnAtHome(goldLoss=12){ // MM seam: original resetPlayer body, gold loss parameterised
+ world.gold=Math.max(0,world.gold-goldLoss);world.hp=heroMaxHP();world.mana=100;game.target=null;game.transition=null;
  world.region='grove';world.mode='outside';world.floor=0;enemies=[];lootDrops=[];world.targetId=null;
  game.x=9.7;game.y=10;game.vx=game.vy=0;const p=project(game.x,game.y);game.camX=p.x;game.camY=p.y;
- familiarSprite.x=game.x+.55;familiarSprite.y=game.y-.55;party.forEach((a,i)=>{const d=(i%2?1:-1)*(.75+Math.floor(i/2)*.4);a.x=game.x+d;a.y=game.y-d;});allies.forEach(a=>{a.x=game.x+.5;a.y=game.y-.5;});dungeonBlocks=[];drawGround();message('You wake at the farm. Lost 12 gold.');
+ familiarSprite.x=game.x+.55;familiarSprite.y=game.y-.55;party.forEach((a,i)=>{const d=(i%2?1:-1)*(.75+Math.floor(i/2)*.4);a.x=game.x+d;a.y=game.y-d;});allies.forEach(a=>{a.x=game.x+.5;a.y=game.y-.5;});dungeonBlocks=[];drawGround();
 }
 function tendPlot(plot){
  if(world.region!=='grove'||world.mode!=='outside'){message('Your farm is in Moonflower Grove');return false;}
@@ -360,13 +389,13 @@ function tendPlot(plot){
  if(!p||screenDistance(game,p)>52){message('Walk closer to a garden plot');return false;}
  if(!p.seed){
   const seed=world.seed;if((world.seeds[seed]||0)<1){message('Out of seeds — buy more in the village');return false;}
-  world.seeds[seed]--;p.seed=seed;p.growth=0;p.health=100;p.watered=world.weather==='Rain';message('Planted '+SEED_TYPES[seed].name);return true;
+  world.seeds[seed]--;p.seed=seed;p.growth=0;p.health=100;p.watered=world.weather==='Rain';mmEmit('plant',{plot:p,seed});message('Planted '+SEED_TYPES[seed].name);return true; // MM seam S4
  }
  if(p.growth>=100){
-  const mutated=Math.random()<.12,amount=mutated?2:1;world.harvest[p.seed]+=amount;world.harvested+=amount;awardXP(mutated?12:7);
+  const mutated=Math.random()<.12,amount=mutated?2:1;world.harvest[p.seed]+=amount;world.harvested+=amount;awardXP(mutated?12:7);mmEmit('harvest',{plot:p,seed:p.seed,amount,mutated}); // MM seam S4
   message((mutated?'Rare harvest! ':'Harvested ')+amount+' '+SEED_TYPES[p.seed].name);p.seed=null;p.growth=0;p.watered=false;return true;
  }
- if(!p.watered){p.watered=true;message('Watered '+SEED_TYPES[p.seed].name);return true;}
+ if(!p.watered){p.watered=true;mmEmit('water',{plot:p});message('Watered '+SEED_TYPES[p.seed].name);return true;} // MM seam S4
  message(SEED_TYPES[p.seed].name+' growing: '+Math.floor(p.growth)+'%');return false;
 }
 function buildFarmWard(){
@@ -378,13 +407,13 @@ function buildFarmWard(){
 function empowerWard(){if(world.region!=='grove'||world.mode!=='outside'){message('Return to your farm');return;}const ward=world.wards.reduce((a,b)=>!a||screenDistance(game,b)<screenDistance(game,a)?b:a,null);if(!ward){message('Build a ward first');return;}if(!world.runes){message('Find or buy a rune first');return;}if((ward.power||0)>=3){message('Ward is fully empowered');return;}world.runes--;ward.power=(ward.power||0)+1;message('Ward empowered to rank '+ward.power);}
 function brew(){if(world.harvest.wheat<2){message('Brewing needs 2 harvested wheat');return;}world.harvest.wheat-=2;world.potions+=world.cls==='alchemy'?2:1;message('Potion brewed');}
 function brewBomb(){if(world.harvest.ember<1){message('A bomb needs 1 ember pepper');return;}world.harvest.ember--;world.bombs++;message('Ember bomb crafted');}
-function throwBomb(){const target=spellTarget(game);if(castCooldown>0)return;if(!world.bombs){message('Craft a bomb from an ember pepper first');return;}if(!target||screenDistance(game,target)>220){message('Move closer to a target');return;}world.bombs--;castCooldown=.32;const base=SPELLS.find(s=>s.id==='fireball');if(effects.length>=32)effects.shift();effects.push({spell:{...base,id:'bomb',damage:48},elapsed:0,from:{x:game.x,y:game.y,height:game.height},target,caster:game,hitIndex:0});addParticles(game,'#f67540','#ffe29a',10,.6);message('Ember bomb thrown');}
+function throwBomb(){const target=spellTarget(game);if(castCooldown>0)return;if(!world.bombs){message('Craft a bomb from an ember pepper first');return;}if(!target||screenDistance(game,target)>220){message('Move closer to a target');return;}world.bombs--;castCooldown=.32;const base=SPELLS.find(s=>s.id==='fireball');if(effects.length>=32)effects.shift();effects.push({spell:{...base,id:'bomb',damage:48},elapsed:0,from:{x:game.x,y:game.y,height:game.height},target,caster:game,hitIndex:0});mmEmit('cast',{actor:game,spell:{...base,id:'bomb',school:'Fire'},target}); /* MM seam S4 */addParticles(game,'#f67540','#ffe29a',10,.6);message('Ember bomb thrown');}
 function drink(){if(world.potions<1){message('No potions — brew more from wheat');return;}if(world.hp>=heroMaxHP()&&world.mana>=95){message('Health and mana are full');return;}world.potions--;world.hp=Math.min(heroMaxHP(),world.hp+(world.cls==='sun'?55:40));world.mana=Math.min(100,world.mana+25);message('Potion restores health and mana');}
 function sellHarvest(){let count=0;for(const k of Object.keys(world.harvest)){count+=world.harvest[k];world.harvest[k]=0;}if(!count){message('No crops to sell');return;}const value=count*(world.cls==='frost'?11:9);world.gold+=value;message('Sold '+count+' crops for '+value+' gold');}
 function upgradeSkill(index){if(world.points<1){message('Earn a level to gain a skill point');return;}const r=ranks();if(r[index]>=3){message('That path is already at rank 3');return;}world.points--;r[index]++;if(index===1)world.hp=Math.min(heroMaxHP(),world.hp+20);message(currentWizard().paths[index]+' rank '+r[index]);}
 function equipSelected(){const i=Number(gameUI('gearSelect').value);if(!Number.isInteger(i)||i<0||i>=world.gear.length){message('Find equipment in dungeons first');return;}world.equipped=i+1;message('Equipped '+world.gear[i].name);}
 function socketRune(){const gear=world.gear[world.equipped-1];if(!gear){message('Equip an item first');return;}if(!world.runes){message('Find or buy a rune first');return;}if(gear.sockets>=gear.maxSockets){message('That item has no empty sockets');return;}world.runes--;gear.sockets++;gear.power+=4;message('Rune socketed: +4 power');}
-function turnInQuest(){const h=(world.requests+1)*2,k=(world.requests+1)*2;if(world.harvested<h||world.kills<k){message('Request needs '+h+' harvests and '+k+' enemy defeats');return;}world.requests++;world.gold+=45+(world.day%3===0?10:0);awardXP(30);message(world.requests===1?'Village shop restored! Seeds now cost less.':world.requests===2?'Village banner raised! Runes now cost less.':'Village request complete: +45 gold');}
+function turnInQuest(){const h=(world.requests+1)*2,k=(world.requests+1)*2;if(world.harvested<h||world.kills<k){message('Request needs '+h+' harvests and '+k+' enemy defeats');return;}world.requests++;world.gold+=45+(world.day%3===0?10:0);awardXP(30);mmEmit('quest',{requests:world.requests}); /* MM seam S4 */message(world.requests===1?'Village shop restored! Seeds now cost less.':world.requests===2?'Village banner raised! Runes now cost less.':'Village request complete: +45 gold');}
 function buySeeds(){const cost=world.requests>=1?9:12;if(world.gold<cost){message('Seeds cost '+cost+' gold');return;}world.gold-=cost;world.seeds[world.seed]+=3;message('Bought 3 '+SEED_TYPES[world.seed].name+' seeds');}
 function buyRune(){const cost=world.requests>=2?24:30;if(world.gold<cost){message('A rune costs '+cost+' gold');return;}world.gold-=cost;world.runes++;message('Bought a rune');}
 function upgradeBroom(){const cost=55+world.broom*50;if(world.broom>=2){message('Broom is fully upgraded');return;}if(world.gold<cost){message('Broom upgrade costs '+cost+' gold');return;}world.gold-=cost;world.broom++;message('Broom upgraded to level '+world.broom);}
@@ -394,25 +423,27 @@ function goRegion(id){
  world.region=id;world.mode='outside';world.floor=0;world.targetId=null;enemies=[];lootDrops=[];dungeonBlocks=[];
  game.x=9.7;game.y=10;game.vx=game.vy=0;const p=project(game.x,game.y);game.camX=p.x;game.camY=p.y;
  familiarSprite.x=game.x+.55;familiarSprite.y=game.y-.55;party.forEach((a,i)=>{const d=(i%2?1:-1)*(.75+Math.floor(i/2)*.4);a.x=game.x+d;a.y=game.y-d;});allies.forEach(a=>{a.x=game.x+.5;a.y=game.y-.5;});
- if(id!=='grove')spawnGroup(REGIONS[id].mob,3+Math.min(1,Math.floor((world.level-1)/2)));drawGround();message('Travelled to '+REGIONS[id].name);
+ if(id!=='grove')spawnGroup(REGIONS[id].mob,3+Math.min(1,Math.floor((world.level-1)/2)));drawGround();mmEmit('region',{id});message('Travelled to '+REGIONS[id].name); // MM seam S4
 }
 function enterDungeon(rift=false){
  if(rift&&!world.riftUnlocked){message('Defeat a dungeon boss to unlock rifts');return;}
  world.mode=rift?'rift':'dungeon';world.floor=1;world.dungeonSeed=Math.floor(Math.random()*1000000);world.targetId=null;world.modifier=rift?['Fortified','Frenzy','Radiant'][Math.floor(Math.random()*3)]:'';
- enemies=[];lootDrops=[];buildDungeonLayout();spawnGroup(REGIONS[world.region].mob,4);drawGround();message(rift?'Entered a '+world.modifier+' rift':'Entered the dungeon');
+ enemies=[];lootDrops=[];buildDungeonLayout();spawnGroup(REGIONS[world.region].mob,4);drawGround();mmEmit('dungeon',{mode:world.mode,floor:1,modifier:world.modifier,region:world.region}); /* MM seam S4 */message(rift?'Entered a '+world.modifier+' rift':'Entered the dungeon');
 }
 function advanceFloor(){
  if(world.mode==='outside'){message('Enter a dungeon first');return;}
  if(enemies.some(e=>e.hp>0)){message('Defeat the remaining enemies first');return;}
- world.floor++;world.targetId=null;const boss=world.floor%3===0;enemies=[];buildDungeonLayout();spawnGroup(REGIONS[world.region].mob,boss?3:Math.min(7,3+world.floor),boss);drawGround();
+ world.floor++;world.targetId=null;const boss=world.floor%3===0;enemies=[];buildDungeonLayout();spawnGroup(REGIONS[world.region].mob,boss?3:Math.min(7,3+world.floor),boss);drawGround();mmEmit('dungeon',{mode:world.mode,floor:world.floor,boss,modifier:world.modifier,region:world.region}); // MM seam S4
  message(boss?'A powerful guardian appears!':'Entered floor '+world.floor);
 }
 function collectNearby(){let count=0;for(const drop of lootDrops)if(drop.life>0&&screenDistance(game,drop)<55){pickup(drop,game);count++;}if(!count)message('Move closer to dropped loot');}
 function setClass(id){const c=WIZARDS.find(w=>w.id===id);if(!c)return;world.cls=id;const i=SPELLS.findIndex(s=>s.id===c.starter);if(i>=0)chooseSpell(i);world.hp=Math.min(world.hp,heroMaxHP());message(c.name+' chosen');}
 function updateWorld(dt){
  world.time+=dt/120;
- if(world.time>=1){world.time-=1;world.day++;world.weather=weatherFor(world.day);message('Day '+world.day+' · '+season()+' · '+world.weather);}
- if(world.region==='grove'&&world.mode==='outside'&&isNight()&&world.lastRaid!==world.day){world.lastRaid=world.day;world.targetId=null;spawnGroup('blight',2+Math.min(3,world.level),false,true);message('Night raid! Defend your farm.');}
+ if(world.time>=1){world.time-=1;world.day++;world.weather=weatherFor(world.day);mmEmit('day',{day:world.day,season:season(),weather:world.weather});message('Day '+world.day+' · '+season()+' · '+world.weather);} // MM seam S4
+ // MM seam (audit §9 #2 fix): a night spans two day numbers, so raids are keyed by the night (the day it began).
+ const raidNight=world.time<.10?world.day-1:world.day;
+ if(world.region==='grove'&&world.mode==='outside'&&isNight()&&world.lastRaid!==raidNight&&world.lastRaid<raidNight){world.lastRaid=raidNight;world.targetId=null;spawnGroup('blight',2+Math.min(3,world.level),false,true);mmEmit('raid',{day:world.day,night:raidNight});message('Night raid! Defend your farm.');}
  world.mana=Math.min(100,world.mana+dt*(8+ranks()[2]*2+(world.gear[world.equipped-1]?.affix==='Focus'?3:0)));
  world.cloak=Math.max(0,(world.cloak||0)-dt);
  for(const plot of world.plots){
@@ -430,7 +461,7 @@ function updateWorld(dt){
   if(enemy.raid){const crop=world.plots.filter(p=>p.seed).reduce((best,p)=>!best||screenDistance(enemy,p)<screenDistance(enemy,best)?p:best,null);if(crop&&(!hero||screenDistance(enemy,crop)<screenDistance(enemy,hero)*.85))hero=crop;}
   if(!hero)continue;
   const from=project(enemy.x,enemy.y),to=project(hero.x,hero.y),distance=Math.hypot(to.x-from.x,to.y-from.y);
-  if(enemy.boss){enemy.special-=dt;if(enemy.special<=0){enemy.special=4;addParticles(enemy,'#d49bce','#ffe3bf',18,1.2);if(distance<55&&hero===game){let pulse=9;if(world.ward>0){const used=Math.min(world.ward,pulse);world.ward-=used;pulse-=used;}world.lastDamage=pulse;world.hp-=pulse;message(enemy.name+' releases a pulse!');if(world.hp<=0){resetPlayer();break;}}}}
+  if(enemy.boss){enemy.special-=dt;if(enemy.special<=0){enemy.special=4;addParticles(enemy,'#d49bce','#ffe3bf',18,1.2);if(distance<55&&hero===game){let pulse=9;if(world.ward>0){const used=Math.min(world.ward,pulse);world.ward-=used;pulse-=used;}world.lastDamage=pulse;world.hp-=pulse;mmEmit('hurt',{amount:pulse,from:enemy});message(enemy.name+' releases a pulse!');if(world.hp<=0){resetPlayer();break;}}}}
   if(distance>23){let sx=to.x-from.x,sy=to.y-from.y;const direction=normalize(sx,sy);
    for(const other of enemies){if(other===enemy||other.hp<=0)continue;const op=project(other.x,other.y),d=Math.hypot(from.x-op.x,from.y-op.y);if(d>0&&d<18){sx+=(from.x-op.x)/d*18;sy+=(from.y-op.y)/d*18;}}
    const steer=normalize(sx,sy);let pace=(enemy.boss?13:14)+(world.mode==='rift'&&world.modifier==='Frenzy'?7:0);if(enemy.status.chill)pace*=.5;if(enemy.status.root)pace=0;
@@ -438,7 +469,7 @@ function updateWorld(dt){
   }else if(enemy.attack<=0){enemy.attack=enemy.boss?1.2:1.8;let damage=enemy.boss?14:4;
    if(hero.seed){hero.health=(hero.health??100)-damage*(world.cls==='sun'?1:2);if(hero.health<=0){hero.seed=null;hero.growth=0;hero.watered=false;message('A raider destroyed a crop');}}
    else if(hero.type==='mirage'){hero.hp-=damage;if(hero.hp<=0)hero.life=0;}
-   else if(hero===game){if(world.ward>0){const used=Math.min(world.ward,damage);world.ward-=used;damage-=used;}world.lastDamage=damage;world.hp-=damage;if(world.hp<=0){resetPlayer();break;}}
+   else if(hero===game){if(world.ward>0){const used=Math.min(world.ward,damage);world.ward-=used;damage-=used;}world.lastDamage=damage;world.hp-=damage;mmEmit('hurt',{amount:damage,from:enemy});if(world.hp<=0){resetPlayer();break;}} /* MM seam S4 */
    else{hero.lastDamage=damage;hero.hp-=damage;if(hero.hp<=0){hero.hp=65;hero.x=game.x+.5;hero.y=game.y+.5;message('Player '+hero.id+' recovered');}}addParticles(hero,'#ee8b77','#ffdbbf',6,.7);}
  }
  enemies=enemies.filter(e=>!e.dead);
@@ -460,14 +491,14 @@ function updateWorld(dt){
  const fp=project(familiarSprite.x,familiarSprite.y),follow=project(game.x+.55,game.y-.55),fv=normalize(follow.x-fp.x,follow.y-fp.y);
  familiarSprite.artMoving=Math.max(0,(familiarSprite.artMoving||0)-dt);
  if(Math.hypot(follow.x-fp.x,follow.y-fp.y)>4){const m=unproject(fv.x*24*dt,fv.y*24*dt);moveActor(familiarSprite,m.x,m.y);}
- updateParty(dt);worldAutosave+=dt;if(worldAutosave>8){worldAutosave=0;saveWorld(true);}
+ updateParty(dt);worldAutosave+=dt;if(worldAutosave>8){worldAutosave=0;if(!window.MM?.save)saveWorld(true);} // MM seam S8: with MM, boot.js autosaves at safe moments
 }
 
 function newCompanion(id){
  const cls=id===2?world.p2Class:id===3?'storm':'sun',wizard=WIZARDS.find(c=>c.id===cls)||WIZARDS[0];
  const requested=id===2?world.p2Spell:wizard.starter,spellIndex=Math.max(0,SPELLS.findIndex(s=>s.id===requested));
  const offset=(id%2?1:-1)*(.75+Math.floor((id-2)/2)*.4);
- return {id,cls,spellIndex,x:game.x+offset,y:game.y-offset,vx:0,vy:0,heading:Math.PI/2,facing:'S',height:0,mounted:false,animation:'idle',frame:0,distance:0,hp:65,maxHP:65,gold:0,power:0,cooldown:0,castRemaining:0,buttonA:false,buttonB:false};
+ return {id,cls,spellIndex,x:game.x+offset,y:game.y-offset,vx:0,vy:0,heading:Math.PI/2,facing:'S',height:0,mounted:false,animation:'idle',frame:0,distance:0,hp:65,maxHP:65,mana:100,gold:0,power:0,cooldown:0,castRemaining:0,buttonA:false,buttonB:false}; // MM seam: own mana pool (audit §9 #3)
 }
 function toggleLocalCoop(){
  world.coop=!world.coop;party=world.coop?[newCompanion(2)]:[];touchPlayer=1;gameUI('touchActor').hidden=!world.coop;
@@ -492,7 +523,7 @@ function updateParty(dt){
   const old=project(p.x,p.y),m=unproject(p.vx*dt,p.vy*dt);moveActor(p,m.x,m.y);
   const projected=project(p.x,p.y),anchor=project(game.x,game.y),distance=Math.hypot(projected.x-anchor.x,projected.y-anchor.y);
   if(distance>140){const pull=unproject((projected.x-anchor.x)*(distance-140)/distance,(projected.y-anchor.y)*(distance-140)/distance);p.x-=pull.x;p.y-=pull.y;}
-  p.distance+=Math.hypot(projected.x-old.x,projected.y-old.y);p.cooldown=Math.max(0,p.cooldown-dt);p.castRemaining=Math.max(0,p.castRemaining-dt);
+  p.distance+=Math.hypot(projected.x-old.x,projected.y-old.y);p.cooldown=Math.max(0,p.cooldown-dt);p.mana=Math.min(100,(p.mana??100)+dt*8);p.castRemaining=Math.max(0,p.castRemaining-dt);
   const movement=Math.hypot(p.vx,p.vy);if(movement>1){p.heading=Math.atan2(p.vy,p.vx);p.facing=facingFromAngle(p.heading);}
   p.height=p.mounted?13:0;p.animation=p.mounted?(movement>3?'fly':'hover'):(movement>1?'walk':'idle');
   p.frame=p.animation==='walk'?Math.floor(p.distance/2)%8:Math.floor(game.elapsed*(p.mounted?10:8))%8;
@@ -500,15 +531,18 @@ function updateParty(dt){
  }
 }
 function drawFarmPlot(p){
- const v=worldToCanvas(p.x,p.y);diamond(ctx,v.x,v.y,26,13,p.watered?'#987f69':'#ae9170');
- diamond(ctx,v.x,v.y-1,20,9,p.watered?'#b09b7d':'#c3a482');
+ const v=worldToCanvas(p.x,p.y);
+ if(!(window.MM?.art&&mmArt(p.watered?'plot_wet':'plot_dry',v.x,v.y))){ // MM seam S5: plot base art
+ diamond(ctx,v.x,v.y,26,13,p.watered?'#987f69':'#ae9170');
+ diamond(ctx,v.x,v.y-1,20,9,p.watered?'#b09b7d':'#c3a482');}
  if(!p.seed){fill('#8a785f',v.x-4,v.y-1,3,1);fill('#8a785f',v.x+3,v.y,3,1);return;}
  const stage=Math.floor(p.growth/25),color=SEED_TYPES[p.seed].color;
+ if(window.MM?.art&&mmArt('crop_'+p.seed+'_'+stage,v.x,v.y))return; // MM seam S5: crop art 'crop_<seed>_<0..4>'
  if(stage===0){fill('#779a63',v.x-1,v.y-3,2,3);fill('#9bbd7c',v.x-3,v.y-4,3,2);}
  else{fill('#618f5f',v.x-1,v.y-6-stage,2,6+stage);fill('#83ad72',v.x-5,v.y-4-stage,4,3);fill('#83ad72',v.x+2,v.y-5-stage,4,3);if(stage>=2){fill(color,v.x-4,v.y-9-stage,4,4);fill(color,v.x+1,v.y-8-stage,4,4);}if(stage>=4)sparkle(v.x+5,v.y-13,color,2);}
 }
-function drawWard(ward){const p=worldToCanvas(ward.x,ward.y);ellipse(p.x,p.y,7,2,'rgba(42,70,48,.2)');fill('#74674e',p.x-3,p.y-12,6,11);fill('#a5c991',p.x-4,p.y-17,8,7);fill('#e2f5be',p.x-2,p.y-15,4,3);}
-function drawDungeonBlock(b){const p=worldToCanvas(b.x,b.y);ellipse(p.x,p.y,10,3,'rgba(32,31,39,.27)');fill('#55575d',p.x-8,p.y-13,16,12);fill('#7b7e7d',p.x-7,p.y-15,14,4);fill('#969894',p.x-5,p.y-14,6,1);if(b.variant===1){fill('#a18bc1',p.x-2,p.y-21,4,9);fill('#d4bfee',p.x-1,p.y-20,1,5);}else fill('#686b6a',p.x-7,p.y-8,5,1);}
+function drawWard(ward){const p=worldToCanvas(ward.x,ward.y);if(window.MM?.art&&(mmArt('ward_'+(ward.power||0),p.x,p.y)||mmArt('ward',p.x,p.y)))return; /* MM seam S5 */ellipse(p.x,p.y,7,2,'rgba(42,70,48,.2)');fill('#74674e',p.x-3,p.y-12,6,11);fill('#a5c991',p.x-4,p.y-17,8,7);fill('#e2f5be',p.x-2,p.y-15,4,3);}
+function drawDungeonBlock(b){const p=worldToCanvas(b.x,b.y);if(window.MM?.art&&(mmArt('block_'+world.region+'_'+b.variant,p.x,p.y)||mmArt('block_'+b.variant,p.x,p.y)||mmArt('block',p.x,p.y)))return; /* MM seam S5 */ellipse(p.x,p.y,10,3,'rgba(32,31,39,.27)');fill('#55575d',p.x-8,p.y-13,16,12);fill('#7b7e7d',p.x-7,p.y-15,14,4);fill('#969894',p.x-5,p.y-14,6,1);if(b.variant===1){fill('#a18bc1',p.x-2,p.y-21,4,9);fill('#d4bfee',p.x-1,p.y-20,1,5);}else fill('#686b6a',p.x-7,p.y-8,5,1);}
 function drawMonster(e){
  const p=worldToCanvas(e.x,e.y),kind=CAST_HEIGHT[e.type]?e.type:'slime';
  const width=(kind==='slime'||kind==='ice')?10:8;
@@ -524,7 +558,8 @@ function drawMonster(e){
  }
  const barY=top-(e.boss?13:6);
  fill('#384d41',p.x-12,barY,24,3);fill(e.boss?'#e38f67':'#bedb97',p.x-11,barY+1,Math.max(0,Math.round(22*e.hp/e.maxHP)),1);
- if(e.boss){ctx.fillStyle='#f6dfae';ctx.font='bold 6px monospace';ctx.textAlign='center';ctx.fillText(e.name,p.x,barY-3);ctx.textAlign='start';}
+ if(e.boss&&window.MM?.baselineDraw?.labels!==false){ctx.fillStyle='#f6dfae';ctx.font='bold 6px monospace'; // MM seam: label gate
+ ctx.textAlign='center';ctx.fillText(e.name,p.x,barY-3);ctx.textAlign='start';}
 }
 function drawSummon(a){
  const p=worldToCanvas(a.x,a.y);ellipse(p.x,p.y,7,2,'rgba(42,60,50,.18)');
@@ -541,9 +576,9 @@ function drawSummon(a){
 function drawCompanion(p){
  const v=worldToCanvas(p.x,p.y),alternate=atlasImages[p.id%2?'neutral':'masculine'],source=alternate&&alternate.complete&&alternate.naturalWidth?alternate:(recoloredAtlas||atlasImages[chosenLook.style]);ellipse(v.x,v.y,8,2,'rgba(42,57,46,.2)');
  if(source&&(source===recoloredAtlas||(source.complete&&source.naturalWidth))){const spec=ANIMATIONS[p.animation];ctx.drawImage(source,p.frame*FRAME_W,(spec.row+DIRS.indexOf(p.facing))*FRAME_H,FRAME_W,FRAME_H,v.x-FOOT_X,v.y-FOOT_Y-p.height,FRAME_W,FRAME_H);}
- ctx.fillStyle='#f4e6ad';ctx.font='bold 7px monospace';ctx.textAlign='center';ctx.fillText('P'+p.id,v.x,v.y-46-p.height);ctx.textAlign='start';
+ if(window.MM?.baselineDraw?.labels!==false){ctx.fillStyle='#f4e6ad';ctx.font='bold 7px monospace';ctx.textAlign='center';ctx.fillText('P'+p.id,v.x,v.y-46-p.height);ctx.textAlign='start';} // MM seam: label gate
 }
-function drawLoot(item){const p=worldToCanvas(item.x,item.y),color=item.type==='gold'?'#eac979':item.type==='rune'?'#9cdde4':'#e0aee5';ellipse(p.x,p.y,5,2,'rgba(52,69,48,.15)');diamond(ctx,p.x,p.y-4,7,7,color);sparkle(p.x,p.y-7,'#fff5c9',2);}
+function drawLoot(item){if(window.MM?.art){const a=worldToCanvas(item.x,item.y);if(mmArt('loot_'+item.type,a.x,a.y,{t:game.elapsed}))return;} /* MM seam S5 */const p=worldToCanvas(item.x,item.y),color=item.type==='gold'?'#eac979':item.type==='rune'?'#9cdde4':'#e0aee5';ellipse(p.x,p.y,5,2,'rgba(52,69,48,.15)');diamond(ctx,p.x,p.y-4,7,7,color);sparkle(p.x,p.y-7,'#fff5c9',2);}
 function drawFamiliar(){
  if(world.familiar==='none')return;
  const p=worldToCanvas(familiarSprite.x,familiarSprite.y);ellipse(p.x,p.y,6,2,'rgba(52,69,48,.2)');
@@ -628,7 +663,7 @@ function initializeExpansion(){
  drawGround();refreshAdventureUI();
 }
 
-function message(text){combatMessage=text;combatMessageTime=1.5;}
+function message(text){combatMessage=text;combatMessageTime=1.5;mmEmit('message',{text});} // MM seam S1/S4
 function chooseSpell(index){
   if(!Number.isInteger(index)||index<0||index>=SPELLS.length)return;
   spellIndex=index;spellSelect.value=String(index);message(SPELLS[index].name+' selected');
@@ -642,17 +677,19 @@ function castSpell(actor=game){
   if(actor===game?castCooldown>0:actor.cooldown>0)return false;
   const spell=SPELLS[actor===game?spellIndex:(actor.spellIndex??spellIndex)];
   const cost=spell.summon?18:(spell.blessing||spell.rewind||spell.cloak)?15:Math.min(17,6+Math.floor(spell.damage/16));
-  if(world.mana<cost){message('Not enough mana yet');return false;}
+  const pool=actor===game?world:actor;if(!Number.isFinite(pool.mana))pool.mana=100; // MM seam: companions spend their own mana (audit §9 #3)
+  if(pool.mana<cost){message('Not enough mana yet');return false;}
   const target=spell.summon||spell.blessing||spell.rewind||spell.cloak?actor:spellTarget(actor);
   if(!target){message(dummy.resetIn>0&&world.region==='grove'?'Dummy is resetting':'Move closer to an enemy or the practice dummy');return false;}
   const from=project(actor.x,actor.y),to=project(target.x,target.y);
   if(Math.hypot(to.x-from.x,to.y-from.y)>220){message('Move closer to the target');return false;}
-  world.mana-=cost;actor.castRemaining=.48;
+  pool.mana-=cost;actor.castRemaining=.48;
   if(target!==actor){actor.castFacing=facingFromAngle(Math.atan2(to.y-from.y,to.x-from.x));actor.facing=actor.castFacing;}
   if(actor===game){game.target=null;castCooldown=.32;}else actor.cooldown=.32;
   if(effects.length>=32)effects.shift();
   effects.push({spell,elapsed:0,from:{x:actor.x,y:actor.y,height:actor.height||0},target,caster:actor,hitIndex:0});
   addParticles(actor,spell.color,spell.core,10,.6);
+  mmEmit('cast',{actor,spell,target}); // MM seam S4
   message(spell.name+'!');return true;
 }
 function hitDummy(amount,color,label=''){
@@ -713,6 +750,7 @@ function toggleBroom(){
   if(game.transition)return;
   game.target=null;
   game.transition={kind:game.mounted?'land':'mount',elapsed:0,duration:0.8};
+  mmEmit('mount',{kind:game.transition.kind,phase:'start'}); // MM seam S4
 }
 function readInput(){
   let x=(keys.has('d')||(!world.coop&&keys.has('arrowright'))?1:0)-(keys.has('a')||(!world.coop&&keys.has('arrowleft'))?1:0);
@@ -731,6 +769,7 @@ function readInput(){
   return {x:0,y:0};
 }
 function update(dt){
+  mmHook('preUpdate',dt); // MM seam S3
   game.elapsed+=dt;
   updateCombat(dt);
   const movingInput=readInput();
@@ -738,7 +777,7 @@ function update(dt){
     const t=game.transition; t.elapsed=Math.min(t.duration,t.elapsed+dt);
     const p=ease(t.elapsed/t.duration);
     game.height=RIDE_HEIGHT*(t.kind==='mount'?p:1-p);
-    if(t.elapsed>=t.duration){game.mounted=t.kind==='mount';game.transition=null;game.height=game.mounted?RIDE_HEIGHT:0;}
+    if(t.elapsed>=t.duration){game.mounted=t.kind==='mount';game.transition=null;game.height=game.mounted?RIDE_HEIGHT:0;mmEmit('mount',{kind:t.kind,phase:'end',mounted:game.mounted});} // MM seam S4
   }
   const transition=game.transition;
   const top=game.mounted?FLY_SPEED*(1+world.broom*.15):WALK_SPEED;
@@ -779,9 +818,11 @@ function update(dt){
     game.facing=game.castFacing;
     if(!game.mounted&&speed()<3){game.animation='cast';game.frame=clamp(Math.floor((.48-game.castRemaining)/.06),0,7);}
   }
-  const camFactor=1-Math.exp(-dt*4.0);
-  game.camX+=(now.x-game.camX)*camFactor;game.camY+=(now.y-game.camY)*camFactor;
-  updateWorld(dt);uiClock+=dt;
+  // MM seam S6: follow rate, velocity look-ahead and focus target from MM.camera (baseline: rate 4, no lead).
+  const cam=window.MM?.camera,focusAt=cam?.focusPoint?.(dt),lead=focusAt?0:(cam?.lookAhead??0);
+  const camFactor=1-Math.exp(-dt*(cam?.follow??4.0)),camTX=focusAt?focusAt.x:now.x+game.vx*lead,camTY=focusAt?focusAt.y:now.y+game.vy*lead;
+  game.camX+=(camTX-game.camX)*camFactor;game.camY+=(camTY-game.camY)*camFactor;
+  updateWorld(dt);mmHook('postUpdate',dt);uiClock+=dt; // MM seam S3
   return dist;
 }
 
@@ -847,7 +888,11 @@ function tree(x,y,v){
 function lamp(x,y){ellipse(x,y,7,2,'rgba(49,74,55,.22)');fill('#546957',x-2,y-18,4,17);fill('#738374',x-1,y-17,1,15);fill('#4e6355',x-4,y-25,8,8);fill('#efe0a8',x-3,y-24,6,6);fill('#f8efc7',x-2,y-23,2,4);fill('#55685a',x-5,y-26,10,2);fill('#5a6e5c',x-2,y-28,4,2);}
 function flowers(x,y){ellipse(x,y,10,3,'rgba(63,91,58,.15)');for(let i=0;i<6;i++){const dx=[-7,-3,0,4,7,2][i],dy=[-3,-5,-2,-5,-2,-7][i];fill('#729a69',x+dx,y+dy,1,5);fill(i%2?'#efcec1':'#f1e6bb',x+dx-1,y+dy,3,2);}}
 function bench(x,y){ellipse(x,y,13,3,'rgba(49,74,55,.2)');fill('#685b4b',x-9,y-8,2,8);fill('#685b4b',x+7,y-6,2,6);fill('#856e53',x-11,y-11,22,4);fill('#c2a27b',x-10,y-10,20,1);fill('#9b805e',x-11,y-6,22,3);fill('#c9aa80',x-10,y-6,20,1);}
-function drawProp(p,x,y){if(p.type==='tree')tree(x,y,p.variant);else if(p.type==='lamp')lamp(x,y);else if(p.type==='bench')bench(x,y);else if(p.type==='flowers')flowers(x,y);else{ellipse(x,y,10,3,'rgba(49,74,55,.12)');fill('#b2beaa',x-6,y-5,12,4);fill('#d5ddc5',x-4,y-7,8,3);}}
+function drawProp(p,x,y){
+  // MM seam S5: custom draw fn, explicit p.art sprite, or 'prop_<type>_<variant>' / 'prop_<type>' from MM.art (anchor = foot).
+  if(typeof p.draw==='function'){p.draw(ctx,{x,y},p);return;}
+  if(window.MM?.art&&(mmArt(p.art,x,y,p.artOpts)||mmArt('prop_'+p.type+'_'+(p.variant??0),x,y)||mmArt('prop_'+p.type,x,y)))return;
+  if(p.type==='tree')tree(x,y,p.variant);else if(p.type==='lamp')lamp(x,y);else if(p.type==='bench')bench(x,y);else if(p.type==='flowers')flowers(x,y);else{ellipse(x,y,10,3,'rgba(49,74,55,.12)');fill('#b2beaa',x-6,y-5,12,4);fill('#d5ddc5',x-4,y-7,8,3);}}
 function worldToCanvas(x,y){const p=project(x,y);return {x:Math.round(SCREEN_W/2+p.x-game.camX),y:Math.round(SCREEN_H/2+p.y-game.camY)};}
 function drawDummy(pos){
   const x=pos.x+(dummy.flash>0?(Math.floor(game.elapsed*32)%2?1:-1):0),y=pos.y;
@@ -855,7 +900,7 @@ function drawDummy(pos){
   ctx.save();if(dummy.flash>0)ctx.filter='brightness(1.35)';drawCastSprite('dummy',{x,y});ctx.restore();
   fill('#385046',x-15,y-47,30,4);fill('#d9e6cc',x-14,y-46,28,2);
   fill('#9cba80',x-14,y-46,Math.round(28*dummy.hp/dummy.maxHP),2);
-  ctx.fillStyle='#516d58';ctx.font='bold 6px monospace';ctx.textAlign='center';ctx.fillText(dummy.hp?'DUMMY':'RESETTING',x,y-50);ctx.textAlign='start';
+  if(window.MM?.baselineDraw?.labels!==false){ctx.fillStyle='#516d58';ctx.font='bold 6px monospace';ctx.textAlign='center';ctx.fillText(dummy.hp?'DUMMY':'RESETTING',x,y-50);ctx.textAlign='start';} // MM seam: label gate
   if(dummy.status.root){fill('#70a966',x-10,y-5,3,4);fill('#8cc776',x+7,y-7,3,5);}
   if(dummy.status.vulnerable){fill('#b296df',x-10,y-29,2,2);fill('#e0ccf3',x+8,y-24,2,2);}
 }
@@ -971,7 +1016,11 @@ function drawCharacter(pos){
 function draw(){
   ctx.clearRect(0,0,SCREEN_W,SCREEN_H);
   ctx.fillStyle='#a0bf9c';ctx.fillRect(0,0,SCREEN_W,SCREEN_H);
+  // MM seam S6: integer screen-shake translate for the world layers (pointer mapping stays unshaken).
+  const shake=window.MM?.camera?.offset?.()||{x:0,y:0};ctx.save();ctx.translate(Math.round(shake.x)||0,Math.round(shake.y)||0);
+  mmHook('preDraw',ctx); // MM seam S3
   ctx.drawImage(ground,Math.round(SCREEN_W/2-game.camX-GX),Math.round(SCREEN_H/2-game.camY-GY));
+  mmHook('drawGround',ctx); // MM seam S3: decals / blob shadows / animated ground on top of the cached ground
   const drawables=(world.mode==='outside'?props:props.filter(p=>p.type==='lamp'||p.type==='rock')).map(p=>({type:'prop',p,depth:project(p.x,p.y).y}));
   drawables.push({type:'player',depth:project(game.x,game.y).y});
   if(world.region==='grove'&&world.mode==='outside'){
@@ -985,6 +1034,8 @@ function draw(){
   for(const p of allies)drawables.push({type:'summon',p,depth:project(p.x,p.y).y});
   for(const p of party)drawables.push({type:'companion',p,depth:project(p.x,p.y).y});
   if(world.familiar!=='none')drawables.push({type:'familiar',depth:project(familiarSprite.x,familiarSprite.y).y});
+  // MM seam S3: modules push {type:'custom',x,y,depth?,draw(ctx,pos)} (depth defaults to project(x,y).y).
+  if(window.MM?.hooks){mmHook('drawables',drawables,project);for(const d of drawables)if(!Number.isFinite(d.depth))d.depth=Number.isFinite(d.x)?project(d.x,d.y).y:0;}
   drawables.sort((a,b)=>a.depth-b.depth);
   for(const item of drawables){
     if(item.type==='player')drawCharacter(worldToCanvas(game.x,game.y));
@@ -998,15 +1049,20 @@ function draw(){
     else if(item.type==='companion')drawCompanion(item.p);
     else if(item.type==='familiar')drawFamiliar();
     else if(item.type==='villager')drawVillageKeeper();
-    else{const p=worldToCanvas(item.p.x,item.p.y);drawProp(item.p,p.x,p.y);}
+    else if(item.type==='custom'){if(typeof item.draw==='function'){try{item.draw(ctx,worldToCanvas(item.x,item.y),item);}catch(e){console.error('[MM drawable]',e);}}} // MM seam S3
+    else if(item.p){const p=worldToCanvas(item.p.x,item.p.y);drawProp(item.p,p.x,p.y);}
   }
-  drawWeatherAndLight();
+  if(mmHook('light',ctx)!==true)drawWeatherAndLight(); // MM seam S3: a lighting module may replace the flat night tint
   for(const effect of effects)drawEffect(effect);
   drawExtraMagic();
+  mmHook('postEffects',ctx); // MM seam S3
   ctx.textAlign='center';ctx.font='bold 8px monospace';
-  for(const n of numbers){const dp=worldToCanvas(n.x??dummy.x,n.y??dummy.y);ctx.fillStyle='#35443b';ctx.fillText(n.value,dp.x+n.offset+1,dp.y-48-(1-n.life)*12+1);ctx.fillStyle=n.color;ctx.fillText(n.value,dp.x+n.offset,dp.y-48-(1-n.life)*12);}
+  if(mmSetting('damageNumbers',true)!==false&&window.MM?.baselineDraw?.damageNumbers!==false)for(const n of numbers){ // MM seam: settings gateconst dp=worldToCanvas(n.x??dummy.x,n.y??dummy.y);ctx.fillStyle='#35443b';ctx.fillText(n.value,dp.x+n.offset+1,dp.y-48-(1-n.life)*12+1);ctx.fillStyle=n.color;ctx.fillText(n.value,dp.x+n.offset,dp.y-48-(1-n.life)*12);}
   ctx.textAlign='start';
   if(game.target){const p=worldToCanvas(game.target.x,game.target.y);ctx.strokeStyle='#f7f5cc';ctx.lineWidth=1;ctx.beginPath();ctx.ellipse(p.x,p.y,5,2.5,0,0,Math.PI*2);ctx.stroke();}
+  ctx.restore(); // MM seam S6: end of shaken world layers
+  mmHook('overlay',ctx); // MM seam S3: screen-space canvas overlay
+  if(window.MM?.legacyUI!==false){ // MM seam S1: legacy sidebar DOM writes (off when MM's menus replace the sidebar)
   debug.textContent=`STATE  ${game.state}\nANIM   ${game.animation}\nFRAME  ${game.frame+1} / 8\nFACING ${game.facing}\nVEL    ${game.vx.toFixed(1)}, ${game.vy.toFixed(1)}\nHEIGHT ${game.height.toFixed(1)}`;
   modeLabel.textContent=game.state;
   modeDetail.textContent=game.state==='Standing'?'· enjoying the garden':game.state==='Walking'?'· taking the scenic route':game.state==='Hovering'?'· floating gently':game.state==='Flying'?'· catching a little breeze':'· one moment';
@@ -1022,6 +1078,8 @@ function draw(){
   castButton.textContent=controlActor===game?'✦ Cast':'✦ P2 cast';
   castButton.disabled=controlActor===game?(castCooldown>0||!!game.transition):controlActor.cooldown>0;
   if(uiClock>.2){uiClock=0;refreshAdventureUI();}
+  } // end MM seam S1 gate
+  mmHook('postDraw'); // MM seam S3
 }
 let previous=0;
 function loop(t){

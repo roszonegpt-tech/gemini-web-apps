@@ -1,0 +1,127 @@
+{
+ "frames": {
+  "fx_harvest_0": {
+   "frame": {
+    "x": 0,
+    "y": 0,
+    "w": 17,
+    "h": 17
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 17,
+    "h": 17
+   },
+   "sourceSize": {
+    "w": 17,
+    "h": 17
+   },
+   "duration": 100
+  },
+  "fx_harvest_1": {
+   "frame": {
+    "x": 17,
+    "y": 0,
+    "w": 17,
+    "h": 17
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 17,
+    "h": 17
+   },
+   "sourceSize": {
+    "w": 17,
+    "h": 17
+   },
+   "duration": 100
+  },
+  "fx_harvest_2": {
+   "frame": {
+    "x": 34,
+    "y": 0,
+    "w": 17,
+    "h": 17
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 17,
+    "h": 17
+   },
+   "sourceSize": {
+    "w": 17,
+    "h": 17
+   },
+   "duration": 100
+  },
+  "fx_harvest_3": {
+   "frame": {
+    "x": 51,
+    "y": 0,
+    "w": 17,
+    "h": 17
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 17,
+    "h": 17
+   },
+   "sourceSize": {
+    "w": 17,
+    "h": 17
+   },
+   "duration": 100
+  },
+  "fx_harvest_4": {
+   "frame": {
+    "x": 68,
+    "y": 0,
+    "w": 17,
+    "h": 17
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 17,
+    "h": 17
+   },
+   "sourceSize": {
+    "w": 17,
+    "h": 17
+   },
+   "duration": 100
+  }
+ },
+ "meta": {
+  "app": "pxl",
+  "image": "fx_harvest.png",
+  "format": "RGBA8888",
+  "size": {
+   "w": 85,
+   "h": 17
+  },
+  "scale": "1",
+  "frameTags": [
+   {
+    "name": "fx_harvest",
+    "from": 0,
+    "to": 4,
+    "direction": "forward"
+   }
+  ]
+ }
+}

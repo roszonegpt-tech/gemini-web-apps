@@ -34,3 +34,12 @@ module.exports.sheets.tiles.anchors = { side_earth: tile, side_stone: tile, side
 module.exports.sheets.crops.anchors = { soil_watered: tile };
 // Fence segments: anchor = midpoint between the two post bases (put it on the tile-edge midpoint).
 module.exports.sheets.props.anchors = { fence_x: [10, 19], fence_y: [10, 19], fence_x_broken: [10, 19], fence_y_broken: [10, 19] };
+// Buildings: front ground corner of the footprint (left face width A, +1 for the outline).
+const front = (A) => (w, h) => [A + 1, h - 2];
+module.exports.sheets.buildings.anchors = {
+  cottage_ruined: front(48), cottage_mended: front(48), cottage_lush: front(48),
+  house_village_0: front(54), house_village_1: front(46), house_village_2: front(40),
+};
+// Wind-up and impact animations play once and hold the last frame.
+module.exports.sheets.bosses.once = (n) => n.includes('_windup_');
+module.exports.sheets.fx.once = (n) => !/^(fx_aura|fx_mote)/.test(n);

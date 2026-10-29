@@ -27,15 +27,17 @@ tileSet("path_dirt", (c, v, s) => {
 })
 
 // ------------------------------------------------------------------ tilled soil (furrows run along j)
+// Furrows follow the iso grain exactly: m = 2y - x is constant along a 2:1 line, and it matches
+// across neighbouring tiles, so rows continue seamlessly from plot to plot.
 const furrows = (c, base, groove, ridge, seed, wet) => {
   fillDia(c, base)
   for (let y = 0; y < 16; y++) for (let x = 0; x < 32; x++) {
     if (!DIA(x, y)) continue
-    const [, j] = isoUV(x, y), f = (j * 4) % 1
-    if (f < 0.22) c.px(x, y, groove); else if (f > 0.55 && f < 0.72) c.px(x, y, ridge)
+    const m = (((2 * y - x) % 8) + 8) % 8
+    if (m === 0 || m === 1) c.px(x, y, groove); else if (m === 6 || m === 7) c.px(x, y, ridge)
   }
   if (wet) sprinkle(c, seed, ["B", "Bi"], 2)
-  else sprinkle(c, seed, ["W", "s"], 3)
+  else sprinkle(c, seed, ["s"], 2)
 }
 V.forEach((v) => {
   sprite(`soil_dry_${v}`, T, (c) => { furrows(c, "w", "D", "W", 300 + v * 11, false); if (v === 2) sprinkle(c, 50, ["R"], 1); if (v === 3) sprinkle(c, 51, ["h"], 1) })
@@ -100,15 +102,15 @@ tileSet("swamp_bog", (c, v, s) => {
 // ------------------------------------------------------------------ Frostpeak: snow + ice
 tileSet("snow", (c, v, s) => {
   fillDia(c, "c")
-  // wind drifts along the iso grain, shadowed on their lower edge with moonlit lavender
-  for (let y = 0; y < 16; y++) for (let x = 0; x < 32; x++) {
-    if (!DIA(x, y)) continue
-    const [i] = isoUV(x, y), f = ((i + v * 0.13) * 3) % 1
-    if (f > 0.86 && hash(x >> 2, y, v) > 0.35) c.px(x, y, "L")
+  // wind drifts: short ridges along the iso grain, lit cream on top, moonlit lavender below
+  const r = c.rng(s)
+  for (let k = 0; k < 3; k++) {
+    const x0 = 6 + Math.floor(r() * 16), y0 = 4 + Math.floor(r() * 7), len = 3 + Math.floor(r() * 4)
+    for (let q = 0; q < len; q++) { const x = x0 + q * 2, y = y0 + q; if (DIA(x + 1, y + 1) && DIA(x - 1, y)) { c.hline(x, y, 2, "L"); c.px(x, y - 1, "c") } }
   }
-  sprinkle(c, s, ["C", "L"], 2)
   if (v === 2) sprinkle(c, s + 4, ["R\nL"], 1)
-  if (v === 3) sprinkle(c, s + 4, ["i"], 2)
+  if (v === 3) sprinkle(c, s + 4, ["i"], 1)
+  if (v === 1) sprinkle(c, s + 5, ["C"], 2)
 })
 tileSet("ice", (c, v, s) => {
   fillDia(c, "i")
@@ -130,11 +132,21 @@ tileSet("crypt_flag", (c, v, s) => {
 })
 
 // ------------------------------------------------------------------ village cobble
+// Cobbles: a 3x3 iso grid of rounded stones set in mortar; stones stay inside the tile so the
+// mortar line at the seam reads as just another joint.
 tileSet("cobble", (c, v, s) => {
-  const cell = (x, y) => { const [i, j] = isoUV(x, y), a = Math.floor(i * 3 + hash(Math.floor(j * 3), 3, v) * 0.5), b = Math.floor(j * 3 + (a % 2) * 0.5); return a + "," + b }
-  stones(c, cell, (id) => (hash(id.charCodeAt(0), id.charCodeAt(id.length - 1), v + 3) < 0.25 ? "C" : "q"), "R", "c", null)
+  fillDia(c, "R")
+  const r = c.rng(s)
+  for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) {
+    const fi = (i + 0.5) / 3, fj = (j + 0.5) / 3
+    const cx = Math.round(16 + (fi - fj) * 16 + (r() - 0.5) * 1.5), cy = Math.round((fi + fj) * 8 - 0.5)
+    const body = r() < 0.25 ? "C" : "q"
+    const hl = (x, y, n, col) => { for (let q = 0; q < n; q++) if (DIA(x + q, y)) c.px(x + q, y, col) }
+    hl(cx - 3, cy - 1, 6, body); hl(cx - 4, cy, 8, body); hl(cx - 3, cy + 1, 6, "r")
+    hl(cx - 2, cy - 1, 3, "c"); if (r() < 0.5) hl(cx + 2, cy, 1, "C")
+  }
   if (v === 2) sprinkle(c, s, ["h"], 2, 0)
-  if (v === 3) sprinkle(c, s, ["r"], 2)
+  if (v === 3) sprinkle(c, s, ["g"], 1, 0)
 })
 
 // ------------------------------------------------------------------ edge fringes (overlay a neighbour tile)
