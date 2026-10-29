@@ -72,4 +72,15 @@ async function scene(page, o = {}) {
   }, o);
 }
 
-module.exports = { open, shot, scene, OUT, ROOT, TEST_SPELLS };
+// Crop (x,y,w,h in canvas px) of the current scene, nearest-neighbour upscaled.
+async function crop(page, name, x, y, w, h, scale = 4) {
+  const url = await page.evaluate(([x, y, w, h, s]) => {
+    const src = document.getElementById('scene'), c = document.createElement('canvas'); c.width = w * s; c.height = h * s;
+    const g = c.getContext('2d'); g.imageSmoothingEnabled = false; g.drawImage(src, x, y, w, h, 0, 0, w * s, h * s); return c.toDataURL('image/png');
+  }, [x, y, w, h, scale]);
+  const file = path.join(OUT, name);
+  fs.writeFileSync(file, Buffer.from(url.split(',')[1], 'base64'));
+  return file;
+}
+
+module.exports = { open, shot, crop, scene, OUT, ROOT, TEST_SPELLS };

@@ -7,10 +7,11 @@
  *   bloom      half-res bright-pass (ctx.filter brightness+contrast threshold) -> quarter-res blur
  *              -> composited 'lighter' at low alpha (only near-white / saturated-bright pixels glow)
  *   diffusion  quarter-res blurred copy composited 'screen' at very low alpha (medium only)
- *   grade      cached radial gradient composited 'soft-light' (warm centre/highlights, cool edges)
- *              + 'screen' deep-blue lift (cool shadows); palette-aware (day/dusk/night/storm/dungeon)
- *   vignette   cached radial gradient (light)
- *   haze       cached top gradient, region-tinted, 'screen'
+ *   grade      cached 1:1 multiply layer: warm centre (highlights keep warmth) -> cooler, darker
+ *              edges = grade + light vignette in one pass; palette-aware (day/dawn/dusk/night/storm/dungeon)
+ *   lift/haze  cached 1:1 screen layer: deep-blue shadow lift + region-tinted haze at the top
+ * (soft-light/overlay full-screen blends cost ~0.5 ms each in software raster, so the grade is
+ *  baked into multiply/screen layers, ~0.2 ms each; upscales are nearest-neighbour 2x)
  *   grain      pre-generated noise tile moved by integer offsets, 'overlay' (off with reducedMotion)
  * Fallback without ctx.filter: x^8 self-multiply threshold + down/up-scale blur.
  * Settings (live): softFilter off|low|medium, bloom off|low|high, quality low|medium|high|custom,
@@ -39,7 +40,7 @@ window.MM = window.MM || {};
 
   // ------------------------------------------------------------------ buffers
   const mk = (w, h) => { const c = document.createElement('canvas'); c.width = w; c.height = h; const x = c.getContext('2d'); x.imageSmoothingEnabled = true; return [c, x]; };
-  const [half, hx] = mk(256, 160), [quar, qx] = mk(128, 80), [eig, ex] = mk(64, 40), [dif, dx] = mk(128, 80);
+  const [half, hx] = mk(256, 160), [half2, h2x] = mk(256, 160), [quar, qx] = mk(128, 80), [dif, dx] = mk(128, 80);
   const FILTER_OK = (function () { try { const t = document.createElement('canvas').getContext('2d'); t.filter = 'blur(1px)'; return t.filter === 'blur(1px)'; } catch (e) { return false; } })();
   F.filterSupported = FILTER_OK;
   // grain tile
@@ -51,94 +52,94 @@ window.MM = window.MM || {};
     nx.putImageData(id, 0, 0);
   })();
 
-  // ------------------------------------------------------------------ cached gradients (per palette / region)
+  // ------------------------------------------------------------------ cached full-screen layers (per palette / region)
+  // GRADE: multiply map = warm centre (highlights keep warmth) -> cooler, darker edges (grade + vignette in one pass)
   const GRADE = {
-    day: ['rgb(152,140,120)', 'rgb(98,104,124)'], dawn: ['rgb(156,138,128)', 'rgb(96,96,124)'], dusk: ['rgb(162,134,112)', 'rgb(90,88,120)'],
-    night: ['rgb(136,136,150)', 'rgb(78,86,120)'], storm: ['rgb(134,136,140)', 'rgb(90,98,116)'], dungeon: ['rgb(142,128,116)', 'rgb(70,70,98)'],
+    day: ['255,251,240', '206,208,226'], dawn: ['255,246,240', '196,192,220'], dusk: ['255,242,226', '186,176,208'],
+    night: ['244,244,255', '160,168,210'], storm: ['250,250,252', '192,198,212'], dungeon: ['255,246,232', '132,126,160'],
   };
+  // LIFT: screen map = deep-blue shadow lift + region-tinted haze at the top ("far" side of the iso view)
   const HAZE = { grove: '238,244,220', village: '246,238,220', forest: '214,220,196', swamp: '212,236,220', mountain: '238,246,255', crypt: '208,200,226', sky: '242,234,255', moonwell: '223,226,255' };
-  const gCache = new Map();
-  let vig = null, sceneCtx = null;
-  function grad(ctx, key) {
-    if (ctx !== sceneCtx) { sceneCtx = ctx; gCache.clear(); vig = null; }
-    let g = gCache.get(key); if (g) return g;
-    if (key.charCodeAt(0) === 104) { // 'h…' haze key: "h|r,g,b"
-      g = ctx.createLinearGradient(0, 0, 0, 150); const c = key.slice(2);
-      g.addColorStop(0, 'rgba(' + c + ',1)'); g.addColorStop(0.45, 'rgba(' + c + ',.45)'); g.addColorStop(1, 'rgba(' + c + ',0)');
-    } else {
-      const p = GRADE[key] || GRADE.day;
-      g = ctx.createRadialGradient(W / 2, H * 0.47, 40, W / 2, H * 0.5, 330);
-      g.addColorStop(0, p[0]); g.addColorStop(0.5, 'rgb(128,128,128)'); g.addColorStop(1, p[1]);
-    }
-    gCache.set(key, g); return g;
+  const layers = new Map();
+  function layer(key, build) {
+    let c = layers.get(key);
+    if (c) { layers.delete(key); layers.set(key, c); return c; }
+    c = build();
+    layers.set(key, c);
+    if (layers.size > 8) layers.delete(layers.keys().next().value);
+    return c;
   }
-  function vignette(ctx) {
-    if (vig && ctx === sceneCtx) return vig;
-    vig = ctx.createRadialGradient(W / 2, H / 2, 120, W / 2, H / 2, 320);
-    vig.addColorStop(0, 'rgba(14,18,30,0)'); vig.addColorStop(0.6, 'rgba(14,18,30,.35)'); vig.addColorStop(1, 'rgba(14,18,30,1)');
-    return vig;
+  function gradeLayer(pal) {
+    return layer('g|' + pal, () => {
+      const [c, x] = mk(W, H), p = GRADE[pal] || GRADE.day;
+      const g = x.createRadialGradient(W / 2, H * 0.46, 60, W / 2, H * 0.5, 330);
+      g.addColorStop(0, 'rgb(' + p[0] + ')'); g.addColorStop(0.45, 'rgb(' + p[0] + ')'); g.addColorStop(1, 'rgb(' + p[1] + ')');
+      x.fillStyle = g; x.fillRect(0, 0, W, H); return c;
+    });
+  }
+  function liftLayer(pal, reg) {
+    return layer('l|' + pal + '|' + reg, () => {
+      const [c, x] = mk(W, H), dark = pal === 'night' || pal === 'dungeon';
+      x.fillStyle = dark ? 'rgb(14,20,44)' : 'rgb(14,19,34)'; x.fillRect(0, 0, W, H);
+      if (reg) {
+        const col = dark ? '70,80,120' : (HAZE[reg] || HAZE.grove), g = x.createLinearGradient(0, 0, 0, 160);
+        g.addColorStop(0, 'rgba(' + col + ',.5)'); g.addColorStop(0.5, 'rgba(' + col + ',.2)'); g.addColorStop(1, 'rgba(' + col + ',0)');
+        x.globalCompositeOperation = 'lighter'; x.fillStyle = g; x.fillRect(0, 0, W, 160);
+      }
+      return c;
+    });
   }
   function palette() { try { return (MM.lighting && MM.lighting.paletteName && MM.lighting.paletteName()) || 'day'; } catch (e) { return 'day'; } }
   function region() { try { return world.mode !== 'outside' ? '' : world.region; } catch (e) { return 'grove'; } }
-  const hazeKeys = {};
-  function hazeKey(reg, night) { const k = (night ? 'n' : '') + reg; let s = hazeKeys[k]; if (!s) s = hazeKeys[k] = 'h|' + (night ? '125,140,192' : HAZE[reg] || HAZE.grove); return s; }
 
   // ------------------------------------------------------------------ the pass
-  const BLOOM_LOW = 'brightness(.53) contrast(10)', BLUR_Q = 'blur(1.5px)', BLUR_E = 'blur(2px)', BLUR_D = 'blur(1px)';
-  let frame = 0, last = 0, avg = 0, samples = 0, settingsTick = 0;
+  const BLOOM_T = 'brightness(.52) contrast(11)', BLUR_H = 'blur(1.5px)', BLUR_Q = 'blur(2px)', BLUR_D = 'blur(1px)';
+  let frame = 0, last = 0, avg = 0, samples = 0, settingsTick = 0, sceneCtx = null;
   F.apply = function (ctx) {
     if (!F.enabled || !ctx) return;
+    sceneCtx = ctx;
     if (--settingsTick <= 0) { settingsTick = 30; readSettings(); }
     if (M.soft === 'off' && M.bloom === 'off') { last = 0; return; }
     const t0 = performance.now();
     const src = ctx.canvas;
     ctx.save();
-    ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1; ctx.filter = 'none';
-    const pal = palette(), dark = pal === 'night' || pal === 'dungeon';
-    // ---- bloom (bright pass at half res, blur at quarter res)
+    ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1; ctx.filter = 'none'; ctx.imageSmoothingEnabled = false;
+    const pal = palette();
+    // ---- bloom: bright-pass at half res, blurred, added back with nearest 2x upscale (pixel-friendly)
     if (M.bloom !== 'off') {
       hx.globalCompositeOperation = 'copy';
-      if (FILTER_OK) { hx.filter = BLOOM_LOW; hx.drawImage(src, 0, 0, 256, 160); hx.filter = 'none'; }
+      if (FILTER_OK) { hx.filter = BLOOM_T; hx.drawImage(src, 0, 0, 256, 160); hx.filter = 'none'; }
       else { hx.drawImage(src, 0, 0, 256, 160); hx.globalCompositeOperation = 'multiply'; hx.drawImage(half, 0, 0); hx.drawImage(half, 0, 0); hx.drawImage(half, 0, 0); }
-      qx.globalCompositeOperation = 'copy';
-      if (FILTER_OK) { qx.filter = BLUR_Q; qx.drawImage(half, 0, 0, 128, 80); qx.filter = 'none'; } else qx.drawImage(half, 0, 0, 128, 80);
-      ctx.imageSmoothingEnabled = true; ctx.globalCompositeOperation = 'lighter';
-      ctx.globalAlpha = M.bloom === 'high' ? 0.7 : 0.5;
-      ctx.drawImage(quar, 0, 0, W, H);
-      if (M.bloom === 'high' || !FILTER_OK) {
-        ex.globalCompositeOperation = 'copy';
-        if (FILTER_OK) { ex.filter = BLUR_E; ex.drawImage(quar, 0, 0, 64, 40); ex.filter = 'none'; } else ex.drawImage(quar, 0, 0, 64, 40);
-        ctx.globalAlpha = M.bloom === 'high' ? 0.45 : 0.3; ctx.drawImage(eig, 0, 0, W, H);
+      h2x.globalCompositeOperation = 'copy';
+      if (FILTER_OK) { h2x.filter = BLUR_H; h2x.drawImage(half, 0, 0); h2x.filter = 'none'; }
+      else { qx.globalCompositeOperation = 'copy'; qx.drawImage(half, 0, 0, 128, 80); h2x.drawImage(quar, 0, 0, 256, 160); }
+      ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = M.bloom === 'high' ? 0.5 : 0.32;
+      ctx.drawImage(half2, 0, 0, W, H);
+      if (M.bloom === 'high') {
+        qx.globalCompositeOperation = 'copy';
+        if (FILTER_OK) { qx.filter = BLUR_Q; qx.drawImage(half2, 0, 0, 128, 80); qx.filter = 'none'; } else qx.drawImage(half2, 0, 0, 128, 80);
+        ctx.globalAlpha = 0.3; ctx.drawImage(quar, 0, 0, W, H);
       }
     }
     if (M.soft !== 'off') {
       const med = M.soft === 'medium';
-      // ---- diffusion: a whisper of blurred scene screened on top (dreamy softness)
+      // ---- diffusion: a whisper of blurred scene screened on top
       if (M.diffusion) {
         dx.globalCompositeOperation = 'copy';
         if (FILTER_OK) { dx.filter = BLUR_D; dx.drawImage(src, 0, 0, 128, 80); dx.filter = 'none'; } else dx.drawImage(src, 0, 0, 128, 80);
-        ctx.imageSmoothingEnabled = true; ctx.globalCompositeOperation = 'screen'; ctx.globalAlpha = dark ? 0.1 : 0.08;
+        ctx.globalCompositeOperation = 'screen'; ctx.globalAlpha = 0.09;
         ctx.drawImage(dif, 0, 0, W, H);
       }
-      // ---- grade: warm centre / highlights, cool darker edges (soft-light) + cool shadow lift (screen)
-      ctx.globalCompositeOperation = 'soft-light'; ctx.globalAlpha = med ? 0.85 : 0.55;
-      ctx.fillStyle = grad(ctx, GRADE[pal] ? pal : 'day'); ctx.fillRect(0, 0, W, H);
-      ctx.globalCompositeOperation = 'screen'; ctx.globalAlpha = (med ? 0.55 : 0.35) * (dark ? 1.2 : 1);
-      ctx.fillStyle = dark ? 'rgb(18,26,56)' : 'rgb(22,30,52)'; ctx.fillRect(0, 0, W, H);
-      // ---- atmospheric haze (top of the iso view is "far"), region-tinted
-      const reg = region();
-      if (reg) {
-        ctx.globalAlpha = (med ? 0.15 : 0.1) * (dark ? 0.6 : 1);
-        ctx.fillStyle = grad(ctx, hazeKey(reg, dark)); ctx.fillRect(0, 0, W, 150);
-      }
-      // ---- vignette (light)
-      ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = med ? 0.26 : 0.18;
-      ctx.fillStyle = vignette(ctx); ctx.fillRect(0, 0, W, H);
+      // ---- grade + vignette (multiply), cool shadows + haze (screen)
+      ctx.globalCompositeOperation = 'multiply'; ctx.globalAlpha = med ? 1 : 0.7;
+      ctx.drawImage(gradeLayer(GRADE[pal] ? pal : 'day'), 0, 0);
+      ctx.globalCompositeOperation = 'screen'; ctx.globalAlpha = med ? 1 : 0.7;
+      ctx.drawImage(liftLayer(GRADE[pal] ? pal : 'day', region()), 0, 0);
       // ---- very fine film grain, integer offsets only
       if (M.grain) {
         frame++;
         const ox = ((frame * 37) % 96), oy = ((frame * 53) % 96);
-        ctx.globalCompositeOperation = 'overlay'; ctx.globalAlpha = 0.06; ctx.imageSmoothingEnabled = false;
+        ctx.globalCompositeOperation = 'overlay'; ctx.globalAlpha = 0.05;
         for (let y = -oy; y < H; y += 96) for (let x = -ox; x < W; x += 96) ctx.drawImage(noise, x, y);
       }
     }
@@ -168,7 +169,7 @@ window.MM = window.MM || {};
     // world FX must land before the filter (so spells / particles bloom); MM.fx.drawWorld is idempotent per frame
     h.on('postEffects', function (ctx) {
       try { if (MM.fx && MM.fx.drawWorld) MM.fx.drawWorld(ctx); } catch (e) { console.error('[MM.filter] fx', e); }
-      sceneCtx = sceneCtx || ctx; F.apply(ctx);
+      F.apply(ctx);
     }, -100);
     try { if (MM.bus && MM.bus.on) MM.bus.on('settings', readSettings); } catch (e) { /* */ }
     try { if (MM.settings && MM.settings.onChange) MM.settings.onChange(readSettings); } catch (e) { /* */ }
