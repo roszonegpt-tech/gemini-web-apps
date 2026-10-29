@@ -12,7 +12,8 @@ let fails = 0; const ok = (cond, msg) => { console.log((cond ? '  ok   ' : '  FA
   const p = await b.newPage({ viewport: { width: 1100, height: 760 } });
   const errors = [];
   p.on('pageerror', e => errors.push('pageerror: ' + e.message));
-  p.on('console', m => { if (m.type() === 'error') errors.push('console: ' + m.text()); });
+  // the deliberately missing test video logs a resource 404; that one is expected
+  p.on('console', m => { if (m.type() === 'error' && !String(m.location().url).includes('__does_not_exist__')) errors.push('console: ' + m.text() + ' @ ' + m.location().url); });
   await p.goto(PAGE); await p.waitForTimeout(500);
 
   // stub bus + audio so we can observe calls
@@ -23,7 +24,7 @@ let fails = 0; const ok = (cond, msg) => { console.log((cond ? '  ok   ' : '  FA
     window.__snap = () => ({ listeners: __listenerCount(), nodes: document.getElementsByTagName('*').length, overlay: !!document.querySelector('.mm-cine'), style: !!document.querySelector('style[data-mm-cine]') });
   });
   const base = await p.evaluate(() => __snap());
-  const clean = async label => { const s = await p.evaluate(() => __snap()); ok(!s.overlay && !s.style && s.nodes === base.nodes && s.listeners === base.listeners, `${label}: cleaned up (nodes ${s.nodes}/${base.nodes}, listeners ${s.listeners}/${base.listeners})`); };
+  const clean = async label => { const s = await p.evaluate(() => __snap()); ok(!s.overlay && !s.style && s.nodes === base.nodes && s.listeners === base.listeners, `${label}: cleaned up (nodes ${s.nodes}/${base.nodes}, listeners ${s.listeners}/${base.listeners})`); if (s.listeners !== base.listeners) console.log(JSON.stringify(await p.evaluate(() => __listenerTypes()))); };
 
   const scenes = await p.evaluate(() => MM.cine.list());
   ok(scenes.length >= 8 && ['intro', 'first_restoration', 'boss_forest_intro', 'boss_swamp_intro', 'boss_frost_intro', 'final_fragment', 'ending', 'defeat_recover'].every(id => scenes.some(s => s.id === id)), `manifest lists ${scenes.length} scenes`);
