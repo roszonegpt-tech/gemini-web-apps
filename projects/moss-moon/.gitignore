@@ -4,3 +4,4 @@ node_modules/
 Thumbs.db
 tests/*.png
 !tests/.gitkeep
+tests/out/

@@ -1,0 +1,1475 @@
+{
+ "version": "20261029114651",
+ "palette": {
+  "k": "#263a37",
+  "j": "#2f4b47",
+  "t": "#46695f",
+  "T": "#6a907f",
+  "G": "#4b7052",
+  "g": "#688d65",
+  "h": "#87ad7b",
+  "H": "#a6c593",
+  "y": "#d2e3ad",
+  "d": "#4a3a31",
+  "D": "#6e5642",
+  "w": "#8f7a5a",
+  "W": "#b89d72",
+  "s": "#c8aa86",
+  "S": "#4e5660",
+  "r": "#737d7e",
+  "R": "#9ea79f",
+  "q": "#d5d6bd",
+  "c": "#f7f4e9",
+  "C": "#e2dcc2",
+  "a": "#9a7444",
+  "o": "#cfaa71",
+  "O": "#eac979",
+  "Y": "#fff3c4",
+  "m": "#4f4566",
+  "v": "#8a78a8",
+  "l": "#c6aedb",
+  "L": "#ebe1f7",
+  "b": "#36636f",
+  "B": "#5f9ca3",
+  "i": "#a5d6d8",
+  "e": "#8a4a40",
+  "E": "#d27a55",
+  "p": "#e8b8a8",
+  "f": "#c95d6a",
+  "x": "#2e2638",
+  "X": "#7b4f7d",
+  "z": "#8ff0d0",
+  "u": "#59573a",
+  "U": "#8b8a58"
+ },
+ "sheets": {
+  "nature": {
+   "file": "assets/images/nature.png",
+   "w": 507,
+   "h": 94,
+   "anchor": "bottom",
+   "note": "Trees, bushes, rocks, fungi, reeds, crystals. Anchor = trunk/base bottom-centre.",
+   "frames": {
+    "bush_0": {
+     "x": 36,
+     "y": 61,
+     "w": 24,
+     "h": 17,
+     "ax": 12,
+     "ay": 16,
+     "frames": 1,
+     "fps": 0
+    },
+    "bush_1": {
+     "x": 61,
+     "y": 61,
+     "w": 24,
+     "h": 17,
+     "ax": 12,
+     "ay": 16,
+     "frames": 1,
+     "fps": 0
+    },
+    "bush_berry": {
+     "x": 86,
+     "y": 61,
+     "w": 24,
+     "h": 17,
+     "ax": 12,
+     "ay": 16,
+     "frames": 1,
+     "fps": 0
+    },
+    "bush_blight": {
+     "x": 111,
+     "y": 61,
+     "w": 24,
+     "h": 17,
+     "ax": 12,
+     "ay": 16,
+     "frames": 1,
+     "fps": 0
+    },
+    "bush_snow": {
+     "x": 136,
+     "y": 61,
+     "w": 24,
+     "h": 17,
+     "ax": 12,
+     "ay": 16,
+     "frames": 1,
+     "fps": 0
+    },
+    "bush_swamp": {
+     "x": 161,
+     "y": 61,
+     "w": 24,
+     "h": 17,
+     "ax": 12,
+     "ay": 16,
+     "frames": 1,
+     "fps": 0
+    },
+    "flowers_moon": {
+     "x": 52,
+     "y": 82,
+     "w": 16,
+     "h": 11,
+     "ax": 8,
+     "ay": 10,
+     "frames": 1,
+     "fps": 0
+    },
+    "flowers_wild": {
+     "x": 153,
+     "y": 82,
+     "w": 14,
+     "h": 9,
+     "ax": 7,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "grass_tall": {
+     "x": 274,
+     "y": 61,
+     "w": 16,
+     "h": 14,
+     "ax": 8,
+     "ay": 13,
+     "frames": 4,
+     "fps": 3
+    },
+    "ice_crystal_0": {
+     "x": 0,
+     "y": 61,
+     "w": 20,
+     "h": 20,
+     "ax": 10,
+     "ay": 19,
+     "frames": 1,
+     "fps": 0
+    },
+    "ice_crystal_1": {
+     "x": 338,
+     "y": 0,
+     "w": 24,
+     "h": 28,
+     "ax": 12,
+     "ay": 27,
+     "frames": 4,
+     "fps": 4
+    },
+    "lilypad": {
+     "x": 136,
+     "y": 82,
+     "w": 16,
+     "h": 9,
+     "ax": 8,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "log": {
+     "x": 0,
+     "y": 82,
+     "w": 28,
+     "h": 12,
+     "ax": 14,
+     "ay": 11,
+     "frames": 1,
+     "fps": 0
+    },
+    "mushroom_brown": {
+     "x": 121,
+     "y": 82,
+     "w": 14,
+     "h": 10,
+     "ax": 7,
+     "ay": 9,
+     "frames": 1,
+     "fps": 0
+    },
+    "mushroom_glow": {
+     "x": 339,
+     "y": 61,
+     "w": 16,
+     "h": 14,
+     "ax": 8,
+     "ay": 13,
+     "frames": 4,
+     "fps": 4
+    },
+    "mushroom_moon": {
+     "x": 404,
+     "y": 61,
+     "w": 16,
+     "h": 14,
+     "ax": 8,
+     "ay": 13,
+     "frames": 4,
+     "fps": 4
+    },
+    "mushroom_red": {
+     "x": 86,
+     "y": 82,
+     "w": 11,
+     "h": 11,
+     "ax": 5,
+     "ay": 10,
+     "frames": 1,
+     "fps": 0
+    },
+    "reeds_0": {
+     "x": 435,
+     "y": 0,
+     "w": 18,
+     "h": 26,
+     "ax": 9,
+     "ay": 25,
+     "frames": 4,
+     "fps": 3
+    },
+    "reeds_1": {
+     "x": 21,
+     "y": 61,
+     "w": 14,
+     "h": 20,
+     "ax": 7,
+     "ay": 19,
+     "frames": 1,
+     "fps": 0
+    },
+    "rock_0": {
+     "x": 69,
+     "y": 82,
+     "w": 16,
+     "h": 11,
+     "ax": 8,
+     "ay": 10,
+     "frames": 1,
+     "fps": 0
+    },
+    "rock_1": {
+     "x": 205,
+     "y": 61,
+     "w": 22,
+     "h": 15,
+     "ax": 11,
+     "ay": 14,
+     "frames": 1,
+     "fps": 0
+    },
+    "rock_2": {
+     "x": 29,
+     "y": 82,
+     "w": 22,
+     "h": 12,
+     "ax": 11,
+     "ay": 11,
+     "frames": 1,
+     "fps": 0
+    },
+    "rock_crypt": {
+     "x": 186,
+     "y": 61,
+     "w": 18,
+     "h": 16,
+     "ax": 9,
+     "ay": 15,
+     "frames": 1,
+     "fps": 0
+    },
+    "rock_moss": {
+     "x": 228,
+     "y": 61,
+     "w": 22,
+     "h": 15,
+     "ax": 11,
+     "ay": 14,
+     "frames": 1,
+     "fps": 0
+    },
+    "rock_snow": {
+     "x": 251,
+     "y": 61,
+     "w": 22,
+     "h": 15,
+     "ax": 11,
+     "ay": 14,
+     "frames": 1,
+     "fps": 0
+    },
+    "snow_mound": {
+     "x": 98,
+     "y": 82,
+     "w": 22,
+     "h": 10,
+     "ax": 11,
+     "ay": 9,
+     "frames": 1,
+     "fps": 0
+    },
+    "stump": {
+     "x": 469,
+     "y": 61,
+     "w": 18,
+     "h": 13,
+     "ax": 9,
+     "ay": 12,
+     "frames": 1,
+     "fps": 0
+    },
+    "tree_blighted": {
+     "x": 0,
+     "y": 0,
+     "w": 46,
+     "h": 60,
+     "ax": 23,
+     "ay": 59,
+     "frames": 1,
+     "fps": 0
+    },
+    "tree_blighted_small": {
+     "x": 307,
+     "y": 0,
+     "w": 30,
+     "h": 42,
+     "ax": 15,
+     "ay": 41,
+     "frames": 1,
+     "fps": 0
+    },
+    "tree_crypt": {
+     "x": 135,
+     "y": 0,
+     "w": 42,
+     "h": 56,
+     "ax": 21,
+     "ay": 55,
+     "frames": 1,
+     "fps": 0
+    },
+    "tree_oak_0": {
+     "x": 178,
+     "y": 0,
+     "w": 42,
+     "h": 56,
+     "ax": 21,
+     "ay": 55,
+     "frames": 1,
+     "fps": 0
+    },
+    "tree_oak_1": {
+     "x": 221,
+     "y": 0,
+     "w": 42,
+     "h": 56,
+     "ax": 21,
+     "ay": 55,
+     "frames": 1,
+     "fps": 0
+    },
+    "tree_oak_2": {
+     "x": 264,
+     "y": 0,
+     "w": 42,
+     "h": 56,
+     "ax": 21,
+     "ay": 55,
+     "frames": 1,
+     "fps": 0
+    },
+    "tree_pine_snow": {
+     "x": 98,
+     "y": 0,
+     "w": 36,
+     "h": 58,
+     "ax": 18,
+     "ay": 57,
+     "frames": 1,
+     "fps": 0
+    },
+    "tree_willow": {
+     "x": 47,
+     "y": 0,
+     "w": 50,
+     "h": 58,
+     "ax": 25,
+     "ay": 57,
+     "frames": 1,
+     "fps": 0
+    }
+   }
+  },
+  "props": {
+   "file": "assets/images/props.png",
+   "w": 496,
+   "h": 71,
+   "anchor": "bottom",
+   "note": "Placeable props. Anchor = bottom-centre ground point. Fences anchor at the segment midpoint.",
+   "frames": {
+    "alchemy_table": {
+     "x": 164,
+     "y": 0,
+     "w": 34,
+     "h": 28,
+     "ax": 17,
+     "ay": 27,
+     "frames": 1,
+     "fps": 0
+    },
+    "barrel": {
+     "x": 130,
+     "y": 49,
+     "w": 15,
+     "h": 18,
+     "ax": 7,
+     "ay": 17,
+     "frames": 1,
+     "fps": 0
+    },
+    "bench": {
+     "x": 81,
+     "y": 49,
+     "w": 28,
+     "h": 20,
+     "ax": 14,
+     "ay": 19,
+     "frames": 1,
+     "fps": 0
+    },
+    "brazier": {
+     "x": 432,
+     "y": 0,
+     "w": 16,
+     "h": 24,
+     "ax": 8,
+     "ay": 23,
+     "frames": 4,
+     "fps": 8
+    },
+    "broom_stand": {
+     "x": 141,
+     "y": 0,
+     "w": 22,
+     "h": 34,
+     "ax": 11,
+     "ay": 33,
+     "frames": 1,
+     "fps": 0
+    },
+    "bucket": {
+     "x": 265,
+     "y": 49,
+     "w": 11,
+     "h": 11,
+     "ax": 5,
+     "ay": 10,
+     "frames": 1,
+     "fps": 0
+    },
+    "cauldron": {
+     "x": 335,
+     "y": 0,
+     "w": 24,
+     "h": 24,
+     "ax": 12,
+     "ay": 23,
+     "frames": 4,
+     "fps": 5.99
+    },
+    "compost": {
+     "x": 0,
+     "y": 49,
+     "w": 26,
+     "h": 22,
+     "ax": 13,
+     "ay": 21,
+     "frames": 1,
+     "fps": 0
+    },
+    "crate": {
+     "x": 110,
+     "y": 49,
+     "w": 19,
+     "h": 19,
+     "ax": 9,
+     "ay": 18,
+     "frames": 1,
+     "fps": 0
+    },
+    "crate_stack": {
+     "x": 224,
+     "y": 0,
+     "w": 22,
+     "h": 28,
+     "ax": 11,
+     "ay": 27,
+     "frames": 1,
+     "fps": 0
+    },
+    "fence_post": {
+     "x": 205,
+     "y": 49,
+     "w": 5,
+     "h": 16,
+     "ax": 2,
+     "ay": 15,
+     "frames": 1,
+     "fps": 0
+    },
+    "fence_x": {
+     "x": 247,
+     "y": 0,
+     "w": 21,
+     "h": 25,
+     "ax": 10,
+     "ay": 19,
+     "frames": 1,
+     "fps": 0
+    },
+    "fence_x_broken": {
+     "x": 269,
+     "y": 0,
+     "w": 21,
+     "h": 25,
+     "ax": 10,
+     "ay": 19,
+     "frames": 1,
+     "fps": 0
+    },
+    "fence_y": {
+     "x": 291,
+     "y": 0,
+     "w": 21,
+     "h": 25,
+     "ax": 10,
+     "ay": 19,
+     "frames": 1,
+     "fps": 0
+    },
+    "fence_y_broken": {
+     "x": 313,
+     "y": 0,
+     "w": 21,
+     "h": 25,
+     "ax": 10,
+     "ay": 19,
+     "frames": 1,
+     "fps": 0
+    },
+    "grave_mound": {
+     "x": 240,
+     "y": 49,
+     "w": 24,
+     "h": 11,
+     "ax": 12,
+     "ay": 10,
+     "frames": 1,
+     "fps": 0
+    },
+    "lamp_post": {
+     "x": 107,
+     "y": 0,
+     "w": 11,
+     "h": 34,
+     "ax": 5,
+     "ay": 33,
+     "frames": 3,
+     "fps": 5
+    },
+    "lantern": {
+     "x": 146,
+     "y": 49,
+     "w": 11,
+     "h": 16,
+     "ax": 5,
+     "ay": 15,
+     "frames": 3,
+     "fps": 5.99
+    },
+    "pumpkin": {
+     "x": 225,
+     "y": 49,
+     "w": 14,
+     "h": 12,
+     "ax": 7,
+     "ay": 11,
+     "frames": 1,
+     "fps": 0
+    },
+    "sack": {
+     "x": 211,
+     "y": 49,
+     "w": 13,
+     "h": 14,
+     "ax": 6,
+     "ay": 13,
+     "frames": 1,
+     "fps": 0
+    },
+    "scarecrow": {
+     "x": 80,
+     "y": 0,
+     "w": 26,
+     "h": 40,
+     "ax": 13,
+     "ay": 39,
+     "frames": 1,
+     "fps": 0
+    },
+    "shop_stall": {
+     "x": 0,
+     "y": 0,
+     "w": 46,
+     "h": 48,
+     "ax": 23,
+     "ay": 47,
+     "frames": 1,
+     "fps": 0
+    },
+    "signpost": {
+     "x": 199,
+     "y": 0,
+     "w": 24,
+     "h": 28,
+     "ax": 12,
+     "ay": 27,
+     "frames": 1,
+     "fps": 0
+    },
+    "tombstone_0": {
+     "x": 27,
+     "y": 49,
+     "w": 17,
+     "h": 21,
+     "ax": 8,
+     "ay": 20,
+     "frames": 1,
+     "fps": 0
+    },
+    "tombstone_1": {
+     "x": 45,
+     "y": 49,
+     "w": 17,
+     "h": 21,
+     "ax": 8,
+     "ay": 20,
+     "frames": 1,
+     "fps": 0
+    },
+    "tombstone_2": {
+     "x": 63,
+     "y": 49,
+     "w": 17,
+     "h": 21,
+     "ax": 8,
+     "ay": 20,
+     "frames": 1,
+     "fps": 0
+    },
+    "well": {
+     "x": 47,
+     "y": 0,
+     "w": 32,
+     "h": 44,
+     "ax": 16,
+     "ay": 43,
+     "frames": 1,
+     "fps": 0
+    },
+    "woodpile": {
+     "x": 180,
+     "y": 49,
+     "w": 24,
+     "h": 16,
+     "ax": 12,
+     "ay": 15,
+     "frames": 1,
+     "fps": 0
+    }
+   }
+  },
+  "tiles": {
+   "file": "assets/images/tiles.png",
+   "w": 494,
+   "h": 111,
+   "anchor": "center",
+   "note": "32x16 iso diamonds, anchor = diamond centre (16,8). Side skirts anchor at their top vertex.",
+   "frames": {
+    "cobble_0": {
+     "x": 261,
+     "y": 0,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "cobble_1": {
+     "x": 294,
+     "y": 0,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "cobble_2": {
+     "x": 327,
+     "y": 0,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "cobble_3": {
+     "x": 360,
+     "y": 0,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "crypt_flag_0": {
+     "x": 393,
+     "y": 0,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "crypt_flag_1": {
+     "x": 426,
+     "y": 0,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "crypt_flag_2": {
+     "x": 459,
+     "y": 0,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "crypt_flag_3": {
+     "x": 0,
+     "y": 27,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "edge_grass_ne": {
+     "x": 33,
+     "y": 27,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "edge_grass_nw": {
+     "x": 66,
+     "y": 27,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "edge_grass_se": {
+     "x": 99,
+     "y": 27,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "edge_grass_sw": {
+     "x": 132,
+     "y": 27,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "edge_moss_ne": {
+     "x": 165,
+     "y": 27,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "edge_moss_nw": {
+     "x": 198,
+     "y": 27,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "edge_moss_se": {
+     "x": 231,
+     "y": 27,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "edge_moss_sw": {
+     "x": 264,
+     "y": 27,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "edge_shore_ne": {
+     "x": 297,
+     "y": 27,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "edge_shore_nw": {
+     "x": 330,
+     "y": 27,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "edge_shore_se": {
+     "x": 363,
+     "y": 27,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "edge_shore_sw": {
+     "x": 396,
+     "y": 27,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "edge_snow_ne": {
+     "x": 429,
+     "y": 27,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "edge_snow_nw": {
+     "x": 462,
+     "y": 27,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "edge_snow_se": {
+     "x": 0,
+     "y": 44,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "edge_snow_sw": {
+     "x": 33,
+     "y": 44,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "edge_wild_ne": {
+     "x": 66,
+     "y": 44,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "edge_wild_nw": {
+     "x": 99,
+     "y": 44,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "edge_wild_se": {
+     "x": 132,
+     "y": 44,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "edge_wild_sw": {
+     "x": 165,
+     "y": 44,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "forest_moss_0": {
+     "x": 198,
+     "y": 44,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "forest_moss_1": {
+     "x": 231,
+     "y": 44,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "forest_moss_2": {
+     "x": 264,
+     "y": 44,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "forest_moss_3": {
+     "x": 297,
+     "y": 44,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "grass_grove_0": {
+     "x": 330,
+     "y": 44,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "grass_grove_1": {
+     "x": 363,
+     "y": 44,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "grass_grove_2": {
+     "x": 396,
+     "y": 44,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "grass_grove_3": {
+     "x": 429,
+     "y": 44,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "grass_wild_0": {
+     "x": 462,
+     "y": 44,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "grass_wild_1": {
+     "x": 0,
+     "y": 61,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "grass_wild_2": {
+     "x": 33,
+     "y": 61,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "grass_wild_3": {
+     "x": 66,
+     "y": 61,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "ice_0": {
+     "x": 99,
+     "y": 61,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "ice_1": {
+     "x": 132,
+     "y": 61,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "ice_2": {
+     "x": 165,
+     "y": 61,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "ice_3": {
+     "x": 198,
+     "y": 61,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "path_dirt_0": {
+     "x": 231,
+     "y": 61,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "path_dirt_1": {
+     "x": 264,
+     "y": 61,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "path_dirt_2": {
+     "x": 297,
+     "y": 61,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "path_dirt_3": {
+     "x": 330,
+     "y": 61,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "side_crypt": {
+     "x": 0,
+     "y": 0,
+     "w": 32,
+     "h": 26,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "side_earth": {
+     "x": 33,
+     "y": 0,
+     "w": 32,
+     "h": 26,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "side_snow": {
+     "x": 66,
+     "y": 0,
+     "w": 32,
+     "h": 26,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "side_stone": {
+     "x": 99,
+     "y": 0,
+     "w": 32,
+     "h": 26,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "snow_0": {
+     "x": 363,
+     "y": 61,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "snow_1": {
+     "x": 396,
+     "y": 61,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "snow_2": {
+     "x": 429,
+     "y": 61,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "snow_3": {
+     "x": 462,
+     "y": 61,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "soil_dry_0": {
+     "x": 0,
+     "y": 78,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "soil_dry_1": {
+     "x": 33,
+     "y": 78,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "soil_dry_2": {
+     "x": 66,
+     "y": 78,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "soil_dry_3": {
+     "x": 99,
+     "y": 78,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "soil_wet_0": {
+     "x": 132,
+     "y": 78,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "soil_wet_1": {
+     "x": 165,
+     "y": 78,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "soil_wet_2": {
+     "x": 198,
+     "y": 78,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "soil_wet_3": {
+     "x": 231,
+     "y": 78,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "swamp_bog_0": {
+     "x": 264,
+     "y": 78,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "swamp_bog_1": {
+     "x": 297,
+     "y": 78,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "swamp_bog_2": {
+     "x": 330,
+     "y": 78,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "swamp_bog_3": {
+     "x": 363,
+     "y": 78,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "swamp_mud_0": {
+     "x": 396,
+     "y": 78,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "swamp_mud_1": {
+     "x": 429,
+     "y": 78,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "swamp_mud_2": {
+     "x": 462,
+     "y": 78,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "swamp_mud_3": {
+     "x": 0,
+     "y": 95,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "water_0": {
+     "x": 33,
+     "y": 95,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "water_1": {
+     "x": 66,
+     "y": 95,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "water_2": {
+     "x": 99,
+     "y": 95,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "water_3": {
+     "x": 132,
+     "y": 95,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "water_anim": {
+     "x": 132,
+     "y": 0,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 4,
+     "fps": 3
+    }
+   }
+  }
+ },
+ "generated": "tools/build-art.js from art/*.px.js (claude-pxl)"
+}
