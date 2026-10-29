@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#e9e5d6">
+<title>Moss & Moon — Isometric Witch Demo</title>
+<style>
+  :root{color-scheme:light;--ink:#263a37;--sub:#63746b;--cream:#f7f4e9;--line:#d8dfcf;--moss:#456b53;--gold:#cfaa71}
+  *{box-sizing:border-box}
+  body{margin:0;background:#e9eee3;color:var(--ink);font-family:ui-rounded,"Trebuchet MS",system-ui,sans-serif}
+  button{font:inherit;cursor:pointer;-webkit-tap-highlight-color:transparent}
+  button:focus-visible,canvas:focus-visible{outline:3px solid #bc8b4f;outline-offset:3px}
+  .shell{max-width:1440px;margin:auto;padding:28px 34px 30px}
+  .top{display:flex;justify-content:space-between;align-items:flex-start;gap:20px;margin-bottom:20px}
+  .eyebrow{text-transform:uppercase;letter-spacing:.19em;font-size:10px;font-weight:800;color:#77927b;margin:0 0 7px}
+  h1{font-family:Georgia,serif;font-size:clamp(31px,3.8vw,48px);line-height:1;margin:0;letter-spacing:-.035em;font-weight:600}
+  .subtitle{margin:8px 0 0;color:var(--sub);font-size:14px}
+  .badge{display:flex;gap:8px;align-items:center;background:#f7f8ef;border:1px solid #d9e1d2;padding:9px 12px;border-radius:99px;font-size:11px;font-weight:700;white-space:nowrap;color:#66806a}
+  .badge i{width:7px;height:7px;border-radius:50%;background:#83a57b;display:inline-block}
+  .layout{display:grid;grid-template-columns:minmax(0,1fr) 250px;gap:20px;align-items:start}
+  .stage{background:#2e473f;padding:10px;border-radius:17px;box-shadow:0 16px 42px #49604c28}
+  .canvas-wrap{position:relative;aspect-ratio:8/5;overflow:hidden;background:#a7c5a3;border:1px solid #d2dfc6;border-radius:9px;touch-action:none}
+  canvas{display:block;width:100%;height:100%;image-rendering:pixelated;image-rendering:crisp-edges;touch-action:none}
+  .location{position:absolute;top:14px;left:14px;pointer-events:none;background:#f6f6e6e8;border:1px solid #e6ead8;padding:8px 11px;border-radius:7px;box-shadow:0 3px 0 #6c886549}
+  .location b{display:block;font-family:Georgia,serif;font-size:14px;line-height:1.05}.location span{display:block;margin-top:4px;color:#7b8c72;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.12em}
+  .debug{position:absolute;top:14px;right:14px;white-space:pre;background:#243a36e8;color:#e4f0d7;border:1px solid #94aa8e;padding:8px 10px;border-radius:6px;font:10px/1.45 ui-monospace,SFMono-Regular,Consolas,monospace;pointer-events:none;box-shadow:0 3px 0 #40594d5c}
+  .debug[hidden]{display:none}
+  .stage-footer{display:flex;align-items:center;justify-content:space-between;padding:10px 5px 1px;color:#d5e0ca;font-size:11px;gap:10px}
+  .stage-footer strong{color:#fff7dc}.stage-footer .hint{text-align:right;opacity:.83}
+  .side{display:flex;flex-direction:column;gap:14px}
+  .card{background:#f8f9f1;border:1px solid #d9e2d3;border-radius:13px;padding:17px;box-shadow:0 4px 10px #8197800b}
+  .card h2{font-family:Georgia,serif;font-size:19px;margin:0 0 7px;font-weight:600;letter-spacing:-.01em}
+  .card p{font-size:12px;line-height:1.55;color:#708075;margin:0}
+  .rule{height:1px;background:#e4eadd;margin:15px 0}
+  .keys{display:flex;align-items:center;gap:9px;font-size:12px;color:#5d7061;margin-top:12px}
+  kbd{font:700 10px ui-monospace,monospace;color:#597160;background:white;border:1px solid #d5dfd0;border-bottom-width:2px;padding:4px 6px;border-radius:4px;white-space:nowrap}
+  .actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+  .btn{border:1px solid #496a52;background:#496f54;color:white;border-radius:7px;padding:10px 13px;font-size:12px;font-weight:700;min-height:40px}
+  .btn:hover{background:#3c624a}.btn.secondary{background:#fff;color:#55705b;border-color:#d1ddd0}.btn.secondary:hover{background:#eff5e9}
+  .btn:disabled{opacity:.6;cursor:default}
+  .note{border-left:3px solid #c8ad80;padding-left:10px;margin-top:15px!important;color:#758476!important}
+  .character-card h2{margin-bottom:5px}
+  .option-label{display:block;margin:13px 0 6px;color:#6e8071;font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase}
+  .style-choices{display:flex;gap:5px;flex-wrap:wrap}
+  .style-choice{border:1px solid #d4dfd0;background:#fff;color:#667a69;border-radius:6px;padding:7px 8px;font-size:10px;font-weight:700;min-height:32px}
+  .style-choice[aria-pressed="true"]{color:#fff;background:#55775c;border-color:#55775c}
+  .swatches{display:flex;flex-wrap:wrap;gap:4px;align-items:center}
+  .swatch{width:29px;height:29px;padding:4px;border:1px solid transparent;border-radius:50%;background:transparent;display:grid;place-items:center}
+  .swatch:before{content:"";display:block;width:19px;height:19px;background:var(--swatch);border-radius:50%;border:1px solid #253b3629}
+  .swatch[aria-pressed="true"]{border-color:#618367;box-shadow:0 0 0 1px #e2eadc inset}
+  .swatch:hover{background:#edf3e8}
+  .spellpanel{margin-top:10px;padding:10px;background:#f2f4e7;border:1px solid #cfdcc8;border-radius:9px;color:#31483e}
+  .spellbar{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:7px;align-items:end}
+  .spellselect-label{display:block;margin-bottom:5px;font-size:9px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:#718475}
+  .spellbar select{width:100%;min-height:40px;border:1px solid #d0dece;border-radius:6px;background:#fff;color:#334d3f;font:700 12px ui-rounded,"Trebuchet MS",system-ui,sans-serif;padding:0 8px}
+  .spellbar .btn{white-space:nowrap;padding:9px 12px}
+  .spell-meta{display:flex;justify-content:space-between;gap:12px;margin-top:7px;color:#6e8171;font-size:10px;line-height:1.4}
+  .spell-meta strong{color:#496a52;font-size:10px;overflow-wrap:anywhere}
+  .world-hud{display:flex;flex-wrap:wrap;gap:6px 14px;padding:9px 5px 1px;color:#f0f4df;font-size:11px;font-weight:700;line-height:1.4}
+  .world-hud span{white-space:nowrap}.world-hud .world-hint{color:#bed5b7}
+  .game-card select{width:100%;min-height:36px;border:1px solid #d4dfd0;border-radius:6px;background:#fff;color:#345244;font:600 12px ui-rounded,"Trebuchet MS",system-ui,sans-serif;padding:5px 7px}
+  .game-card details{border-top:1px solid #e2e9dd;margin-top:11px;padding-top:10px}
+  .game-card summary{font:600 15px Georgia,serif;color:#395745;cursor:pointer}
+  .game-card details p{margin-top:7px;font-size:11px;line-height:1.5}
+  .mini-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:9px}
+  .mini-actions button{border:1px solid #c9d9c7;background:white;color:#496b52;border-radius:6px;padding:7px 8px;font-size:10px;font-weight:700;min-height:34px}
+  .mini-actions button:hover{background:#edf5e9}.mini-actions button:disabled{opacity:.45;cursor:default}
+  .game-card .option-label{margin-top:10px}
+  .statline{color:#54745d!important;font-weight:700;overflow-wrap:anywhere}
+  @media(max-width:650px){.game-card select{font-size:16px}.mini-actions button{font-size:12px;min-height:38px}}
+  .touch{display:none}
+  .foot{display:flex;justify-content:space-between;gap:15px;margin-top:15px;color:#849486;font-size:10px;letter-spacing:.02em}
+  @media(max-width:900px){.shell{padding:20px}.layout{grid-template-columns:1fr}.side{display:grid;grid-template-columns:1fr 1fr}.stage{max-width:100%}}
+  @media(max-width:650px){.shell{padding:14px 12px 24px}.top{margin-bottom:13px}.badge{display:none}.subtitle{font-size:12px}.layout{gap:12px}.stage{padding:6px;border-radius:12px}.canvas-wrap{border-radius:7px}.debug{font-size:8px;top:7px;right:7px;padding:6px}.location{top:7px;left:7px;padding:6px 8px}.location b{font-size:11px}.location span{font-size:8px}.stage-footer{font-size:10px}.stage-footer .hint{display:none}.spellpanel{padding:8px}.spellbar{gap:4px}.spellbar select{font-size:16px;padding:0 4px}.spellbar .btn{font-size:12px;padding:8px 7px}.spell-meta{flex-direction:column;gap:2px}.side{grid-template-columns:1fr}.side .card{padding:13px}.side .card h2{font-size:17px}.touch{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:10px;padding:0 3px 3px}.pad{display:grid;grid-template-columns:repeat(3,42px);grid-template-rows:repeat(3,36px);gap:3px}.pad button{background:#eef5e5;color:#486c54;border:0;border-radius:6px;font-size:16px;font-weight:700;touch-action:none;user-select:none;-webkit-user-select:none}.pad button:active,.pad button.pressed{background:#bcd1b5}.pad .empty{opacity:0;pointer-events:none}.touch .btn{min-width:120px;min-height:48px}.foot{display:none}}
+  @media(hover:none) and (min-width:651px){.touch{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:10px;padding:0 3px 3px}.pad{display:grid;grid-template-columns:repeat(3,44px);grid-template-rows:repeat(3,38px);gap:4px}.pad button{background:#eef5e5;color:#486c54;border:0;border-radius:6px;font-size:16px;touch-action:none}.pad .empty{opacity:0;pointer-events:none}.pad button.pressed{background:#bcd1b5}.touch .btn{min-width:130px;min-height:48px}}
+</style>
+</head>
+<body>
+<main class="shell">
+  <header class="top">
+    <div><p class="eyebrow">An enchanted farm &amp; adventure</p><h1>Moss &amp; Moon</h1><p class="subtitle">Grow your magic, explore the wilds, and bring your harvest home.</p></div>
+    <div class="badge"><i></i> PLAYABLE PROTOTYPE</div>
+  </header>
+  <div class="layout">
+    <section class="stage" aria-label="Playable isometric scene">
+      <div class="canvas-wrap">
+        <canvas id="scene" width="512" height="320" tabindex="0" aria-label="Isometric garden with a spell practice dummy. Use arrow keys or WASD to move, B to ride the broom, and space to cast."></canvas>
+        <div class="location"><b id="areaLabel">Moonflower Grove</b><span id="areaSub">Farm · explore · practice magic</span></div>
+        <div id="debug" class="debug" aria-label="Animation debug overlay"></div>
+      </div>
+      <div class="stage-footer"><span><strong id="modeLabel">Standing</strong> <span id="modeDetail">· enjoying the garden</span></span><span class="hint">TAP ENEMY OR SPACE TO CAST &nbsp; · &nbsp; B TO RIDE</span></div>
+      <div id="worldHud" class="world-hud" aria-label="Adventure status"></div>
+      <div class="spellpanel" aria-label="Spellbook and training dummy controls">
+        <div class="spellbar">
+          <div><label class="spellselect-label" for="spellSelect">Spellbook</label><select id="spellSelect" aria-label="Choose a spell"></select></div>
+          <button id="castButton" class="btn" type="button">✦ Cast</button>
+          <button id="resetDummy" class="btn secondary" type="button">Reset dummy</button>
+        </div>
+        <div class="spell-meta"><span id="spellDesc">Choose a spell, then cast at the dummy.</span><strong id="dummyStatus">Dummy 1,200 / 1,200</strong></div>
+      </div>
+      <div class="touch" aria-label="Touch controls">
+        <div class="pad" role="group" aria-label="Movement controls">
+          <button type="button" data-dir="NW" aria-label="Move northwest">↖</button><button type="button" data-dir="N" aria-label="Move north">↑</button><button type="button" data-dir="NE" aria-label="Move northeast">↗</button>
+          <button type="button" data-dir="W" aria-label="Move west">←</button><button type="button" class="empty" tabindex="-1" aria-hidden="true">·</button><button type="button" data-dir="E" aria-label="Move east">→</button>
+          <button type="button" data-dir="SW" aria-label="Move southwest">↙</button><button type="button" data-dir="S" aria-label="Move south">↓</button><button type="button" data-dir="SE" aria-label="Move southeast">↘</button>
+        </div>
+        <div><button id="touchMount" class="btn" type="button">✦ &nbsp;Mount broom</button><br><button id="touchActor" class="btn secondary" type="button" style="margin-top:6px" hidden>Control P1</button></div>
+      </div>
+    </section>
+    <aside class="side">
+      <div class="card game-card">
+        <h2>Your adventure</h2><p>Grow a little farm, choose a magic path, and explore for loot.</p>
+        <label class="option-label" for="classSelect">Wizard path</label>
+        <select id="classSelect" aria-label="Wizard path"></select><p id="classDesc"></p>
+        <details open>
+          <summary>Farm &amp; crafting</summary>
+          <p id="farmInfo"></p>
+          <label class="option-label" for="seedSelect">Seed to plant</label><select id="seedSelect" aria-label="Seed to plant"></select>
+          <div class="mini-actions"><button id="farmAction" type="button">Plant / water / harvest</button><button id="buildWard" type="button">Build ward</button><button id="empowerWard" type="button">Rune a ward</button><button id="restTime" type="button">Rest ¼ day</button></div>
+          <div class="mini-actions"><button id="brewPotion" type="button">Brew potion</button><button id="usePotion" type="button">Use potion</button><button id="brewBomb" type="button">Craft bomb</button><button id="throwBomb" type="button">Throw bomb</button><button id="sellCrops" type="button">Sell crops</button></div>
+          <p>Tap a garden plot or press <b>E</b> nearby to tend it. Rain waters crops.</p>
+        </details>
+        <details>
+          <summary>Explore &amp; dungeons</summary>
+          <label class="option-label" for="regionSelect">Destination</label><select id="regionSelect" aria-label="Destination"></select>
+          <div class="mini-actions"><button id="travelRegion" type="button">Travel</button><button id="enterDungeon" type="button">Enter dungeon</button><button id="nextFloor" type="button">Next floor</button><button id="exitDungeon" type="button">Return home</button><button id="openRift" type="button">Open rift</button></div>
+          <p id="adventureInfo"></p>
+        </details>
+        <details>
+          <summary>Skills, gear &amp; loot</summary><p id="progressInfo"></p>
+          <div class="mini-actions"><button id="skill0" type="button">Power</button><button id="skill1" type="button">Guard</button><button id="skill2" type="button">Growth</button></div>
+          <label class="option-label" for="gearSelect">Found equipment</label><select id="gearSelect" aria-label="Found equipment"></select>
+          <div class="mini-actions"><button id="equipGear" type="button">Equip item</button><button id="socketRune" type="button">Socket rune</button><button id="collectLoot" type="button">Collect nearby loot</button></div><p id="gearInfo"></p>
+        </details>
+        <details>
+          <summary>Village, familiars &amp; co-op</summary><p id="questInfo"></p>
+          <div class="mini-actions"><button id="finishQuest" type="button">Complete request</button><button id="buySeed" type="button">Buy seeds</button><button id="buyRune" type="button">Buy rune</button><button id="upgradeBroom" type="button">Upgrade broom</button><button id="discoverStar" type="button">Find constellation</button></div>
+          <label class="option-label" for="familiarSelect">Familiar</label><select id="familiarSelect" aria-label="Familiar"></select>
+          <label class="option-label" for="p2Class">Player 2 wizard</label><select id="p2Class" aria-label="Player 2 wizard"></select>
+          <label class="option-label" for="p2Spell">Player 2 spell</label><select id="p2Spell" aria-label="Player 2 spell"></select>
+          <div class="mini-actions"><button id="toggleCoop" type="button">Start local co-op</button><button id="lootMode" type="button">Loot: Shared</button><button id="p2Cast" type="button">P2 cast</button><button id="depositP2" type="button">P2 deposit gold</button><button id="saveGame" type="button">Save game</button></div>
+          <p>Local co-op: player 1 uses WASD + Space; player 2 uses arrows + Enter. Additional connected gamepads can join.</p>
+        </details>
+      </div>
+      <div class="card character-card">
+        <h2>Your character</h2><p>Choose a look and mix your colors.</p>
+        <span class="option-label">Character style</span>
+        <div class="style-choices" role="group" aria-label="Character style">
+          <button class="style-choice" type="button" data-style="feminine" aria-pressed="true">Feminine</button>
+          <button class="style-choice" type="button" data-style="masculine" aria-pressed="false">Masculine</button>
+          <button class="style-choice" type="button" data-style="neutral" aria-pressed="false">Neutral</button>
+        </div>
+        <span class="option-label">Skin</span>
+        <div class="swatches" role="group" aria-label="Skin color">
+          <button class="swatch" type="button" data-group="skin" data-color="porcelain" style="--swatch:#f3d0b9" aria-label="Porcelain skin" aria-pressed="false"></button>
+          <button class="swatch" type="button" data-group="skin" data-color="warm" style="--swatch:#e7b89c" aria-label="Warm light skin" aria-pressed="true"></button>
+          <button class="swatch" type="button" data-group="skin" data-color="honey" style="--swatch:#c98f6c" aria-label="Honey skin" aria-pressed="false"></button>
+          <button class="swatch" type="button" data-group="skin" data-color="tan" style="--swatch:#aa7052" aria-label="Tan skin" aria-pressed="false"></button>
+          <button class="swatch" type="button" data-group="skin" data-color="deep" style="--swatch:#85523b" aria-label="Deep brown skin" aria-pressed="false"></button>
+          <button class="swatch" type="button" data-group="skin" data-color="rich" style="--swatch:#58392d" aria-label="Rich brown skin" aria-pressed="false"></button>
+        </div>
+        <span class="option-label">Hair</span>
+        <div class="swatches" role="group" aria-label="Hair color">
+          <button class="swatch" type="button" data-group="hair" data-color="ink" style="--swatch:#272833" aria-label="Black hair" aria-pressed="true"></button>
+          <button class="swatch" type="button" data-group="hair" data-color="brown" style="--swatch:#5b4032" aria-label="Brown hair" aria-pressed="false"></button>
+          <button class="swatch" type="button" data-group="hair" data-color="auburn" style="--swatch:#a2573d" aria-label="Auburn hair" aria-pressed="false"></button>
+          <button class="swatch" type="button" data-group="hair" data-color="gold" style="--swatch:#c2a271" aria-label="Golden hair" aria-pressed="false"></button>
+          <button class="swatch" type="button" data-group="hair" data-color="silver" style="--swatch:#a8abb0" aria-label="Silver hair" aria-pressed="false"></button>
+        </div>
+        <span class="option-label">Hat &amp; outfit</span>
+        <div class="swatches" role="group" aria-label="Hat and outfit color">
+          <button class="swatch" type="button" data-group="outfit" data-color="charcoal" style="--swatch:#393944" aria-label="Charcoal outfit" aria-pressed="true"></button>
+          <button class="swatch" type="button" data-group="outfit" data-color="plum" style="--swatch:#66506d" aria-label="Plum outfit" aria-pressed="false"></button>
+          <button class="swatch" type="button" data-group="outfit" data-color="moss" style="--swatch:#4d7058" aria-label="Moss outfit" aria-pressed="false"></button>
+          <button class="swatch" type="button" data-group="outfit" data-color="ocean" style="--swatch:#426a79" aria-label="Ocean outfit" aria-pressed="false"></button>
+          <button class="swatch" type="button" data-group="outfit" data-color="rose" style="--swatch:#925f60" aria-label="Rose outfit" aria-pressed="false"></button>
+          <button class="swatch" type="button" data-group="outfit" data-color="ochre" style="--swatch:#96784f" aria-label="Ochre outfit" aria-pressed="false"></button>
+        </div>
+      </div>
+      <div class="card">
+        <h2>Stay awhile</h2><p>Wander the grove, fly a broom, and practice spells on the straw dummy.</p>
+        <div class="keys"><kbd>W A S D</kbd><span>or arrow keys to move</span></div>
+        <div class="keys"><kbd>B</kbd><span>mount or land</span></div>
+        <div class="keys"><kbd>SPACE</kbd><span>cast the selected spell</span></div>
+        <div class="keys"><kbd>E</kbd><span>tend the nearest farm plot</span></div>
+        <div class="keys"><kbd>H</kbd><span>drink a potion</span></div>
+        <div class="keys"><kbd>1–5</kbd><span>choose the first five spells</span></div>
+        <div class="keys"><kbd>CLICK</kbd><span>walk or fly to a spot</span></div>
+        <div class="rule"></div>
+        <div class="actions"><button class="btn" id="mount" type="button">✦ &nbsp;Mount broom</button><button class="btn secondary" id="reset" type="button">Reset</button></div>
+      </div>
+      <div class="card">
+        <h2>Under the hood</h2><p>Watch the current pose, frame, direction and velocity as you move.</p>
+        <div class="actions"><button class="btn secondary" id="debugToggle" type="button" aria-pressed="true">Hide debug</button></div>
+        <p class="note">Eight directions · walking and broom flight · no external files</p>
+      </div>
+    </aside>
+  </div>
+  <div class="foot"><span>AN ISOMETRIC FARM &amp; MAGIC ADVENTURE</span><span>MADE TO EXPLORE AT YOUR OWN PACE ✦</span></div>
+</main>
+<script src="assets/js/atlas-data.js"></script>
+<script src="assets/js/cast-data.js"></script>
+<script src="src/core/baseline.js"></script>
+</body>
+</html>
