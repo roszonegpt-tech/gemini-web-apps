@@ -61,7 +61,8 @@ Storage unavailable/quota → `MM.save.available === false`, saves go to memory 
 
 ### Game flow
 - `MM.game.newGame({name, look, cls, startCampaign})`: resets every section (world reset = baseline `newAdventure()`), applies name/look, sets
-  `active`, enters `'play'`, emits `game:new`, **then calls `MM.campaign.start()` if it exists** (UI must not call it again), then force-saves.
+  `active`, enters `'play'`, emits `game:new`, then force-saves. It does **not** start the story: the caller (UI creation screen) calls
+  `MM.campaign.start()` — or passes `{startCampaign:true}` (boot.js fallback title / `#mm-new` do that).
   UI should not call `MM.state.go('play')` after newGame/continueGame (they do it; campaign may already have moved to `'cine'`).
 - `continueGame()` → `{ok, reason?, restored?, migrated?}`, enters `'play'` on success. `toTitle()` saves if safe, `active=false`, `'title'`.
 - Death: baseline `resetPlayer()` emits `death`, then `MM.game.handleDeath()` sets HP 0 and enters `'defeat'` with
@@ -92,8 +93,10 @@ levelup/quest/region/dungeon/day/fragment/restored/chapter, only at safe moments
 ## Page shell
 Stage 8:5, letterboxed on dark moss; boot.js sizes it to an integer **device-pixel** scale when ≥2× fits, else fractional; CSS var `--mm-scale`,
 `--mm-text-scale` (from settings), `html[data-reduced-motion]`, `[data-reduced-flashes]`, `[data-quality]`. Safe-area insets padded on `#mm-app`.
-`#mm-fx` z-index 50 (cinematics/fx canvases go inside it, pointer-events none), `#mm-ui` z-index 100 (children get pointer events).
-Body has `touch-action:none` / no overscroll; the canvas has no focus ring during play.
+`#mm-fx` z-index 50 (cinematics/fx canvases go inside it, pointer-events none), `#mm-ui` z-index 100 with `pointer-events:none` —
+UI elements must opt in with `pointer-events:auto` (full-stage wrappers must NOT, or they swallow canvas clicks).
+`#mm-stage` and `#mm-ui` are `overflow:clip` and boot.js pins their scroll to 0,0: focusing overflowing UI content once scrolled the
+stage by ~6000 px, moving the canvas out from under the pointer. Body has `touch-action:none` / no overscroll; no canvas focus ring during play.
 
 ## Diagnostics `window.__mm` (tests/automation)
 `getState()` (state, paused, active, elapsed, x, y, region, mode, floor, day, time, hp, mana, gold, level, enemies, boss, saveStatus, layout…),
@@ -104,4 +107,27 @@ Body has `touch-action:none` / no overscroll; the canvas has no focus ring durin
 URL hash autostart: `#mm-new` (new game), `#mm-continue` / `#mm-play` (continue, else new).
 
 ## Tests
-See the "Test log" section at the end (updated with real results).
+- `node tests/smoke.js [index.html|builds/moss-moon-v0.2.0.html] [shot.png]` — 22 checks: title reached, canvas non-uniform (title+play),
+  59 legacy ids, newGame→play, frames advance, keyboard moves the witch, pause freezes `game.elapsed` and blocks keys, resume, save/load
+  round trip (gold, potions, position), corrupt primary → backup restored, total corruption → safe failure while the game keeps running,
+  v1 migration (with sanitising of a junk gear entry and an out-of-range `equipped`), settings validation/presets/persistence across reload,
+  save persists across reload, zero console errors.
+- `node tests/core-test.js [--unit-only]` — 85 checks: Node-vm unit tests of mm.js (bus, settings, state, hooks, camera, save envelope,
+  sections, late registration, unknown-section passthrough, failing section isolation, newer-version refusal, import/export, v1 migration,
+  storage unavailable) + browser: baseline alone with no MM/no shim (S1 null safety, seams no-op, legacy v1 save), baseline+shim without MM,
+  layout+click-to-move mapping at 1280×800 (integer 2×), 700×1000, 1500×520, 390×844, hooks/custom drawables, cast/hit/region/kill events,
+  night-raid fix, P2 mana, particle cap, shake, death→defeat→respawnHome, defeated boss floor not respawned after reload, preventDefault key
+  claiming, `MM.input.block`, legacy DOM writes gated, no-UI fallbacks (title/pause/defeat/toTitle), tab-hide pause, 30 s sim autosave,
+  single-file build boots, `--check` passes, `builds/baseline` untouched.
+
+### Test log (2026-10-29, Chromium headless via Playwright, with every module on disk at the time loaded)
+- `node tests/core-test.js` → `{"pass":true,"total":85,"failed":[]}`
+- `node tests/smoke.js index.html` → pass, 22/22 checks, 0 console errors.
+- `node tests/smoke.js builds/moss-moon-v0.2.0.html` → pass, 22/22, 0 console errors.
+- `node tools/build.js` → `builds/moss-moon-v0.2.0.html` (~1.6 MiB, all scripts inlined), `builds/LATEST.txt` written; `--check` ok.
+
+## Known issues / notes for others
+- `MM.input.pressed(action)` (optional in the contract) is not implemented; use `MM.input.action(name)` / `MM.input.touch()`.
+- The S5 art names (`prop_*`, `cast_*`, `plot_*`, `crop_*`, `ward*`, `block*`, `loot_*`) don't exist in the atlas yet, so the baseline
+  still draws its procedural art; props can also carry `art:'tree_oak_0'` or a `draw(ctx,pos,p)` function.
+- Requests filed for UI in `notes/REQUESTS.md` (title sky layer stays over the canvas when a game starts outside the UI flow).

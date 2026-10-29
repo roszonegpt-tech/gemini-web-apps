@@ -300,16 +300,16 @@ window.MM = window.MM || {};
       cooldown: 0, extraCost: 0, unlock: 'start', icon: 'spell_moonbolt',
       description: 'A quick crescent of moonlight. Cheap and fast; +20% at night.', mmNight: .2 },
     { id: 'emberbloom', key: '2', name: 'Ember Bloom', school: 'Fire', kind: 'fireball', color: '#f47c46', core: '#ffe3a1', damage: 44, hit: [.5], duration: 1.1, status: 'burn',
-      cooldown: 2.5, extraCost: 2, unlock: 'chapter:1', icon: 'spell_emberbloom', mmBloom: { r: 44, dur: 3, tick: .6, dmg: 4 },
+      cooldown: 2.5, extraCost: 2, unlock: 'chapter:1', icon: 'spell_emberbloom', mmBloom: { r: 1.6, dur: 3, every: .6, dmg: 4 },
       description: 'A seed of fire that bursts into a burning bloom, scorching everything nearby. Clears brambles.' },
     { id: 'thornbind', key: '3', name: 'Thornbind', school: 'Nature', kind: 'vines', color: '#71ad68', core: '#c7e990', damage: 22, hit: [.4], duration: 1.35, status: 'root',
-      cooldown: 4, extraCost: 0, unlock: 'tutorial', icon: 'spell_thornbind', mmZone: { r: 40, dur: 4.5, tick: .75, dmg: 4 },
+      cooldown: 4, extraCost: 0, unlock: 'tutorial', icon: 'spell_thornbind', mmZone: { r: 1.5, dur: 4.5, every: .75, dmg: 4 },
       description: 'Roots erupt in a ring: enemies inside are held, pricked, and can\'t make melee attacks.' },
     { id: 'frostbell', key: '4', name: 'Frostbell', school: 'Frost', kind: 'nova', color: '#a9e4f5', core: '#f0ffff', damage: 34, hit: [.36], duration: 1.05, status: 'chill',
-      cooldown: 3, extraCost: 1, unlock: 'fragment:swamp|chapter:3', icon: 'spell_frostbell', mmPulse: { r: 60, shatter: 30 },
+      cooldown: 3, extraCost: 1, unlock: 'fragment:swamp|chapter:3', icon: 'spell_frostbell', mmPulse: { r: 2.2, shatter: 30, splash: .35 },
       description: 'A ringing pulse that chills and slows all nearby foes. Shatters already-chilled or rooted targets for bonus damage.' },
     { id: 'starfall', key: '5', name: 'Starfall', school: 'Astral', kind: 'meteor', color: '#f5d58c', core: '#fff9db', damage: 92, hit: [1.05], duration: 1.6,
-      cooldown: 9, extraCost: 12, unlock: 'fragment:forest', icon: 'spell_starfall', mmStrike: { r: 56, splash: .7 },
+      cooldown: 9, extraCost: 12, unlock: 'fragment:forest', icon: 'spell_starfall', mmStrike: { r: 2.2, splash: .7 },
       description: 'Mark the ground, then a falling star lands a moment later. Huge damage in an area; long recharge.' }
   ];
 
@@ -317,18 +317,18 @@ window.MM = window.MM || {};
   // kind = baseline cast sprite. hp/dmg are at enemy level 1; scaled by region level & floor in systems.
   D.archetypes = {
     blightling: { kind: 'blight', name: 'Blightling', hp: 52, dmg: 5, rate: 1.7, speed: 1, drops: { blight_bark: .55 } },
-    moss_slime: { kind: 'slime', name: 'Moss Slime', hp: 44, dmg: 4, rate: 1.5, speed: .8, drops: { blight_bark: .25, glowcap: .1 } },
+    moss_slime: { kind: 'slime', tint: 'hue-rotate(35deg) saturate(1.2)', name: 'Moss Slime', hp: 44, dmg: 4, rate: 1.5, speed: .8, drops: { blight_bark: .25, glowcap: .1 } },
     thorn_sprout: { kind: 'blight', name: 'Thorn Sprout', hp: 34, dmg: 3, rate: 1.2, speed: 0, anchored: true, small: true, drops: {} },
     bog_ghost: { kind: 'ghost', name: 'Bog Ghost', hp: 62, dmg: 6, rate: 1.7, speed: 1.15, drops: { bog_pearl: .45 } },
-    mire_slime: { kind: 'slime', name: 'Mire Slime', hp: 72, dmg: 5, rate: 1.6, speed: .8, slowOnHit: .55, drops: { bog_pearl: .3, glowcap: .15 } },
-    marsh_wisp: { kind: 'wisp', name: 'Marsh Wisp', hp: 40, dmg: 6, rate: 1.3, speed: 1.4, drops: { moon_dust: .08 } },
-    mire_wisp: { kind: 'wisp', name: 'Mire Wisp', hp: 70, dmg: 6, rate: 1.2, speed: 1.3, drops: {} },
+    mire_slime: { kind: 'slime', tint: 'hue-rotate(110deg) saturate(.8) brightness(.9)', name: 'Mire Slime', hp: 72, dmg: 5, rate: 1.6, speed: .8, slowOnHit: .55, drops: { bog_pearl: .3, glowcap: .15 } },
+    marsh_wisp: { kind: 'wisp', tint: 'hue-rotate(70deg)', name: 'Marsh Wisp', hp: 40, dmg: 6, rate: 1.3, speed: 1.4, drops: { moon_dust: .08 } },
+    mire_wisp: { kind: 'wisp', tint: 'hue-rotate(110deg) saturate(1.3)', name: 'Mire Wisp', hp: 70, dmg: 6, rate: 1.2, speed: 1.3, drops: {} },
     rime_imp: { kind: 'ice', name: 'Rime Imp', hp: 80, dmg: 7, rate: 1.6, speed: 1, slowOnHit: .65, drops: { rime_shard: .4 } },
-    stone_golem: { kind: 'golem', name: 'Frost-bitten Golem', hp: 150, dmg: 11, rate: 2.3, speed: .6, drops: { rime_shard: .6 } },
+    stone_golem: { kind: 'golem', tint: 'saturate(.4) brightness(1.15)', name: 'Frost-bitten Golem', hp: 150, dmg: 11, rate: 2.3, speed: .6, drops: { rime_shard: .6 } },
     frost_spirit: { kind: 'spirit', name: 'Frost Spirit', hp: 70, dmg: 8, rate: 1.5, speed: 1.25, drops: { moon_dust: .1, rime_shard: .2 } },
     crypt_skeleton: { kind: 'skeleton', name: 'Crypt Skeleton', hp: 120, dmg: 10, rate: 1.6, speed: 1, drops: { moon_dust: .15 } },
-    crypt_ghost: { kind: 'ghost', name: 'Crypt Shade', hp: 100, dmg: 9, rate: 1.5, speed: 1.2, drops: { moon_dust: .15 } },
-    shard_wisp: { kind: 'wisp', name: 'Moon Shard', hp: 60, dmg: 7, rate: 1.2, speed: 1.2, drops: {} }
+    crypt_ghost: { kind: 'ghost', tint: 'grayscale(.6) brightness(.85)', name: 'Crypt Shade', hp: 100, dmg: 9, rate: 1.5, speed: 1.2, drops: { moon_dust: .15 } },
+    shard_wisp: { kind: 'wisp', tint: 'grayscale(.5) brightness(1.2)', name: 'Moon Shard', hp: 60, dmg: 7, rate: 1.2, speed: 1.2, drops: {} }
   };
   D.scaling = { hpPerLevel: .16, dmgPerLevel: .14, hpPerFloor: .12, postgame: 1.35, restoredDmg: .6, restoredCount: 2, nightDust: .06 };
 

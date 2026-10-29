@@ -65,7 +65,7 @@ window.MM = window.MM || {};
       replay, rewardKey: 'cine.boss_forest_intro.seen'
     },
     boss_swamp_intro: {
-      id: 'boss_swamp_intro', title: 'Mother Murk',
+      id: 'boss_swamp_intro', title: 'Mire Heart',
       trigger: 'Player enters the boss arena of the Whispering Swamp.',
       playback: 'auto', video: {}, fallback: 'engine', duration: 8.5, music: 'cine_sorrow',
       cues: [{ t: 0.4, sfx: 'cine_sting' }, { t: 3.1, sfx: 'boss_roar' }],
@@ -73,19 +73,19 @@ window.MM = window.MM || {};
         S(0.6, 3.0, 'The whispers fall silent. Out on the black water, a lantern opens its eye.'),
         S(5.6, 8.2, 'That light isn\'t hers. It belongs to the Moonwell.')
       ],
-      boss: { name: 'Mother Murk', epithet: 'Drowned voice of the Whispering Swamp' },
+      boss: { name: 'Mire Heart', epithet: 'Drowned heart of the Whispering Swamp' },
       replay, rewardKey: 'cine.boss_swamp_intro.seen'
     },
     boss_frost_intro: {
-      id: 'boss_frost_intro', title: 'The Rimebound Colossus',
+      id: 'boss_frost_intro', title: 'Frost Wyrm Husk',
       trigger: 'Player enters the boss arena on Frostpeak.',
       playback: 'auto', video: {}, fallback: 'engine', duration: 8.5, music: 'cine_sorrow',
       cues: [{ t: 0.4, sfx: 'cine_sting' }, { t: 3.1, sfx: 'boss_roar' }],
       subtitles: [
         S(0.6, 3.0, 'The wind stops. Somewhere in the ice, a stolen moonbeam glows.'),
-        S(5.6, 8.2, 'Old ice, cold heart. Bring warmth — and bring the light home.')
+        S(5.6, 8.2, 'Old bones, cold heart. Bring warmth — and bring the light home.')
       ],
-      boss: { name: 'The Rimebound Colossus', epithet: 'Frozen sentinel of Frostpeak' },
+      boss: { name: 'Frost Wyrm Husk', epithet: 'Old bones of the Frostpeak storm' },
       replay, rewardKey: 'cine.boss_frost_intro.seen'
     },
     final_fragment: {

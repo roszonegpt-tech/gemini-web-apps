@@ -761,6 +761,7 @@ function hitDummy(amount,color,label=''){
   const bonus=dummy.status.vulnerable?1.25:1;
   const hit=Math.max(1,Math.round(amount*bonus));
   dummy.hp=Math.max(0,dummy.hp-hit);dummy.flash=.18;
+  mmEmit('hit',{target:dummy,amount:hit,color,dummy:true}); // MM seam S4
   numbers.push({value:label||String(hit),color,life:.9,offset:(numbers.length%3-1)*5});
   if(numbers.length>20)numbers.shift();
   if(dummy.hp===0){dummy.resetIn=2;dummy.status={};message('Dummy defeated — resetting');}

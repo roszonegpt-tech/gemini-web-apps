@@ -3,11 +3,11 @@
 // Plays scenes listed in MM.CINE_MANIFEST (src/config/cinematics.js) either from a real video file
 // (assets/video/*.webm|mp4, when listed) or from the procedural "engine" scenes defined below.
 // Renders into its own overlay <canvas> (512×320, pixelated, letterboxed 8:5) above the game canvas and
-// below DOM UI (z-index 90 < 100). Subtitles, titles and nameplates are sharp DOM text.
+// below DOM UI (z-index 50 < 100; PHASE2_CONTRACT). Subtitles, titles and nameplates are sharp DOM text.
 // Never throws, always resolves; never grants rewards (callers use result.rewardKey). See notes/CINEMATICS.md.
 window.MM = window.MM || {};
 (function (MM) {
-  const W = 512, H = 320, Z_INDEX = 90;
+  const W = 512, H = 320, Z_INDEX = 50;
   const clamp = (v, a = 0, b = 1) => v < a ? a : v > b ? b : v;
   const lerp = (a, b, t) => a + (b - a) * t;
   const seg = (t, a, b) => clamp((t - a) / (b - a));
@@ -532,13 +532,25 @@ window.MM = window.MM || {};
       g.lineWidth = 6; [[22, 98, 4, 110], [120, 98, 146, 110]].forEach(([a, b, c, d]) => { g.beginPath(); g.moveTo(a, b); g.quadraticCurveTo((a + c) / 2, b - 8, c, d); g.stroke(); });
       g.lineWidth = 1.6; for (let i = 0; i < 14; i++) { const x = 34 + i * 6, y = 62 + Math.abs(i - 6) * 2.4; g.beginPath(); g.moveTo(x, y); g.lineTo(x + (i % 3 - 1), y + 14 + (i * 7) % 12); g.stroke(); }
     } },
-    frost: { k: .8, w: 132, h: 142, body: '#0d1626', tex: '#2a3c5a', rim: '#dcf2ff', eye: '#bff6ff', eyes: [[60, 31], [71, 31]], heart: [66, 72], draw(g) {
-      g.fillRect(40, 100, 20, 42); g.fillRect(72, 100, 20, 42);
-      g.beginPath(); g.moveTo(30, 106); g.lineTo(102, 106); g.lineTo(114, 58); g.lineTo(94, 40); g.lineTo(38, 40); g.lineTo(18, 58); g.closePath(); g.fill();
-      g.fillRect(54, 20, 24, 22);
-      [[[20, 54], [10, 16], [34, 44]], [[32, 44], [32, 8], [46, 40]], [[100, 44], [104, 10], [88, 40]], [[112, 54], [124, 20], [98, 46]], [[58, 22], [62, 6], [68, 22]]].forEach(pts => { g.beginPath(); g.moveTo(...pts[0]); g.lineTo(...pts[1]); g.lineTo(...pts[2]); g.closePath(); g.fill(); });
-      g.lineWidth = 13; g.beginPath(); g.moveTo(22, 60); g.lineTo(10, 104); g.stroke(); g.beginPath(); g.moveTo(110, 60); g.lineTo(122, 104); g.stroke();
-      g.fillRect(0, 100, 24, 22); g.fillRect(108, 100, 24, 22);
+    frost: { k: .95, w: 156, h: 132, body: '#0d1626', tex: '#2a3c5a', rim: '#dcf2ff', eye: '#bff6ff', eyes: [[47, 27], [55, 26]], heart: [84, 101], draw(g) {
+      const st = (pts, w) => { g.lineWidth = w; g.beginPath(); g.moveTo(...pts[0]); for (let i = 1; i < pts.length; i++) g.lineTo(...pts[i]); g.stroke(); };
+      // tattered wing
+      g.beginPath(); [[98, 82], [118, 34], [144, 8], [150, 40], [140, 38], [146, 62], [132, 58], [134, 80], [120, 74], [116, 92]].forEach(([x, y], i) => i ? g.lineTo(x, y) : g.moveTo(x, y)); g.closePath(); g.fill();
+      g.globalCompositeOperation = 'destination-out'; [[130, 40, 4], [138, 54, 3], [124, 64, 3]].forEach(([x, y, r]) => { g.beginPath(); g.arc(x, y, r, 0, 7); g.fill(); }); g.globalCompositeOperation = 'source-over';
+      st([[98, 82], [118, 34], [144, 8]], 3);
+      // spine, neck and tail
+      st([[124, 112], [138, 116], [154, 126]], 5); st([[124, 110], [100, 92], [84, 88], [74, 74], [68, 54], [66, 38]], 9); st([[70, 60], [64, 40], [62, 30]], 7);
+      // ribs (hollow cage)
+      for (let i = 0; i < 6; i++) { const x = 72 + i * 9; st([[x + 4, 90 - i * .5], [x - 4, 102], [x - 2, 116]], 3); }
+      st([[66, 114], [124, 114]], 3);
+      // legs
+      st([[74, 108], [64, 124], [56, 130]], 7); st([[112, 110], [118, 124], [126, 130]], 7); st([[56, 130], [48, 131]], 3); st([[126, 130], [134, 131]], 3);
+      // skull, jaw, horns
+      g.beginPath(); [[70, 20], [56, 16], [38, 22], [28, 30], [44, 33], [60, 34], [72, 30]].forEach(([x, y], i) => i ? g.lineTo(x, y) : g.moveTo(x, y)); g.closePath(); g.fill();
+      g.beginPath(); [[56, 33], [34, 42], [30, 40], [48, 34]].forEach(([x, y], i) => i ? g.lineTo(x, y) : g.moveTo(x, y)); g.closePath(); g.fill();
+      st([[64, 18], [78, 6], [90, 4]], 3); st([[60, 16], [70, 2]], 2.5); st([[36, 33], [36, 37]], 2); st([[42, 34], [42, 38]], 2);
+      // icicle shards along the spine
+      for (let i = 0; i < 5; i++) { const x = 86 + i * 8; g.beginPath(); g.moveTo(x - 3, 90 + i * 2); g.lineTo(x, 78 + i * 2); g.lineTo(x + 3, 90 + i * 2); g.fill(); }
     } }
   };
   function bossArt(kind) {
@@ -684,8 +696,8 @@ window.MM = window.MM || {};
           mist(g, by - 8 - cy, REGION[R0].fog, .6, cx * .9 + t * 10);
           g.fillStyle = '#05060a'; g.fillRect(0, R(278 - cy * 1.1), W, 60);
           for (let x = 0; x < W; x += 3) { const hh = 3 + R(hash(x, 1) * 7); g.fillRect(x, R(278 - cy * 1.1) - hh, 2, hh); }
-          witch(g, 132 - cx * 1.2, 290 - cy * 1.1, 2, 'idle', 'N', frameAt(t, 8));
-          charmGlowAt(g, 132 - cx * 1.2, 290 - 40 - cy * 1.1, .25 + .35 * rev, t);
+          witch(g, 84 - cx * 1.2, 290 - cy * 1.1, 2, 'idle', 'NE', frameAt(t, 8));
+          charmGlowAt(g, 84 - cx * 1.2, 290 - 40 - cy * 1.1, .25 + .35 * rev, t);
           if (kind === 'forest') spores(g, t, .8, '#c89aff', 40);
           if (kind === 'frost') snowfall(g, t, .8, 70 + roar * 120, 100);
           if (kind === 'swamp') pollen(g, t, { n: 30, y0: 120, y1: 300, col: '#c8ff9a', a: .7 });
@@ -870,7 +882,7 @@ window.MM = window.MM || {};
         { t0: 22.4, t1: 30.6, xf: 1, cam: [[0, { x: -20, y: 0, z: 1 }], [1, { x: 20, y: 0, z: 1.03 }]], still: { x: 0, y: 0, z: 1 },
           draw(g, s) {
             const lt = s.lt, t = s.t, cx = s.cam.x;
-            sky(g, 'bright'); stars(g, t, cx * .04, 1, s.rm); moon(g, 404 - cx * .05, 56, 15, 1.2, 0);
+            sky(g, 'bright'); stars(g, t, cx * .04, 1, s.rm); moon(g, 420 - cx * .05, 52, 14, 1.3, 0);
             g.save(); g.globalCompositeOperation = 'lighter'; const gr = g.createLinearGradient(0, 210, 0, 0); gr.addColorStop(0, rgba('#9fe9ff', .5)); gr.addColorStop(1, rgba('#9fe9ff', 0)); g.fillStyle = gr; g.fillRect(R(254 - cx * .3), 0, 8, 210); g.restore(); glow(g, 258 - cx * .3, 206, 40, '#8fe8ff', .5);
             band(g, layer('hillsH'), cx * .25 + 60, 116); band(g, layer('treesH'), cx * .45 + 200, 150);
             mist(g, 238, '#a8c0f0', .4, cx * .5 + t * 3);
@@ -941,22 +953,30 @@ window.MM = window.MM || {};
 .mm-cine-skip:focus-visible{outline:2px solid #e8cf8e;outline-offset:2px}
 .mm-cine-skip i{width:1.05em;height:1.05em;border-radius:50%;background:conic-gradient(#f0d48c calc(var(--hold,0)*360deg),#ffffff2a 0)}`;
 
-  let sess = null, timeScale = 1, subtitlesOn = true, subtitlesSet = false, reducedSet = false, reduced = false, busBound = false;
+  let sess = null, timeScale = 1, reducedFlashes = false, shakeK = 1, subtitlesOn = true, subtitlesSet = false, reducedSet = false, reduced = false, busBound = false;
   const queue = [];
   try { reduced = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches); } catch (e) { /* ignore */ }
   const manifest = () => MM.CINE_MANIFEST || {};
   const safe = (fn, ...a) => { try { return fn && fn(...a); } catch (e) { MM.cine.lastError = String(e && e.stack || e); console.warn('[cine]', e); } };
   const audio = (m, ...a) => { const A = MM.audio; if (A && typeof A[m] === 'function') safe(() => A[m](...a)); };
   const emit = (n, d) => { const b = MM.bus; if (b && typeof b.emit === 'function') safe(() => b.emit(n, d)); };
+  function applySettingsObj(a, fromApiGuard) {
+    if (!a) return;
+    if (typeof a.subtitles === 'boolean' && !(fromApiGuard && subtitlesSet)) subtitlesOn = a.subtitles;
+    if (typeof a.reducedMotion === 'boolean' && !(fromApiGuard && reducedSet)) reduced = a.reducedMotion;
+    if (typeof a.reducedFlashes === 'boolean') reducedFlashes = a.reducedFlashes;
+    if (typeof a.shake === 'string') shakeK = { off: 0, low: .5, full: 1 }[a.shake] ?? 1;
+  }
   function bindBus() {
     if (busBound || !MM.bus || typeof MM.bus.on !== 'function') return; busBound = true;
-    safe(() => MM.bus.on('settings', d => { if (!d) return; if (typeof d.subtitles === 'boolean') api.setSubtitles(d.subtitles); if (typeof d.reducedMotion === 'boolean') api.setReducedMotion(d.reducedMotion); const v = d.volumes || d; if (typeof v.cine === 'number') api.volume = clamp(v.cine); }));
+    // core emits {key, value, changed, all:{…settings}, audio:{master,music,sfx,cine}}
+    safe(() => MM.bus.on('settings', d => { if (!d) return; applySettingsObj(d.all || d); if (sess && sess.sub) sess.sub.hidden = !subtitlesOn; if (sess && sess.video) sess.video.volume = effVolume(); }));
   }
   function readSettings() {
     const st = MM.settings; if (!st) return;
-    const get = k => typeof st.get === 'function' ? safe(() => st.get(k)) : st[k];
-    if (!subtitlesSet) { const v = get('subtitles'); if (typeof v === 'boolean') subtitlesOn = v; }
-    if (!reducedSet) { const v = get('reducedMotion'); if (typeof v === 'boolean') reduced = v; }
+    const all = typeof st.all === 'function' ? safe(() => st.all()) : null;
+    if (all) applySettingsObj(all, true);
+    else { const get = k => typeof st.get === 'function' ? safe(() => st.get(k)) : st[k]; applySettingsObj({ subtitles: get('subtitles'), reducedMotion: get('reducedMotion'), reducedFlashes: get('reducedFlashes'), shake: get('shake') }, true); }
   }
   function effVolume() {
     let v = typeof api.volume === 'number' ? api.volume : null; const vols = MM.audio && typeof MM.audio.getVolumes === 'function' ? safe(() => MM.audio.getVolumes()) : null;
@@ -984,7 +1004,7 @@ window.MM = window.MM || {};
 
   function buildDom() {
     const style = el('style'); style.textContent = CSS; style.setAttribute('data-mm-cine', ''); document.head.appendChild(style);
-    const host = document.querySelector('.canvas-wrap');
+    const host = document.querySelector('#mm-stage') || document.querySelector('.canvas-wrap');
     const root = el('div', 'mm-cine' + (host ? '' : ' mm-fixed')); root.setAttribute('role', 'region'); root.setAttribute('aria-label', 'Cinematic: ' + (sess.entry?.title || sess.id)); root.setAttribute('aria-roledescription', 'cinematic');
     const stage = el('div', 'mm-cine-stage', root), cv = el('canvas', null, stage); cv.width = W; cv.height = H; cv.setAttribute('aria-hidden', 'true');
     const cap = el('div', 'mm-cine-cap', stage), sub = el('div', 'mm-cine-sub', stage); sub.setAttribute('aria-live', 'polite');
@@ -1009,6 +1029,7 @@ window.MM = window.MM || {};
     sess = { id: job.id, job, entry, opts: job.opts || {}, listeners: [], t: 0, real: 0, paused: false, closing: false, closeT: 0, closeDur: 0, usedFallback: false, fired: 0, hold: 0, holding: false, skipShownAt: -1, lastInput: -9, subKey: null, mode: 'pending', caps: [], subs: [] };
     sess.skippable = sess.opts.skippable !== false;
     readSettings(); bindBus(); atlas(); castPage(0); castPage(1);
+    const cur = MM.audio && typeof MM.audio.current === 'function' ? safe(() => MM.audio.current()) : null; sess.prevMusic = cur && cur.music || null;
     buildDom(); bindInput();
     const sources = sess.opts.engineOnly ? [] : videoSources(entry);
     if ((entry && entry.playback === 'video' || entry && entry.playback === 'auto') && sources.length) startVideo(sources);
@@ -1021,7 +1042,7 @@ window.MM = window.MM || {};
     const entry = e.entry || sess.entry || {}, scene = SCENES[e.sceneId];
     Object.assign(sess, { mode: 'engine', scene, sceneId: e.sceneId, t: 0, fired: 0, usedFallback: !!fallback || e.sceneId !== id, dur: entry.duration || (scene.shots[scene.shots.length - 1].t1), subs: entry.subtitles || [], cues: (entry.cues || []).slice().sort((a, b) => a.t - b.t), sceneEntry: entry });
     buildCaptions(scene, entry);
-    if (entry.music) audio('music', entry.music, { fade: 700 });
+    if (entry.music) audio('music', entry.music, { fade: .7 });
     return true;
   }
   function startVideo(sources) {
@@ -1039,7 +1060,7 @@ window.MM = window.MM || {};
       if (p && p.catch) p.catch(err => { if (sess && sess.video === v && sess.mode === 'video-pending' && v.src.indexOf(src) >= 0) fail(err && err.name === 'NotAllowedError' ? 'autoplay-blocked' : 'play-rejected'); });
     };
     listen(v, 'error', () => fail('error'));
-    listen(v, 'playing', () => { if (!sess || sess.video !== v) return; if (sess.mode === 'video-pending') { sess.mode = 'video'; clearTimeout(sess.vTimer); audio('duck', .7, Math.max(1000, (isFinite(v.duration) ? v.duration : sess.dur || 60) * 1000)); sess.ducked = true; } });
+    listen(v, 'playing', () => { if (!sess || sess.video !== v) return; if (sess.mode === 'video-pending') { sess.mode = 'video'; clearTimeout(sess.vTimer); audio('duck', .7, Infinity); sess.ducked = true; } });
     listen(v, 'ended', () => { if (sess && sess.video === v) finish(false); });
     try { v.defaultPlaybackRate = v.playbackRate = clamp(timeScale, .25, 16); } catch (e) { /* ignore */ }
     trySrc();
@@ -1099,14 +1120,14 @@ window.MM = window.MM || {};
     let i = shots.findIndex(s => t >= s.t0 && t < s.t1); if (i < 0) i = t < shots[0].t0 ? 0 : shots.length - 1;
     const cur = shots[i], xf = cur.xf ?? .9, cut = cur.in === 'cut' && !reduced;
     let sx = 0, sy = 0;
-    if (!reduced) for (const s of sc.shake || []) if (t >= s.t0 && t < s.t1) { const k = s.amp * (1 - seg(t, s.t0, s.t1)); sx += R((hash(R(t * 60), 1) - .5) * 2 * k); sy += R((hash(R(t * 60), 2) - .5) * 2 * k); }
+    if (!reduced && shakeK > 0) for (const s of sc.shake || []) if (t >= s.t0 && t < s.t1) { const k = s.amp * shakeK * (1 - seg(t, s.t0, s.t1)); sx += R((hash(R(t * 60), 1) - .5) * 2 * k); sy += R((hash(R(t * 60), 2) - .5) * 2 * k); }
     g.fillStyle = '#000'; g.fillRect(0, 0, W, H);
     const a = drawShot(cur, t, B.a);
     const mixPrev = i > 0 && !cut && t - cur.t0 < xf ? 1 - (t - cur.t0) / xf : 0;
     if (mixPrev > 0) { g.drawImage(drawShot(shots[i - 1], t, B.b), sx, sy); g.globalAlpha = sm(1 - mixPrev); g.drawImage(a, sx, sy); g.globalAlpha = 1; }
     else g.drawImage(a, sx, sy);
     if (sc.vignette) { const v = sc.vignette; let k = v.k ?? .55; if (v.pulse) k = .55 + .25 * (reduced ? .5 : .5 + .5 * Math.sin(t * 2.4)); const j = v.pulse && !reduced ? R(Math.sin(t * 13) * 2 + sx) : 0; g.drawImage(vignetteCanvas(v.col, R(k * 20) / 20), j, v.pulse && !reduced ? R(Math.cos(t * 11) * 2 + sy) : 0); if (v.pulse && v.col !== '#000000') g.drawImage(vignetteCanvas('#000000', .5), 0, 0); }
-    for (const f of sc.flash || []) if (t >= f.t && t < f.t + f.d) { g.globalAlpha = f.a * (reduced ? .35 : 1) * (1 - EASE.out(seg(t, f.t, f.t + f.d))); g.fillStyle = f.c; g.fillRect(0, 0, W, H); g.globalAlpha = 1; }
+    for (const f of sc.flash || []) if (t >= f.t && t < f.t + f.d) { g.globalAlpha = f.a * (reduced || reducedFlashes ? .3 : 1) * (1 - EASE.out(seg(t, f.t, f.t + f.d))); g.fillStyle = f.c; g.fillRect(0, 0, W, H); g.globalAlpha = 1; }
     const fade = Math.max(1 - seg(t, 0, sc.fadeIn || .6), seg(t, sess.dur - (sc.fadeOut || .8), sess.dur));
     if (fade > 0) { g.globalAlpha = fade; g.fillStyle = '#000'; g.fillRect(0, 0, W, H); g.globalAlpha = 1; }
     if (sc.bars) { const bh = R(30 * EASE.outCubic(seg(t, 0, 1.1))); g.fillStyle = '#000'; g.fillRect(0, 0, W, bh); g.fillRect(0, H - bh, W, bh); }
@@ -1128,7 +1149,7 @@ window.MM = window.MM || {};
   }
   function fireCues(from, to) {
     const cues = sess.cues || [];
-    while (sess.fired < cues.length && cues[sess.fired].t <= to) { const c = cues[sess.fired++]; if (c.t < from - .001) continue; if (c.music) audio('music', c.music, { fade: 900 }); if (c.sfx) audio('sfx', c.sfx, {}); }
+    while (sess.fired < cues.length && cues[sess.fired].t <= to) { const c = cues[sess.fired++]; if (c.t < from - .001) continue; if (c.music) audio('music', c.music, { fade: .9 }); if (c.sfx) audio('sfx', c.sfx, {}); }
   }
   function tick(now) {
     if (!sess) return; sess.raf = 0;
@@ -1168,7 +1189,8 @@ window.MM = window.MM || {};
     if (s.video) { safe(() => { s.video.pause(); s.video.removeAttribute('src'); s.video.load(); }); }
     safe(() => s.root && s.root.remove()); safe(() => s.style && s.style.remove());
     if (s.ducked) audio('duck', 0, 0);
-    const r = s.result || { id: s.id, skipped: false, completed: false, usedFallback: false };
+    if (s.prevMusic && s.mode === 'engine' && !/^cine_|^ending$/.test(s.prevMusic)) audio('music', s.prevMusic, { fade: 1.2 });
+    const r = s.result || { id: s.id, skipped: false, completed: false, usedFallback: false }; r.prevMusic = s.prevMusic;
     emit('cine:end', r);
     resolveJob(s.job, r);
     if (queue.length) { const next = queue.shift(); setTimeout(() => { try { if (sess) queue.unshift(next); else start(next); } catch (e) { console.warn('[cine]', e); finalizeBroken(next); } }, 0); }

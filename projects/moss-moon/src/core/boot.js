@@ -106,7 +106,7 @@
   function fallbackConfirm(forceNew) {
     if (overlayKind === 'title') {
       if (!forceNew && MM.save.hasSave()) { const r = MM.game.continueGame(); if (r.ok) return; toast('Save could not be loaded (' + r.reason + '); starting fresh', 'error'); }
-      MM.game.newGame({ name: 'Witch' });
+      MM.game.newGame({ name: 'Witch', startCampaign: true });
     } else if (overlayKind === 'pause') MM.state.go('play');
     else if (overlayKind === 'defeat') MM.game.respawnHome();
   }
@@ -203,6 +203,11 @@
     if (booted) return; booted = true;
     layout();
     window.addEventListener('resize', layout);
+    // Scroll containers must stay at 0,0: a focused element inside overflowing UI could otherwise scroll the stage/page
+    // (shifting the canvas under the pointer). overflow:clip in index.html prevents it; this is the fallback for older engines.
+    const pin = (el) => { if (el && (el.scrollTop || el.scrollLeft)) { el.scrollTop = 0; el.scrollLeft = 0; } };
+    for (const id of ['mm-app', 'mm-stage', 'mm-ui']) { const el = $(id); if (el) el.addEventListener('scroll', () => pin(el), { passive: true }); }
+    window.addEventListener('scroll', () => { if (window.scrollX || window.scrollY) window.scrollTo(0, 0); }, { passive: true });
     window.addEventListener('orientationchange', () => setTimeout(layout, 120));
     if (window.visualViewport) window.visualViewport.addEventListener('resize', layout);
     applyDocSettings(); MM.settings.onChange(applyDocSettings);
@@ -214,8 +219,8 @@
     MM.bus.emit('boot', { version: MM.version });
     if (MM.state.current === 'boot') MM.state.go('title');
     const h = (location.hash || '').toLowerCase();
-    if (h === '#mm-new') MM.game.newGame({ name: 'Witch' });
-    else if (h === '#mm-continue' || h === '#mm-play') { const r = MM.save.hasSave() ? MM.game.continueGame() : { ok: false }; if (!r.ok) MM.game.newGame({ name: 'Witch' }); }
+    if (h === '#mm-new') MM.game.newGame({ name: 'Witch', startCampaign: true });
+    else if (h === '#mm-continue' || h === '#mm-play') { const r = MM.save.hasSave() ? MM.game.continueGame() : { ok: false }; if (!r.ok) MM.game.newGame({ name: 'Witch', startCampaign: true }); }
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
 })();

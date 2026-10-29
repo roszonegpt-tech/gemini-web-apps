@@ -413,8 +413,8 @@
   const api = {
     name: 'Witch', active: false, flags: {},
     world: B.world, player: B.game,
-    // newGame({name, look:{style,skin,hair,outfit}, cls}) -> true. Resets every save section, enters 'play',
-    // then calls MM.campaign.start() if present (pass {startCampaign:false} to skip). Saves immediately (forced).
+    // newGame({name, look:{style,skin,hair,outfit}, cls, startCampaign}) -> true. Resets every save section, enters 'play'
+    // and saves immediately (forced). The caller starts the story (MM.campaign.start()); {startCampaign:true} does it here.
     newGame(opts) {
       opts = opts || {};
       if (!B.fn('newAdventure')) { console.error('[MM.game] baseline not loaded'); return false; }
@@ -426,7 +426,7 @@
       api.active = true;
       state.go('play', { newGame: true });
       bus.emit('game:new', { name: api.name, look: isObj(opts.look) ? { ...opts.look } : null });
-      if (opts.startCampaign !== false && MM.campaign && typeof MM.campaign.start === 'function') {
+      if (opts.startCampaign === true && MM.campaign && typeof MM.campaign.start === 'function') {
         try { MM.campaign.start(); } catch (e) { console.error('[MM.game] campaign.start failed', e); }
       }
       save.save({ silent: true, force: true, reason: 'new' });

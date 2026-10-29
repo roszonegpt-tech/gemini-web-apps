@@ -23,8 +23,8 @@
     const live = new Map(); window.__listenerCount = () => { let n = 0; live.forEach(v => n += v); return n; }; window.__listenerTypes = () => [...live].filter(e => e[1]);
     const add = EventTarget.prototype.addEventListener, rem = EventTarget.prototype.removeEventListener, seen = new WeakMap();
     EventTarget.prototype.addEventListener = function (type, fn, opts) {
-      // only count listeners registered by page scripts (Playwright injects its own hit-target listeners)
-      if ((this === window || this === document) && String(new Error().stack).indexOf('file://') >= 0) { const cap = !!(typeof opts === 'object' ? opts && opts.capture : opts), key = type + '|' + cap; let m = seen.get(fn); if (!m) seen.set(fn, m = new Set()); if (!m.has(this === window ? 'w' + key : 'd' + key)) { m.add(this === window ? 'w' + key : 'd' + key); live.set(key, (live.get(key) || 0) + 1); } }
+      // only count listeners registered by the cinematics module (Playwright injects its own hit-target listeners)
+      if ((this === window || this === document) && String(new Error().stack).indexOf('/src/systems/cinematics.js') >= 0) { const cap = !!(typeof opts === 'object' ? opts && opts.capture : opts), key = type + '|' + cap; let m = seen.get(fn); if (!m) seen.set(fn, m = new Set()); if (!m.has(this === window ? 'w' + key : 'd' + key)) { m.add(this === window ? 'w' + key : 'd' + key); live.set(key, (live.get(key) || 0) + 1); } }
       return add.call(this, type, fn, opts);
     };
     EventTarget.prototype.removeEventListener = function (type, fn, opts) {
