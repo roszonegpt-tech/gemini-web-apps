@@ -43,3 +43,17 @@ module.exports.sheets.buildings.anchors = {
 // Wind-up and impact animations play once and hold the last frame.
 module.exports.sheets.bosses.once = (n) => n.includes('_windup_');
 module.exports.sheets.fx.once = (n) => !/^(fx_aura|fx_mote)/.test(n);
+// FX whose impact point is not the image centre: the ground point where the spell lands.
+module.exports.sheets.fx.anchors = { fx_starfall: [17, 36], fx_thornbind: [16, 24], fx_heal: [7, 20] };
+// Aliases for the baseline's MM.art seams (src/core/baseline.js drawProp: 'prop_<type>_<variant>' / 'prop_<type>').
+module.exports.aliases = {
+  prop_tree_0: 'tree_oak_0', prop_tree_1: 'tree_oak_1', prop_tree_2: 'tree_oak_2',
+  prop_lamp: 'lamp_post', prop_bench: 'bench', prop_flowers: 'flowers_wild', prop_rock: 'rock_moss',
+};
+// Contact shadows: [rx, ry] of a soft ellipse drawn under the anchor when MM.art.draw gets {shadow:true}
+// (aliases used by the baseline seams draw it automatically, since the baseline skips its own shadow then).
+const groundShadow = (n, w, h) => { const rx = Math.max(4, Math.round(Math.min(w, 40) * 0.36)); return [rx, Math.max(2, Math.round(rx / 3))]; };
+for (const s of ['nature', 'props', 'crops', 'bosses']) module.exports.sheets[s].shadow = groundShadow;
+module.exports.sheets.nature.shadow = (n, w, h) => (/lilypad|flowers|snow_mound/.test(n) ? null : groundShadow(n, w, h));
+module.exports.sheets.crops.shadow = (n, w, h) => (/_seed$|soil_/.test(n) ? null : [5, 2]);
+module.exports.sheets.props.shadow = (n, w, h) => (/^fence_[xy]/.test(n) ? null : groundShadow(n, w, h));

@@ -606,17 +606,64 @@ function drawExtraMagic(){
  ctx.globalAlpha=1;
 }
 function saveWorld(silent=false){
+ // MM seam S8: route through MM.save (versioned envelope, safe-moment checks) when present.
+ if(window.MM?.save?.save){const ok=MM.save.save({silent,reason:silent?'auto':'manual'});if(!silent)message(ok?'Adventure saved on this device':'Cannot save right now');return ok;}
  try{const saved={...world,coop:false,targetId:null};localStorage.setItem('moss-moon-adventure-v1',JSON.stringify(saved));if(!silent)message('Adventure saved on this device');return true;}
  catch(_error){if(!silent)message('Could not save in this browser');return false;}
 }
-function loadWorld(){
- try{const value=JSON.parse(localStorage.getItem('moss-moon-adventure-v1')||'null');if(!value||typeof value!=='object')return;
+// MM seam S8: loadWorld(raw) sanitises a world object supplied by MM.save's 'world' section. Without an argument it reads
+// the legacy v1 key — but only without MM (with MM the title screen decides between New and Continue). Returns true if loaded.
+function loadWorld(raw){
+ try{const value=raw!==undefined?raw:(window.MM?.save?null:JSON.parse(localStorage.getItem('moss-moon-adventure-v1')||'null'));if(!value||typeof value!=='object'||Array.isArray(value))return false;
   const base=newWorld();world={...base,...value,seeds:{...base.seeds,...value.seeds},harvest:{...base.harvest,...value.harvest},coop:false,targetId:null};
   if(!WIZARDS.some(c=>c.id===world.cls))world.cls='grove';if(!REGIONS[world.region])world.region='grove';if(!SEED_TYPES[world.seed])world.seed='wheat';if(!FAMILIARS[world.familiar])world.familiar='cat';
   if(!Array.isArray(world.plots)||world.plots.length!==6)world.plots=defaultPlots();
   if(!Array.isArray(world.gear))world.gear=[];if(!Array.isArray(world.wards))world.wards=[];
   if(!Number.isFinite(world.hp))world.hp=100;if(!Number.isFinite(world.mana))world.mana=100;
- }catch(_error){world=newWorld();}
+  sanitizeWorld(); // MM seam: validate gear/equipped/mode/floor/modifier/skills/wards/plots/numbers (audit §7, §9 #14)
+  return true;
+ }catch(_error){world=newWorld();return false;}
+}
+function sanitizeWorld(){ // MM seam: added validation for loaded worlds
+ const num=(v,d,lo=-Infinity,hi=Infinity,int=false)=>{let n=Number(v);if(!Number.isFinite(n))n=d;n=Math.min(hi,Math.max(lo,n));return int?Math.floor(n):n;};
+ const AFFIXES=['Vitality','Focus','Harvest','Greed','Spellpower'],RARITIES=['Common','Magic','Rare','Legendary'];
+ world.gear=world.gear.filter(g=>g&&typeof g==='object'&&typeof g.name==='string').slice(-40).map(g=>{const maxSockets=num(g.maxSockets,1,0,2,true);return {name:g.name.slice(0,80),rarity:RARITIES.includes(g.rarity)?g.rarity:'Common',power:num(g.power,1,0,999,true),affix:AFFIXES.includes(g.affix)?g.affix:'',sockets:num(g.sockets,0,0,maxSockets,true),maxSockets};});
+ if(!(Number.isInteger(world.equipped)&&world.equipped>=1&&world.equipped<=world.gear.length))world.equipped=null;
+ if(!['outside','dungeon','rift'].includes(world.mode))world.mode='outside';
+ world.floor=world.mode==='outside'?0:num(world.floor,1,1,999,true);
+ if(world.mode!=='rift')world.modifier='';else if(!['Fortified','Frenzy','Radiant'].includes(world.modifier))world.modifier='Fortified';
+ const skills={};if(world.skillByClass&&typeof world.skillByClass==='object')for(const [k,v] of Object.entries(world.skillByClass))if(WIZARDS.some(c=>c.id===k)&&Array.isArray(v))skills[k]=[0,1,2].map(i=>num(v[i],0,0,3,true));world.skillByClass=skills;
+ world.wards=world.wards.filter(w=>w&&Number.isFinite(w.x)&&Number.isFinite(w.y)).slice(0,3).map(w=>({x:num(w.x,10,.6,19.4),y:num(w.y,10,.6,19.4),cooldown:num(w.cooldown,.5,0,5),power:num(w.power,0,0,3,true)}));
+ const plots=defaultPlots();world.plots=plots.map((d,i)=>{const p=world.plots[i]||{},seed=SEED_TYPES[p.seed]?p.seed:null;return {x:d.x,y:d.y,seed,growth:seed?num(p.growth,0,0,100):0,watered:seed?!!p.watered:false,health:num(p.health,100,0,100)};});
+ for(const bag of ['seeds','harvest']){const b={};for(const k of Object.keys(SEED_TYPES))b[k]=num(world[bag]?.[k],0,0,9999,true);for(const [k,v] of Object.entries(world[bag]||{}))if(!(k in b)&&Number.isFinite(v))b[k]=num(v,0,0,9999,true);world[bag]=b;} // unknown crops (added by modules) survive
+ world.gold=num(world.gold,85,0,9999999);world.level=num(world.level,1,1,99,true);world.xp=num(world.xp,0,0,1e7);world.points=num(world.points,0,0,999,true);
+ world.day=num(world.day,1,1,1e6,true);world.time=num(world.time,.18,0,.9999);world.lastRaid=num(world.lastRaid,0,0,1e6,true);
+ world.hp=num(world.hp,100,1,heroMaxHP());world.mana=num(world.mana,100,0,100);world.ward=num(world.ward,0,0,60);world.cloak=num(world.cloak,0,0,7);world.lastDamage=num(world.lastDamage,0,0,999);
+ world.stars=num(world.stars,0,0,3,true);world.broom=num(world.broom,0,0,2,true);world.potions=num(world.potions,0,0,999,true);world.bombs=num(world.bombs,0,0,999,true);world.runes=num(world.runes,0,0,999,true);
+ world.harvested=num(world.harvested,0,0,1e7,true);world.kills=num(world.kills,0,0,1e7,true);world.requests=num(world.requests,0,0,1e4,true);
+ if(!['shared','individual'].includes(world.lootMode))world.lootMode='shared';if(!WIZARDS.some(c=>c.id===world.p2Class))world.p2Class='summoner';if(!SPELLS.some(x=>x.id===world.p2Spell))world.p2Spell='wisp';
+ world.riftUnlocked=!!world.riftUnlocked;world.weather=['Clear','Rain','Wind'].includes(world.weather)?world.weather:weatherFor(world.day);
+ if(world.dungeonSeed!==undefined)world.dungeonSeed=num(world.dungeonSeed,1,0,1e9,true);
+}
+function bossFloorKey(){return world.region+':'+world.mode+':'+world.floor+':'+(world.dungeonSeed||0);} // MM seam (audit §9 #14)
+// MM seam S8: rebuilds the transient scene for the current `world` (after load / new adventure). A boss floor whose boss
+// was already defeated (world.bossCleared) does not respawn it.
+function restoreAdventure(){
+ mmQuiet++;
+ try{
+  enemies=[];lootDrops=[];allies=[];party=[];dungeonBlocks=[];particles=[];bursts=[];effects.length=0;numbers.length=0;world.targetId=null;
+  clearControls();game=freshGame();const p=project(game.x,game.y);game.camX=p.x;game.camY=p.y;familiarSprite.x=game.x+.55;familiarSprite.y=game.y-.55;
+  if(world.mode==='outside'&&world.region!=='grove')spawnGroup(REGIONS[world.region].mob,3);
+  else if(world.mode!=='outside'){buildDungeonLayout();const bossFloor=world.floor%3===0;if(!(bossFloor&&world.bossCleared===bossFloorKey()))spawnGroup(REGIONS[world.region].mob,Math.min(7,3+world.floor),bossFloor);}
+  const starter=SPELLS.findIndex(s=>s.id===currentWizard().starter);if(starter>=0)chooseSpell(starter);
+  combatMessage='';combatMessageTime=0;drawGround();refreshAdventureUI();
+ }finally{mmQuiet--;}
+}
+// MM seam S8: a fresh adventure (MM.game.newGame / the world save section's reset()).
+function newAdventure(cls='grove'){
+ world=newWorld();if(WIZARDS.some(c=>c.id===cls))world.cls=cls;
+ mmQuiet++;try{resetTraining();}finally{mmQuiet--;}
+ worldAutosave=0;restoreAdventure();
 }
 let gearSignature='';
 function refreshAdventureUI(){
@@ -657,10 +704,27 @@ function initializeExpansion(){
   fn();if(e?.detail>0&&typeof canvas.focus==='function')canvas.focus({preventScroll:true});
   if(e?.detail>0&&['travelRegion','enterDungeon','nextFloor','exitDungeon','openRift'].includes(id)&&typeof canvas.scrollIntoView==='function')canvas.scrollIntoView({behavior:'smooth',block:'nearest'});
  });
- if(world.mode==='outside'&&world.region!=='grove')spawnGroup(REGIONS[world.region].mob,3);
- else if(world.mode!=='outside'){buildDungeonLayout();spawnGroup(REGIONS[world.region].mob,Math.min(7,3+world.floor),world.floor%3===0);}
- const starter=SPELLS.findIndex(s=>s.id===currentWizard().starter);if(starter>=0)chooseSpell(starter);
- drawGround();refreshAdventureUI();
+ restoreAdventure(); // MM seam S8: shared with MM.save (also fixes boss respawn on load, audit §9 #14)
+ if(window.MM?.save?.registerSection)registerSaveSections(); // MM seam S8
+}
+// MM seam S8: baseline state as MM.save sections ('world', 'player', 'look'); MM applies them in that order.
+function registerSaveSections(){
+ MM.save.registerSection('world',{
+  get:()=>({...world,coop:false,targetId:null}),
+  set:v=>{if(!loadWorld(v))throw new Error('invalid world section');restoreAdventure();},
+  reset:()=>newAdventure('grove')});
+ MM.save.registerSection('player',{
+  get:()=>({x:+game.x.toFixed(3),y:+game.y.toFixed(3),mounted:game.mounted&&!game.transition,facing:game.facing,spell:SPELLS[spellIndex]?.id||null}),
+  set:v=>{if(!v||typeof v!=='object')throw new Error('invalid player section');
+   if(Number.isFinite(v.x)&&Number.isFinite(v.y)&&!blockedAt(v.x,v.y)){game.x=clamp(v.x,.6,19.4);game.y=clamp(v.y,.6,19.4);}
+   game.mounted=!!v.mounted;game.height=game.mounted?RIDE_HEIGHT:0;if(DIRS.includes(v.facing)){game.facing=v.facing;game.castFacing=v.facing;}
+   const i=SPELLS.findIndex(s=>s.id===v.spell);if(i>=0){mmQuiet++;try{chooseSpell(i);}finally{mmQuiet--;}}
+   const p=project(game.x,game.y);game.camX=p.x;game.camY=p.y;familiarSprite.x=game.x+.55;familiarSprite.y=game.y-.55;},
+  reset:()=>{}});
+ MM.save.registerSection('look',{
+  get:()=>({...chosenLook}),
+  set:v=>{if(!v||typeof v!=='object')return;for(const g of ['style','skin','hair','outfit'])if(v[g]&&v[g]!==chosenLook[g])chooseLook(g,v[g]);},
+  reset:()=>{}});
 }
 
 function message(text){combatMessage=text;combatMessageTime=1.5;mmEmit('message',{text});} // MM seam S1/S4
@@ -1057,7 +1121,7 @@ function draw(){
   drawExtraMagic();
   mmHook('postEffects',ctx); // MM seam S3
   ctx.textAlign='center';ctx.font='bold 8px monospace';
-  if(mmSetting('damageNumbers',true)!==false&&window.MM?.baselineDraw?.damageNumbers!==false)for(const n of numbers){ // MM seam: settings gateconst dp=worldToCanvas(n.x??dummy.x,n.y??dummy.y);ctx.fillStyle='#35443b';ctx.fillText(n.value,dp.x+n.offset+1,dp.y-48-(1-n.life)*12+1);ctx.fillStyle=n.color;ctx.fillText(n.value,dp.x+n.offset,dp.y-48-(1-n.life)*12);}
+  if(mmSetting('damageNumbers',true)!==false&&window.MM?.baselineDraw?.damageNumbers!==false)/* MM seam: damageNumbers setting gate */for(const n of numbers){const dp=worldToCanvas(n.x??dummy.x,n.y??dummy.y);ctx.fillStyle='#35443b';ctx.fillText(n.value,dp.x+n.offset+1,dp.y-48-(1-n.life)*12+1);ctx.fillStyle=n.color;ctx.fillText(n.value,dp.x+n.offset,dp.y-48-(1-n.life)*12);}
   ctx.textAlign='start';
   if(game.target){const p=worldToCanvas(game.target.x,game.target.y);ctx.strokeStyle='#f7f5cc';ctx.lineWidth=1;ctx.beginPath();ctx.ellipse(p.x,p.y,5,2.5,0,0,Math.PI*2);ctx.stroke();}
   ctx.restore(); // MM seam S6: end of shaken world layers
@@ -1086,12 +1150,13 @@ function loop(t){
   if(!previous)previous=t;
   // Substeps keep acceleration and turn behavior stable on slower devices.
   let remaining=Math.min((t-previous)/1000,.2);previous=t;
-  while(remaining>0.00001){const step=Math.min(remaining,1/60);update(step);remaining-=step;}
+  while(remaining>0.00001&&!mmPaused()){const step=Math.min(remaining,1/60);update(step);remaining-=step;} // MM seam S2: sim frozen while paused
   draw();requestAnimationFrame(loop);
 }
 requestAnimationFrame(loop);
 
 window.addEventListener('keydown',e=>{
+  if(mmInputBlocked()||e.defaultPrevented)return; // MM seam S2: menus/cinematics/dialogue own the keyboard; preventDefault() claims a key
   if(e.altKey||e.ctrlKey||e.metaKey)return;
   const k=e.key.toLowerCase();
   // Form controls keep their normal keyboard behavior.
@@ -1112,12 +1177,14 @@ window.addEventListener('keyup',e=>{keys.delete(e.key.toLowerCase());});
 window.addEventListener('blur',clearControls);
 document.addEventListener('visibilitychange',()=>{if(document.hidden){clearControls();previous=0;}});
 document.querySelectorAll('[data-dir]').forEach(button=>{
-  button.addEventListener('pointerdown',e=>{e.preventDefault();button.setPointerCapture(e.pointerId);touchDirections.set(e.pointerId,button.dataset.dir);button.classList.add('pressed');});
+  button.addEventListener('pointerdown',e=>{if(mmInputBlocked())return; /* MM seam S2 */e.preventDefault();button.setPointerCapture(e.pointerId);touchDirections.set(e.pointerId,button.dataset.dir);button.classList.add('pressed');});
   const release=e=>{touchDirections.delete(e.pointerId);button.classList.remove('pressed');};
   button.addEventListener('pointerup',release);button.addEventListener('pointercancel',release);button.addEventListener('lostpointercapture',release);
 });
 canvas.addEventListener('pointerdown',e=>{
-  const r=canvas.getBoundingClientRect();
+  if(mmInputBlocked()||e.defaultPrevented)return; // MM seam S2
+  // Pointer mapping uses the canvas box; index.html sizes the canvas to exactly fill the letterboxed 8:5 stage (no object-fit).
+  const r=canvas.getBoundingClientRect();if(!r.width||!r.height)return;
   const screenX=(e.clientX-r.left)*SCREEN_W/r.width,screenY=(e.clientY-r.top)*SCREEN_H/r.height;
   for(const foe of enemies){const p=worldToCanvas(foe.x,foe.y);if(Math.abs(screenX-p.x)<18&&screenY>p.y-(CAST_HEIGHT[foe.type]||38)-(foe.boss?12:4)&&screenY<p.y+5){world.targetId=foe.id;castSpell();return;}}
   if(world.region==='grove'&&world.mode==='outside')for(const plot of world.plots){const p=worldToCanvas(plot.x,plot.y);if(Math.abs(screenX-p.x)<12&&Math.abs(screenY-p.y)<7){tendPlot(plot);return;}}
@@ -1131,7 +1198,7 @@ canvas.addEventListener('pointerdown',e=>{
 mountBtn.addEventListener('click',toggleBroom);touchMount.addEventListener('click',()=>{if(world.coop&&touchPlayer===2&&party[0])party[0].mounted=!party[0].mounted;else toggleBroom();});
 spellSelect.addEventListener('change',()=>{const i=Number(spellSelect.value);if(world.coop&&touchPlayer===2&&party[0]&&SPELLS[i]){party[0].spellIndex=i;world.p2Spell=SPELLS[i].id;gameUI('p2Spell').value=world.p2Spell;}else chooseSpell(i);});
 castButton.addEventListener('click',()=>castSpell(world.coop&&touchPlayer===2&&party[0]?party[0]:game));resetDummyButton.addEventListener('click',resetTraining);
-document.getElementById('reset').addEventListener('click',()=>{clearControls();game=freshGame();resetTraining();const p=project(game.x,game.y);game.camX=p.x;game.camY=p.y;draw();});
+uiEl('reset','button').addEventListener('click',()=>{clearControls();game=freshGame();resetTraining();const p=project(game.x,game.y);game.camX=p.x;game.camY=p.y;draw();});
 toggleDebug.addEventListener('click',()=>{debug.hidden=!debug.hidden;toggleDebug.textContent=debug.hidden?'Show debug':'Hide debug';toggleDebug.setAttribute('aria-pressed',String(!debug.hidden));});
 function refreshChoices(){
   document.querySelectorAll('[data-style]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.style===chosenLook.style)));

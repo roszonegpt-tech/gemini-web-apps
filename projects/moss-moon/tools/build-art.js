@@ -98,6 +98,8 @@ for (const file of files) {
     const errs = (r.stdout + r.stderr).split('\n').filter((l) => /error|Error|✗/.test(l));
     if (r.status !== 0 || errs.length) { failed = true; console.error(`pxl ${file}: exit ${r.status}\n${r.stdout}\n${r.stderr}`); }
     else console.log(`pxl ${file}: ok`);
+    // GIFs are review aids only; keep them with --preview, drop them otherwise to keep the repo lean.
+    if (!PREVIEW) for (const d of ['sprites', 'anims']) { const dd = path.join(out, d); if (fs.existsSync(dd)) for (const f of fs.readdirSync(dd)) if (f.endsWith('.gif')) fs.unlinkSync(path.join(dd, f)); }
   }
   if (!fs.existsSync(out)) { console.error(`missing ${out} (build it first)`); failed = true; continue; }
 
@@ -145,8 +147,12 @@ for (const file of files) {
       if (it.durs.some((d) => d !== ms)) e.durs = it.durs;
       const once = cfg.once; if (typeof once === 'function' ? once(it.name) : (once || []).includes(it.name)) e.loop = false;
     }
+    // contact-shadow size for things that stand on the ground (props, nature, buildings, bosses, crops)
+    if (cfg.shadow) { const sh = typeof cfg.shadow === 'function' ? cfg.shadow(it.name, it.fw, it.fh) : null; if (sh) e.sh = sh; }
     frames[it.name] = e;
   }
+  // Aliases (art/meta.js): extra names for existing sprites, e.g. the baseline's 'prop_tree_0' seam.
+  for (const [al, target] of Object.entries(meta.aliases || {})) if (frames[target]) frames[al] = Object.assign({ alias: target }, frames[target], frames[target].sh ? { autoShadow: true } : {});
   sheets[name] = { png, frames, w: sheet.w, h: sheet.h, data: sheet };
   manifest.sheets[name] = { file: 'assets/images/' + name + '.png', w: sheet.w, h: sheet.h, anchor: cfg.anchor || 'bottom', note: cfg.note || '', frames };
 }

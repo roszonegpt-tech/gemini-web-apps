@@ -53,8 +53,8 @@ anim("fx_frostbell", { w: 25, h: 29, frames: 6, fps: 10 }, (c) => {
   if (k >= 4) for (let i = 0; i < 6; i++) { const t = i / 6 * TAU, r = (k - 3) * 4; c.px(Math.round(cx + Math.cos(t) * r), Math.round(top + 8 + Math.sin(t) * r), i % 2 ? "i" : "c") }
 })
 // Starfall: a star streaks down and bursts
-anim("fx_starfall", { w: 25, h: 41, frames: 7, fps: 14 }, (c) => {
-  const k = c.frame, cx = 12, gy = 36
+anim("fx_starfall", { w: 35, h: 41, frames: 7, fps: 14 }, (c) => {
+  const k = c.frame, cx = 17, gy = 36
   if (k < 3) { const y = 4 + k * 12, x = cx + 6 - k * 3; c.line(x + 6, y - 9, x, y, "O"); c.line(x + 4, y - 6, x, y, "Y"); spark(c, x, y, "Y", "c") }
   if (k >= 3) {
     const r = (k - 2) * 3
@@ -64,9 +64,9 @@ anim("fx_starfall", { w: 25, h: 41, frames: 7, fps: 14 }, (c) => {
   }
 })
 // generic feedback
-anim("fx_poof", { w: 17, h: 13, frames: 5, fps: 12 }, (c) => {
+anim("fx_poof", { w: 23, h: 13, frames: 5, fps: 12 }, (c) => {
   const k = c.frame
-  for (const [dx, dy, r] of [[-4, 1, 3], [4, 1, 3], [0, -2, 3], [-1, 2, 2]]) { const rr = Math.max(0, r + Math.floor(k / 2) - (k > 3 ? 2 : 0)); if (rr) { c.circ(8 + dx * (1 + k * 0.3), 7 + dy, rr, k > 2 ? "R" : "q"); c.circ(7 + dx * (1 + k * 0.3), 6 + dy, Math.max(0, rr - 2), "c") } }
+  for (const [dx, dy, r] of [[-4, 1, 3], [4, 1, 3], [0, -2, 3], [-1, 2, 2]]) { const rr = Math.max(0, r + Math.floor(k / 2) - (k > 3 ? 2 : 0)); if (rr) { c.circ(11 + dx * (1 + k * 0.3), 7 + dy, rr, k > 2 ? "R" : "q"); c.circ(10 + dx * (1 + k * 0.3), 6 + dy, Math.max(0, rr - 2), "c") } }
 })
 anim("fx_harvest", { w: 17, h: 17, frames: 5, fps: 10 }, (c) => {
   const k = c.frame

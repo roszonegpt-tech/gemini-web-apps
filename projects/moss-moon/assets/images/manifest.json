@@ -1,5 +1,5 @@
 {
- "version": "20261029115843",
+ "version": "20261029120240",
  "palette": {
   "k": "#263a37",
   "j": "#2f4b47",
@@ -58,7 +58,11 @@
      "ax": 33,
      "ay": 73,
      "frames": 4,
-     "fps": 5
+     "fps": 5,
+     "sh": [
+      14,
+      5
+     ]
     },
     "bramble_warden_idle_s": {
      "x": 265,
@@ -68,7 +72,11 @@
      "ax": 33,
      "ay": 73,
      "frames": 4,
-     "fps": 5
+     "fps": 5,
+     "sh": [
+      14,
+      5
+     ]
     },
     "bramble_warden_windup_e": {
      "x": 0,
@@ -79,7 +87,11 @@
      "ay": 73,
      "frames": 3,
      "fps": 6,
-     "loop": false
+     "loop": false,
+     "sh": [
+      14,
+      5
+     ]
     },
     "bramble_warden_windup_s": {
      "x": 199,
@@ -90,7 +102,11 @@
      "ay": 73,
      "frames": 3,
      "fps": 6,
-     "loop": false
+     "loop": false,
+     "sh": [
+      14,
+      5
+     ]
     },
     "frost_wyrm_idle_e": {
      "x": 223,
@@ -100,7 +116,11 @@
      "ax": 41,
      "ay": 73,
      "frames": 4,
-     "fps": 5
+     "fps": 5,
+     "sh": [
+      14,
+      5
+     ]
     },
     "frost_wyrm_idle_s": {
      "x": 552,
@@ -110,7 +130,11 @@
      "ax": 41,
      "ay": 73,
      "frames": 4,
-     "fps": 5
+     "fps": 5,
+     "sh": [
+      14,
+      5
+     ]
     },
     "frost_wyrm_windup_e": {
      "x": 530,
@@ -121,7 +145,11 @@
      "ay": 73,
      "frames": 3,
      "fps": 6,
-     "loop": false
+     "loop": false,
+     "sh": [
+      14,
+      5
+     ]
     },
     "frost_wyrm_windup_s": {
      "x": 777,
@@ -132,7 +160,11 @@
      "ay": 73,
      "frames": 3,
      "fps": 6,
-     "loop": false
+     "loop": false,
+     "sh": [
+      14,
+      5
+     ]
     },
     "mire_hag_idle_e": {
      "x": 398,
@@ -142,7 +174,11 @@
      "ax": 33,
      "ay": 69,
      "frames": 4,
-     "fps": 5
+     "fps": 5,
+     "sh": [
+      14,
+      5
+     ]
     },
     "mire_hag_idle_s": {
      "x": 663,
@@ -152,7 +188,11 @@
      "ax": 33,
      "ay": 69,
      "frames": 4,
-     "fps": 5
+     "fps": 5,
+     "sh": [
+      14,
+      5
+     ]
     },
     "mire_hag_windup_e": {
      "x": 0,
@@ -163,7 +203,11 @@
      "ay": 69,
      "frames": 3,
      "fps": 6,
-     "loop": false
+     "loop": false,
+     "sh": [
+      14,
+      5
+     ]
     },
     "mire_hag_windup_s": {
      "x": 199,
@@ -174,7 +218,11 @@
      "ay": 69,
      "frames": 3,
      "fps": 6,
-     "loop": false
+     "loop": false,
+     "sh": [
+      14,
+      5
+     ]
     },
     "well_spirit_idle_e": {
      "x": 0,
@@ -184,7 +232,11 @@
      "ax": 37,
      "ay": 89,
      "frames": 4,
-     "fps": 5
+     "fps": 5,
+     "sh": [
+      14,
+      5
+     ]
     },
     "well_spirit_idle_s": {
      "x": 297,
@@ -194,7 +246,11 @@
      "ax": 37,
      "ay": 89,
      "frames": 4,
-     "fps": 5
+     "fps": 5,
+     "sh": [
+      14,
+      5
+     ]
     },
     "well_spirit_windup_e": {
      "x": 594,
@@ -205,7 +261,11 @@
      "ay": 89,
      "frames": 3,
      "fps": 6,
-     "loop": false
+     "loop": false,
+     "sh": [
+      14,
+      5
+     ]
     },
     "well_spirit_windup_s": {
      "x": 0,
@@ -216,7 +276,11 @@
      "ay": 89,
      "frames": 3,
      "fps": 6,
-     "loop": false
+     "loop": false,
+     "sh": [
+      14,
+      5
+     ]
     }
    }
   },
@@ -354,7 +418,11 @@
      "ax": 8,
      "ay": 23,
      "frames": 1,
-     "fps": 0
+     "fps": 0,
+     "sh": [
+      5,
+      2
+     ]
     },
     "crop_ember_pepper_ripe": {
      "x": 432,
@@ -364,7 +432,11 @@
      "ax": 8,
      "ay": 23,
      "frames": 1,
-     "fps": 0
+     "fps": 0,
+     "sh": [
+      5,
+      2
+     ]
     },
     "crop_ember_pepper_seed": {
      "x": 231,
@@ -384,7 +456,11 @@
      "ax": 8,
      "ay": 23,
      "frames": 4,
-     "fps": 6
+     "fps": 6,
+     "sh": [
+      5,
+      2
+     ]
     },
     "crop_ember_pepper_sprout": {
      "x": 159,
@@ -394,7 +470,11 @@
      "ax": 5,
      "ay": 9,
      "frames": 1,
-     "fps": 0
+     "fps": 0,
+     "sh": [
+      5,
+      2
+     ]
     },
     "crop_frost_berry_growing": {
      "x": 450,
@@ -404,7 +484,11 @@
      "ax": 8,
      "ay": 23,
      "frames": 1,
-     "fps": 0
+     "fps": 0,
+     "sh": [
+      5,
+      2
+     ]
     },
     "crop_frost_berry_ripe": {
      "x": 468,
@@ -414,7 +498,11 @@
      "ax": 8,
      "ay": 23,
      "frames": 1,
-     "fps": 0
+     "fps": 0,
+     "sh": [
+      5,
+      2
+     ]
     },
     "crop_frost_berry_seed": {
      "x": 245,
@@ -434,7 +522,11 @@
      "ax": 8,
      "ay": 23,
      "frames": 4,
-     "fps": 6
+     "fps": 6,
+     "sh": [
+      5,
+      2
+     ]
     },
     "crop_frost_berry_sprout": {
      "x": 171,
@@ -444,7 +536,11 @@
      "ax": 5,
      "ay": 9,
      "frames": 1,
-     "fps": 0
+     "fps": 0,
+     "sh": [
+      5,
+      2
+     ]
     },
     "crop_glowcap_growing": {
      "x": 486,
@@ -454,7 +550,11 @@
      "ax": 8,
      "ay": 23,
      "frames": 1,
-     "fps": 0
+     "fps": 0,
+     "sh": [
+      5,
+      2
+     ]
     },
     "crop_glowcap_ripe": {
      "x": 0,
@@ -464,7 +564,11 @@
      "ax": 8,
      "ay": 23,
      "frames": 1,
-     "fps": 0
+     "fps": 0,
+     "sh": [
+      5,
+      2
+     ]
     },
     "crop_glowcap_seed": {
      "x": 259,
@@ -484,7 +588,11 @@
      "ax": 8,
      "ay": 23,
      "frames": 4,
-     "fps": 6
+     "fps": 6,
+     "sh": [
+      5,
+      2
+     ]
     },
     "crop_glowcap_sprout": {
      "x": 183,
@@ -494,7 +602,11 @@
      "ax": 5,
      "ay": 9,
      "frames": 1,
-     "fps": 0
+     "fps": 0,
+     "sh": [
+      5,
+      2
+     ]
     },
     "crop_moonflower_growing": {
      "x": 18,
@@ -504,7 +616,11 @@
      "ax": 8,
      "ay": 23,
      "frames": 1,
-     "fps": 0
+     "fps": 0,
+     "sh": [
+      5,
+      2
+     ]
     },
     "crop_moonflower_ripe": {
      "x": 36,
@@ -514,7 +630,11 @@
      "ax": 8,
      "ay": 23,
      "frames": 1,
-     "fps": 0
+     "fps": 0,
+     "sh": [
+      5,
+      2
+     ]
     },
     "crop_moonflower_seed": {
      "x": 273,
@@ -534,7 +654,11 @@
      "ax": 8,
      "ay": 23,
      "frames": 4,
-     "fps": 6
+     "fps": 6,
+     "sh": [
+      5,
+      2
+     ]
     },
     "crop_moonflower_sprout": {
      "x": 195,
@@ -544,7 +668,11 @@
      "ax": 5,
      "ay": 9,
      "frames": 1,
-     "fps": 0
+     "fps": 0,
+     "sh": [
+      5,
+      2
+     ]
     },
     "crop_starmint_growing": {
      "x": 54,
@@ -554,7 +682,11 @@
      "ax": 8,
      "ay": 23,
      "frames": 1,
-     "fps": 0
+     "fps": 0,
+     "sh": [
+      5,
+      2
+     ]
     },
     "crop_starmint_ripe": {
      "x": 72,
@@ -564,7 +696,11 @@
      "ax": 8,
      "ay": 23,
      "frames": 1,
-     "fps": 0
+     "fps": 0,
+     "sh": [
+      5,
+      2
+     ]
     },
     "crop_starmint_seed": {
      "x": 287,
@@ -584,7 +720,11 @@
      "ax": 8,
      "ay": 23,
      "frames": 4,
-     "fps": 6
+     "fps": 6,
+     "sh": [
+      5,
+      2
+     ]
     },
     "crop_starmint_sprout": {
      "x": 207,
@@ -594,7 +734,11 @@
      "ax": 5,
      "ay": 9,
      "frames": 1,
-     "fps": 0
+     "fps": 0,
+     "sh": [
+      5,
+      2
+     ]
     },
     "crop_wheat_growing": {
      "x": 90,
@@ -604,7 +748,11 @@
      "ax": 8,
      "ay": 23,
      "frames": 1,
-     "fps": 0
+     "fps": 0,
+     "sh": [
+      5,
+      2
+     ]
     },
     "crop_wheat_ripe": {
      "x": 108,
@@ -614,7 +762,11 @@
      "ax": 8,
      "ay": 23,
      "frames": 1,
-     "fps": 0
+     "fps": 0,
+     "sh": [
+      5,
+      2
+     ]
     },
     "crop_wheat_seed": {
      "x": 301,
@@ -634,7 +786,11 @@
      "ax": 8,
      "ay": 23,
      "frames": 4,
-     "fps": 6
+     "fps": 6,
+     "sh": [
+      5,
+      2
+     ]
     },
     "crop_wheat_sprout": {
      "x": 219,
@@ -644,7 +800,11 @@
      "ax": 5,
      "ay": 9,
      "frames": 1,
-     "fps": 0
+     "fps": 0,
+     "sh": [
+      5,
+      2
+     ]
     },
     "soil_watered": {
      "x": 126,
@@ -687,7 +847,7 @@
      "loop": false
     },
     "fx_ember_bloom": {
-     "x": 176,
+     "x": 246,
      "y": 0,
      "w": 29,
      "h": 29,
@@ -725,7 +885,7 @@
      "w": 15,
      "h": 21,
      "ax": 7,
-     "ay": 10,
+     "ay": 20,
      "frames": 6,
      "fps": 10,
      "loop": false
@@ -744,9 +904,9 @@
     "fx_poof": {
      "x": 86,
      "y": 98,
-     "w": 17,
+     "w": 23,
      "h": 13,
-     "ax": 8,
+     "ax": 11,
      "ay": 6,
      "frames": 5,
      "fps": 12,
@@ -755,10 +915,10 @@
     "fx_starfall": {
      "x": 0,
      "y": 0,
-     "w": 25,
+     "w": 35,
      "h": 41,
-     "ax": 12,
-     "ay": 20,
+     "ax": 17,
+     "ay": 36,
      "frames": 7,
      "fps": 14.1,
      "loop": false
@@ -769,7 +929,7 @@
      "w": 33,
      "h": 27,
      "ax": 16,
-     "ay": 13,
+     "ay": 24,
      "frames": 6,
      "fps": 10,
      "loop": false
@@ -1340,7 +1500,11 @@
      "ax": 12,
      "ay": 16,
      "frames": 1,
-     "fps": 0
+     "fps": 0,
+     "sh": [
+      9,
+      3
+     ]
     },
     "bush_1": {
      "x": 61,
@@ -1350,7 +1514,11 @@
      "ax": 12,
      "ay": 16,
      "frames": 1,
-     "fps": 0
+     "fps": 0,
+     "sh": [
+      9,
+      3
+     ]
     },
     "bush_berry": {
      "x": 86,
@@ -1360,7 +1528,11 @@
      "ax": 12,
      "ay": 16,
      "frames": 1,
-     "fps": 0
+     "fps": 0,
+     "sh": [
+      9,
+      3
+     ]
     },
     "bush_blight": {
      "x": 111,
@@ -1370,7 +1542,11 @@
      "ax": 12,
      "ay": 16,
      "frames": 1,
-     "fps": 0
+     "fps": 0,
+     "sh": [
+      9,
+      3
+     ]
     },
     "bush_snow": {
      "x": 136,
@@ -1380,7 +1556,11 @@
      "ax": 12,
      "ay": 16,
      "frames": 1,
-     "fps": 0
+     "fps": 0,
+     "sh": [
+      9,
+      3
+     ]
     },
     "bush_swamp": {
      "x": 161,
@@ -1390,7 +1570,11 @@
      "ax": 12,
      "ay": 16,
      "frames": 1,
-     "fps": 0
+     "fps": 0,
+     "sh": [
+      9,
+      3
+     ]
     },
     "flowers_moon": {
      "x": 52,
@@ -1420,7 +1604,11 @@
      "ax": 8,
      "ay": 13,
      "frames": 4,
-     "fps": 3
+     "fps": 3,
+     "sh": [
+      6,
+      2
+     ]
     },
     "ice_crystal_0": {
      "x": 0,
@@ -1430,7 +1618,11 @@
      "ax": 10,
      "ay": 19,
      "frames": 1,
-     "fps": 0
+     "fps": 0,
+     "sh": [
+      7,
+      2
+     ]
     },
     "ice_crystal_1": {
      "x": 338,
@@ -1440,7 +1632,11 @@
      "ax": 12,
      "ay": 27,
      "frames": 4,
-     "fps": 4
+     "fps": 4,
+     "sh": [
+      9,
+      3
+     ]
     },
     "lilypad": {
      "x": 136,
@@ -1460,7 +1656,11 @@
      "ax": 14,
      "ay": 11,
      "frames": 1,
-     "fps": 0
+     "fps": 0,
+     "sh": [
+      10,
+      3
+     ]
     },
     "mushroom_brown": {
      "x": 121,
@@ -1470,7 +1670,11 @@
      "ax": 7,
      "ay": 9,
      "frames": 1,
-     "fps": 0
+     "fps": 0,
+     "sh": [
+      5,
+      2
+     ]
     },
     "mushroom_glow": {
      "x": 339,
@@ -1480,7 +1684,11 @@
      "ax": 8,
      "ay": 13,
      "frames": 4,
-     "fps": 4
+     "fps": 4,
+     "sh": [
+      6,
+      2
+     ]
     },
     "mushroom_moon": {
      "x": 404,
@@ -1490,7 +1698,11 @@
      "ax": 8,
      "ay": 13,
      "frames": 4,
-     "fps": 4
+     "fps": 4,
+     "sh": [
+      6,
+      2
+     ]
     },
     "mushroom_red": {
      "x": 86,
@@ -1500,7 +1712,11 @@
      "ax": 5,
      "ay": 10,
      "frames": 1,
-     "fps": 0
+     "fps": 0,
+     "sh": [
+      4,
+      2
+     ]
     },
     "reeds_0": {
      "x": 435,
@@ -1510,7 +1726,11 @@
      "ax": 9,
      "ay": 25,
      "frames": 4,
-     "fps": 3
+     "fps": 3,
+     "sh": [
+      6,
+      2
+     ]
     },
     "reeds_1": {
      "x": 21,
@@ -1520,7 +1740,11 @@
      "ax": 7,
      "ay": 19,
      "frames": 1,
-     "fps": 0
+     "fps": 0,
+     "sh": [
+      5,
+      2
+     ]
     },
     "rock_0": {
      "x": 69,
@@ -1530,7 +1754,11 @@
      "ax": 8,
      "ay": 10,
      "frames": 1,
-     "fps": 0
+     "fps": 0,
+     "sh": [
+      6,
+      2
+     ]
     },
     "rock_1": {
      "x": 205,
@@ -1540,7 +1768,11 @@
      "ax": 11,
      "ay": 14,
      "frames": 1,
-     "fps": 0
+     "fps": 0,
+     "sh": [
+      8,
+      3
+     ]
     },
     "rock_2": {
      "x": 29,
@@ -1550,7 +1782,11 @@
      "ax": 11,
      "ay": 11,
      "frames": 1,
-     "fps": 0
+     "fps": 0,
+     "sh": [
+      8,
+      3
+     ]
     },
     "rock_crypt": {
      "x": 186,
@@ -1560,7 +1796,11 @@
      "ax": 9,
      "ay": 15,
      "frames": 1,
-     "fps": 0
+     "fps": 0,
+     "sh": [
+      6,
+      2
+     ]
     },
     "rock_moss": {
      "x": 228,
@@ -1570,7 +1810,11 @@
      "ax": 11,
      "ay": 14,
      "frames": 1,
-     "fps": 0
+     "fps": 0,
+     "sh": [
+      8,
+      3
+     ]
     },
     "rock_snow": {
      "x": 251,
@@ -1580,7 +1824,11 @@
      "ax": 11,
      "ay": 14,
      "frames": 1,
-     "fps": 0
+     "fps": 0,
+     "sh": [
+      8,
+      3
+     ]
     },
     "snow_mound": {
      "x": 98,
@@ -1600,7 +1848,11 @@
      "ax": 9,
      "ay": 12,
      "frames": 1,
-     "fps": 0
+     "fps": 0,
+     "sh": [
+      6,
+      2
+     ]
     },
     "tree_blighted": {
      "x": 0,
@@ -1610,7 +1862,11 @@
      "ax": 23,
      "ay": 59,
      "frames": 1,
-     "fps": 0
+     "fps": 0,
+     "sh": [
+      14,
+      5
+     ]
     },
     "tree_blighted_small": {
      "x": 307,
@@ -1620,7 +1876,11 @@
      "ax": 15,
      "ay": 41,
      "frames": 1,
-     "fps": 0
+     "fps": 0,
+     "sh": [
+      11,
+      4
+     ]
     },
     "tree_crypt": {
      "x": 135,
@@ -1630,7 +1890,11 @@
      "ax": 21,
      "ay": 55,
      "frames": 1,
-     "fps": 0
+     "fps": 0,
+     "sh": [
+      14,
+      5
+     ]
     },
     "tree_oak_0": {
      "x": 178,
@@ -1640,7 +1904,11 @@
      "ax": 21,
      "ay": 55,
      "frames": 1,
-     "fps": 0
+     "fps": 0,
+     "sh": [
+      14,
+      5
+     ]
     },
     "tree_oak_1": {
      "x": 221,
@@ -1650,7 +1918,11 @@
      "ax": 21,
      "ay": 55,
      "frames": 1,
-     "fps": 0
+     "fps": 0,
+     "sh": [
+      14,
+      5
+     ]
     },
     "tree_oak_2": {
      "x": 264,
@@ -1660,7 +1932,11 @@
      "ax": 21,
      "ay": 55,
      "frames": 1,
-     "fps": 0
+     "fps": 0,
+     "sh": [
+      14,
+      5
+     ]
     },
     "tree_pine_snow": {
      "x": 98,
@@ -1670,7 +1946,11 @@
      "ax": 18,
      "ay": 57,
      "frames": 1,
-     "fps": 0
+     "fps": 0,
+     "sh": [
+      13,
+      4
+     ]
     },
     "tree_willow": {
      "x": 47,
@@ -1680,7 +1960,86 @@
      "ax": 25,
      "ay": 57,
      "frames": 1,
+     "fps": 0,
+     "sh": [
+      14,
+      5
+     ]
+    },
+    "prop_tree_0": {
+     "alias": "tree_oak_0",
+     "x": 178,
+     "y": 0,
+     "w": 42,
+     "h": 56,
+     "ax": 21,
+     "ay": 55,
+     "frames": 1,
+     "fps": 0,
+     "sh": [
+      14,
+      5
+     ],
+     "autoShadow": true
+    },
+    "prop_tree_1": {
+     "alias": "tree_oak_1",
+     "x": 221,
+     "y": 0,
+     "w": 42,
+     "h": 56,
+     "ax": 21,
+     "ay": 55,
+     "frames": 1,
+     "fps": 0,
+     "sh": [
+      14,
+      5
+     ],
+     "autoShadow": true
+    },
+    "prop_tree_2": {
+     "alias": "tree_oak_2",
+     "x": 264,
+     "y": 0,
+     "w": 42,
+     "h": 56,
+     "ax": 21,
+     "ay": 55,
+     "frames": 1,
+     "fps": 0,
+     "sh": [
+      14,
+      5
+     ],
+     "autoShadow": true
+    },
+    "prop_flowers": {
+     "alias": "flowers_wild",
+     "x": 153,
+     "y": 82,
+     "w": 14,
+     "h": 9,
+     "ax": 7,
+     "ay": 8,
+     "frames": 1,
      "fps": 0
+    },
+    "prop_rock": {
+     "alias": "rock_moss",
+     "x": 228,
+     "y": 61,
+     "w": 22,
+     "h": 15,
+     "ax": 11,
+     "ay": 14,
+     "frames": 1,
+     "fps": 0,
+     "sh": [
+      8,
+      3
+     ],
+     "autoShadow": true
     }
    }
   },
@@ -1699,7 +2058,11 @@
      "ax": 17,
      "ay": 27,
      "frames": 1,
-     "fps": 0
+     "fps": 0,
+     "sh": [
+      12,
+      4
+     ]
     },
     "barrel": {
      "x": 129,
@@ -1709,7 +2072,11 @@
      "ax": 7,
      "ay": 17,
      "frames": 1,
-     "fps": 0
+     "fps": 0,
+     "sh": [
+      5,
+      2
+     ]
     },
     "bench": {
      "x": 0,
@@ -1719,7 +2086,11 @@
      "ax": 13,
      "ay": 23,
      "frames": 1,
-     "fps": 0
+     "fps": 0,
+     "sh": [
+      10,
+      3
+     ]
     },
     "brazier": {
      "x": 432,
@@ -1729,7 +2100,11 @@
      "ax": 8,
      "ay": 23,
      "frames": 4,
-     "fps": 8
+     "fps": 8,
+     "sh": [
+      6,
+      2
+     ]
     },
     "broom_stand": {
      "x": 141,
@@ -1739,7 +2114,11 @@
      "ax": 11,
      "ay": 33,
      "frames": 1,
-     "fps": 0
+     "fps": 0,
+     "sh": [
+      8,
+      3
+     ]
     },
     "bucket": {
      "x": 264,
@@ -1749,7 +2128,11 @@
      "ax": 5,
      "ay": 10,
      "frames": 1,
-     "fps": 0
+     "fps": 0,
+     "sh": [
+      4,
+      2
+     ]
     },
     "cauldron": {
      "x": 335,
@@ -1759,7 +2142,11 @@
      "ax": 12,
      "ay": 23,
      "frames": 4,
-     "fps": 6
+     "fps": 6,
+     "sh": [
+      9,
+      3
+     ]
     },
     "compost": {
      "x": 28,
@@ -1769,7 +2156,11 @@
      "ax": 13,
      "ay": 21,
      "frames": 1,
-     "fps": 0
+     "fps": 0,
+     "sh": [
+      9,
+      3
+     ]
     },
     "crate": {
      "x": 109,
@@ -1779,7 +2170,11 @@
      "ax": 9,
      "ay": 18,
      "frames": 1,
-     "fps": 0
+     "fps": 0,
+     "sh": [
+      7,
+      2
+     ]
     },
     "crate_stack": {
      "x": 224,
@@ -1789,7 +2184,11 @@
      "ax": 11,
      "ay": 27,
      "frames": 1,
-     "fps": 0
+     "fps": 0,
+     "sh": [
+      8,
+      3
+     ]
     },
     "fence_post": {
      "x": 204,
@@ -1799,7 +2198,11 @@
      "ax": 2,
      "ay": 15,
      "frames": 1,
-     "fps": 0
+     "fps": 0,
+     "sh": [
+      4,
+      2
+     ]
     },
     "fence_x": {
      "x": 247,
@@ -1849,7 +2252,11 @@
      "ax": 12,
      "ay": 10,
      "frames": 1,
-     "fps": 0
+     "fps": 0,
+     "sh": [
+      9,
+      3
+     ]
     },
     "lamp_post": {
      "x": 107,
@@ -1859,7 +2266,11 @@
      "ax": 5,
      "ay": 33,
      "frames": 3,
-     "fps": 5
+     "fps": 5,
+     "sh": [
+      4,
+      2
+     ]
     },
     "lantern": {
      "x": 145,
@@ -1869,7 +2280,11 @@
      "ax": 5,
      "ay": 15,
      "frames": 3,
-     "fps": 6
+     "fps": 6,
+     "sh": [
+      4,
+      2
+     ]
     },
     "pumpkin": {
      "x": 224,
@@ -1879,7 +2294,11 @@
      "ax": 7,
      "ay": 11,
      "frames": 1,
-     "fps": 0
+     "fps": 0,
+     "sh": [
+      5,
+      2
+     ]
     },
     "sack": {
      "x": 210,
@@ -1889,7 +2308,11 @@
      "ax": 6,
      "ay": 13,
      "frames": 1,
-     "fps": 0
+     "fps": 0,
+     "sh": [
+      5,
+      2
+     ]
     },
     "scarecrow": {
      "x": 80,
@@ -1899,7 +2322,11 @@
      "ax": 13,
      "ay": 39,
      "frames": 1,
-     "fps": 0
+     "fps": 0,
+     "sh": [
+      9,
+      3
+     ]
     },
     "shop_stall": {
      "x": 0,
@@ -1909,7 +2336,11 @@
      "ax": 23,
      "ay": 47,
      "frames": 1,
-     "fps": 0
+     "fps": 0,
+     "sh": [
+      14,
+      5
+     ]
     },
     "signpost": {
      "x": 199,
@@ -1919,7 +2350,11 @@
      "ax": 12,
      "ay": 27,
      "frames": 1,
-     "fps": 0
+     "fps": 0,
+     "sh": [
+      9,
+      3
+     ]
     },
     "tombstone_0": {
      "x": 55,
@@ -1929,7 +2364,11 @@
      "ax": 8,
      "ay": 20,
      "frames": 1,
-     "fps": 0
+     "fps": 0,
+     "sh": [
+      6,
+      2
+     ]
     },
     "tombstone_1": {
      "x": 73,
@@ -1939,7 +2378,11 @@
      "ax": 8,
      "ay": 20,
      "frames": 1,
-     "fps": 0
+     "fps": 0,
+     "sh": [
+      6,
+      2
+     ]
     },
     "tombstone_2": {
      "x": 91,
@@ -1949,7 +2392,11 @@
      "ax": 8,
      "ay": 20,
      "frames": 1,
-     "fps": 0
+     "fps": 0,
+     "sh": [
+      6,
+      2
+     ]
     },
     "well": {
      "x": 47,
@@ -1959,7 +2406,11 @@
      "ax": 16,
      "ay": 43,
      "frames": 1,
-     "fps": 0
+     "fps": 0,
+     "sh": [
+      12,
+      4
+     ]
     },
     "woodpile": {
      "x": 179,
@@ -1969,7 +2420,43 @@
      "ax": 12,
      "ay": 15,
      "frames": 1,
-     "fps": 0
+     "fps": 0,
+     "sh": [
+      9,
+      3
+     ]
+    },
+    "prop_lamp": {
+     "alias": "lamp_post",
+     "x": 107,
+     "y": 0,
+     "w": 11,
+     "h": 34,
+     "ax": 5,
+     "ay": 33,
+     "frames": 3,
+     "fps": 5,
+     "sh": [
+      4,
+      2
+     ],
+     "autoShadow": true
+    },
+    "prop_bench": {
+     "alias": "bench",
+     "x": 0,
+     "y": 49,
+     "w": 27,
+     "h": 24,
+     "ax": 13,
+     "ay": 23,
+     "frames": 1,
+     "fps": 0,
+     "sh": [
+      10,
+      3
+     ],
+     "autoShadow": true
     }
    }
   },

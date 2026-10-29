@@ -4,7 +4,7 @@
    "frame": {
     "x": 0,
     "y": 0,
-    "w": 25,
+    "w": 35,
     "h": 41
    },
    "rotated": false,
@@ -12,20 +12,20 @@
    "spriteSourceSize": {
     "x": 0,
     "y": 0,
-    "w": 25,
+    "w": 35,
     "h": 41
    },
    "sourceSize": {
-    "w": 25,
+    "w": 35,
     "h": 41
    },
    "duration": 71
   },
   "fx_starfall_1": {
    "frame": {
-    "x": 25,
+    "x": 35,
     "y": 0,
-    "w": 25,
+    "w": 35,
     "h": 41
    },
    "rotated": false,
@@ -33,20 +33,20 @@
    "spriteSourceSize": {
     "x": 0,
     "y": 0,
-    "w": 25,
+    "w": 35,
     "h": 41
    },
    "sourceSize": {
-    "w": 25,
+    "w": 35,
     "h": 41
    },
    "duration": 71
   },
   "fx_starfall_2": {
    "frame": {
-    "x": 50,
+    "x": 70,
     "y": 0,
-    "w": 25,
+    "w": 35,
     "h": 41
    },
    "rotated": false,
@@ -54,20 +54,20 @@
    "spriteSourceSize": {
     "x": 0,
     "y": 0,
-    "w": 25,
+    "w": 35,
     "h": 41
    },
    "sourceSize": {
-    "w": 25,
+    "w": 35,
     "h": 41
    },
    "duration": 71
   },
   "fx_starfall_3": {
    "frame": {
-    "x": 75,
+    "x": 105,
     "y": 0,
-    "w": 25,
+    "w": 35,
     "h": 41
    },
    "rotated": false,
@@ -75,20 +75,20 @@
    "spriteSourceSize": {
     "x": 0,
     "y": 0,
-    "w": 25,
+    "w": 35,
     "h": 41
    },
    "sourceSize": {
-    "w": 25,
+    "w": 35,
     "h": 41
    },
    "duration": 71
   },
   "fx_starfall_4": {
    "frame": {
-    "x": 100,
+    "x": 140,
     "y": 0,
-    "w": 25,
+    "w": 35,
     "h": 41
    },
    "rotated": false,
@@ -96,20 +96,20 @@
    "spriteSourceSize": {
     "x": 0,
     "y": 0,
-    "w": 25,
+    "w": 35,
     "h": 41
    },
    "sourceSize": {
-    "w": 25,
+    "w": 35,
     "h": 41
    },
    "duration": 71
   },
   "fx_starfall_5": {
    "frame": {
-    "x": 125,
+    "x": 175,
     "y": 0,
-    "w": 25,
+    "w": 35,
     "h": 41
    },
    "rotated": false,
@@ -117,20 +117,20 @@
    "spriteSourceSize": {
     "x": 0,
     "y": 0,
-    "w": 25,
+    "w": 35,
     "h": 41
    },
    "sourceSize": {
-    "w": 25,
+    "w": 35,
     "h": 41
    },
    "duration": 71
   },
   "fx_starfall_6": {
    "frame": {
-    "x": 150,
+    "x": 210,
     "y": 0,
-    "w": 25,
+    "w": 35,
     "h": 41
    },
    "rotated": false,
@@ -138,11 +138,11 @@
    "spriteSourceSize": {
     "x": 0,
     "y": 0,
-    "w": 25,
+    "w": 35,
     "h": 41
    },
    "sourceSize": {
-    "w": 25,
+    "w": 35,
     "h": 41
    },
    "duration": 71
@@ -153,7 +153,7 @@
   "image": "fx_starfall.png",
   "format": "RGBA8888",
   "size": {
-   "w": 175,
+   "w": 245,
    "h": 41
   },
   "scale": "1",

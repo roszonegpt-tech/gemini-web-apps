@@ -4,7 +4,7 @@
    "frame": {
     "x": 0,
     "y": 0,
-    "w": 17,
+    "w": 23,
     "h": 13
    },
    "rotated": false,
@@ -12,20 +12,20 @@
    "spriteSourceSize": {
     "x": 0,
     "y": 0,
-    "w": 17,
+    "w": 23,
     "h": 13
    },
    "sourceSize": {
-    "w": 17,
+    "w": 23,
     "h": 13
    },
    "duration": 83
   },
   "fx_poof_1": {
    "frame": {
-    "x": 17,
+    "x": 23,
     "y": 0,
-    "w": 17,
+    "w": 23,
     "h": 13
    },
    "rotated": false,
@@ -33,20 +33,20 @@
    "spriteSourceSize": {
     "x": 0,
     "y": 0,
-    "w": 17,
+    "w": 23,
     "h": 13
    },
    "sourceSize": {
-    "w": 17,
+    "w": 23,
     "h": 13
    },
    "duration": 83
   },
   "fx_poof_2": {
    "frame": {
-    "x": 34,
+    "x": 46,
     "y": 0,
-    "w": 17,
+    "w": 23,
     "h": 13
    },
    "rotated": false,
@@ -54,20 +54,20 @@
    "spriteSourceSize": {
     "x": 0,
     "y": 0,
-    "w": 17,
+    "w": 23,
     "h": 13
    },
    "sourceSize": {
-    "w": 17,
+    "w": 23,
     "h": 13
    },
    "duration": 83
   },
   "fx_poof_3": {
    "frame": {
-    "x": 51,
+    "x": 69,
     "y": 0,
-    "w": 17,
+    "w": 23,
     "h": 13
    },
    "rotated": false,
@@ -75,20 +75,20 @@
    "spriteSourceSize": {
     "x": 0,
     "y": 0,
-    "w": 17,
+    "w": 23,
     "h": 13
    },
    "sourceSize": {
-    "w": 17,
+    "w": 23,
     "h": 13
    },
    "duration": 83
   },
   "fx_poof_4": {
    "frame": {
-    "x": 68,
+    "x": 92,
     "y": 0,
-    "w": 17,
+    "w": 23,
     "h": 13
    },
    "rotated": false,
@@ -96,11 +96,11 @@
    "spriteSourceSize": {
     "x": 0,
     "y": 0,
-    "w": 17,
+    "w": 23,
     "h": 13
    },
    "sourceSize": {
-    "w": 17,
+    "w": 23,
     "h": 13
    },
    "duration": 83
@@ -111,7 +111,7 @@
   "image": "fx_poof.png",
   "format": "RGBA8888",
   "size": {
-   "w": 85,
+   "w": 115,
    "h": 13
   },
   "scale": "1",

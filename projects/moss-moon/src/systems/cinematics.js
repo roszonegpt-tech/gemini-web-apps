@@ -28,7 +28,7 @@ window.MM = window.MM || {};
   const mixA = (A, B, t) => [A[0] + (B[0] - A[0]) * t, A[1] + (B[1] - A[1]) * t, A[2] + (B[2] - A[2]) * t];
   function mix(a, b, t) { const c = mixA(rgb(a), rgb(b), clamp(t)); return `rgb(${c[0] | 0},${c[1] | 0},${c[2] | 0})`; }
   function rgba(h, a) { const c = rgb(h); return `rgba(${c[0]},${c[1]},${c[2]},${a})`; }
-  function mkCanvas(w, h) { const c = document.createElement('canvas'); c.width = w; c.height = h; const g = c.getContext('2d'); g.imageSmoothingEnabled = false; return [c, g]; }
+  function mkCanvas(w, h, rf) { const c = document.createElement('canvas'); c.width = w; c.height = h; const g = c.getContext('2d', rf ? { willReadFrequently: true } : undefined); g.imageSmoothingEnabled = false; return [c, g]; }
   const CACHE = new Map();
   function cached(key, fn) { let v = CACHE.get(key); if (v === undefined) { v = fn(); CACHE.set(key, v); } return v; }
 
@@ -171,16 +171,16 @@ window.MM = window.MM || {};
   }
   function mask(kind, w, h, seed, o = {}) {
     return cached('mask:' + [kind, w, h, seed, JSON.stringify(o)].join('|'), () => {
-      const [c, g] = mkCanvas(w, h), r = rng(seed); g.fillStyle = '#fff';
+      const [c, g] = mkCanvas(w, h, true), r = rng(seed); g.fillStyle = '#fff';
       const TAU = Math.PI * 2, base = x => h - (o.base ?? 8) - R((Math.sin(x / w * TAU * 2 + seed) * .6 + Math.sin(x / w * TAU * 5 + seed * 2) * .4) * (o.roll ?? 5));
       const wrap = (fn, x, by, hh, sd, ex) => { for (const dx of [0, -w, w]) fn(g, x + dx, by, hh, rng(sd), ex); };
       if (kind === 'mountains') {
         const ridge = new Float32Array(w).fill(h), pk = o.peaks || 6;
         for (let i = 0; i < pk; i++) {
-          const cx = (o.px ? o.px[i] : r()) * w, ph = h * ((o.minH ?? .35) + r() * ((o.maxH ?? .9) - (o.minH ?? .35))), sl = .55 + r() * .5;
-          for (let x = 0; x < w; x++) { let dx = Math.abs(x - cx); if (!o.noWrap) dx = Math.min(dx, w - dx); const top = h - ph + dx * sl; if (top < ridge[x]) ridge[x] = top; }
+          const cx = (o.px ? o.px[i] : (i + r() * .8) / pk) * w, ph = h * ((o.minH ?? .35) + r() * ((o.maxH ?? .9) - (o.minH ?? .35))), sl = .45 + r() * .9, sl2 = sl * (.6 + r() * .8);
+          for (let x = 0; x < w; x++) { let dx = x - cx; if (!o.noWrap) { if (dx > w / 2) dx -= w; if (dx < -w / 2) dx += w; } const top = h - ph + Math.abs(dx) * (dx < 0 ? sl : sl2) + Math.sin(x * .21 + i) * 1.5 + Math.sin(x * .057 + i * 3) * 4; if (top < ridge[x]) ridge[x] = top; }
         }
-        let j = 0; for (let x = 0; x < w; x++) { j += (r() - .5) * 1.4; j *= .82; g.fillRect(x, R(ridge[x] + j), 1, h); }
+        let j = 0; for (let x = 0; x < w; x++) { j += (r() - .5) * 2.2; j *= .8; g.fillRect(x, R(ridge[x] + j), 1, h); }
         return c;
       }
       if (kind === 'clouds') {
@@ -240,8 +240,8 @@ window.MM = window.MM || {};
   const LAYERS = {
     hillsH: () => colorize(mask('forest', 1024, 96, 5, { base: 34, roll: 12, min: 6, max: 14, gap: 9 }), { body: '#1e3452', rim: '#5a7ca6', base: '#192a44', rim2: 1 }),
     hillsC: () => colorize(mask('forest', 1024, 96, 5, { base: 34, roll: 12, min: 6, max: 14, gap: 9 }), { body: '#1b1a2c', rim: '#403b5c', base: '#141322' }),
-    treesH: () => colorize(mask('forest', 1024, 112, 9, { base: 10, roll: 5, min: 18, max: 46, gap: 6 }), { body: '#132a3a', rim: '#4a7f92', base: '#0b1722', tex: '#24485e', rim2: 1 }),
-    treesC: () => colorize(mask('forest', 1024, 112, 9, { base: 10, roll: 5, min: 18, max: 46, gap: 6 }), { body: '#14121f', rim: '#41395a', base: '#0a0911', tex: '#26213a' }),
+    treesH: () => colorize(mask('forest', 1024, 112, 9, { base: 10, roll: 6, min: 20, max: 58, gap: 6 }), { body: '#132a3a', rim: '#4a7f92', base: '#0b1722', tex: '#24485e', rim2: 1 }),
+    treesC: () => colorize(mask('forest', 1024, 112, 9, { base: 10, roll: 6, min: 20, max: 58, gap: 6 }), { body: '#14121f', rim: '#41395a', base: '#0a0911', tex: '#26213a' }),
     frameL: () => colorize(mask('frame', 260, 340, 41), { body: '#070a11', rim: '#1d2c42', base: '#04060a', fade: .5, tex: '#0e1522', texP: .1 }),
     cloudsA: () => colorize(mask('clouds', 1024, 80, 12, { n: 8 }), { body: '#242e5a', rim: '#8ea2d8', base: '#1a2148', rim2: 1 }),
     cloudsB: () => colorize(mask('clouds', 1024, 110, 19, { n: 6 }), { body: '#1a2048', rim: '#6c80bc', base: '#121738', rim2: 1 }),
@@ -254,8 +254,8 @@ window.MM = window.MM || {};
     swampFarC: () => colorize(mask('swamp', 640, 90, 31, { base: 24, roll: 4, min: 20, max: 40, gap: 10, blight: 1 }), { body: '#1b2419', rim: '#4d6a34', base: '#121a12' }),
     swampMidH: () => colorize(mask('swamp', 640, 120, 33, { base: 18, roll: 3, min: 40, max: 80, gap: 9 }), { body: '#0f2626', rim: '#4a8a70', base: '#091818', tex: '#1d3d38', rim2: 1 }),
     swampMidC: () => colorize(mask('swamp', 640, 120, 33, { base: 18, roll: 3, min: 40, max: 80, gap: 9, blight: 1 }), { body: '#121a10', rim: '#6a8a3a', base: '#0a0f09', tex: '#24301a' }),
-    frostFarH: () => colorize(mask('mountains', 640, 170, 41, { peaks: 6, minH: .35, maxH: .95 }), { body: '#2a3e5e', rim: '#a8c2e2', base: '#1c2a44', snow: '#e8f2ff', snowD: 7, snowLine: .55 }),
-    frostFarC: () => colorize(mask('mountains', 640, 170, 41, { peaks: 6, minH: .35, maxH: .95 }), { body: '#1a1d2e', rim: '#55667e', base: '#11131f', snow: '#7d8fab', snowD: 5, snowLine: .55 }),
+    frostFarH: () => colorize(mask('mountains', 640, 170, 41, { peaks: 8, minH: .3, maxH: .95 }), { body: '#2a3e5e', rim: '#a8c2e2', base: '#1c2a44', snow: '#e8f2ff', snowD: 7, snowLine: .55 }),
+    frostFarC: () => colorize(mask('mountains', 640, 170, 41, { peaks: 8, minH: .3, maxH: .95 }), { body: '#1a1d2e', rim: '#55667e', base: '#11131f', snow: '#7d8fab', snowD: 5, snowLine: .55 }),
     frostMidH: () => colorize(mask('frost', 640, 120, 43, { base: 14, roll: 8, min: 24, max: 56, gap: 7 }), { body: '#172840', rim: '#dcecff', base: '#0e1a2c', tex: '#2d4466', rim2: 1 }),
     frostMidC: () => colorize(mask('frost', 640, 120, 43, { base: 14, roll: 8, min: 24, max: 56, gap: 7, blight: 1 }), { body: '#121828', rim: '#86aee0', base: '#0b0f1a', tex: '#25344e' }),
     peakFar: () => colorize(mask('mountains', 1024, 190, 47, { peaks: 9, minH: .3, maxH: .85 }), { body: '#24365a', rim: '#a6c0e6', base: '#17233e', snow: '#eef5ff', snowD: 8, snowLine: .6 })
@@ -543,12 +543,12 @@ window.MM = window.MM || {};
   };
   function bossArt(kind) {
     return cached('boss:' + kind, () => {
-      const b0 = BOSS[kind], k = b0.k || 1, b = Object.assign({}, b0, { w: Math.ceil(b0.w * k), h: Math.ceil(b0.h * k), eyes: b0.eyes.map(([x, y]) => [R(x * k), R(y * k)]), heart: b0.heart.map(v => R(v * k)) }), [c, g] = mkCanvas(b.w, b.h); g.fillStyle = g.strokeStyle = '#fff'; g.lineCap = 'round'; g.scale(k, k); b0.draw(g);
+      const b0 = BOSS[kind], k = b0.k || 1, b = Object.assign({}, b0, { w: Math.ceil(b0.w * k), h: Math.ceil(b0.h * k), eyes: b0.eyes.map(([x, y]) => [R(x * k), R(y * k)]), heart: b0.heart.map(v => R(v * k)) }), [c, g] = mkCanvas(b.w, b.h, true); g.fillStyle = g.strokeStyle = '#fff'; g.lineCap = 'round'; g.scale(k, k); b0.draw(g);
       const src = g.getImageData(0, 0, b.w, b.h).data, op = (x, y) => x >= 0 && y >= 0 && x < b.w && y < b.h && src[(y * b.w + x) * 4 + 3] > 110;
       const [bc, bg] = mkCanvas(b.w, b.h), [rc, rg] = mkCanvas(b.w, b.h), bi = bg.createImageData(b.w, b.h), ri = rg.createImageData(b.w, b.h);
       const B = rgb(b.body), T = rgb(b.tex), RM = rgb(b.rim);
       for (let y = 0; y < b.h; y++) for (let x = 0; x < b.w; x++) {
-        if (!op(x, y)) continue; const i = (y * b.w + x) * 4, col = hash(x, y >> 1) < .09 ? T : B;
+        if (!op(x, y)) continue; const i = (y * b.w + x) * 4, col = hash(x >> 1, y >> 2) < .05 ? T : B;
         bi.data[i] = col[0]; bi.data[i + 1] = col[1]; bi.data[i + 2] = col[2]; bi.data[i + 3] = 255;
         const e1 = !op(x, y - 1) || !op(x - 1, y), e2 = !op(x, y - 2) || !op(x - 2, y);
         if (e1 || e2) { const k = e1 ? 1 : .45; ri.data[i] = RM[0]; ri.data[i + 1] = RM[1]; ri.data[i + 2] = RM[2]; ri.data[i + 3] = 255 * k; }
@@ -624,25 +624,25 @@ window.MM = window.MM || {};
   };
   // Distant regions (forest / swamp / frost), healthy ↔ corrupt. x is the region's left edge on screen.
   const REGION = {
-    forest: { far: 120, mid: 162, ground: ['#1d3a34', '#0e1d1a', '#2c5444', '#183228'], groundC: ['#1e1426', '#0d0912', '#2e2038', '#1b1224'], fog: '#b48ae0', sky: 'forest' },
-    swamp: { far: 150, mid: 180, ground: ['#16302e', '#0a1716', '#2a5048', '#123028'], groundC: ['#151d14', '#090d08', '#29361e', '#151d12'], fog: '#9fd06a', sky: 'swamp', water: true },
-    frost: { far: 70, mid: 168, ground: ['#a9bfd8', '#56708f', '#d6e6f8', '#8ea6c4'], groundC: ['#4e5b72', '#252c3c', '#68789a', '#3b465c'], fog: '#c8dcff', sky: 'frost' }
+    forest: { far: 112, mid: 104, gy: 240, ground: ['#1d3a34', '#0e1d1a', '#2c5444', '#183228'], groundC: ['#1e1426', '#0d0912', '#2e2038', '#1b1224'], fog: '#b48ae0', sky: 'forest' },
+    swamp: { far: 134, mid: 136, gy: 236, ground: ['#16302e', '#0a1716', '#2a5048', '#123028'], groundC: ['#151d14', '#090d08', '#29361e', '#151d12'], fog: '#9fd06a', sky: 'swamp', water: true },
+    frost: { far: 58, mid: 128, gy: 240, ground: ['#a9bfd8', '#56708f', '#d6e6f8', '#8ea6c4'], groundC: ['#4e5b72', '#252c3c', '#68789a', '#3b465c'], fog: '#c8dcff', sky: 'frost' }
   };
-  function region(g, s, key, x, w, c, farOff, midOff, clipW) {
+  function region(g, s, key, x, w, c, farOff, midOff, clipW, bg) {
     const Rg = REGION[key], t = s.t, cw = clipW ?? w; if (cw <= 0) return;
-    g.save(); g.beginPath(); g.rect(R(x), 0, R(Math.min(w, cw)), H); g.clip();
+    g.save(); g.beginPath(); g.rect(R(x), 0, R(Math.min(w, cw)), H); g.clip(); if (bg) bg();
     const f = (name, off, y, a) => { if (a <= 0) return; const cv = layer(key + name), cwid = cv.width; let sx = x + off; while (sx > x) sx -= cwid; g.globalAlpha = Math.min(1, a); for (; sx < x + w; sx += cwid) g.drawImage(cv, R(sx), R(y)); g.globalAlpha = 1; };
     f('FarH', farOff, Rg.far, 1); f('FarC', farOff, Rg.far, c);
-    if (key === 'frost' && c > 0) { g.globalAlpha = c * .55; g.fillStyle = '#1a1f30'; for (let i = 0; i < 6; i++) g.fillRect(R(x + ((i * 97 + t * 30) % (w + 120)) - 60), R(Rg.far + 10 + (i % 3) * 14), 90, 8); g.globalAlpha = 1; }
-    mist(g, Rg.mid + 40, c > .5 ? Rg.fog : '#a8c0f0', .5 + c * .4, -midOff * .8 - x + t * 8);
-    const gy = Rg.mid + 100, gH = groundCanvas(key + 'H', ...Rg.ground, 80), gC = groundCanvas(key + 'C', ...Rg.groundC, 80);
+    if (key === 'frost' && c > 0) band(g, layer('cloudsB'), -(x + farOff) + t * 25, Rg.far - 20, c * .85);
+    mist(g, Rg.gy - 40, c > .5 ? Rg.fog : '#a8c0f0', .5 + c * .4, -midOff * .8 - x + t * 8);
+    const gy = Rg.gy, gH = groundCanvas(key + 'H', ...Rg.ground, 80), gC = groundCanvas(key + 'C', ...Rg.groundC, 80);
     f('MidH', midOff, Rg.mid, 1); f('MidC', midOff, Rg.mid, c);
     band(g, gH, -(x + midOff), gy, 1); band(g, gC, -(x + midOff), gy, c);
     if (Rg.water) { const wy = gy + 10; g.fillStyle = mix('#0b1c22', '#0a120c', c); g.fillRect(R(x), wy, R(w), 50); for (let i = 0; i < 26; i++) { g.globalAlpha = .35 + .3 * Math.sin(t * 2 + i); g.fillStyle = c > .5 ? '#4a6a2a' : '#7fb8d8'; g.fillRect(R(x + (i * 53 + t * 6) % w), wy + 4 + (i * 7) % 40, 6 + i % 9, 1); } g.globalAlpha = 1; }
     if (key === 'forest') { if (c > .02) spores(g, t, c, '#c89aff', 30); fireflies(g, t, { n: R(20 * (1 - c)), y0: 160, y1: 280, ox: -(x + midOff), a: 1 - c }); }
     if (key === 'swamp') { for (let i = 0; i < 7; i++) { const wx = x + midOff * .5 + 40 + i * 70 + Math.sin(t * .7 + i) * 12, wy = 210 + Math.sin(t * 1.1 + i * 2) * 8; glow(g, wx, wy, 10, c > .5 ? '#c8ff6a' : '#8fe8ff', .55); g.fillStyle = '#eaffff'; g.fillRect(R(wx), R(wy), 1, 1); } }
     if (key === 'frost') { snowfall(g, t, .4 + c * .5, 20 + c * 80, R(50 + c * 60)); if (c < .5) for (let i = 0; i < 8; i++) { const sx = x + (i * 71) % w, sy = 180 + (i * 37) % 90, a = Math.max(0, Math.sin(t * 3 + i * 1.7)) * (1 - c * 2); g.globalAlpha = a; g.fillStyle = '#ffffff'; g.fillRect(R(sx) - 2, R(sy), 5, 1); g.fillRect(R(sx), R(sy) - 2, 1, 5); g.globalAlpha = 1; } }
-    if (c > .02) { g.globalAlpha = c * .2; g.fillStyle = Rg.fog; g.fillRect(R(x), 0, R(w), H); g.globalAlpha = 1; }
+    if (c > .02) { const gr = g.createLinearGradient(0, 60, 0, H); gr.addColorStop(0, rgba(Rg.fog, 0)); gr.addColorStop(1, rgba(Rg.fog, .28 * c)); g.fillStyle = gr; g.fillRect(R(x), 0, R(w), H); }
     g.restore();
   }
   function regionVignette(g, s, key, c) {
@@ -718,7 +718,7 @@ window.MM = window.MM || {};
               FR7.forEach(f => {
                 const pos = q => [wx + Math.cos(f.a) * 230 * q * f.sp + f.side * 40 * q, wy - f.up * q * 1.5 + 160 * q * q];
                 const q = clamp(k * .42 * f.sp), [x, y] = pos(q), pts = []; for (let i = 1; i < 18; i++) pts.push(pos(Math.max(0, q - i * .012)));
-                trail(g, pts, 1 - q * .5); shard(g, x, y, 1, 1 - seg(q, .8, 1), s.t);
+                trail(g, pts, 1 - q * .5); shard(g, x, y, 2, 1 - seg(q, .8, 1), s.t);
               });
             }
           } },
@@ -804,14 +804,14 @@ window.MM = window.MM || {};
           for (let i = 0; i < 70; i++) { const x = i * 8 - cx * .1, yy = 40 + Math.sin(i * .21 + t * .4) * 18 + Math.sin(i * .07) * 10, h = 40 + Math.sin(i * .5 + t) * 14, gr = g.createLinearGradient(0, yy, 0, yy + h); gr.addColorStop(0, rgba('#7affc8', 0)); gr.addColorStop(.5, rgba(i % 9 < 3 ? '#9fd8ff' : '#7affc8', .12 + .06 * Math.sin(i + t * 2))); gr.addColorStop(1, rgba('#7affc8', 0)); g.fillStyle = gr; g.fillRect(R(x), R(yy - cy * .1), 8, R(h)); }
           g.restore();
           moon(g, 420 - cx * .05, 56 - cy * .05, 12, 1 + seg(lt, 7, 9), 0);
-          band(g, layer('peakFar'), cx * .2, 120 - cy * .2);
-          mist(g, 300 - cy * .4, '#cfe0ff', .6, cx * .4 + t * 6);
+          band(g, layer('peakFar'), cx * .2, 150 - cy * .2); g.globalAlpha = .35; g.fillStyle = '#1a2a4a'; g.fillRect(0, R(240 - cy * .2), W, 100); g.globalAlpha = 1;
+          mist(g, 250 - cy * .4, '#cfe0ff', .7, cx * .4 + t * 6);
           const home = seg(lt, 7.6, 10.5); if (home > 0) { glow(g, 96 - cx * .2, 236 - cy * .2, 30, '#8fe8ff', home * .7); g.save(); g.globalCompositeOperation = 'lighter'; g.globalAlpha = home * .6; g.fillStyle = '#9fe9ff'; g.fillRect(R(95 - cx * .2), 0, 2, R(236 - cy * .2)); g.restore(); }
           const P = pen(g, -cx, -cy, 1); g.fillStyle = '#0c1424';
-          for (let x = 0; x < W + 60; x++) { const top = R(262 + Math.abs(x - 300) * .08 + Math.sin(x * .09) * 3 + (x < 140 ? (140 - x) * .3 : 0)); P.r(x - 20, top, 1, 100, '#0c1424'); P.r(x - 20, top, 1, 2 + R(hash(x, 2) * 2), '#dbe8f8'); P.r(x - 20, top + 3, 1, 1, '#7d93b5'); }
-          witch(g, 230 - cx, 270 - cy, 2, lt > 2.2 && lt < 2.7 ? 'cast' : 'idle', 'NE', lt > 2.2 && lt < 2.7 ? Math.floor((lt - 2.2) * 16) & 7 : frameAt(lt, 8));
-          charmGlowAt(g, 236 - cx, 230 - cy, .2 + .7 * seg(lt, 4, 5) * (1 - seg(lt, 7, 9) * .5), t);
-          const fx0 = 300 - cx, fy0 = 170 - cy + (s.rm ? 0 : Math.sin(t * 2) * 4);
+          for (let x = 0; x < W + 60; x++) { const xx = x - 20, top = R(236 + Math.pow(Math.abs(xx - 236) / 10, 1.5) * 1.6 + Math.sin(xx * .19) * 2 + (hash(xx >> 2, 5) - .5) * 3); P.r(xx, top, 1, 140, '#0c1424'); P.r(xx, top, 1, 2 + R(hash(xx, 2) * 2), '#dbe8f8'); P.r(xx, top + 3, 1, 1, '#7d93b5'); if (hash(xx, 9) < .05) P.r(xx, top + 6 + R(hash(xx, 4) * 20), 2, 1, '#2a3a58'); }
+          witch(g, 230 - cx, 240 - cy, 2, lt > 2.2 && lt < 2.7 ? 'cast' : 'idle', 'NE', lt > 2.2 && lt < 2.7 ? Math.floor((lt - 2.2) * 16) & 7 : frameAt(lt, 8));
+          charmGlowAt(g, 236 - cx, 200 - cy, .2 + .7 * seg(lt, 4, 5) * (1 - seg(lt, 7, 9) * .5), t);
+          const fx0 = 312 - cx, fy0 = 150 - cy + (s.rm ? 0 : Math.sin(t * 2) * 4);
           if (lt < 6.6) shard(g, fx0, fy0, 2, 1, t, true);
           else { const q = EASE.in(seg(lt, 6.6, 8.4)); const pos = qq => [lerp(fx0, 96 - cx * .2, qq), lerp(fy0, 236 - cy * .2, qq) - Math.sin(qq * Math.PI) * 120]; const [x, y] = pos(q), pts = []; for (let i = 1; i < 30; i++) pts.push(pos(Math.max(0, q - i * .008))); if (q < 1) { trail(g, pts, 1); shard(g, x, y, 2 - (q > .5 ? 1 : 0), 1, t, true); } }
           snowfall(g, t, .5, 25, 60);
@@ -822,9 +822,9 @@ window.MM = window.MM || {};
       bars: true, fadeIn: 1.2, fadeOut: 1.4, vignette: { col: '#000000', k: .42 },
       flash: [{ t: 10.6, d: 1.6, c: '#ffffff', a: .9 }], shake: [{ t0: 10.6, t1: 11.6, amp: 1.5 }],
       captions: [
-        { t0: 14.2, t1: 16.4, kind: 'region', title: 'The Whisperwood', sub: 'restored' },
-        { t0: 16.6, t1: 18.8, kind: 'region', title: 'Lilyreach', sub: 'restored' },
-        { t0: 19.0, t1: 21.6, kind: 'region', title: 'The Shining Heights', sub: 'restored' },
+        { t0: 14.6, t1: 16.8, kind: 'region', title: 'The Whisperwood', sub: 'restored' },
+        { t0: 17.2, t1: 19.6, kind: 'region', title: 'Lilyreach', sub: 'restored' },
+        { t0: 20.0, t1: 22.4, kind: 'region', title: 'The Shining Heights', sub: 'restored' },
         { t0: 39.0, t1: 46.5, kind: 'card', title: 'Moss & Moon', sub: 'The Moonwell shines again.', small: 'To be continued — keep playing ✦' }
       ],
       shots: [
@@ -856,14 +856,15 @@ window.MM = window.MM || {};
               }
             });
           } },
-        { t0: 13.4, t1: 22.4, xf: 1, cam: [[0, { x: 0, y: 0, z: 1 }], [1, { x: 1244, y: 0, z: 1 }]], ease: 'cubic', still: null,
+        { t0: 13.4, t1: 22.4, xf: 1, cam: [[0, { x: 0, y: 0, z: 1 }], [1, { x: 1244, y: 0, z: 1 }]], ease: 'inOut', still: null,
           draw(g, s) {
-            const lt = s.lt, cx = s.rm ? 0 : s.cam.x, wave = lerp(-40, 3 * 560 + 40, EASE.cubic(seg(lt, .1, 8.4)));
-            sky(g, 'dim'); sky(g, 'bright', seg(lt, .5, 8)); stars(g, s.t, cx * .03, 1, s.rm); moon(g, 420, 52, 14, 1.3, 0);
+            const lt = s.lt, cx = s.rm ? 0 : s.cam.x, wave = cx * .9 + lerp(-40, 330, sm(seg(lt, 0, 2))) + 260 * sm(seg(lt, 7, 9));
+            const bgf = () => { sky(g, 'dim'); sky(g, 'bright', seg(lt, .5, 8)); stars(g, s.t, cx * .03, 1, s.rm); moon(g, 420, 52, 14, 1.3, 0); }; bgf();
             const reg = ['forest', 'swamp', 'frost'];
             if (s.rm) { const k = Math.min(2, Math.floor(seg(lt, 0, 9) * 3)), ls = lt - k * 3; region(g, s, reg[k], 0, W, 1 - sm(seg(ls, .3, 2)), 0, 0); return; }
             const wx = wave - cx * .9;
-            reg.forEach((key, i) => { const x0 = R(i * 560 - cx * .9); if (x0 > W || x0 + 560 < 0) return; region(g, s, key, x0, 560, 1, cx * .5, cx * .1); region(g, s, key, x0, 560, 0, cx * .5, cx * .1, R(wx - x0)); }); g.save(); g.globalCompositeOperation = 'lighter'; const gr = g.createLinearGradient(wx - 80, 0, wx + 10, 0); gr.addColorStop(0, rgba('#9fe9ff', 0)); gr.addColorStop(.8, rgba('#bff3ff', .35)); gr.addColorStop(1, rgba('#ffffff', 0)); g.fillStyle = gr; g.fillRect(R(wx - 80), 0, 90, H); g.restore();
+            reg.forEach((key, i) => { const x0 = R(i * 560 - cx * .9); if (x0 > W || x0 + 560 < 0) return; region(g, s, key, x0, 560, 1, cx * .5, cx * .1); region(g, s, key, x0, 560, 0, cx * .5, cx * .1, R(wx - x0), bgf); });
+            for (let i = 1; i < 3; i++) { const bx = i * 560 - cx * .9; if (bx < -60 || bx > W + 60) continue; const gr = g.createLinearGradient(bx - 40, 0, bx + 40, 0); gr.addColorStop(0, rgba('#9ab4e0', 0)); gr.addColorStop(.5, rgba('#9ab4e0', .22)); gr.addColorStop(1, rgba('#9ab4e0', 0)); g.fillStyle = gr; g.fillRect(R(bx - 40), 90, 80, H); } g.save(); g.globalCompositeOperation = 'lighter'; const gr = g.createLinearGradient(wx - 80, 0, wx + 10, 0); gr.addColorStop(0, rgba('#9fe9ff', 0)); gr.addColorStop(.8, rgba('#bff3ff', .35)); gr.addColorStop(1, rgba('#ffffff', 0)); g.fillStyle = gr; g.fillRect(R(wx - 80), 0, 90, H); g.restore();
             for (let i = 0; i < 40; i++) { const f = MOTES[i], x = wx - f.x % 70, y = 140 + f.y * 170 - ((s.t * 20 + i * 9) % 60); g.globalAlpha = .7; g.fillStyle = i % 2 ? '#e6fbff' : '#ffe9a8'; g.fillRect(R(x), R(y), 1, 1); } g.globalAlpha = 1;
           } },
         { t0: 22.4, t1: 30.6, xf: 1, cam: [[0, { x: -20, y: 0, z: 1 }], [1, { x: 20, y: 0, z: 1.03 }]], still: { x: 0, y: 0, z: 1 },
@@ -890,7 +891,7 @@ window.MM = window.MM || {};
         { t0: 34.8, t1: 38.6, xf: 1, cam: [[0, { x: 0, y: 0, z: 1 }], [1, { x: 0, y: 0, z: 1 }]],
           draw(g, s) { const t = s.t; sky(g, 'velvet'); bokeh(g, t, true); glow(g, 330, 120, 120, '#8fe8ff', .25); charm(g, 230 + (s.rm ? 0 : R(Math.sin(t * 1.1) * 2)), 170, 6, 1, t); g.drawImage(vignetteCanvas('#000000', .7), 0, 0); } },
         { t0: 38.6, t1: 46, xf: 1.4, cam: [[0, { x: 0, y: -24, z: 1.03 }], [1, { x: 0, y: 0, z: 1 }]], still: { x: 0, y: 0, z: 1 },
-          draw(g, s) { grove(g, s, { health: 1, layout: 'wide', glow: 1, sky: 'bright', sky2: 'dawn', sky2a: .55 * seg(s.lt, 0, 6), lit: 1, smoke: 1, flies: 50 }); g.globalAlpha = .25; g.fillStyle = '#05060c'; g.fillRect(0, 0, W, H); g.globalAlpha = 1; } }
+          draw(g, s) { grove(g, s, { health: 1, layout: 'wide', glow: 1, sky: 'bright', sky2: 'dawn', sky2a: .55 * seg(s.lt, 0, 6), lit: 1, smoke: 1, flies: 50 }); g.globalAlpha = .38; g.fillStyle = '#05060c'; g.fillRect(0, 0, W, H); g.globalAlpha = 1; } }
       ]
     },
     defeat_recover: {
@@ -1040,7 +1041,7 @@ window.MM = window.MM || {};
     listen(v, 'error', () => fail('error'));
     listen(v, 'playing', () => { if (!sess || sess.video !== v) return; if (sess.mode === 'video-pending') { sess.mode = 'video'; clearTimeout(sess.vTimer); audio('duck', .7, Math.max(1000, (isFinite(v.duration) ? v.duration : sess.dur || 60) * 1000)); sess.ducked = true; } });
     listen(v, 'ended', () => { if (sess && sess.video === v) finish(false); });
-    try { v.playbackRate = clamp(timeScale, .25, 16); } catch (e) { /* ignore */ }
+    try { v.defaultPlaybackRate = v.playbackRate = clamp(timeScale, .25, 16); } catch (e) { /* ignore */ }
     trySrc();
   }
   function dropVideo() {

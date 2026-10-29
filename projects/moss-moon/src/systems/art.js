@@ -3,7 +3,8 @@
 // atlas or a sprite is missing, so callers can draw unconditionally and fall back to their own art.
 //
 //   MM.art.whenReady(cb) / await MM.art.whenReady()     fires once all sheets decoded (or none exist)
-//   MM.art.draw(ctx, name, x, y, {frame, t, scale, flip, alpha, ax, ay}) -> true if drawn
+//   MM.art.draw(ctx, name, x, y, {frame, t, scale, flip, alpha, ax, ay, shadow}) -> true if drawn
+//   MM.art.shadow(ctx, x, y, rx, ry)  crisp contact-shadow ellipse (sprites carry their size in .sh)
 //   MM.art.get(name) -> {name, sheet, x, y, w, h, ax, ay, frames, fps, durs, loop, img} | null
 //   MM.art.has(name), MM.art.names(prefix?), MM.art.frameAt(name, t), MM.art.tile(base, seed)
 //   MM.art.drawTile(ctx, base, seed, x, y, opts)  (pick a ground variant and draw it)
@@ -98,6 +99,7 @@ window.MM = window.MM || {};
     const sx = f.x + fi * f.w;
     const a0 = ctx.globalAlpha;
     if (o.alpha != null) ctx.globalAlpha = a0 * o.alpha;
+    if (f.sh && (o.shadow != null ? o.shadow : f.autoShadow)) art.shadow(ctx, x, y + s, f.sh[0] * s, f.sh[1] * s);
     if (flip) {
       ctx.save(); ctx.translate(dx + f.w * s, dy); ctx.scale(-1, 1);
       ctx.drawImage(f.img, sx, f.y, f.w, f.h, 0, 0, f.w * s, f.h * s);
@@ -105,6 +107,16 @@ window.MM = window.MM || {};
     } else ctx.drawImage(f.img, sx, f.y, f.w, f.h, dx, dy, f.w * s, f.h * s);
     ctx.globalAlpha = a0;
     return true;
+  };
+  // Crisp pixel ellipse contact shadow (ink-teal, translucent), centred on (x, y).
+  art.shadowColor = 'rgba(38,58,55,.22)';
+  art.shadow = function (ctx, x, y, rx, ry) {
+    if (!ctx || rx <= 0 || ry <= 0) return;
+    ctx.fillStyle = art.shadowColor;
+    for (let dy = -ry; dy <= ry; dy++) {
+      const w = Math.round(rx * Math.sqrt(1 - (dy / (ry + 0.5)) ** 2));
+      if (w > 0) ctx.fillRect(Math.round(x - w), Math.round(y + dy), w * 2, 1);
+    }
   };
   art.drawTile = function (ctx, base, seed, x, y, o) {
     const n = art.tile(base, seed);

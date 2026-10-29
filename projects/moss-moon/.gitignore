@@ -5,3 +5,4 @@ Thumbs.db
 tests/*.png
 !tests/.gitkeep
 tests/out/
+assets/images/pxl/
