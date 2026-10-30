@@ -95,7 +95,11 @@ for (const file of files) {
   if (built) {
     fs.rmSync(out, { recursive: true, force: true });
     const r = cp.spawnSync(process.execPath, [PXL, 'build', path.join(ART, file), '--out', out, ...(PREVIEW ? [] : ['--no-preview'])], { encoding: 'utf8' });
-    const errs = (r.stdout + r.stderr).split('\n').filter((l) => /error|Error|✗/.test(l));
+    const lines = (r.stdout + r.stderr).split('\n');
+    const errs = lines.filter((l) => !l.startsWith('@@meta ') && /error|Error|✗/.test(l));
+    // "@@meta {json}" lines printed by art files (art/_iso.px.js meta()) -> per-sprite anchors + extra fields
+    const pm = {}; for (const l of lines) if (l.startsWith('@@meta ')) { try { const j = JSON.parse(l.slice(7)); pm[j.name] = j; } catch (e) { failed = true; console.error('bad @@meta line: ' + l); } }
+    fs.mkdirSync(out, { recursive: true }); fs.writeFileSync(path.join(out, 'meta.json'), JSON.stringify(pm));
     if (r.status !== 0 || errs.length) { failed = true; console.error(`pxl ${file}: exit ${r.status}\n${r.stdout}\n${r.stderr}`); }
     else console.log(`pxl ${file}: ok`);
     // GIFs are review aids only; keep them with --preview, drop them otherwise to keep the repo lean.
@@ -105,6 +109,7 @@ for (const file of files) {
 
   // Collect sprites (single frame) and anims (strip + json).
   const items = [], cfg = meta.sheets[name] || {};
+  const pmFile = path.join(out, 'meta.json'), pmeta = fs.existsSync(pmFile) ? JSON.parse(fs.readFileSync(pmFile, 'utf8')) : {};
   const sdir = path.join(out, 'sprites'), adir = path.join(out, 'anims');
   if (fs.existsSync(sdir)) for (const f of fs.readdirSync(sdir).sort()) {
     if (!f.endsWith('.png') || f.endsWith('_n.png')) continue;
@@ -139,7 +144,8 @@ for (const file of files) {
 
   const frames = {};
   for (const it of items.sort((a, b) => (a.name < b.name ? -1 : 1))) {
-    const a = anchorFor(cfg, it.name, it.fw, it.fh);
+    const pm = pmeta[it.name] || {};
+    const a = pm.ax != null ? [pm.ax, pm.ay] : anchorFor(cfg, it.name, it.fw, it.fh);
     const e = { x: it.x, y: it.y, w: it.fw, h: it.fh, ax: a[0], ay: a[1], frames: it.frames, fps: 0 };
     if (it.frames > 1) {
       const ms = it.durs[0];
@@ -149,6 +155,9 @@ for (const file of files) {
     }
     // contact-shadow size for things that stand on the ground (props, nature, buildings, bosses, crops)
     if (cfg.shadow) { const sh = typeof cfg.shadow === 'function' ? cfg.shadow(it.name, it.fw, it.fh) : null; if (sh) e.sh = sh; }
+    // extra documented fields from @@meta (foot [tilesX,tilesY], flipOf, wall, hook, sh override...)
+    for (const [k, v] of Object.entries(pm)) if (!['name', 'ax', 'ay'].includes(k)) e[k] = v;
+    if (pm.sh === null) delete e.sh;
     frames[it.name] = e;
   }
   // Aliases (art/meta.js): extra names for existing sprites, e.g. the baseline's 'prop_tree_0' seam.

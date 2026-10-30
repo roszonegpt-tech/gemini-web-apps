@@ -115,8 +115,7 @@
       const scr = MM.screens;
       if (scr && typeof scr.listen === 'function' && scr.current === name) {
         const r = safe(() => scr.listen(target, type, wrapped, opts), null);
-        off = typeof r === 'function' ? r : () => target.removeEventListener(type, wrapped, opts);
-        if (typeof r !== 'function') { /* CORE returned nothing: we still remove it ourselves (double remove is harmless) */ }
+        off = typeof r === 'function' ? r : null; // we also remove it ourselves (a double remove is harmless)
       } else target.addEventListener(type, wrapped, opts);
       const rm = () => { safe(() => target.removeEventListener(type, wrapped, opts)); if (off) safe(off); };
       S.offs.push(rm); return rm;
@@ -124,7 +123,10 @@
     // Timers are only used for non-animation chores (never for animation: that runs in update(dt)).
     S.timeout = function (fn, ms) {
       const scr = MM.screens, cb = () => { if (S.alive) fn(); };
-      if (scr && typeof scr.timeout === 'function' && scr.current === name) { const id = safe(() => scr.timeout(cb, ms), null); if (id != null) { S.timers.push(() => safe(() => clearTimeout(id))); return id; } }
+      if (scr && typeof scr.timeout === 'function' && scr.current === name) {
+        const r = safe(() => scr.timeout(cb, ms), null); // CORE returns cancel() (with .id)
+        if (r != null) { S.timers.push(typeof r === 'function' ? r : () => clearTimeout(r)); return r; }
+      }
       const id = setTimeout(cb, ms); S.timers.push(() => clearTimeout(id)); return id;
     };
     S.track = (node) => { if (node) S.nodes.push(node); return node; };

@@ -38,15 +38,19 @@ const path = require('path');
 
   try {
     await page.goto('file://' + file);
-    check('reached title', await waitFor(() => window.__mm && window.MM && window.MM.state.current === 'title'));
+    // phase 3: boot hands off to MM.flow (logo -> intro -> title) when present, else core's fallback title
+    check('reached front-end (logo/intro/title)', await waitFor(() => window.__mm && window.MM && ['logo', 'intro', 'title'].includes(window.MM.state.current)));
     await wait(400);
-    const colors = await ev(() => window.__mm.canvasColors());
-    check('canvas painted (title)', colors > 30, colors);
+    const fe = await ev(() => ({ vis: document.getElementById('scene').style.visibility, el: window.__mm.game().elapsed, paused: window.MM.isPaused() }));
+    await wait(300);
+    const fe2 = await ev(() => window.__mm.game().elapsed);
+    check('front-end: #scene hidden, baseline frozen', fe.vis === 'hidden' && fe.paused && fe2 === fe.el, { fe, fe2 });
     check('legacy shim 59 ids', await ev(() => window.MM.legacyShim && window.MM.legacyShim.ids.length === 59 && window.MM.legacyShim.ids.every((id) => document.getElementById(id))));
 
     // ---- new game -> play
     check('newGame', await ev(() => window.__mm.newGame({ name: 'Smoke' })));
     check('state play', await ensurePlay());
+    check('single rAF (MM.loop)', await ev(async () => { await new Promise((r) => setTimeout(r, 300)); window.MM.loop.resetPeak(); await new Promise((r) => setTimeout(r, 300)); return window.MM.loop.stats().peak === 1; }));
     const s0 = await st();
     check('game active + saved', s0.active && s0.saveStatus === 'ok', s0.saveStatus);
     await wait(500);
@@ -119,7 +123,7 @@ const path = require('path');
     const sp = await ev(() => { const S = window.MM.settings; S.set('quality', 'high'); S.set('particles', 'low'); S.set('volMusic', 0.25); S.set('volMusic', 7); S.set('bogus', 1); return S.all(); });
     check('settings validate + presets', sp.quality === 'custom' && sp.softFilter === 'medium' && sp.bloom === 'high' && sp.particles === 'low' && sp.volMusic === 1, sp);
     await page.reload();
-    check('title after reload', await waitFor(() => window.__mm && window.MM.state.current === 'title'));
+    check('front-end after reload', await waitFor(() => window.__mm && ['logo', 'intro', 'title'].includes(window.MM.state.current)));
     const sr = await ev(() => ({ all: window.MM.settings.all(), ps: window.MM.settings.particleScale(), hasSave: window.MM.save.hasSave() }));
     check('settings persisted', sr.all.quality === 'custom' && sr.all.particles === 'low' && sr.all.volMusic === 1 && sr.ps === 0.35, sr.all);
     check('save persisted across reload', sr.hasSave);

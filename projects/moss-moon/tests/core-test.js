@@ -273,7 +273,7 @@ async function browserTests() {
     // B3b: fallbacks without the UI module + autosave + tab-hide pause
     {
       const noui = path.join(ROOT, '__core_test_noui.html');
-      fs.writeFileSync(noui, fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8').replace(/<script src="src\/ui\/[^"]+"><\/script>\n?/g, '').replace(/<link rel="stylesheet" href="assets\/css\/ui\.css">/g, ''));
+      fs.writeFileSync(noui, fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8').replace(/<script src="src\/(ui|screens)\/[^"]+"><\/script>\n?/g, '').replace(/<link rel="stylesheet" href="assets\/css\/ui\.css">/g, ''));
       try {
         const { page, errors, context } = await open(fileUrl(noui));
         await page.waitForFunction(() => window.__mm && window.MM.state.current === 'title');
@@ -314,7 +314,7 @@ async function browserTests() {
       const html = fs.readFileSync(out, 'utf8');
       ok('build: no external local refs', !/<script[^>]+src=/i.test(html) && !/<link[^>]+stylesheet/i.test(html));
       const { page, errors, context } = await open(fileUrl(out));
-      const reached = await page.waitForFunction(() => window.__mm && window.MM.state.current === 'title', null, { timeout: 8000 }).then(() => true, () => false);
+      const reached = await page.waitForFunction(() => window.__mm && ['logo', 'intro', 'title'].includes(window.MM.state.current), null, { timeout: 8000 }).then(() => true, () => false);
       ok('build: single file boots to title', reached && errors.length === 0, errors);
       await context.close();
       let failedLoud = false;
