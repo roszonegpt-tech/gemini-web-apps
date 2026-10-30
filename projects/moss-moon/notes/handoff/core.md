@@ -106,6 +106,55 @@ stage by ~6000 px, moving the canvas out from under the pointer. Body has `touch
 `events(name?)` / `clearEvents()` (last 400 bus events), `errors()`, `save(force)`, `load()`, `layout()`, `canvasColors()`.
 URL hash autostart: `#mm-new` (new game), `#mm-continue` / `#mm-play` (continue, else new).
 
+## PHASE 3 additions (notes/PHASE3_CONTRACT.md "CORE additions") — final API
+**States:** `boot logo intro title creation tutorial play interior menu dialogue cine defeat ending loading` (`title` = main menu, `menu` = pause).
+Default policies (override with `MM.screens.register`, which merges over them):
+| state | sim | draw | | state | sim | draw |
+|---|---|---|---|---|---|---|
+| boot/logo/intro/title/creation | none | none | | menu | none | frozen |
+| tutorial, play | world | world | | dialogue, cine, ending | none | world |
+| interior | player | custom (falls back to `world` until a `render` is registered) | | defeat, loading | none | frozen |
+
+- `MM.isPaused()` = current `sim === 'none'`. `MM.input.isBlocked()` = `MM.input.block()` flag || paused → baseline keys/pointer/axis ignored.
+- `MM.state.go(name, data)`: `prev.exit(next)` → `prev.cleanup()` → release everything prev registered via `MM.screens.listen/timeout/interval/mount`
+  → policy (`#scene` `visibility:hidden` for draw `none`; frozen snapshot; sim `none` clears keys/click target/axis and stops every `MM.audio` loop;
+  `def.audio` `{music, ambience, keep, fade}` applied via `MM.audio.music/ambience` unless `keep`) → `next.enter(data, prev)` → bus `'state'` `{from,to,data}`.
+  `go()` called inside exit/cleanup runs right after the transition; `go()` inside enter (redirect) runs nested, and `'state'` events are still emitted in order.
+  Unknown/same state → false. Resources registered while state X is current belong to X (including during X's enter).
+- `MM.screens`: `register(name, {sim, draw, audio, enter, exit, update(dt), render(ctx,w,h), resize(w,h,dpr), cleanup})`, `current`, `def(name?)`,
+  **extras** `sim()`, `drawMode()`, `states`, `stats()` → `{listeners, timers, mounts, listened, released, timersMade, timersCleared, mounted, unmounted, transitions, canvases}`.
+  `listen(target,type,fn,opts)` → off(); `timeout(fn,ms)` / `interval(fn,ms)` → `cancel()` (with `.id`); all auto-cleared on exit.
+  `mount(name, {w=512, h=320 | 'stage', pixelated=true, layer='screens'|'fx'|'ui'})` → `{canvas, ctx, destroy()}`; canvas class `mm-screen-canvas`,
+  CSS-stretched to the stage; `w:'stage'` = stage CSS px × dpr, resized on layout. Destroyed on exit.
+  `render` gets: draw `custom` → `#scene` ctx (instead of baseline draw); `world`/`frozen` → `#scene` ctx after the world (overlay);
+  `none` → the ctx of the screen's last mounted canvas (or null). `resize(w,h,dpr)` is called on every stage layout change (bus `layout`).
+- `MM.loop`: the ONE rAF (started by baseline via `MM.loop.attach({simulate, draw})`; baseline never calls rAF itself when MM exists).
+  Frame: `onTick` fns → gamepad stick poll → `def.update(dt)` → baseline `simulate(min(raw,.2), sim)` (≤1/60 substeps) unless sim `none` → render per draw policy.
+  `dt` wall clock clamped ≤0.1; reset on visibility change (no spike). `onTick(fn)` → off. `stats()` → `{rafs, frames, running, dt, foreign, peak, ticks}`;
+  every other `requestAnimationFrame` call is counted as `foreign` (rafs = 1 + foreign last frame); `resetPeak()`; `start()/stop()`.
+- `sim:'player'`: baseline `update()` runs input → movement → animation → camera; skips `updateCombat` (only cooldowns tick) and `updateWorld`
+  (enemies, farm, raids, clock, particles, familiar, baseline autosave). `preUpdate`/`postUpdate` hooks still run — check `MM.screens.sim()`.
+- Collision hook (extra): `MM.hooks.on('blocked', (x, y) => true|false)` — consulted by baseline `blockedAt()` for every actor move (buildings, interiors).
+- `MM.input`: `axis` {x,y} (screen space, |v|≤1), `setAxis(x,y,source)` (`'touch'|'gamepad'|'keyboard'`), `axisSource`, `method` (`keyboard|touch|gamepad`,
+  bus `input:method`), `setMethod(m)`, `glyph(action)` for `move cast interact broom potion pause confirm back tend inventory map spells click`
+  (keyboard 'E'/'Space'…, touch 'Tap ✦'/'Joystick'…, gamepad 'A button'/'Left stick'…), `glyphs` table, `touchControls()` → resolved bool
+  (`auto` = `(pointer: coarse)` or a touch/pen pointerdown seen; bus `input:touch` on first touch). Baseline `readInput` consumes the axis after keys
+  (0.15 deadzone, analog speed). Gamepad: CORE maps only the left stick → axis (0.2 deadzone); buttons stay with the UI input module.
+  `MM.input.touch()` (d-pad) was **removed**, as was baseline's `[data-dir]` pad.
+- Settings added: `joystickSize` 0.8–1.4 (1), `joystickSide` left|right (left), `joystickMode` floating|fixed (floating), `haptics` (true), `fxIntensity` 0.5|1|1.5 (1).
+- Page: `<div id="mm-screens">` between `#scene` and `#mm-fx`, z-index 40, `pointer-events:none` (screens listen on window/document via `MM.screens.listen`).
+- boot.js: calls `MM.flow.start()` when present (else enters `title` with the fallback overlay); `#mm-new/#mm-continue` bypass the flow.
+  Tab hidden or Esc (fallback) pauses from `play|interior|tutorial` with `MM.state.go('menu', {screen:'pause', reason, resume: from})` — resume to `data.resume`.
+  DPR changes re-run the integer-scale layout. Save refused in `logo intro title creation tutorial cine loading defeat boot` (tutorial = sandbox).
+- `tools/build.js` PLANNED (load order): data → legacy-shim → mm → audio → art → cinematics (config, system) → campaign config → regions-visual → **baseline**
+  → buildings.js, tutorial.js (config) → bosses → campaign → world-render → interiors, interior-render → lighting, fx, filter → UI files (MANIFEST or default
+  incl. `ui-joystick.js`) → `src/screens/flow, logo, title, intro, tutorial` → boot.js. Styles: `assets/css/ui.css`, `assets/css/screens.css`.
+- `__mm` extras: `loop()`, `screens()`, `listeners()`.
+- Tests: `node tests/core-phase3-test.js` (39 checks: lifecycle order, release counters, deferred/redirect ordering, isPaused per state, audio policy, settings,
+  axis/glyph/method; browser: no sim/draw in logo/intro/title/creation, sim 'player', frozen draw, deadzone, gamepad stick, mount, 50× round trips with zero
+  listener/timer/mount/canvas/bus leaks, rafs===1 settled, full page rafs===1). Smoke now expects a front-end state (logo/intro/title) and checks `#scene` hidden + frozen.
+  Results 2026-10-30: core-test 85/85, core-phase3-test 39/39, smoke index 23/23, smoke build 23/23 (0 console errors). A mutation (title sim→world) fails 4 phase-3 checks.
+
 ## Tests
 - `node tests/smoke.js [index.html|builds/moss-moon-v0.2.0.html] [shot.png]` — 22 checks: title reached, canvas non-uniform (title+play),
   59 legacy ids, newGame→play, frames advance, keyboard moves the witch, pause freezes `game.elapsed` and blocks keys, resume, save/load

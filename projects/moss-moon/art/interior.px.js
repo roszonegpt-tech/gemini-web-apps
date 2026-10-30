@@ -236,16 +236,13 @@ for (const [kind, K] of Object.entries(KINDS)) {
   // cut ends: the section through the wall thickness (4 px), lit on the left end, shaded on the right end
   for (const side of ["l", "r"]) {
     const lit = side === "l", name = `iwall_${kind}_end_${side}`
-    sprite(name, { w: 6, h: PH }, (c) => {
+    sprite(name, { w: lit ? 21 : 20, h: PH }, (c) => {
       for (let k = 0; k < 4; k++) {
-        const x = lit ? 3 - k : 2 + k, g = gy(0) - Math.ceil(k / 2) - (lit ? 0 : 0)
-        for (let v = 0; v < WH + 2; v++) c.px(x, g - v, v >= WH ? "k" : (k === 0 ? K.cap[1] : K.cap[0]))
-        c.px(x, g - WH - 2, "k")
+        const x = lit ? 3 - k : 16 + k, g = gy(0) - Math.ceil(k / 2)
+        for (let v = 0; v < WH + 3; v++) c.px(x, g - v, k === 3 || v === 0 || v === WH + 2 ? "k" : v >= WH ? K.cap[0] : k === 0 ? K.cap[1] : K.cap[0])
       }
-      // outer edge
-      for (let v = 0; v < WH + 3; v++) c.px(lit ? 0 : 5, gy(0) - 2 - v, "k")
     })
-    meta(name, { ax: lit ? 6 + 16 - 2 : -1 + 2, ay: OY + 8, wall: side === "l" ? "nw-end" : "ne-end" })
+    meta(name, { ax: lit ? 20 : 0, ay: OY + 8, wall: side === "l" ? "nw-end" : "ne-end" })
   }
   // cut-away front stubs (SW and SE edges), 8 px tall with a lit cap
   for (const side of ["sw", "se"]) for (const door of [false, true]) {
