@@ -1,0 +1,106 @@
+{
+ "frames": {
+  "well_spirit_idle_e_0": {
+   "frame": {
+    "x": 0,
+    "y": 0,
+    "w": 74,
+    "h": 90
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 74,
+    "h": 90
+   },
+   "sourceSize": {
+    "w": 74,
+    "h": 90
+   },
+   "duration": 200
+  },
+  "well_spirit_idle_e_1": {
+   "frame": {
+    "x": 74,
+    "y": 0,
+    "w": 74,
+    "h": 90
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 74,
+    "h": 90
+   },
+   "sourceSize": {
+    "w": 74,
+    "h": 90
+   },
+   "duration": 200
+  },
+  "well_spirit_idle_e_2": {
+   "frame": {
+    "x": 148,
+    "y": 0,
+    "w": 74,
+    "h": 90
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 74,
+    "h": 90
+   },
+   "sourceSize": {
+    "w": 74,
+    "h": 90
+   },
+   "duration": 200
+  },
+  "well_spirit_idle_e_3": {
+   "frame": {
+    "x": 222,
+    "y": 0,
+    "w": 74,
+    "h": 90
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 74,
+    "h": 90
+   },
+   "sourceSize": {
+    "w": 74,
+    "h": 90
+   },
+   "duration": 200
+  }
+ },
+ "meta": {
+  "app": "pxl",
+  "image": "well_spirit_idle_e.png",
+  "format": "RGBA8888",
+  "size": {
+   "w": 296,
+   "h": 90
+  },
+  "scale": "1",
+  "frameTags": [
+   {
+    "name": "well_spirit_idle_e",
+    "from": 0,
+    "to": 3,
+    "direction": "forward"
+   }
+  ]
+ }
+}

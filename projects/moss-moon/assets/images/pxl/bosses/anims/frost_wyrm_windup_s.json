@@ -1,0 +1,85 @@
+{
+ "frames": {
+  "frost_wyrm_windup_s_0": {
+   "frame": {
+    "x": 0,
+    "y": 0,
+    "w": 82,
+    "h": 74
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 82,
+    "h": 74
+   },
+   "sourceSize": {
+    "w": 82,
+    "h": 74
+   },
+   "duration": 167
+  },
+  "frost_wyrm_windup_s_1": {
+   "frame": {
+    "x": 82,
+    "y": 0,
+    "w": 82,
+    "h": 74
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 82,
+    "h": 74
+   },
+   "sourceSize": {
+    "w": 82,
+    "h": 74
+   },
+   "duration": 167
+  },
+  "frost_wyrm_windup_s_2": {
+   "frame": {
+    "x": 164,
+    "y": 0,
+    "w": 82,
+    "h": 74
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 82,
+    "h": 74
+   },
+   "sourceSize": {
+    "w": 82,
+    "h": 74
+   },
+   "duration": 167
+  }
+ },
+ "meta": {
+  "app": "pxl",
+  "image": "frost_wyrm_windup_s.png",
+  "format": "RGBA8888",
+  "size": {
+   "w": 246,
+   "h": 74
+  },
+  "scale": "1",
+  "frameTags": [
+   {
+    "name": "frost_wyrm_windup_s",
+    "from": 0,
+    "to": 2,
+    "direction": "forward"
+   }
+  ]
+ }
+}

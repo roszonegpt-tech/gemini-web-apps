@@ -1,0 +1,106 @@
+{
+ "frames": {
+  "frost_wyrm_idle_s_0": {
+   "frame": {
+    "x": 0,
+    "y": 0,
+    "w": 82,
+    "h": 74
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 82,
+    "h": 74
+   },
+   "sourceSize": {
+    "w": 82,
+    "h": 74
+   },
+   "duration": 200
+  },
+  "frost_wyrm_idle_s_1": {
+   "frame": {
+    "x": 82,
+    "y": 0,
+    "w": 82,
+    "h": 74
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 82,
+    "h": 74
+   },
+   "sourceSize": {
+    "w": 82,
+    "h": 74
+   },
+   "duration": 200
+  },
+  "frost_wyrm_idle_s_2": {
+   "frame": {
+    "x": 164,
+    "y": 0,
+    "w": 82,
+    "h": 74
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 82,
+    "h": 74
+   },
+   "sourceSize": {
+    "w": 82,
+    "h": 74
+   },
+   "duration": 200
+  },
+  "frost_wyrm_idle_s_3": {
+   "frame": {
+    "x": 246,
+    "y": 0,
+    "w": 82,
+    "h": 74
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 82,
+    "h": 74
+   },
+   "sourceSize": {
+    "w": 82,
+    "h": 74
+   },
+   "duration": 200
+  }
+ },
+ "meta": {
+  "app": "pxl",
+  "image": "frost_wyrm_idle_s.png",
+  "format": "RGBA8888",
+  "size": {
+   "w": 328,
+   "h": 74
+  },
+  "scale": "1",
+  "frameTags": [
+   {
+    "name": "frost_wyrm_idle_s",
+    "from": 0,
+    "to": 3,
+    "direction": "forward"
+   }
+  ]
+ }
+}

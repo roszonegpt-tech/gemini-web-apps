@@ -1,0 +1,106 @@
+{
+ "frames": {
+  "cottage_lush_0": {
+   "frame": {
+    "x": 0,
+    "y": 0,
+    "w": 86,
+    "h": 100
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 86,
+    "h": 100
+   },
+   "sourceSize": {
+    "w": 86,
+    "h": 100
+   },
+   "duration": 333
+  },
+  "cottage_lush_1": {
+   "frame": {
+    "x": 86,
+    "y": 0,
+    "w": 86,
+    "h": 100
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 86,
+    "h": 100
+   },
+   "sourceSize": {
+    "w": 86,
+    "h": 100
+   },
+   "duration": 333
+  },
+  "cottage_lush_2": {
+   "frame": {
+    "x": 172,
+    "y": 0,
+    "w": 86,
+    "h": 100
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 86,
+    "h": 100
+   },
+   "sourceSize": {
+    "w": 86,
+    "h": 100
+   },
+   "duration": 333
+  },
+  "cottage_lush_3": {
+   "frame": {
+    "x": 258,
+    "y": 0,
+    "w": 86,
+    "h": 100
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 86,
+    "h": 100
+   },
+   "sourceSize": {
+    "w": 86,
+    "h": 100
+   },
+   "duration": 333
+  }
+ },
+ "meta": {
+  "app": "pxl",
+  "image": "cottage_lush.png",
+  "format": "RGBA8888",
+  "size": {
+   "w": 344,
+   "h": 100
+  },
+  "scale": "1",
+  "frameTags": [
+   {
+    "name": "cottage_lush",
+    "from": 0,
+    "to": 3,
+    "direction": "forward"
+   }
+  ]
+ }
+}

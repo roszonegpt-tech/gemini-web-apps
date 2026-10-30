@@ -1,0 +1,7 @@
+# MM.ui load order (UI agent). ui-core first, ui-input last (it runs init).
+ui-core.js
+ui-hud.js
+ui-menus.js
+ui-screens.js
+ui-joystick.js
+ui-input.js

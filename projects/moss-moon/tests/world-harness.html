@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>world harness</title>
+<style>html,body{margin:0;background:#1f2c2a}canvas{display:block;width:1024px;height:640px;image-rendering:pixelated}</style></head>
+<body>
+<!-- WORLD agent test page: contract load order (notes/PHASE2_CONTRACT.md). ?fx=1 adds the FX modules, ?noart=1 drops MM_ART,
+     ?nohooks=1 skips src/core/mm.js (exercises the hook-less fallback path). -->
+<canvas id="scene" width="512" height="320"></canvas>
+<script>
+  window.__q = new URLSearchParams(location.search);
+  const S = (src) => document.write('<script src="../' + src + '"><\/script>');
+  S('assets/js/atlas-data.js'); S('assets/js/cast-data.js');
+  if (!__q.get('noart')) S('assets/js/art-data.js');
+  S('src/core/legacy-shim.js');
+  if (!__q.get('nohooks')) S('src/core/mm.js');
+  S('src/systems/art.js');
+  S('src/config/campaign.js');
+  S('src/config/regions-visual.js');
+  S('src/core/baseline.js');
+  S('src/systems/world-render.js');
+  if (__q.get('wb')) S('src/systems/world-buildings.js');
+  if (__q.get('fx')) { S('src/systems/lighting.js'); S('src/systems/fx.js'); S('src/systems/filter.js'); }
+</script>
+<script>
+  window.addEventListener('load', () => { try { window.MM?.state?.go?.('play'); } catch (e) { console.error(e); } window.__harnessReady = true; });
+</script>
+</body></html>

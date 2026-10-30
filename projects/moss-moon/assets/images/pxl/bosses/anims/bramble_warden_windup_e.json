@@ -1,0 +1,85 @@
+{
+ "frames": {
+  "bramble_warden_windup_e_0": {
+   "frame": {
+    "x": 0,
+    "y": 0,
+    "w": 66,
+    "h": 74
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 66,
+    "h": 74
+   },
+   "sourceSize": {
+    "w": 66,
+    "h": 74
+   },
+   "duration": 167
+  },
+  "bramble_warden_windup_e_1": {
+   "frame": {
+    "x": 66,
+    "y": 0,
+    "w": 66,
+    "h": 74
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 66,
+    "h": 74
+   },
+   "sourceSize": {
+    "w": 66,
+    "h": 74
+   },
+   "duration": 167
+  },
+  "bramble_warden_windup_e_2": {
+   "frame": {
+    "x": 132,
+    "y": 0,
+    "w": 66,
+    "h": 74
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 66,
+    "h": 74
+   },
+   "sourceSize": {
+    "w": 66,
+    "h": 74
+   },
+   "duration": 167
+  }
+ },
+ "meta": {
+  "app": "pxl",
+  "image": "bramble_warden_windup_e.png",
+  "format": "RGBA8888",
+  "size": {
+   "w": 198,
+   "h": 74
+  },
+  "scale": "1",
+  "frameTags": [
+   {
+    "name": "bramble_warden_windup_e",
+    "from": 0,
+    "to": 2,
+    "direction": "forward"
+   }
+  ]
+ }
+}

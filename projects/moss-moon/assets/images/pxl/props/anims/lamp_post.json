@@ -1,0 +1,85 @@
+{
+ "frames": {
+  "lamp_post_0": {
+   "frame": {
+    "x": 0,
+    "y": 0,
+    "w": 11,
+    "h": 34
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 11,
+    "h": 34
+   },
+   "sourceSize": {
+    "w": 11,
+    "h": 34
+   },
+   "duration": 200
+  },
+  "lamp_post_1": {
+   "frame": {
+    "x": 11,
+    "y": 0,
+    "w": 11,
+    "h": 34
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 11,
+    "h": 34
+   },
+   "sourceSize": {
+    "w": 11,
+    "h": 34
+   },
+   "duration": 200
+  },
+  "lamp_post_2": {
+   "frame": {
+    "x": 22,
+    "y": 0,
+    "w": 11,
+    "h": 34
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 11,
+    "h": 34
+   },
+   "sourceSize": {
+    "w": 11,
+    "h": 34
+   },
+   "duration": 200
+  }
+ },
+ "meta": {
+  "app": "pxl",
+  "image": "lamp_post.png",
+  "format": "RGBA8888",
+  "size": {
+   "w": 33,
+   "h": 34
+  },
+  "scale": "1",
+  "frameTags": [
+   {
+    "name": "lamp_post",
+    "from": 0,
+    "to": 2,
+    "direction": "forward"
+   }
+  ]
+ }
+}

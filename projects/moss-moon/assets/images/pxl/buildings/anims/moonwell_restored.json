@@ -1,0 +1,190 @@
+{
+ "frames": {
+  "moonwell_restored_0": {
+   "frame": {
+    "x": 0,
+    "y": 0,
+    "w": 54,
+    "h": 50
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 54,
+    "h": 50
+   },
+   "sourceSize": {
+    "w": 54,
+    "h": 50
+   },
+   "duration": 167
+  },
+  "moonwell_restored_1": {
+   "frame": {
+    "x": 54,
+    "y": 0,
+    "w": 54,
+    "h": 50
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 54,
+    "h": 50
+   },
+   "sourceSize": {
+    "w": 54,
+    "h": 50
+   },
+   "duration": 167
+  },
+  "moonwell_restored_2": {
+   "frame": {
+    "x": 108,
+    "y": 0,
+    "w": 54,
+    "h": 50
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 54,
+    "h": 50
+   },
+   "sourceSize": {
+    "w": 54,
+    "h": 50
+   },
+   "duration": 167
+  },
+  "moonwell_restored_3": {
+   "frame": {
+    "x": 162,
+    "y": 0,
+    "w": 54,
+    "h": 50
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 54,
+    "h": 50
+   },
+   "sourceSize": {
+    "w": 54,
+    "h": 50
+   },
+   "duration": 167
+  },
+  "moonwell_restored_4": {
+   "frame": {
+    "x": 216,
+    "y": 0,
+    "w": 54,
+    "h": 50
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 54,
+    "h": 50
+   },
+   "sourceSize": {
+    "w": 54,
+    "h": 50
+   },
+   "duration": 167
+  },
+  "moonwell_restored_5": {
+   "frame": {
+    "x": 270,
+    "y": 0,
+    "w": 54,
+    "h": 50
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 54,
+    "h": 50
+   },
+   "sourceSize": {
+    "w": 54,
+    "h": 50
+   },
+   "duration": 167
+  },
+  "moonwell_restored_6": {
+   "frame": {
+    "x": 324,
+    "y": 0,
+    "w": 54,
+    "h": 50
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 54,
+    "h": 50
+   },
+   "sourceSize": {
+    "w": 54,
+    "h": 50
+   },
+   "duration": 167
+  },
+  "moonwell_restored_7": {
+   "frame": {
+    "x": 378,
+    "y": 0,
+    "w": 54,
+    "h": 50
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 54,
+    "h": 50
+   },
+   "sourceSize": {
+    "w": 54,
+    "h": 50
+   },
+   "duration": 167
+  }
+ },
+ "meta": {
+  "app": "pxl",
+  "image": "moonwell_restored.png",
+  "format": "RGBA8888",
+  "size": {
+   "w": 432,
+   "h": 50
+  },
+  "scale": "1",
+  "frameTags": [
+   {
+    "name": "moonwell_restored",
+    "from": 0,
+    "to": 7,
+    "direction": "forward"
+   }
+  ]
+ }
+}

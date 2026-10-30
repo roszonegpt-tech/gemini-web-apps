@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Moss Moon Audio Bench</title>
+<style>
+  :root{--bg:#1d2b2a;--card:#263a37;--ink:#eef3e4;--sub:#a9bba8;--acc:#cfaa71;--btn:#36524c;--btnh:#456b5f;--on:#7fa86f}
+  @media (prefers-color-scheme: light){:root:not([data-theme="dark"]){--bg:#e9eee3;--card:#f8f9f1;--ink:#263a37;--sub:#63746b;--btn:#dfe8d8;--btnh:#cfdcc6;--on:#6f9a62}}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.4 ui-rounded,"Trebuchet MS",system-ui,sans-serif;padding:16px}
+  h1{font-family:Georgia,serif;font-weight:600;margin:0 0 4px;font-size:26px}
+  h2{font-family:Georgia,serif;font-weight:600;font-size:17px;margin:0 0 10px}
+  p{color:var(--sub);margin:0 0 14px;max-width:70ch}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px}
+  .card{background:var(--card);border-radius:12px;padding:14px}
+  .btns{display:flex;flex-wrap:wrap;gap:6px}
+  button{font:inherit;font-size:12px;border:0;border-radius:7px;padding:8px 10px;background:var(--btn);color:var(--ink);cursor:pointer;min-height:36px}
+  button:hover{background:var(--btnh)} button.on{background:var(--on);color:#10201a}
+  button.big{background:var(--acc);color:#2a2116;font-weight:700;font-size:14px;padding:10px 16px}
+  label{display:grid;grid-template-columns:80px 1fr 40px;align-items:center;gap:8px;margin:6px 0;font-size:12px}
+  input[type=range]{width:100%}
+  pre{font:11px/1.45 ui-monospace,Consolas,monospace;white-space:pre-wrap;margin:0;color:var(--sub)}
+  .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
+</style>
+</head>
+<body>
+<h1>Moss Moon — Audio Bench</h1>
+<p>Everything here is synthesized live by <code>src/systems/audio.js</code>. Tap <b>Start audio</b> first (browsers need a gesture), then audition tracks, ambience and sound effects.</p>
+<div class="row">
+  <button class="big" id="init">Start audio</button>
+  <button id="stop">Stop all</button>
+  <button id="mute">Mute</button>
+  <button id="duck">Duck 60% / 2s</button>
+  <button id="broom">Broom loop</button>
+  <button id="charge">Charge loop</button>
+  <button id="allsfx">Play every sfx</button>
+</div>
+<div class="grid">
+  <div class="card"><h2>Music</h2><div class="btns" id="music"></div>
+    <label>Intensity<input type="range" id="inten" min="0" max="1" step="0.05" value="0"><span id="intenV">0</span></label></div>
+  <div class="card"><h2>Ambience</h2><div class="btns" id="amb"></div></div>
+  <div class="card"><h2>Volume</h2><div id="vols"></div>
+    <label>Pan sfx<input type="range" id="pan" min="-1" max="1" step="0.1" value="0"><span id="panV">0</span></label>
+    <label>Rate sfx<input type="range" id="rate" min="0.5" max="2" step="0.05" value="1"><span id="rateV">1</span></label></div>
+  <div class="card" style="grid-column:1/-1"><h2>Sound effects</h2><div class="btns" id="sfx"></div></div>
+  <div class="card" style="grid-column:1/-1"><h2>Stats</h2><pre id="stats">not started</pre></div>
+</div>
+<script src="../src/systems/audio.js"></script>
+<script>
+(function () {
+  var A = MM.audio, L = A.list(), $ = function (id) { return document.getElementById(id); };
+  function mk(parent, label, fn) { var b = document.createElement('button'); b.textContent = label; b.onclick = fn; parent.appendChild(b); return b; }
+  function mark(group, btn) { Array.prototype.forEach.call(group.children, function (c) { c.classList.toggle('on', c === btn); }); }
+  $('init').onclick = function () { A.init(); };
+  $('stop').onclick = function () { A.stopAll(); mark($('music')); mark($('amb')); };
+  $('mute').onclick = function () { this.classList.toggle('on', A.toggleMute()); };
+  $('duck').onclick = function () { A.duck(0.6, 2000); };
+  var loops = {};
+  ['broom', 'charge'].forEach(function (n) { $(n).onclick = function () { loops[n] = !loops[n]; A.loop(n, loops[n], { speed: 0.7 }); this.classList.toggle('on', loops[n]); }; });
+  $('allsfx').onclick = function () { A.preview.playAll(450); };
+  L.music.forEach(function (id) { var b = mk($('music'), id, function () { A.init(); A.music(id); mark($('music'), b); }); });
+  mk($('music'), '(off)', function () { A.music(null); mark($('music')); });
+  L.ambience.forEach(function (id) { var b = mk($('amb'), id, function () { A.init(); A.ambience(id); mark($('amb'), id === 'none' ? null : b); }); });
+  L.sfx.forEach(function (id) { mk($('sfx'), id, function () { A.init(); A.sfx(id, { pan: +$('pan').value, rate: +$('rate').value }); }); });
+  var v = A.getVolumes();
+  ['master', 'music', 'sfx', 'cine', 'ambience'].forEach(function (k) {
+    var l = document.createElement('label'); l.innerHTML = k + '<input type="range" min="0" max="1" step="0.01" value="' + v[k] + '"><span>' + v[k] + '</span>';
+    var r = l.querySelector('input'); r.oninput = function () { A.setVolume(k, +r.value); l.querySelector('span').textContent = (+r.value).toFixed(2); };
+    $('vols').appendChild(l);
+  });
+  $('inten').oninput = function () { A.setIntensity(+this.value); $('intenV').textContent = this.value; };
+  $('pan').oninput = function () { $('panV').textContent = this.value; };
+  $('rate').oninput = function () { $('rateV').textContent = this.value; };
+  setInterval(function () {
+    var s = A.stats(), m = A.meter();
+    $('stats').textContent = 'state ' + s.state + ' | music ' + s.music + ' | ambience ' + s.ambience + ' | intensity ' + A.intensity +
+      '\nvoices ' + s.voices + ' ' + JSON.stringify(s.byId) + '\nnodes ' + s.nodes + ' (music ' + s.musicNodes + ', amb ' + s.ambNodes + ', sfx ' + s.sfxNodes + ', persistent ' + s.persistent + ')' +
+      '\ntracks ' + s.tracks + ' ambiences ' + s.ambiences + ' loops ' + JSON.stringify(s.loops) + ' | dropped ' + s.dropped + ' stolen ' + s.stolen + ' skips ' + s.skips +
+      '\npeak pre-limiter ' + m.pre.toFixed(3) + ' | output ' + m.post.toFixed(3) + ' | bad ' + s.bad + ' errors ' + s.errors;
+  }, 250);
+})();
+</script>
+</body>
+</html>

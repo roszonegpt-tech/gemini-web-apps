@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#16231e">
+<meta name="color-scheme" content="dark">
+<meta name="description" content="Moss &amp; Moon — a cozy isometric farm-and-magic adventure. Restore Moonflower Grove after the Moonwell loses its light.">
+<title>Moss &amp; Moon</title>
+<style>
+  /* Stage shell (CORE). Menus/HUD styling lives in assets/css/ui.css (UI agent). */
+  :root{--mm-bg:#16231e;--mm-bg2:#1f3129;--mm-ink:#f3eedb;--mm-focus:#f2c46d;--mm-scale:1;--mm-text-scale:1;
+    --mm-safe-t:env(safe-area-inset-top,0px);--mm-safe-r:env(safe-area-inset-right,0px);--mm-safe-b:env(safe-area-inset-bottom,0px);--mm-safe-l:env(safe-area-inset-left,0px)}
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;overflow:hidden;background:var(--mm-bg);color:var(--mm-ink);
+    font-family:ui-rounded,"Trebuchet MS",system-ui,sans-serif;overscroll-behavior:none;-webkit-text-size-adjust:100%}
+  body{position:fixed;inset:0;touch-action:none;-webkit-tap-highlight-color:transparent;
+    background:radial-gradient(ellipse at 50% 40%,var(--mm-bg2) 0%,var(--mm-bg) 70%)}
+  #mm-app{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
+    padding:var(--mm-safe-t) var(--mm-safe-r) var(--mm-safe-b) var(--mm-safe-l)}
+  /* 8:5 stage. boot.js sets an exact px size (integer device-pixel scale when >=2x fits); this is the CSS-only fallback. */
+  #mm-stage{position:relative;flex:none;aspect-ratio:8/5;width:min(100%,calc((100dvh - var(--mm-safe-t) - var(--mm-safe-b))*1.6));
+    max-height:100%;overflow:hidden;overflow:clip;background:#000;box-shadow:0 0 0 1px #0006,0 18px 60px #000a;contain:layout paint;user-select:none;-webkit-user-select:none}
+  #scene{position:absolute;inset:0;display:block;width:100%;height:100%;margin:0;padding:0;border:0;
+    image-rendering:pixelated;image-rendering:crisp-edges;touch-action:none;outline:none;cursor:pointer}
+  #scene:focus,#scene:focus-visible{outline:none} /* the canvas holds focus during play; menus show focus rings */
+  /* screen canvases (MM.screens.mount): above #scene, below cinematics (50) and UI (100) */
+  #mm-screens{position:absolute;inset:0;z-index:40;pointer-events:none;overflow:hidden;overflow:clip}
+  #mm-screens>canvas{position:absolute;inset:0;width:100%;height:100%}
+  #mm-fx{position:absolute;inset:0;z-index:50;pointer-events:none;overflow:hidden}
+  #mm-fx>canvas{position:absolute;inset:0;width:100%;height:100%;image-rendering:pixelated}
+  /* overflow:clip — focusing overflowing UI content must never scroll the stage (that would shift the canvas and break pointer mapping) */
+  #mm-ui{position:absolute;inset:0;z-index:100;pointer-events:none;overflow:hidden;overflow:clip;font-size:calc(16px*var(--mm-text-scale))}
+  /* #mm-ui itself never takes pointer events; UI elements opt in with pointer-events:auto (full-stage layer wrappers must not) */
+  #mm-ui :focus-visible{outline:2px solid var(--mm-focus);outline-offset:2px}
+  #mm-legacy-ui,[hidden]{display:none!important}
+  /* Built-in fallbacks (boot.js) used only when the UI module (MM.ui) is missing. */
+  .mm-fallback{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.6em;text-align:center;
+    background:linear-gradient(#0d1813cc,#0d1813ee);color:var(--mm-ink);cursor:pointer;padding:1em;pointer-events:auto}
+  .mm-fallback h1{margin:0;font:600 clamp(28px,7vmin,64px)/1 Georgia,serif;letter-spacing:.08em;color:#f6e7b8;text-shadow:0 2px 0 #0008}
+  .mm-fallback p{margin:0;font-size:clamp(12px,2.4vmin,18px);opacity:.9}
+  .mm-fallback kbd{font:700 .9em ui-monospace,monospace;border:1px solid #f3eedb88;border-bottom-width:2px;border-radius:4px;padding:.05em .4em}
+  .mm-toasts{position:absolute;left:50%;bottom:4%;transform:translateX(-50%);display:flex;flex-direction:column;gap:6px;align-items:center;pointer-events:none!important;z-index:200}
+  .mm-toast{background:#1a2a23ee;color:var(--mm-ink);border:1px solid #f3eedb44;border-radius:6px;padding:6px 10px;font-size:13px;max-width:80vw}
+  .mm-toast.error{border-color:#e38f67;color:#ffd9c7}
+  noscript div{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:2em;text-align:center;background:var(--mm-bg);color:var(--mm-ink);font-size:18px;z-index:1000}
+  @media (prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}
+</style>
+<!-- UI stylesheet (UI agent): uncomment / run `node tools/build.js --sync` once assets/css/ui.css exists. -->
+<!-- MM:STYLES BEGIN -->
+<link rel="stylesheet" href="assets/css/ui.css">
+<!-- MM:STYLES END -->
+</head>
+<body>
+<noscript><div>Moss &amp; Moon needs JavaScript to run. Please enable it, then reload this page.</div></noscript>
+<div id="mm-app">
+  <div id="mm-stage">
+    <canvas id="scene" width="512" height="320" tabindex="0" aria-label="Moss and Moon game scene"></canvas>
+    <div id="mm-screens"></div>
+    <div id="mm-fx"></div>
+    <div id="mm-ui" aria-live="polite"></div>
+  </div>
+</div>
+<!--
+  Script load order is FIXED (notes/PHASE2_CONTRACT.md "File ownership"). Classic scripts only.
+  Only files that exist get a tag; `node tools/build.js --sync` rewrites the block below from the
+  planned list in tools/build.js (+ src/ui/MANIFEST.txt). Planned but possibly not-yet-existing:
+    see PLANNED in tools/build.js (phase 3 adds src/config/buildings.js, src/systems/interiors.js,
+    src/systems/interior-render.js, src/ui/ui-joystick.js, src/config/tutorial.js, src/screens/{flow,logo,title,intro,tutorial}.js,
+    assets/css/screens.css; screens load after the UI files, boot.js last)
+-->
+<!-- MM:SCRIPTS BEGIN -->
+<script src="assets/js/atlas-data.js"></script>
+<script src="assets/js/cast-data.js"></script>
+<script src="assets/js/art-data.js"></script>
+<script src="src/core/legacy-shim.js"></script>
+<script src="src/core/mm.js"></script>
+<script src="src/systems/audio.js"></script>
+<script src="src/systems/art.js"></script>
+<script src="src/config/cinematics.js"></script>
+<script src="src/systems/cinematics.js"></script>
+<script src="src/config/campaign.js"></script>
+<script src="src/config/regions-visual.js"></script>
+<script src="src/core/baseline.js"></script>
+<script src="src/entities/bosses.js"></script>
+<script src="src/systems/campaign.js"></script>
+<script src="src/systems/world-render.js"></script>
+<script src="src/systems/lighting.js"></script>
+<script src="src/systems/fx.js"></script>
+<script src="src/systems/filter.js"></script>
+<script src="src/ui/ui-core.js"></script>
+<script src="src/ui/ui-hud.js"></script>
+<script src="src/ui/ui-menus.js"></script>
+<script src="src/ui/ui-screens.js"></script>
+<script src="src/ui/ui-joystick.js"></script>
+<script src="src/ui/ui-input.js"></script>
+<script src="src/screens/flow.js"></script>
+<script src="src/core/boot.js"></script>
+<!-- MM:SCRIPTS END -->
+</body>
+</html>
