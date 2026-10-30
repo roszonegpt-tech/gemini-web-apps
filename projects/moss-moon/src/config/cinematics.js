@@ -30,13 +30,13 @@ window.MM = window.MM || {};
         S(1.2, 4.6, 'Moonflower Grove has always slept beneath a kind moon.'),
         S(4.8, 8.4, 'Its light was kept by the Moonwell — and by the keeper who tended it.'),
         S(9.0, 11.3, 'Then, one quiet night, the Moonwell faltered.'),
-        S(12.0, 15.0, 'Its light broke apart and scattered across the land.'),
+        S(12.0, 15.0, 'Its light broke into three pieces and scattered across the land.'),
         S(15.6, 19.2, 'Without it, the grove grew dim. Crops withered, and the paths ran wild.'),
         S(19.6, 23.4, 'Beyond the hills, the forest, the swamp and the high peaks turned strange and cold.'),
         S(24.0, 27.6, 'Until, at last, a young witch came home on her broom…'),
         S(28.0, 31.2, '…with a case of seeds, and her grandmother\'s little silver moon.'),
         S(31.8, 34.6, 'The old homestead was quiet and overgrown. But it was still home.'),
-        S(34.8, 37.6, 'If the Moonwell can be woken, it will begin right here.')
+        S(34.8, 37.8, 'Seeds to plant, neighbours to help, and three lost pieces of the moon to bring home.')
       ],
       replay, rewardKey: 'cine.intro.seen'
     },
@@ -109,7 +109,7 @@ window.MM = window.MM || {};
         { t: 19.0, sfx: 'region_restored' }
       ],
       subtitles: [
-        S(1.0, 4.4, 'One by one, the pieces of the moon found their way home.'),
+        S(1.0, 4.4, 'One by one, the three pieces of the moon found their way home.'),
         S(4.8, 7.8, 'The keeper\'s charm glowed, as if it had been waiting all along.'),
         S(8.6, 12.4, 'And the Moonwell remembered how to shine.'),
         S(13.6, 17.4, 'Light ran through the roots, over the fields, and out to the farthest hills.'),

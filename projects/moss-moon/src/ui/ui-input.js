@@ -8,7 +8,8 @@
   const { h, safe } = ui;
   const input = ui.input = {};
 
-  // ---------------------------------------------------------------- synthetic keys → same path as the keyboard
+  // ---------------------------------------------------------------- gameplay actions (touch buttons, gamepad, HUD clicks)
+  // Prefer CORE's MM.input.action (no fake key events → MM.input.method stays correct); synthetic keys only as FALLBACK.
   input.press = function (key) {
     const opts = { key, code: key === ' ' ? 'Space' : 'Key' + key.toUpperCase(), bubbles: true, cancelable: true };
     window.dispatchEvent(new KeyboardEvent('keydown', opts));
@@ -22,19 +23,20 @@
     ui.data.selectSpell(next);
     ui.sfx('ui_move');
   };
+  const CORE_ACT = { cast: 'cast', broom: 'broom', potion: 'potion' };
+  const KEY_ACT = { cast: ' ', interact: 'e', broom: 'b', potion: 'h' };
   input.action = function (name) {
-    if (!ui.stateIs('play') || ui.isOpen()) return false;
-    switch (name) {
-      case 'cast': input.press(' '); break;
-      case 'interact': input.press('e'); break;
-      case 'broom': input.press('b'); break;
-      case 'potion': input.press('h'); break;
-      case 'spellNext': input.cycleSpell(1); break;
-      case 'spellPrev': input.cycleSpell(-1); break;
-      case 'pause': ui.openPause(); break;
-      default: return false;
+    if (!ui.inGameplay() || ui.isOpen()) return false;
+    if (name === 'pause') { ui.openPause(); return true; }
+    if (name === 'spellNext' || name === 'spellPrev') { input.cycleSpell(name === 'spellNext' ? 1 : -1); return true; }
+    if (name === 'interact') {
+      if (MM.world && typeof MM.world.interact === 'function') { const r = safe(() => MM.world.interact(), false); if (r) return true; }
+      if (MM.input && typeof MM.input.action === 'function' && (MM.input.actions || []).includes('tend')) return safe(() => MM.input.action('tend'), false) !== false;
+      input.press('e'); return true;
     }
-    return true;
+    if (CORE_ACT[name] && MM.input && typeof MM.input.action === 'function' && (MM.input.actions || []).includes(CORE_ACT[name])) return safe(() => MM.input.action(CORE_ACT[name]), false) !== false;
+    if (KEY_ACT[name]) { input.press(KEY_ACT[name]); return true; }
+    return false;
   };
 
   // ---------------------------------------------------------------- spatial navigation
@@ -91,7 +93,7 @@
     lastInput = 'key';
     const k = (e.key || '').toLowerCase();
     if (!uiOwnsKeys()) {
-      if (ui.stateIs('play') && !e.ctrlKey && !e.altKey && !e.metaKey) {
+      if (ui.inGameplay() && !e.ctrlKey && !e.altKey && !e.metaKey) {
         const map = { escape: 'pause', p: 'pause', i: 'inventory', k: 'spellbook', j: 'journal', m: 'map' };
         const act = map[k];
         if (act && !e.repeat) {
@@ -137,83 +139,42 @@
   // While the UI owns input, pointer presses on the canvas must not reach the game.
   window.addEventListener('pointerdown', (e) => {
     lastInput = e.pointerType === 'touch' ? 'touch' : 'pointer';
-    if (e.pointerType === 'touch' && ui.setting('touchControls') === 'auto' && !input.touchSeen) { input.touchSeen = true; input.updateTouch(); }
+    if (e.pointerType === 'touch' && !input.touchSeen) { input.touchSeen = true; input.updateTouch(); }
     if (uiOwnsKeys() && e.target && e.target.id === 'scene') e.stopPropagation();
   }, true);
   let lastInput = 'pointer';
   input.lastInput = () => lastInput;
 
-  // ---------------------------------------------------------------- touch controls
+  // ---------------------------------------------------------------- movement output
   const DIR8 = ['E', 'SE', 'S', 'SW', 'W', 'NW', 'N', 'NE'];
+  input.DIR8 = DIR8;
   const KEYDIR = { N: ['w'], NE: ['w', 'd'], E: ['d'], SE: ['s', 'd'], S: ['s'], SW: ['s', 'a'], W: ['a'], NW: ['w', 'a'] };
+  input.dir8 = (x, y) => (Math.hypot(x, y) < 1e-3 ? null : DIR8[((Math.round(Math.atan2(y, x) / (Math.PI / 4)) % 8) + 8) % 8]);
+  // 8-way FALLBACK used only when MM.input.setAxis is absent.
   function setMoveDir(id, dir) {
+    if (MM.input && typeof MM.input.touch === 'function') { MM.input.touch(id, dir); return; }
     const td = ui.base.touch();
     if (td) { if (dir) td.set(id, dir); else td.delete(id); return; }
-    // FALLBACK: drive the baseline `keys` Set if touchDirections is unreachable.
     const ks = ui.base.keys(); if (!ks) return;
     ['w', 'a', 's', 'd'].forEach((x) => ks.delete(x));
     if (dir) KEYDIR[dir].forEach((x) => ks.add(x));
   }
   input.setMoveDir = setMoveDir;
-  let joy = null;
-  input.buildTouch = function () {
-    const L = ui.layers.touch;
-    L.innerHTML = '';
-    const knob = h('i', { class: 'mm-joy-knob' });
-    const base = h('div', { class: 'mm-joy', role: 'presentation' }, h('i', { class: 'mm-joy-ring' }), knob);
-    joy = { base, knob, id: null, dir: null };
-    const move = (e) => {
-      const r = base.getBoundingClientRect(), cx = r.left + r.width / 2, cy = r.top + r.height / 2, rad = r.width / 2;
-      let dx = e.clientX - cx, dy = e.clientY - cy;
-      const m = Math.hypot(dx, dy), lim = rad * 0.55;
-      const kx = m > lim ? (dx / m) * lim : dx, ky = m > lim ? (dy / m) * lim : dy;
-      knob.style.transform = 'translate(' + kx.toFixed(1) + 'px,' + ky.toFixed(1) + 'px)';
-      const dir = m < rad * 0.22 ? null : DIR8[((Math.round(Math.atan2(dy, dx) / (Math.PI / 4)) % 8) + 8) % 8];
-      if (dir !== joy.dir) { joy.dir = dir; setMoveDir('mm-joy', dir); }
-      base.dataset.dir = dir || '';
-    };
-    const release = () => { if (joy.id == null) return; joy.id = null; joy.dir = null; knob.style.transform = ''; base.classList.remove('mm-active'); base.dataset.dir = ''; setMoveDir('mm-joy', null); };
-    base.addEventListener('pointerdown', (e) => { if (!ui.stateIs('play') || ui.isOpen()) return; e.preventDefault(); e.stopPropagation(); try { base.setPointerCapture(e.pointerId); } catch (x) { /* synthetic */ } joy.id = e.pointerId; base.classList.add('mm-active'); move(e); });
-    base.addEventListener('pointermove', (e) => { if (e.pointerId === joy.id) move(e); });
-    ['pointerup', 'pointercancel', 'lostpointercapture'].forEach((ev) => base.addEventListener(ev, (e) => { if (e.pointerId === joy.id) release(); }));
-    joy.release = release;
-    const act = (name, icon, label, cls) => {
-      const b = h('button', { type: 'button', class: 'mm-tbtn ' + (cls || ''), 'aria-label': label, tabindex: '-1', 'data-act': name }, ui.icon(icon), h('span', null, label));
-      b.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); b.classList.add('mm-pressed'); input.action(name); });
-      const up = () => b.classList.remove('mm-pressed');
-      ['pointerup', 'pointercancel', 'pointerleave'].forEach((ev) => b.addEventListener(ev, up));
-      b.addEventListener('click', (e) => { if (e.detail === 0) input.action(name); }); // keyboard/AT activation
-      return b;
-    };
-    const castBtn = act('cast', 'sparkle', 'Cast', 'mm-tbtn-cast');
-    input.castIcon = castBtn;
-    const acts = h('div', { class: 'mm-tacts' }, castBtn, act('interact', 'hand', 'Use', 'mm-tbtn-use'), act('broom', 'broom', 'Broom', 'mm-tbtn-broom'), act('potion', 'potion', 'Potion', 'mm-tbtn-potion'), act('spellNext', 'retry', 'Swap', 'mm-tbtn-swap'));
-    L.append(base, acts);
-    input.updateTouch();
+  // Analog move vector in screen space (|v| ≤ 1). MM.input.setAxis when present, else snapped 8-way.
+  input.setAxis = function (x, y, source) {
+    if (MM.input && typeof MM.input.setAxis === 'function') { safe(() => MM.input.setAxis(x, y, source)); return 'axis'; }
+    setMoveDir('mm-' + source, Math.hypot(x, y) > 0.15 ? input.dir8(x, y) : null);
+    return 'dir';
   };
-  input.touchEnabled = function () {
-    const m = ui.setting('touchControls');
-    if (m === 'on') return true;
-    if (m === 'off') return false;
-    return !!(input.touchSeen || safe(() => matchMedia('(pointer: coarse)').matches, false) || (navigator.maxTouchPoints > 0 && safe(() => matchMedia('(hover: none)').matches, false)));
-  };
-  input.updateTouch = function () {
-    const on = input.touchEnabled();
-    ui.root().classList.toggle('mm-touch', on);
-    const show = on && ui.stateIs('play') && !ui.isOpen();
-    ui.layers.touch.classList.toggle('mm-hidden', !show);
-    if (!show && joy) joy.release();
-    // spell colour on the cast button
-    const sel = ui.data.spells().find((s) => s.selected);
-    if (input.castIcon && sel) input.castIcon.style.setProperty('--spell', ui.spellStyle(sel).color);
-  };
+  input.updateTouch = function () { if (ui.joystick) ui.joystick.update(); };
+  input.touchEnabled = function () { return ui.joystick ? ui.joystick.enabled() : false; };
   input.onState = function () { input.updateTouch(); };
 
   // ---------------------------------------------------------------- gamepad (Standard mapping)
   const pads = { prev: {}, rep: {} };
   function pollPads(now) {
     const list = safe(() => (navigator.getGamepads ? Array.from(navigator.getGamepads()) : []), []).filter(Boolean);
-    if (!list.length) { if (pads.moving) { setMoveDir('mm-gp', null); pads.moving = false; } return; }
+    if (!list.length) { if (pads.moving) { input.setAxis(0, 0, 'gamepad'); pads.moving = false; } return; }
     const gp = list[0];
     const btn = (i) => !!(gp.buttons[i] && (gp.buttons[i].pressed || gp.buttons[i].value > 0.5));
     const ax = gp.axes[0] || 0, ay = gp.axes[1] || 0;
@@ -227,12 +188,14 @@
       if (edge('b')) ui.back();
       if (edge('start') && ui.top() && ui.top().id === 'pause') ui.resume();
       if (edge('lb') || edge('rb')) { const top = ui.top(); if (top && top.onKey) top.onKey(new KeyboardEvent('keydown', { key: edge('lb') ? 'q' : 'e' })); }
-      if (pads.moving) { setMoveDir('mm-gp', null); pads.moving = false; }
-    } else if (ui.stateIs('play') && !ui.isOpen() && !safe(() => world.coop, false)) { // eslint-disable-line no-undef
-      // left stick / d-pad → movement; analog magnitude snapped to 8 directions
-      const mx = (state.right ? 1 : 0) - (state.left ? 1 : 0), my = (state.down ? 1 : 0) - (state.up ? 1 : 0);
-      const dir = mx || my ? DIR8[((Math.round(Math.atan2(my, mx) / (Math.PI / 4)) % 8) + 8) % 8] : null;
-      if (dir !== pads.dir) { pads.dir = dir; setMoveDir('mm-gp', dir); pads.moving = !!dir; }
+      if (pads.moving) { input.setAxis(0, 0, 'gamepad'); pads.moving = false; }
+    } else if (ui.inGameplay() && !ui.isOpen() && !(MM.input && MM.input.gamepadPolled) && !safe(() => world.coop, false)) { // eslint-disable-line no-undef
+      // left stick (analog, 0.2 deadzone) or d-pad → movement
+      let mx = Math.abs(ax) > 0.2 ? ax : 0, my = Math.abs(ay) > 0.2 ? ay : 0;
+      if (btn(12) || btn(13) || btn(14) || btn(15)) { mx = (btn(15) ? 1 : 0) - (btn(14) ? 1 : 0); my = (btn(13) ? 1 : 0) - (btn(12) ? 1 : 0); }
+      const m = Math.hypot(mx, my); if (m > 1) { mx /= m; my /= m; }
+      const sig = mx.toFixed(2) + ',' + my.toFixed(2);
+      if (sig !== pads.sig) { pads.sig = sig; input.setAxis(mx, my, 'gamepad'); pads.moving = !!(mx || my); }
       if (edge('a')) input.action('cast');
       if (edge('x')) input.action('interact');
       if (edge('y')) input.action('broom');
@@ -242,10 +205,10 @@
       if (edge('start')) ui.openPause();
       if (edge('back')) { ui.open('pause'); ui.open('map'); }
       if (dir || state.a) lastInput = 'pad';
-    } else if (ui.stateIs('play') === false && pads.moving) { setMoveDir('mm-gp', null); pads.moving = false; pads.dir = null; }
+    } else if (pads.moving) { input.setAxis(0, 0, 'gamepad'); pads.moving = false; pads.sig = null; }
     pads.prev = state;
   }
-  function padLoop(now) { try { pollPads(now); } catch (e) { /* ignore */ } requestAnimationFrame(padLoop); }
+
 
   // ---------------------------------------------------------------- FALLBACK pause gate (only when MM core is absent)
   function installFallbackGate() {
@@ -266,13 +229,13 @@
     ui.applySettings();
     ui.applyAudio && ui.applyAudio();
     ui.hud.init();
-    input.buildTouch();
+    if (ui.joystick) ui.joystick.build();
     ui.screensInit();
     ui.on('settings', () => { ui.applySettings(); ui.applyAudio && ui.applyAudio(); input.updateTouch(); });
     safe(() => matchMedia('(prefers-reduced-motion: reduce)').addEventListener('change', () => ui.applySettings()));
     ui.on('ui:open', () => input.updateTouch());
     ui.on('ui:close', () => input.updateTouch());
-    requestAnimationFrame(padLoop);
+    ui.tick(() => pollPads(performance.now()));
     installFallbackGate();
     // Stage geometry → CSS vars (portrait phones place HUD bands above/below the stage).
     const cv = document.getElementById('scene');
@@ -283,6 +246,9 @@
       r.style.setProperty('--stage-left', Math.round(b.left) + 'px');
       r.style.setProperty('--stage-w', Math.round(b.width) + 'px');
       r.classList.toggle('mm-portrait', window.innerHeight > window.innerWidth * 1.15);
+      // Are fixed layers anchored to the viewport (no transform/contain on an ancestor)? Portrait HUD bands need that.
+      const sr = ui.layers.screens.getBoundingClientRect();
+      r.classList.toggle('mm-viewport', Math.abs(sr.width - window.innerWidth) < 2 && Math.abs(sr.height - window.innerHeight) < 2);
       r.classList.toggle('mm-compact', b.width < 700 || b.height < 420);
     };
     measure();

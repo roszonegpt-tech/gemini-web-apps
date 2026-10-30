@@ -22,10 +22,40 @@ window.MM = window.MM || {};
 (function (MM) {
   const R = {};
   const SPAWN = [9.7, 10];
+  // Default exterior buildings (used until/unless MM.BUILDINGS has placements for the region). Sizes follow the
+  // player-derived unit: witch ≈ 39 px tall/24 px wide → door 26×54 px (≥1.35× height), walls 66 px, windows 14×16.
+  const DOOR = { w: 26, h: 54 }, WIN = { w: 14, h: 16, z: 26 };
+  const win = (face, at, o) => Object.assign({ face, at }, WIN, o || {});
+  // building(id, x, y, o): x,y = front ground corner (tile coords); o: fw, fd, name, type, spec (painter spec), door {face, at},
+  // enterable, lockedReason, interior, smoke, art (sprite name used instead of the painter when MM.art has it)
+  const bld = (id, x, y, o) => Object.assign({ id, x, y, enterable: true }, o);
+  MM.WORLD_BUILDINGS_DEFAULT = {
+    grove: (c) => {
+      const L = c.L, base = { fw: 4, fd: 3, wh: 66, rh: 40, door: Object.assign({ face: 'L', at: 24 }, DOOR), windows: [win('L', 50), win('R', 24)], chimney: { at: 44 } };
+      const st = [
+        { wall: 'plank', roofColor: 'moss', ruined: true, weather: 0.9, shuttered: true, steps: 1 },
+        { wall: 'plank', roofColor: 'shingle', weather: 0.5, steps: 2 },
+        { wall: 'plaster', roofColor: 'shingle', weather: 0.3, steps: 2 },
+        { wall: 'plaster', roofColor: 'shingle', weather: 0.15, flowerBoxes: true, porch: { depth: 10 } },
+        { wall: 'plaster', roofColor: 'shingle', weather: 0.1, flowerBoxes: true, ivy: 0.6, porch: { depth: 10 } },
+      ][L];
+      return [bld('cottage', 7.4, 5.2, { type: 'cottage_home', name: 'the cottage', fw: 4, fd: 3, interior: 'cottage', smoke: L >= 2, litWindows: L >= 1, spec: Object.assign({}, base, st, { seed: 11 }) })];
+    },
+    village: () => [
+      bld('elder_house', 6.8, 6.4, { type: 'elder_house', name: "Elder Marrow's house", fw: 4, fd: 3, interior: 'elder_house', smoke: true, litWindows: true,
+        spec: { fw: 4, fd: 3, wh: 66, rh: 42, wall: 'plaster', roofColor: 'red', door: Object.assign({ face: 'L', at: 26 }, DOOR), windows: [win('L', 52), win('R', 22)], steps: 2, weather: 0.15, flowerBoxes: true, seed: 21, chimney: { at: 40 } } }),
+      bld('village_shop', 15.6, 5.2, { type: 'village_shop', name: "Pip's shop", fw: 3.5, fd: 3, interior: 'village_shop', smoke: true, litWindows: true,
+        spec: { fw: 3.5, fd: 3, wh: 66, rh: 40, wall: 'stone', roofColor: 'violet', door: Object.assign({ face: 'L', at: 22 }, DOOR), windows: [win('L', 44), win('R', 24)], awning: { stripes: ['v', 'c'] }, steps: 2, weather: 0.2, seed: 22, chimney: { at: 34 } } }),
+      bld('herbalist_house', 5.6, 15.8, { type: 'herbalist_house', name: "Wren's cottage", fw: 3.5, fd: 3, interior: 'herbalist_house', smoke: true, litWindows: true,
+        spec: { fw: 3.5, fd: 3, wh: 66, rh: 38, wall: 'log', roof: 'thatch', door: Object.assign({ face: 'R', at: 22 }, DOOR), windows: [win('L', 28), win('R', 42, { w: 10 })], porch: { depth: 9 }, ivy: 0.5, flowerBoxes: true, weather: 0.3, seed: 23, chimney: { at: 20 } } }),
+      bld('mill_shed', 17.6, 15.0, { type: 'shed', name: 'the old mill shed', fw: 2.5, fd: 2, enterable: false, lockedReason: 'The shed is barred shut. Pip says the miller took the key to the coast.', smoke: false,
+        spec: { fw: 2.5, fd: 2, wh: 60, rh: 30, wall: 'plank', roofColor: 'slate', locked: true, door: Object.assign({ face: 'R', at: 16 }, DOOR), windows: [win('L', 20, { w: 12 })], steps: 1, weather: 0.6, seed: 24, chimney: false } }),
+    ],
+  };
 
   // ------------------------------------------------------------------ homestead (restoration 0..4)
   const G_PATHS = [
-    [[4.9, 5.8], [4.9, 8.6], [9.6, 8.6]],          // cottage door -> yard
+    [[5.9, 6.1], [5.9, 8.6], [9.6, 8.6]],          // cottage door -> yard
     [[9.6, 8.6], [9.6, 20.5]],                      // lane south (travel board)
     [[9.6, 8.6], [12.2, 7.4], [13.2, 6.9]],         // to the Moonwell
   ];
@@ -51,11 +81,6 @@ window.MM = window.MM || {};
       const L = c.L;
       B.reserve(SPAWN[0], SPAWN[1], 1.3); B.reserve(12, 9, 0.9); // spawn + training dummy
       B.reserve(8, 11.5, 2.0);                                   // garden plots 7..9 x 11..12
-      // cottage: front corner (7.2,5.4); footprint 3.0 x 2.35 tiles
-      const cot = ['cottage_ruined', 'cottage_mended', 'cottage_mended', 'cottage_lush', 'cottage_lush'][L];
-      B.p(cot, 7.2, 5.4, { k: 'house', foot: [3.0, 2.35], tall: true, smoke: L >= 2 && cot !== 'cottage_lush' ? [[-17, -86]] : null,
-        lights: L >= 1 ? [{ dx: -26, dy: -36, r: 26, color: '#ffd98a', flicker: 0.15, night: true, kind: 'window' }, { dx: 14, dy: -40, r: 24, color: '#ffd98a', flicker: 0.15, night: true, kind: 'window' }] : null });
-      B.i('bed', 4.9, 6.1, { prompt: L ? 'Rest in the cottage' : 'Rest by the old cottage', r: 1.0, kind: 'rest' });
       // Moonwell (state = campaign moonwell level, else derived from restoration)
       const mwS = ['moonwell_dark', 'moonwell_faint', 'moonwell_glow', 'moonwell_restored'][c.mw];
       B.p(mwS, 13.6, 6.2, { k: 'moonwell', r: 0.85, moonwell: c.mw,
@@ -89,9 +114,9 @@ window.MM = window.MM || {};
         B.p('lamp_post', 8.6, 15.2, { k: 'lamp', r: 0.12, lights: [{ dx: 0, dy: -30, r: 34, color: '#ffe0a0', flicker: 0.2, night: true, kind: 'lamp' }] }); }
       if (L >= 3) { B.p('lamp_post', 12.6, 8.4, { k: 'lamp', r: 0.12, lights: [{ dx: 0, dy: -30, r: 34, color: '#ffe0a0', flicker: 0.2, night: true, kind: 'lamp' }] });
         B.p('bench', 12.0, 11.4, { k: 'bench', r: 0.35, low: true });
-        B.garland(7.2, 5.4, 44, 10.7, 9.0, 30, { kind: 'lanterns' }); }
-      if (L >= 1) B.p('lantern', 5.6, 6.0, { k: 'lantern', lights: [{ dx: 0, dy: -8, r: 20, color: '#ffd27a', flicker: 0.3, night: true, kind: 'lantern' }] });
-      if (L >= 4) { B.garland(4.2, 5.4, 40, 3.2, 8.5, 26, { kind: 'bunting' }); B.p('pumpkin', 6.1, 14.2, { k: 'pumpkin', low: true }); B.p('pumpkin', 5.5, 13.0, { k: 'pumpkin', low: true }); }
+        B.garland(7.4, 5.2, 62, 10.7, 9.0, 30, { kind: 'lanterns' }); }
+      if (L >= 1) B.p('lantern', 4.6, 5.8, { k: 'lantern', lights: [{ dx: 0, dy: -8, r: 20, color: '#ffd27a', flicker: 0.3, night: true, kind: 'lantern' }] });
+      if (L >= 4) { B.p('pumpkin', 6.1, 14.2, { k: 'pumpkin', low: true }); B.p('pumpkin', 5.5, 13.0, { k: 'pumpkin', low: true }); }
       // pond dressing
       B.p('tree_willow', 14.7, 1.3, { k: 'tree', r: 0.35, tall: true, sway: true });
       B.p('tree_willow', 19.0, 5.2, { k: 'tree', r: 0.35, tall: true, sway: true, flip: true });
@@ -101,12 +126,12 @@ window.MM = window.MM || {};
       B.scatter({ s: ['tree_oak_0', 'tree_oak_1', 'tree_oak_2'], n: 15, zone: 'back', avoid: 1.5, k: 'tree', tall: true, sway: true });
       B.scatter({ s: ['tree_oak_1', 'tree_oak_2'], n: 4, zone: 'front', avoid: 2.4, k: 'tree', tall: true, sway: true });
       B.scatter({ s: L >= 3 ? ['bush_0', 'bush_1', 'bush_berry'] : ['bush_0', 'bush_1'], n: 10, zone: 'rim', avoid: 1.0, k: 'bush', sway: true });
-      B.scatter({ s: ['bush_blight'], n: [6, 3, 0, 0, 0][L], zone: 'inner', avoid: 1.2, k: 'bush' });
-      B.scatter({ s: ['grass_tall'], n: [26, 16, 8, 4, 2][L], zone: 'any', avoid: 0.7, k: 'grass', sway: true });
+      B.scatter({ s: ['bush_blight'], n: [6, 3, 0, 0, 0][L], zone: 'inner', avoid: 1.2, cluster: true, k: 'bush' });
+      B.scatter({ s: ['grass_tall'], n: [26, 16, 8, 4, 2][L], zone: 'any', avoid: 0.7, cluster: true, k: 'grass', sway: true });
       B.scatter({ s: ['log', 'stump'], n: [4, 3, 2, 1, 1][L], zone: 'rim', avoid: 1.2, k: 'log', r: 0.3, low: true });
       B.scatter({ s: ['rock_moss', 'rock_0', 'rock_1'], n: 5, zone: 'any', avoid: 1.2, k: 'rock', r: 0.3, low: true });
-      B.scatter({ s: ['flowers_wild'], n: [2, 6, 10, 14, 18][L], zone: 'any', avoid: 0.6, decal: true });
-      B.scatter({ s: ['flowers_moon'], n: [0, 0, 3, 7, 12][L], zone: 'any', avoid: 0.6, decal: true });
+      B.scatter({ s: ['flowers_wild'], n: [2, 6, 10, 14, 18][L], zone: 'any', avoid: 0.6, cluster: true, decal: true });
+      B.scatter({ s: ['flowers_moon'], n: [0, 0, 3, 7, 12][L], zone: 'any', avoid: 0.6, cluster: true, decal: true });
       B.scatter({ s: ['mushroom_moon'], n: [0, 0, 1, 3, 6][L], zone: 'any', avoid: 0.9, k: 'mushroom', glow: L >= 3 ? '#c6aedb' : null });
       B.scatter({ s: ['mushroom_brown'], n: 3, zone: 'rim', avoid: 0.9, k: 'mushroom', decal: true });
     },
@@ -132,9 +157,6 @@ window.MM = window.MM || {};
     build(B, c) {
       B.reserve(SPAWN[0], SPAWN[1], 1.4);
       const win = (dx, dy) => ({ dx, dy, r: 24, color: '#ffd98a', flicker: 0.15, night: true, kind: 'window' });
-      B.p('house_village_0', 6.6, 6.2, { k: 'house', foot: [3.4, 2.5], tall: true, smoke: [[7, -96]], lights: [win(-38, -30), win(-8, -30), win(18, -34)] });
-      B.p('house_village_1', 15.4, 5.0, { k: 'house', foot: [2.9, 2.9], tall: true, smoke: [[14, -88]], lights: [win(-14, -30), win(38, -38)] });
-      B.p('house_village_2', 5.4, 15.6, { k: 'house', foot: [2.5, 2.1], tall: true, smoke: [[22, -100]], lights: [win(-14, -48), win(22, -50)] });
       // plaza
       B.p('well', 12.4, 7.8, { k: 'well', r: 0.55 }); B.i('well', 12.4, 7.8, { prompt: 'Draw water from the well', r: 1.0, kind: 'well' });
       B.p('@notice_board', 8.0, 7.0, { k: 'board', r: 0.25 }); B.i('notice_board', 8.0, 7.0, { prompt: 'Read the notice board', r: 1.1, kind: 'board' });
@@ -153,14 +175,14 @@ window.MM = window.MM || {};
       B.p('bench', 8.0, 12.6, { k: 'bench', r: 0.35, low: true }); B.p('bench', 11.6, 6.6, { k: 'bench', r: 0.35, low: true });
       B.p('barrel', 4.4, 7.4, { k: 'barrel', r: 0.25, low: true }); B.p('woodpile', 3.3, 6.9, { k: 'woodpile', low: true });
       B.p('pumpkin', 11.4, 13.4, { k: 'pumpkin', low: true });
-      B.garland(6.6, 6.2, 44, 12.4, 5.9, 30, { kind: 'bunting' });
+      B.garland(6.8, 6.4, 62, 12.4, 5.9, 30, { kind: 'bunting' });
       B.garland(7.2, 9.3, 30, 12.5, 12.7, 30, { kind: 'lanterns' });
       B.p('signpost', 10.8, 17.6, { k: 'signpost', r: 0.2 }); B.i('travel_board', 10.8, 17.6, { prompt: 'Travel', r: 1.3, kind: 'travel' });
       B.p('fence_x', 15.6, 14.8, { k: 'fence', low: true }); B.p('fence_x', 16.6, 14.8, { k: 'fence', low: true }); B.p('fence_y', 15.1, 15.3, { k: 'fence', low: true });
       B.scatter({ s: ['tree_oak_0', 'tree_oak_1', 'tree_oak_2'], n: 12, zone: 'back', avoid: 1.6, k: 'tree', tall: true, sway: true });
       B.scatter({ s: ['tree_oak_0', 'tree_oak_2'], n: 3, zone: 'front', avoid: 2.5, k: 'tree', tall: true, sway: true });
       B.scatter({ s: ['bush_0', 'bush_1', 'bush_berry'], n: 10, zone: 'rim', avoid: 1.0, k: 'bush', sway: true });
-      B.scatter({ s: ['flowers_wild', 'flowers_moon'], n: 12, zone: 'any', avoid: 0.7, decal: true });
+      B.scatter({ s: ['flowers_wild', 'flowers_moon'], n: 12, zone: 'any', avoid: 0.7, cluster: true, decal: true });
       B.scatter({ s: ['grass_tall'], n: 5, zone: 'rim', avoid: 0.8, k: 'grass', sway: true });
     },
   };
@@ -198,7 +220,7 @@ window.MM = window.MM || {};
       B.scatter({ s: ok ? ['bush_0', 'bush_blight'] : ['bush_blight'], n: 12, zone: 'any', avoid: 1.0, k: 'bush' });
       B.scatter({ s: ['log', 'stump'], n: 6, zone: 'any', avoid: 1.3, k: 'log', r: 0.3, low: true });
       B.scatter({ s: ['rock_moss', 'rock_1'], n: 5, zone: 'any', avoid: 1.2, k: 'rock', r: 0.3, low: true });
-      B.scatter({ s: ['mushroom_red', 'mushroom_brown'], n: 8, zone: 'any', avoid: 0.8, k: 'mushroom', decal: true });
+      B.scatter({ s: ['mushroom_red', 'mushroom_brown'], n: 8, zone: 'any', avoid: 0.8, cluster: true, k: 'mushroom', decal: true });
       B.scatter({ s: ['mushroom_glow'], n: 3, zone: 'inner', avoid: 1.5, k: 'mushroom', glow: '#8ff0d0' });
       B.scatter({ s: ['grass_tall'], n: 8, zone: 'any', avoid: 0.8, k: 'grass', sway: true });
       if (ok) B.scatter({ s: ['flowers_wild'], n: 8, zone: 'any', avoid: 0.7, decal: true });
@@ -224,10 +246,10 @@ window.MM = window.MM || {};
       B.scatter({ s: ['tree_willow'], n: 9, zone: 'back', avoid: 2.0, k: 'tree', tall: true, sway: true, on: ['swamp_mud', 'grass_wild'] });
       B.scatter({ s: ['tree_willow', 'tree_blighted_small'], n: 4, zone: 'inner', avoid: 2.6, k: 'tree', tall: true, sway: true, on: ['swamp_mud', 'grass_wild'] });
       B.scatter({ s: ['@pillar', '@pillar_broken'], n: 5, zone: 'any', avoid: 2.0, k: 'pillar', r: 0.3, on: ['swamp_mud', 'swamp_bog'] });
-      B.scatter({ s: ['reeds_0', 'reeds_1'], n: 18, zone: 'shore', avoid: 0.6, k: 'reeds', sway: true });
+      B.scatter({ s: ['reeds_0', 'reeds_1'], n: 18, zone: 'shore', avoid: 0.6, cluster: true, k: 'reeds', sway: true });
       B.scatter({ s: ['lilypad'], n: 10, on: ['water'], decal: true, water: true, avoid: 0.7 });
       B.scatter({ s: ['bush_swamp'], n: 9, zone: 'any', avoid: 1.1, k: 'bush', sway: true, on: ['swamp_mud', 'grass_wild'] });
-      B.scatter({ s: ['mushroom_glow'], n: 8, zone: 'any', avoid: 1.2, k: 'mushroom', glow: '#8ff0d0', on: ['swamp_mud', 'grass_wild', 'swamp_bog'] });
+      B.scatter({ s: ['mushroom_glow'], n: 8, zone: 'any', avoid: 1.2, cluster: true, k: 'mushroom', glow: '#8ff0d0', on: ['swamp_mud', 'grass_wild', 'swamp_bog'] });
       B.scatter({ s: ['log'], n: 3, zone: 'any', avoid: 1.5, k: 'log', r: 0.3, low: true, on: ['swamp_mud'] });
       B.scatter({ s: ['rock_moss'], n: 4, zone: 'any', avoid: 1.3, k: 'rock', r: 0.3, low: true });
       B.p('lantern', 9.0, 15.0, { k: 'lantern', lights: [{ dx: 0, dy: -8, r: 22, color: '#b8f0c0', flicker: 0.35, night: false, kind: 'lantern' }] });
@@ -255,7 +277,7 @@ window.MM = window.MM || {};
       B.scatter({ s: ['tree_pine_snow'], n: 3, zone: 'inner', avoid: 3, k: 'pine', tall: true, on: ['snow'] });
       B.scatter({ s: ['rock_snow', 'rock_1'], n: 8, zone: 'any', avoid: 1.3, k: 'rock', r: 0.32, low: true });
       B.scatter({ s: ['ice_crystal_1', 'ice_crystal_0'], n: 8, zone: 'any', avoid: 1.6, k: 'crystal', r: 0.25, glow: '#a5d6d8' });
-      B.scatter({ s: ['snow_mound'], n: 7, zone: 'any', avoid: 1.0, k: 'mound', decal: true, on: ['snow'] });
+      B.scatter({ s: ['snow_mound'], n: 7, zone: 'any', avoid: 1.0, cluster: true, k: 'mound', decal: true, on: ['snow'] });
       B.scatter({ s: ['bush_snow'], n: 6, zone: 'rim', avoid: 1.0, k: 'bush', on: ['snow'] });
     },
   };
@@ -309,9 +331,29 @@ window.MM = window.MM || {};
       B.p('@waystone', 10.9, 17.4, { k: 'waystone', r: 0.25, lights: [{ dx: 0, dy: -18, r: 22, color: '#9fe8d8', flicker: 0.1, night: false, kind: 'rune' }] });
       B.i('travel_board', 10.9, 17.4, { prompt: 'Travel (waystone)', r: 1.3, kind: 'travel' });
       B.scatter({ s: ['ice_crystal_1', 'ice_crystal_0'], n: 10, zone: 'any', avoid: 1.6, k: 'crystal', r: 0.25, glow: '#ebe1f7' });
-      B.scatter({ s: ['flowers_moon'], n: 16, zone: 'any', avoid: 0.6, decal: true });
+      B.scatter({ s: ['flowers_moon'], n: 16, zone: 'any', avoid: 0.6, cluster: true, decal: true });
       B.scatter({ s: ['tree_oak_2', 'tree_willow'], n: 8, zone: 'back', avoid: 2, k: 'tree', tall: true, sway: true });
       B.scatter({ s: ['mushroom_moon'], n: 6, zone: 'any', avoid: 1, k: 'mushroom', glow: '#c6aedb' });
+    },
+  };
+
+  // ------------------------------------------------------------------ tutorial sandbox (region id 'tutorial', TUTORIAL agent)
+  // A tidy practice yard: grass, a fenced lane, a few trees. Buildings (the practice hut) come from MM.BUILDINGS placements;
+  // the sign is interactable 'tutorial_sign'. Plots/dummy are drawn by the baseline/tutorial module.
+  const T_PATHS = [[[9.7, 10.4], [9.7, 6.0]], [[9.7, 10.4], [13.2, 10.4]], [[9.7, 10.4], [7.0, 12.4]]];
+  R.tutorial = {
+    name: 'Practice Yard', tint: null, shadow: [36, 56, 42], side: 'side_earth',
+    skirt: { a: '#5c4634', b: '#3f3029', drip: 'roots', dripColor: '#6f8a5a' },
+    backdrop: { top: '#c3dab0', bottom: '#7a9d7a', motif: 'canopy', far: '#93b48d', near: '#6b8f6c', haze: '#eef3dc' },
+    fog: { color: '#f1f5e1', alpha: 0.06, count: 2 }, ambient: [{ kind: 'pollen', n: 14 }], foliage: 'leafy',
+    terrain(x, y, c) { const cx = x + 0.5, cy = y + 0.5; if (c.near(cx, cy, T_PATHS, 0.6)) return 'path_dirt'; return c.noise(cx, cy, 3, 99) < 0.2 ? 'grass_wild' : 'grass_grove'; },
+    build(B, c) {
+      B.reserve(9.7, 10, 1.6); B.reserve(8, 11.5, 2.0); B.reserve(12, 9, 1.0);
+      B.p('signpost', 11.2, 9.0, { k: 'signpost', r: 0.2 }); B.i('tutorial_sign', 11.2, 9.0, { prompt: 'Read the sign', r: 1.2, kind: 'sign' });
+      B.p('barrel', 6.2, 9.4, { k: 'barrel', r: 0.25, low: true }); B.p('bucket', 6.8, 9.0, { k: 'bucket', low: true });
+      B.scatter({ s: ['tree_oak_0', 'tree_oak_1', 'tree_oak_2'], n: 12, zone: 'back', avoid: 1.6, k: 'tree', tall: true, sway: true });
+      B.scatter({ s: ['bush_0', 'bush_1'], n: 8, zone: 'rim', avoid: 1.0, k: 'bush', sway: true, cluster: true });
+      B.scatter({ s: ['flowers_wild'], n: 10, zone: 'any', avoid: 0.7, decal: true, cluster: true });
     },
   };
 

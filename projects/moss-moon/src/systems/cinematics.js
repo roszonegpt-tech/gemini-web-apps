@@ -338,6 +338,7 @@ window.MM = window.MM || {};
   });
   // The Moonwell: stone basin, arch with crescent ornament, glowing water and a beam of light.
   function moonwell(g, X, Y, sc, st) {
+    if (wellArt()) return moonwellArt(g, X, Y, sc, st);
     const P = pen(g, X, Y, sc), gl = clamp(st.glow ?? 0), bl = clamp(st.blaze || 0), t = st.t || 0, crack = st.crack || 0, ov = clamp(st.over || 0);
     const sD = '#262c3b', s0 = '#46506a', sL = '#66738f', sT = '#8a97b2', sH = '#a9b6cf';
     g.globalAlpha = .38; P.ell(0, 1, 40, 6, '#04060a'); g.globalAlpha = 1;
@@ -393,6 +394,7 @@ window.MM = window.MM || {};
   }
   // A cottage (3/4 front view). lit: number or [left,right] window light; over: overgrowth 0..1.
   function cottage(g, X, Y, sc, o = {}) {
+    if (hasArt('cottage_mended') && hasArt('cottage_ruined') && hasArt('cottage_lush')) return cottageArt(g, X, Y, sc, o);
     const P = pen(g, X, Y, sc), lw = Array.isArray(o.lit) ? o.lit : [o.lit || 0, o.lit || 0], ov = clamp(o.over || 0), t = o.t || 0;
     const wall = '#565a70', wallL = '#6e7290', wallD = '#3b3d50', beam = '#2b2634', roof = '#3d3449', roofL = '#5c4f6c', roofD = '#251f2e';
     g.globalAlpha = .4; P.ell(0, 1, 38, 4, '#04060a'); g.globalAlpha = 1;
@@ -457,7 +459,8 @@ window.MM = window.MM || {};
   }
   function lanternPost(g, x, y, sc, lit, t) {
     const P = pen(g, x, y, sc); P.r(0, -18, 1, 18, '#2a2230'); P.r(0, -18, 4, 1, '#2a2230'); P.r(3, -17, 1, 2, '#2a2230');
-    P.r(2, -15, 3, 4, mix('#2c2a36', '#ffd27a', lit)); P.r(2, -16, 3, 1, '#1d1822');
+    if (hasArt('lantern')) { art(g, 'lantern', x + 3 * sc, y - 2 * sc, sc, { frame: 0, tint: NIGHT }); art(g, 'lantern', x + 3 * sc, y - 2 * sc, sc, { t, alpha: lit }); }
+    else { P.r(2, -15, 3, 4, mix('#2c2a36', '#ffd27a', lit)); P.r(2, -16, 3, 1, '#1d1822'); }
     glow(g, x + 3 * sc, y - 13 * sc, (12 + Math.sin(t * 3 + x) * 1.2) * sc, '#ffb54a', .7 * lit);
   }
 
@@ -576,6 +579,83 @@ window.MM = window.MM || {};
     if (o.eyes > 0) for (const [ex, ey] of b.eyes) { const x = x0 + ex * sc, y = y0 + ey * sc; glow(g, x, y, 11 * sc, b.eye, .7 * o.eyes); g.globalAlpha = o.eyes; g.fillStyle = '#ffffff'; g.fillRect(R(x - sc), R(y - sc / 2), sc * 2, sc); g.globalAlpha = 1; }
   }
 
+  // ───────────────────────────── MM.art sprites (same claude-pxl set as the game) ─────────────────────────────
+  // Used for the cottage, Moonwell, village houses and lanterns when present, night-tinted with a multiply pass;
+  // the procedural painters above remain the fallback (no MM.art, or MM.cine.useArt = false). Lighting stays procedural.
+  const hasArt = n => { try { return MM.cine && MM.cine.useArt !== false && !!(MM.art && typeof MM.art.has === 'function' && MM.art.has(n) && MM.art.get(n)); } catch (e) { return false; } };
+  function artCanvas(name, frame, tint) {
+    return cached(`art:${name}:${frame}:${tint || ''}`, () => {
+      const s = MM.art.get(name), [c, g] = mkCanvas(s.w, s.h, true); MM.art.draw(g, name, s.ax, s.ay, { frame });
+      if (!tint) return c;
+      const [t2, g2] = mkCanvas(s.w, s.h); g2.drawImage(c, 0, 0); g2.globalCompositeOperation = 'multiply'; g2.fillStyle = tint; g2.fillRect(0, 0, s.w, s.h);
+      g2.globalCompositeOperation = 'destination-in'; g2.drawImage(c, 0, 0); return t2;
+    });
+  }
+  function artFrame(s, o) { return o.frame != null ? o.frame : (s.frames > 1 ? Math.floor((o.t || 0) * (s.fps || 6)) % s.frames : 0); }
+  function withFlip(g, x, flip, fn) { if (!flip) return fn(R(x), 1); g.save(); g.translate(R(x), 0); g.scale(-1, 1); fn(0, -1); g.restore(); }
+  function art(g, name, x, y, sc, o = {}) {
+    const s = MM.art.get(name), c = artCanvas(name, artFrame(s, o), o.tint || null), a = o.alpha ?? 1; if (a <= 0) return;
+    g.globalAlpha = Math.min(1, a); withFlip(g, x, o.flip, ax => g.drawImage(c, ax - s.ax * sc, R(y - s.ay * sc), s.w * sc, s.h * sc)); g.globalAlpha = 1;
+  }
+  // Lit windows: connected warm pixels of a sprite (merged with a 2px tolerance), left→right.
+  function windowsOf(name) {
+    return cached('win:' + name, () => {
+      const s = MM.art.get(name), d = artCanvas(name, 0, null).getContext('2d').getImageData(0, 0, s.w, s.h).data, warm = new Uint8Array(s.w * s.h), seen = new Uint8Array(s.w * s.h), out = [];
+      for (let i = 0; i < s.w * s.h; i++) { const r = d[i * 4], gg = d[i * 4 + 1], b = d[i * 4 + 2]; warm[i] = d[i * 4 + 3] > 200 && r > 200 && gg > 165 && b < 160 ? 1 : 0; }
+      for (let i = 0; i < warm.length; i++) {
+        if (!warm[i] || seen[i]) continue; const st = [i], box = [s.w, s.h, 0, 0]; let n = 0; seen[i] = 1;
+        while (st.length) { const k = st.pop(), x = k % s.w, y = (k / s.w) | 0; n++; box[0] = Math.min(box[0], x); box[1] = Math.min(box[1], y); box[2] = Math.max(box[2], x); box[3] = Math.max(box[3], y);
+          for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) { const xx = x + dx, yy = y + dy, j = yy * s.w + xx; if (xx >= 0 && yy >= 0 && xx < s.w && yy < s.h && warm[j] && !seen[j]) { seen[j] = 1; st.push(j); } } }
+        if (n >= 6) out.push(box);
+      }
+      return out.sort((a, b) => a[0] - b[0]);
+    });
+  }
+  function litWindows(g, src, x, y, sc, levels, o = {}) {
+    const s = MM.art.get(src), c = artCanvas(src, 0, null);
+    windowsOf(src).forEach((b, i) => {
+      const l = clamp(Array.isArray(levels) ? (levels[i] ?? levels[levels.length - 1] ?? 0) : levels); if (!(l > 0)) return;
+      const bw = b[2] - b[0] + 1, bh = b[3] - b[1] + 1;
+      g.globalAlpha = l; withFlip(g, x, o.flip, ax => g.drawImage(c, b[0], b[1], bw, bh, ax + (b[0] - s.ax) * sc, R(y + (b[1] - s.ay) * sc), bw * sc, bh * sc)); g.globalAlpha = 1;
+      const cx = (b[0] + bw / 2 - s.ax) * sc * (o.flip ? -1 : 1);
+      glow(g, R(x) + cx, y + (b[1] + bh / 2 - s.ay) * sc, 18 * sc, '#ffad46', .5 * l);
+      g.globalAlpha = .12 * l; g.fillStyle = '#ffcf73'; g.fillRect(R(R(x) + cx - 8 * sc), R(y - 2 * sc), 16 * sc, 4 * sc); g.globalAlpha = 1;
+    });
+  }
+  const NIGHT = '#6a73a8', NIGHT_SOFT = '#a6b0e0';
+  const WELL_STATES = ['moonwell_dark', 'moonwell_faint', 'moonwell_glow', 'moonwell_restored'];
+  const wellArt = () => hasArt('moonwell_dark') && hasArt('moonwell_restored');
+  const WELL_SC = () => wellArt() ? 3 : 2;                         // scale used by close-ups ('well' layout)
+  const wellWater = sc => (wellArt() ? 14.5 : 16) * sc;           // water centre above the anchor
+  function moonwellArt(g, X, Y, sc, st) {
+    const gl = clamp(st.glow ?? 0), bl = clamp(st.blaze || 0), t = st.t || 0, P = pen(g, X, Y, sc);
+    g.globalAlpha = .38; P.ell(0, 0, 30, 5, '#04060a'); g.globalAlpha = 1;
+    const lvl = clamp(gl * 1.3 + bl) * 3, i0 = Math.min(2, Math.floor(lvl)), f = lvl - i0, tint = gl + bl > .55 ? NIGHT_SOFT : NIGHT;
+    art(g, WELL_STATES[i0], X, Y, sc, { t, tint }); if (f > 0) art(g, WELL_STATES[i0 + 1], X, Y, sc, { t, tint, alpha: f });
+    const wy = Y - wellWater(sc), oy = Y - 42 * sc;
+    glow(g, X, wy, (10 + 20 * gl + 60 * bl) * sc, '#79dcff', .5 * gl + .5 * bl);
+    glow(g, X, oy, 9 * sc, '#cfe8ff', .55 * clamp(gl * (1 - (st.crack || 0) * .8) + bl));
+    if (gl > .05 && !st.still) for (let k = 0; k < 3; k++) { const ph = (t * .45 + k / 3) % 1, rr = 3 + ph * 13; g.globalAlpha = (1 - ph) * gl * .55; pen(g, X, wy, sc).ring(0, 0, rr, rr * .26, '#dff8ff'); g.globalAlpha = 1; }
+    if ((gl > .02 || bl > 0) && st.beam !== false) {
+      const bw = R((3 + 6 * gl + bl * 22) * sc); g.save(); g.globalCompositeOperation = 'lighter';
+      const gr = g.createLinearGradient(0, wy, 0, Math.max(-40, wy - 360 * sc)); gr.addColorStop(0, rgba('#9fe9ff', .5 * gl + .4 * bl)); gr.addColorStop(.35, rgba('#7fc8ff', .16 * gl + .25 * bl)); gr.addColorStop(1, rgba('#7fc8ff', 0));
+      g.fillStyle = gr; g.fillRect(R(X - bw / 2), 0, bw, R(wy)); g.fillRect(R(X - bw / 6), 0, Math.max(1, R(bw / 3)), R(wy)); g.restore();
+    }
+    if (gl > .15 && !st.still) for (let i = 0; i < 12; i++) { const ph = (t * .32 + i * .137) % 1, x = X + Math.sin(i * 7.3 + t * .8) * 12 * sc * (1 - ph * .5), y = wy - ph * 70 * sc; g.globalAlpha = gl * (1 - ph) * .9; g.fillStyle = '#d8faff'; g.fillRect(R(x), R(y), sc > 1 ? 2 : 1, sc > 1 ? 2 : 1); }
+    g.globalAlpha = 1;
+  }
+  function cottageArt(g, X, Y, sc, o) {
+    const ov = clamp(o.over || 0), lw = Array.isArray(o.lit) ? o.lit : [o.lit || 0, o.lit || 0], t = o.t || 0, flip = o.flip !== false, P = pen(g, X, Y, sc);
+    g.globalAlpha = .4; P.ell(flip ? 6 : -6, 0, 44, 6, '#04060a'); g.globalAlpha = 1;
+    const base = o.lush ? 'cottage_lush' : 'cottage_mended';
+    if (ov < 1) art(g, base, X, Y, sc, { t, tint: NIGHT, flip });
+    if (ov > 0) art(g, 'cottage_ruined', X, Y, sc, { tint: NIGHT, flip, alpha: sm(ov) });
+    litWindows(g, 'cottage_lush', X, Y, sc, lw, { flip });
+    if (o.smoke && !o.lush) for (let k = 0; k < 7; k++) { const ph = (t * .22 + k / 7) % 1; g.globalAlpha = (1 - ph) * .28 * o.smoke * Math.min(1, ph * 5); pen(g, X + (flip ? 17 : -17) * sc, Y - 88 * sc, sc).disc(Math.sin(ph * 5 + k) * 2 + ph * 10, -ph * 40, 1.5 + ph * 4, '#9a9fb8'); }
+    g.globalAlpha = 1;
+  }
+  const cottageDoor = (X, Y, sc, flip = true) => [X + (flip ? 36 : -36) * sc, Y - 15 * sc];
+  function house(g, name, X, Y, sc, lit, t) { const P = pen(g, X, Y, sc); g.globalAlpha = .4; P.ell(0, 0, 46, 6, '#04060a'); g.globalAlpha = 1; art(g, name, X, Y, sc, { t, tint: NIGHT }); litWindows(g, name, X, Y, sc, lit); }
   // ───────────────────────────── composed backdrops ─────────────────────────────
   // Moonflower Grove, shared by most scenes. st.health 0 (dim, overgrown) … 1 (healthy), st.layout 'wide'|'home'|'well'.
   function grove(g, s, st) {
@@ -603,10 +683,10 @@ window.MM = window.MM || {};
       hills: 120, trees: 132, ground: 222, hx: 0, tx: 40, moon: [404, 62, 15], frame: 'L',
       draw(g, s, st, hl, gy) {
         const cx = s.cam.x, t = s.t;
-        dirtPath(g, [[128 - cx, gy + 26, 10], [170 - cx, gy + 50, 22], [236 - cx, gy + 98, 46]]);
+        dirtPath(g, [[150 - cx, gy + 16, 8], [176 - cx, gy + 50, 22], [236 - cx, gy + 98, 46]]);
         dirtPath(g, [[255 - cx * .9, gy + 12, 8], [215 - cx, gy + 60, 18], [236 - cx, gy + 98, 46]]);
         moonwell(g, 256 - cx * .9, gy + 12 - s.cam.y * .1, 1, { glow: st.glow ?? hl * .9, blaze: st.blaze, t, over: 1 - hl, crack: st.crack, still: s.rm && false });
-        cottage(g, 118 - cx, gy + 28, 1, { lit: st.lit ?? hl, over: st.over ?? (1 - hl), t, smoke: st.smoke ?? hl, lantern: st.lit ?? hl, flowers: hl > .6, board: st.board });
+        cottage(g, 112 - cx, gy + 30, 1, { lit: st.lit ?? hl, over: st.over ?? (1 - hl), t, smoke: st.smoke ?? hl, lantern: st.lit ?? hl, flowers: hl > .6, board: st.board, lush: hl > .8 });
         crops(g, 318 - cx, gy + 30, 1, { health: st.crops ?? hl, t, cols: 10, rows: 4, still: s.rm });
         crops(g, 330 - cx, gy + 62, 1, { health: st.crops ?? hl, t, cols: 9, rows: 3, still: s.rm });
         if ((st.over ?? 1 - hl) > .05) brambles(g, 140 - cx, gy + 52, 1, { grow: st.over ?? 1 - hl, len: 70, n: 3 });
@@ -618,8 +698,8 @@ window.MM = window.MM || {};
       draw(g, s, st, hl, gy) {
         const cx = s.cam.x, t = s.t;
         moonwell(g, 404 - cx * .8, gy + 10, 1, { glow: st.glow ?? hl * .9, t, over: 1 - hl, crack: st.crack });
-        dirtPath(g, [[186 - cx, gy + 58, 12], [214 - cx, gy + 80, 30], [262 - cx, gy + 116, 64]]);
-        cottage(g, 182 - cx, gy + 58, 2, { lit: st.lit ?? [hl, hl], over: st.over ?? 1 - hl, t, smoke: st.smoke ?? 0, board: st.board ?? 1, lantern: st.lantern, flowers: hl > .6 });
+        dirtPath(g, [[252 - cx, gy + 28, 10], [262 - cx, gy + 66, 26], [282 - cx, gy + 116, 64]]);
+        cottage(g, 182 - cx, gy + 58, 2, { lit: st.lit ?? [hl, hl], over: st.over ?? 1 - hl, t, smoke: st.smoke ?? 0, board: st.board ?? 1, lantern: st.lantern, flowers: hl > .6, lush: hl > .8 });
         crops(g, 318 - cx, gy + 50, 2, { health: st.crops ?? hl, t, cols: 9, rows: 3, wave: st.wave, still: s.rm });
         if ((st.over ?? 1 - hl) > .05) { brambles(g, 168 - cx, gy + 84, 2, { grow: st.over ?? 1 - hl, len: 60, n: 3, berries: 1 }); brambles(g, 300 - cx, gy + 80, 2, { grow: st.over ?? 1 - hl, len: 70, n: 2 }); }
         if (st.actors) st.actors(g, s, gy);
@@ -628,7 +708,7 @@ window.MM = window.MM || {};
     well: {
       hills: 96, trees: 112, ground: 200, hx: 300, tx: 420, moon: [424, 60, 14], frame: null,
       draw(g, s, st, hl, gy) {
-        moonwell(g, 300 - s.cam.x, gy + 66, 2, { glow: st.glow ?? hl, blaze: st.blaze, t: s.t, over: st.over ?? 1 - hl, crack: st.crack, still: st.still });
+        moonwell(g, 300 - s.cam.x, gy + 66, WELL_SC(), { glow: st.glow ?? hl, blaze: st.blaze, t: s.t, over: st.over ?? 1 - hl, crack: st.crack, still: st.still });
         crops(g, 4 - s.cam.x, gy + 70, 2, { health: st.crops ?? hl, t: s.t, cols: 5, rows: 2, still: s.rm });
         if (st.actors) st.actors(g, s, gy);
       }
@@ -673,8 +753,13 @@ window.MM = window.MM || {};
   }
   function flicker(t, rm) { if (rm) return .7; const a = Math.sin(t * 23) * Math.sin(t * 7.3 + 1) + Math.sin(t * 41.7) * .4; return a > .35 ? .15 : a > -.2 ? .65 : 1; }
   function frags(n, seed) { const r = rng(seed); return Array.from({ length: n }, (_, i) => ({ a: (i / n) * Math.PI * 2 + r() * .5, sp: .8 + r() * .5, up: 120 + r() * 120, side: (r() - .5) * 2, ph: r() * 6 })); }
-  const FR7 = frags(7, 5);
+  const FR3 = [{ a: Math.PI * 1.12, sp: 1, up: 170, side: -1, ph: 0 }, { a: Math.PI * 1.5, sp: .85, up: 260, side: .2, ph: 2 }, { a: Math.PI * 1.88, sp: 1.05, up: 180, side: 1, ph: 4 }], SPARKS = frags(9, 5);
 
+  function fallingShard(g, s, x1) {
+    const q = EASE.in(seg(s.lt, 0, .9)); if (q <= 0 || q >= 1) { if (q >= 1) glow(g, x1 - s.cam.x * .7, 236, 26, '#8fe8ff', .5 * (1 - seg(s.lt, .9, 1.5))); return; }
+    const pos = qq => [lerp(x1 + 180, x1, qq) - s.cam.x * .7, lerp(-10, 236, qq)], [x, y] = pos(q), pts = []; for (let i = 1; i < 16; i++) pts.push(pos(Math.max(0, q - i * .02)));
+    trail(g, pts, 1); shard(g, x, y, 1, 1, s.t, true);
+  }
   function bossScene(kind) {
     const R0 = { forest: 'forest', swamp: 'swamp', frost: 'frost' }[kind];
     return {
@@ -715,7 +800,7 @@ window.MM = window.MM || {};
         { t0: 19.7, t1: 21.2, kind: 'region', title: 'The Blighted Forest', sub: 'once the Whisperwood' },
         { t0: 21.3, t1: 22.8, kind: 'region', title: 'The Whispering Swamp', sub: 'once Lilyreach' },
         { t0: 22.9, t1: 24.2, kind: 'region', title: 'Frostpeak', sub: 'once the Shining Heights' },
-        { t0: 38.4, t1: 42.5, kind: 'title', title: 'Moss & Moon', sub: 'Restore the Moonwell · Tend the grove' }
+        { t0: 38.4, t1: 42.5, kind: 'title', title: 'Moss & Moon', sub: 'Tend the grove · Bring back the moon\'s light' }
       ],
       shots: [
         { t0: 0, t1: 8.6, cam: [[0, { x: -26, y: 8, z: 1 }], [1, { x: 22, y: 0, z: 1.05 }]], still: { x: 0, y: 0, z: 1 },
@@ -726,19 +811,20 @@ window.MM = window.MM || {};
             const fade = seg(lt, br, br + 3.2);
             grove(g, s, { health: 1 - fade * .55, layout: 'well', glow: broken ? fl : lerp(.9, fl, seg(lt, .6, 1)), crack: broken ? 1 : 0, crops: 1 - fade * .3, frame: false, flies: 26 * (1 - fade) });
             if (broken) {
-              const k = lt - br, wx = 300 - s.cam.x, wy = 200 + 66 - 16 * 2 - s.cam.y;
-              FR7.forEach(f => {
-                const pos = q => [wx + Math.cos(f.a) * 230 * q * f.sp + f.side * 40 * q, wy - f.up * q * 1.5 + 160 * q * q];
-                const q = clamp(k * .42 * f.sp), [x, y] = pos(q), pts = []; for (let i = 1; i < 18; i++) pts.push(pos(Math.max(0, q - i * .012)));
-                trail(g, pts, 1 - q * .5); shard(g, x, y, 2, 1 - seg(q, .8, 1), s.t);
+              const k = lt - br, wx = 300 - s.cam.x, wy = 200 + 66 - wellWater(WELL_SC()) - s.cam.y;
+              SPARKS.forEach(f => { const q = clamp(k * .9), x = wx + Math.cos(f.a) * 90 * q * f.sp, y = wy - 30 * q + Math.sin(f.a) * 40 * q + 50 * q * q; g.globalAlpha = 1 - q; g.fillStyle = '#dff8ff'; g.fillRect(R(x), R(y), 1, 1); g.globalAlpha = 1; });
+              FR3.forEach(f => {
+                const pos = q => [wx + Math.cos(f.a) * 260 * q * f.sp + f.side * 60 * q, wy - f.up * q * 1.4 + 150 * q * q];
+                const q = clamp(k * .4 * f.sp), [x, y] = pos(q), pts = []; for (let i = 1; i < 22; i++) pts.push(pos(Math.max(0, q - i * .012)));
+                trail(g, pts, 1 - q * .4); shard(g, x, y, 2, 1 - seg(q, .85, 1), s.t, true);
               });
             }
           } },
         { t0: 15.2, t1: 19.4, xf: 1, cam: [[0, { x: -10, y: 0, z: 1 }], [1, { x: 16, y: 0, z: 1.04 }]], still: { x: 0, y: 0, z: 1 },
           draw(g, s) { const p = sm(s.p); grove(g, s, { health: lerp(.55, .05, p), layout: 'home', crops: lerp(.9, .05, p), over: lerp(0, 1, p), lit: [lerp(.6, 0, p), 0], glow: .05, crack: 1, board: -1 }); } },
-        { t0: 19.4, t1: 21.0, xf: .7, cam: [[0, { x: 0, y: 0, z: 1 }], [1, { x: 40, y: 0, z: 1 }]], still: { x: 20, y: 0, z: 1 }, draw(g, s) { regionVignette(g, s, 'forest', sm(seg(s.lt, .1, 1.4))); } },
-        { t0: 21.0, t1: 22.6, xf: .5, cam: [[0, { x: 0, y: 0, z: 1 }], [1, { x: 40, y: 0, z: 1 }]], still: { x: 20, y: 0, z: 1 }, draw(g, s) { regionVignette(g, s, 'swamp', sm(seg(s.lt, .1, 1.4))); } },
-        { t0: 22.6, t1: 24.2, xf: .5, cam: [[0, { x: 0, y: 0, z: 1 }], [1, { x: 40, y: 0, z: 1 }]], still: { x: 20, y: 0, z: 1 }, draw(g, s) { regionVignette(g, s, 'frost', sm(seg(s.lt, .1, 1.4))); } },
+        { t0: 19.4, t1: 21.0, xf: .7, cam: [[0, { x: 0, y: 0, z: 1 }], [1, { x: 40, y: 0, z: 1 }]], still: { x: 20, y: 0, z: 1 }, draw(g, s) { regionVignette(g, s, 'forest', sm(seg(s.lt, .1, 1.4))); fallingShard(g, s, 150); } },
+        { t0: 21.0, t1: 22.6, xf: .5, cam: [[0, { x: 0, y: 0, z: 1 }], [1, { x: 40, y: 0, z: 1 }]], still: { x: 20, y: 0, z: 1 }, draw(g, s) { regionVignette(g, s, 'swamp', sm(seg(s.lt, .1, 1.4))); fallingShard(g, s, 300); } },
+        { t0: 22.6, t1: 24.2, xf: .5, cam: [[0, { x: 0, y: 0, z: 1 }], [1, { x: 40, y: 0, z: 1 }]], still: { x: 20, y: 0, z: 1 }, draw(g, s) { regionVignette(g, s, 'frost', sm(seg(s.lt, .1, 1.4))); fallingShard(g, s, 230); } },
         { t0: 24.2, t1: 28.4, xf: .9, cam: [[0, { x: 0, y: 0, z: 1 }], [1, { x: 0, y: 0, z: 1 }]],
           draw(g, s) {
             const lt = s.lt, t = s.t;
@@ -765,7 +851,7 @@ window.MM = window.MM || {};
                 const cx = s2.cam.x; let x, y, an = 'fly', dir = 'SE', fr = frameAt(lt), a = 1;
                 if (lt < 2.4) { const q = EASE.out(seg(lt, 0, 2.4)); x = lerp(520, 280, q); y = lerp(70, gy + 80, q); }
                 else if (lt < 3.2) { x = 280; y = gy + 80; an = 'mount'; fr = 7 - Math.min(7, Math.floor((lt - 2.4) * 10)); }
-                else { const q = seg(lt, 3.4, 4.5); x = lerp(280, 196, q); y = lerp(gy + 80, gy + 62, q); an = q > 0 && q < 1 ? 'walk' : 'idle'; dir = 'NW'; fr = frameAt(lt, 9); a = 1 - seg(lt, 4.3, 4.7); if (lt < 3.4) dir = 'S'; }
+                else { const [dx, dy] = hasArt('cottage_mended') ? cottageDoor(182, gy + 58, 2) : [196, gy + 62], q = seg(lt, 3.4, 4.5); x = lerp(280, dx, q); y = lerp(gy + 80, dy, q); an = q > 0 && q < 1 ? 'walk' : 'idle'; dir = 'NW'; fr = frameAt(lt, 9); a = 1 - seg(lt, 4.3, 4.7); if (lt < 3.4) dir = 'S'; }
                 witch(g2, x - cx, y, 2, an, dir, fr, a); charmGlowAt(g2, x - cx, y - 40, .3 * a, s2.t);
                 castSprite(g2, 'raven', 100 - cx, gy + 74, 2, 'SE', false, frameAt(s2.t, 4), 1);
               }
@@ -784,10 +870,10 @@ window.MM = window.MM || {};
             grove(g, s, {
               health: .15 + .25 * seg(lt, land, land + 2), layout: 'well', glow: gl, over: .7 - .3 * seg(lt, land, 5), frame: false, crops: .15 + .4 * ring,
               actors(g2, s2, gy) {
-                const wx = 300 - s2.cam.x, wy = gy + 66 - 32;
+                const wx = 300 - s2.cam.x, wy = gy + 66 - wellWater(WELL_SC());
                 witch(g2, 150 - s2.cam.x, gy + 86, 2, lt > 2 && lt < 2.6 ? 'cast' : 'idle', 'E', lt > 2 && lt < 2.6 ? Math.floor((lt - 2) * 16) & 7 : frameAt(lt, 8)); charmGlowAt(g2, 156 - s2.cam.x, gy + 46, .3 + .5 * ring, s2.t);
                 if (lt < land) { const q = sm(seg(lt, 0, land)), a = q * 6 + 1, rr = (1 - q) * 110; const pos = qq => [wx + Math.cos(qq * 6 + 1) * (1 - qq) * 110, wy - 40 - (1 - qq) * 150 + qq * 40]; const [x, y] = pos(q), pts = []; for (let i = 1; i < 20; i++) pts.push(pos(Math.max(0, q - i * .01))); trail(g2, pts, 1); shard(g2, x, y, 2, 1, s2.t, true); void a; void rr; }
-                if (ring > 0 && ring < 1) { g2.globalAlpha = 1 - ring; pen(g2, wx, wy + 32, 1).ring(0, 0, 30 + ring * 260, (30 + ring * 260) * .22, '#cff6ff'); g2.globalAlpha = 1; }
+                if (ring > 0 && ring < 1) { g2.globalAlpha = 1 - ring; pen(g2, wx, wy + wellWater(WELL_SC()), 1).ring(0, 0, 30 + ring * 260, (30 + ring * 260) * .22, '#cff6ff'); g2.globalAlpha = 1; }
               }
             });
           } },
@@ -846,12 +932,12 @@ window.MM = window.MM || {};
             grove(g, s, {
               health: .2, layout: 'well', glow: .2 + .1 * seg(lt, 4, 8), over: .6, frame: false, crops: .2,
               actors(g2, s2, gy) {
-                const wx = 300 - s2.cam.x, wy = gy + 34, cast = lt > 4.6 && lt < 5.1;
+                const wx = 300 - s2.cam.x, wy = gy + 66 - wellWater(WELL_SC()), cast = lt > 4.6 && lt < 5.1;
                 witch(g2, 150 - s2.cam.x, gy + 86, 2, cast ? 'cast' : 'idle', 'E', cast ? Math.floor((lt - 4.6) * 16) & 7 : frameAt(lt, 8)); charmGlowAt(g2, 156 - s2.cam.x, gy + 46, .3 + .6 * seg(lt, 4.6, 6), s2.t);
-                FR7.forEach((f, i) => {
-                  const arrive = 1 + i * .45, q = sm(seg(lt, arrive - 1, arrive + 1.4)), orb = lt * .9 + i / 7 * Math.PI * 2;
+                FR3.forEach((f, i) => {
+                  const arrive = 1 + i * 1.1, q = sm(seg(lt, arrive - 1, arrive + 1.4)), orb = lt * .9 + i / 3 * Math.PI * 2;
                   const sx = wx + Math.cos(f.a) * 340, sy = wy - 140 + Math.sin(f.a) * 120, ox = wx + Math.cos(orb) * 70, oy = wy - 40 + Math.sin(orb) * 18;
-                  const x = lerp(sx, ox, q), y = lerp(sy, oy, q); shard(g2, x, y, 1, seg(lt, arrive - 1, arrive - .6), s2.t);
+                  const x = lerp(sx, ox, q), y = lerp(sy, oy, q), pts = []; for (let k = 1; k < 14; k++) { const qq = sm(seg(lt - k * .03, arrive - 1, arrive + 1.4)); pts.push([lerp(sx, ox, qq), lerp(sy, oy, qq)]); } if (q < .98) trail(g2, pts, .8); shard(g2, x, y, 2, seg(lt, arrive - 1, arrive - .6), s2.t, true);
                 });
               }
             });
@@ -862,9 +948,9 @@ window.MM = window.MM || {};
             grove(g, s, {
               health: hl, layout: 'well', glow: .3 + .7 * seg(lt, 0, 2.4), blaze: blaze * (1 - seg(lt, 4, 5.2) * .6), over: .6 * (1 - seg(lt, 2.4, 5)), frame: false, crops: hl, moonA: 1 + blaze, sky: 'bright',
               actors(g2, s2, gy) {
-                const wx = 300 - s2.cam.x, wy = gy + 34 - s2.cam.y * 0;
+                const wx = 300 - s2.cam.x, wy = gy + 66 - wellWater(WELL_SC());
                 witch(g2, 150 - s2.cam.x, gy + 86, 2, 'idle', 'E', frameAt(lt, 8)); charmGlowAt(g2, 156 - s2.cam.x, gy + 46, .9, s2.t);
-                FR7.forEach((f, i) => { const q = sm(seg(lt, i * .2, 1.4 + i * .2)), orb = (8.2 + lt) * .9 + i / 7 * Math.PI * 2 + q * 5, rr = 70 * (1 - q); const x = wx + Math.cos(orb) * rr, y = wy - 40 * (1 - q) + Math.sin(orb) * rr * .26 - 6 * q; if (q < 1) shard(g2, x, y, 1, 1, s2.t); });
+                FR3.forEach((f, i) => { const q = sm(seg(lt, i * .35, 1.5 + i * .35)), orb = (8.2 + lt) * .9 + i / 3 * Math.PI * 2 + q * 5, rr = 70 * (1 - q); const x = wx + Math.cos(orb) * rr, y = wy - 40 * (1 - q) + Math.sin(orb) * rr * .26 - 6 * q; if (q < 1) shard(g2, x, y, 2, 1, s2.t, true); });
               }
             });
           } },
@@ -887,7 +973,8 @@ window.MM = window.MM || {};
             band(g, layer('hillsH'), cx * .25 + 60, 116); band(g, layer('treesH'), cx * .45 + 200, 150);
             mist(g, 238, '#a8c0f0', .4, cx * .5 + t * 3);
             const gy = 230; band(g, groundCanvas('groveH', '#1f3c3e', '#10221f', '#2e5a4c', '#173029'), cx + 300, gy); g.fillStyle = '#10221f'; g.fillRect(0, gy + 120, W, 40);
-            [[70, 238, .5, 0], [150, 226, .9, 1], [400, 230, 1.3, 2], [470, 244, 1.7, 3]].forEach(([x, y, d, i]) => cottage(g, x - cx * .7, y, 1, { lit: [sm(seg(lt, d, d + .5)), sm(seg(lt, d + .3, d + .8))], t, smoke: 1, flowers: true, lantern: seg(lt, d, d + .4) }));
+            const VH = hasArt('house_village_0') && hasArt('house_village_1') && hasArt('house_village_2');
+            [[70, 238, .5, 0, 'house_village_2'], [168, 226, .9, 1, 'house_village_0'], [394, 230, 1.3, 2, 'house_village_1'], [482, 250, 1.7, 3, 'cottage_mended']].forEach(([x, y, d, i, nm]) => { const lit = [0, 1, 2, 3].map(k => sm(seg(lt, d + k * .3, d + k * .3 + .5))); if (VH) { if (nm === 'cottage_mended') cottage(g, x - cx * .7, y, 1, { lit, t, smoke: 1 }); else house(g, nm, x - cx * .7, y, 1, lit, t); } else cottage(g, x - cx * .7, y, 1, { lit: [lit[0], lit[1]], t, smoke: 1, flowers: true, lantern: seg(lt, d, d + .4) }); });
             dirtPath(g, [[262 - cx, 236, 8], [292 - cx, 258, 16], [250 - cx, 284, 28], [200 - cx, 322, 44]], '#3a3444', '#4a4456');
             [[206, 288], [246, 270], [300, 256], [276, 242]].forEach(([x, y], i) => lanternPost(g, x - cx, y, 1, sm(seg(lt, 1.6 + i * .6, 2.1 + i * .6)), t));
             [[0, .2, 'NE'], [1, 1.6, 'N'], [2, 3.0, 'NE']].forEach(([i, st, dir]) => { const q = seg(lt, st, st + 6); const x = lerp(196 + i * 26, 262 + i * 8, q) - cx, y = lerp(306, 248 + i * 4, q); villager(g, x, y, 1, dir, q < 1, frameAt(t, 8), sm(seg(lt, st + .4, st + 1)), t); });
@@ -950,7 +1037,10 @@ window.MM = window.MM || {};
 .mm-cap-name p:before,.mm-cap-name p:after{content:"✦";margin:0 .9em;opacity:.7}
 .mm-cine-skip{position:absolute;right:2.4%;top:11.5%;display:flex;gap:.55em;align-items:center;background:#0b0f1cd9;color:#f4ecd4;border:1px solid #e8d4a066;border-radius:99px;padding:.5em .95em .5em .7em;font:700 max(10px,1.45cqw)/1 ui-rounded,"Trebuchet MS",system-ui,sans-serif;letter-spacing:.04em;opacity:0;pointer-events:none;transition:opacity .2s;cursor:pointer}
 .mm-cine-skip.on{opacity:1;pointer-events:auto}
-.mm-cine-skip:focus-visible{outline:2px solid #e8cf8e;outline-offset:2px}
+.mm-cine-skip:focus-visible{outline:2px solid #e8cf8e;outline-offset:2px;opacity:1;pointer-events:auto}
+.mm-cine-skip[hidden]{display:none}
+.mm-cine:focus{outline:none}
+.mm-cine-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;margin:0}
 .mm-cine-skip i{width:1.05em;height:1.05em;border-radius:50%;background:conic-gradient(#f0d48c calc(var(--hold,0)*360deg),#ffffff2a 0)}`;
 
   let sess = null, timeScale = 1, reducedFlashes = false, shakeK = 1, subtitlesOn = true, subtitlesSet = false, reducedSet = false, reduced = false, busBound = false;
@@ -970,6 +1060,7 @@ window.MM = window.MM || {};
   function bindBus() {
     if (busBound || !MM.bus || typeof MM.bus.on !== 'function') return; busBound = true;
     // core emits {key, value, changed, all:{…settings}, audio:{master,music,sfx,cine}}
+    safe(() => MM.bus.on('state', () => { if (sess) hostCheck(); }));
     safe(() => MM.bus.on('settings', d => { if (!d) return; applySettingsObj(d.all || d); if (sess && sess.sub) sess.sub.hidden = !subtitlesOn; if (sess && sess.video) sess.video.volume = effVolume(); }));
   }
   function readSettings() {
@@ -999,19 +1090,40 @@ window.MM = window.MM || {};
     if (fb && SCENES[fb]) return { sceneId: fb, entry: manifest()[fb] || e };
     return null;
   }
-  function listen(target, type, fn, opts) { target.addEventListener(type, fn, opts); sess.listeners.push([target, type, fn, opts]); }
+  // Listeners: registered through MM.screens.listen when this cinematic is hosted by the current screen (so the
+  // screen system also releases them on state exit); always tracked and removed here on end/skip/stop.
+  function listen(target, type, fn, opts) {
+    const rec = [target, type, fn, opts, null], S = MM.screens; let viaScreens = false;
+    if (S && typeof S.listen === 'function' && sess.host && MM.state && MM.state.current === sess.host) {
+      try { const off = S.listen(target, type, fn, opts); viaScreens = true; if (typeof off === 'function') rec[4] = off; } catch (e) { viaScreens = false; }
+    }
+    if (!viaScreens) target.addEventListener(type, fn, opts);
+    sess.listeners.push(rec);
+  }
+  function unlisten(rec) { const [tg, ty, fn, o, off] = rec; safe(() => tg.removeEventListener(ty, fn, o)); if (off) safe(off); }
   function el(tag, cls, parent, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; if (parent) parent.appendChild(e); return e; }
 
   function buildDom() {
     const style = el('style'); style.textContent = CSS; style.setAttribute('data-mm-cine', ''); document.head.appendChild(style);
-    const host = document.querySelector('#mm-stage') || document.querySelector('.canvas-wrap');
-    const root = el('div', 'mm-cine' + (host ? '' : ' mm-fixed')); root.setAttribute('role', 'region'); root.setAttribute('aria-label', 'Cinematic: ' + (sess.entry?.title || sess.id)); root.setAttribute('aria-roledescription', 'cinematic');
+    const host = (sess.opts.container && sess.opts.container.nodeType === 1 ? sess.opts.container : null) || api.container || document.querySelector('#mm-stage') || document.querySelector('.canvas-wrap');
+    const root = el('div', 'mm-cine' + (host ? '' : ' mm-fixed')); root.setAttribute('role', 'region'); root.setAttribute('aria-label', 'Cinematic: ' + (sess.entry?.title || sess.id)); root.setAttribute('aria-roledescription', 'cinematic'); root.tabIndex = -1;
     const stage = el('div', 'mm-cine-stage', root), cv = el('canvas', null, stage); cv.width = W; cv.height = H; cv.setAttribute('aria-hidden', 'true');
     const cap = el('div', 'mm-cine-cap', stage), sub = el('div', 'mm-cine-sub', stage); sub.setAttribute('aria-live', 'polite');
+    const hint = el('p', 'mm-cine-sr', root, sess.skippable ? 'Cinematic playing. Press Escape, or use the Skip button, to skip.' : 'Cinematic playing.'); hint.id = 'mm-cine-hint'; root.setAttribute('aria-describedby', 'mm-cine-hint');
     const skip = el('button', 'mm-cine-skip', stage); skip.type = 'button'; skip.setAttribute('aria-label', 'Skip cinematic'); el('i', null, skip); el('span', null, skip, 'Skip ▸');
+    if (!sess.skippable) skip.hidden = true;
     (host || document.body).appendChild(root);
     const g = cv.getContext('2d'); g.imageSmoothingEnabled = false;
-    Object.assign(sess, { style, root, stage, cv, g, cap, sub, skipBtn: skip, host });
+    Object.assign(sess, { style, root, stage, cv, g, cap, sub, skipBtn: skip, hostEl: host });
+    sess.prevFocus = document.activeElement; safe(() => root.focus({ preventScroll: true }));
+    if (sess.skippable && api.showSkipOnStart) { skip.classList.add('on'); sess.lastInput = 0; sess.skipShownAt = 0; }
+    layout();
+  }
+  // Re-layout the 8:5 stage in px (CSS container-query sizing is the default; this keeps it exact on resize).
+  function layout() {
+    if (!sess || !sess.root) return; const r = sess.root.getBoundingClientRect(); if (!(r.width > 0 && r.height > 0)) return;
+    const w = Math.min(r.width, r.height * 1.6), h = w / 1.6; sess.stage.style.width = w.toFixed(2) + 'px'; sess.stage.style.height = h.toFixed(2) + 'px'; sess.layouts = (sess.layouts || 0) + 1;
+    if (sess.mode === 'engine' && (sess.paused || sess.driver === 'manual')) safe(render);
   }
   function bufs() { return cached('bufs', () => ({ work: mkCanvas(W, H), a: mkCanvas(W, H), b: mkCanvas(W, H) })); }
   function buildCaptions(scene, entry) {
@@ -1024,18 +1136,55 @@ window.MM = window.MM || {};
     });
   }
 
+  // ── driver: MM.loop.onTick (the single authoritative rAF) when present; a private rAF only as a guarded fallback when MM.loop is absent.
+  let loopOff = null, loopSubscribed = false, fbRaf = 0, fbLast = null;
+  function onLoopTick(dt) { if (sess && sess.driver === 'loop') tick(dt); }
+  function startDriver() {
+    if (sess.opts.manual) { sess.driver = 'manual'; return; }
+    const L = MM.loop;
+    if (L && typeof L.onTick === 'function') {
+      sess.driver = 'loop';
+      if (!loopSubscribed) { let off = null; try { off = L.onTick(onLoopTick); } catch (e) { off = null; } loopSubscribed = true; loopOff = typeof off === 'function' ? off : null; }
+      // watchdog: if the loop never ticks (not started yet), fall back so play() still resolves
+      sess.wd = setInterval(() => { if (sess && sess.driver === 'loop' && !document.hidden && performance.now() - (sess.lastTickAt || sess.startedAt) > 1500) { console.warn('[cine] MM.loop is not ticking; using fallback driver'); sess.driver = 'fallback'; fbLast = null; if (!fbRaf) fbRaf = requestAnimationFrame(fbStep); } }, 700);
+      return;
+    }
+    sess.driver = 'fallback'; fbLast = null;
+    if (!fbRaf) fbRaf = requestAnimationFrame(fbStep);
+  }
+  function fbStep(now) {
+    fbRaf = 0; if (!sess || sess.driver !== 'fallback') return;
+    if (document.hidden) fbLast = null; else { const dt = fbLast == null ? 0 : (now - fbLast) / 1000; fbLast = now; tick(dt); }
+    if (sess && sess.driver === 'fallback' && !fbRaf) fbRaf = requestAnimationFrame(fbStep);
+  }
+  function stopDriver() {
+    if (loopOff) { safe(loopOff); loopOff = null; loopSubscribed = false; }
+    if (fbRaf) { cancelAnimationFrame(fbRaf); fbRaf = 0; }
+  }
+  // Hosting: when MM.state says we are in 'intro' or 'cine', leaving that state ends the cinematic (skipped, reason 'state-exit');
+  // the in-game pause menu just pauses it.
+  const HOSTS = { intro: 1, cine: 1 }, HOLD_STATES = { menu: 1, loading: 1 };
+  function hostCheck() {
+    if (!sess || sess.closing || !MM.state) return; const st = MM.state.current; if (!st) return;
+    if (HOSTS[st]) { if (!sess.host) sess.host = st; if (sess.autoPaused) { sess.autoPaused = false; api.resume(); } return; }
+    if (!sess.host) return;
+    if (HOLD_STATES[st]) { if (!sess.paused) { sess.autoPaused = true; api.pause(); } return; }
+    api.stop('state-exit');
+  }
+
   function start(job) {
     const entry = manifest()[job.id] || null;
-    sess = { id: job.id, job, entry, opts: job.opts || {}, listeners: [], t: 0, real: 0, paused: false, closing: false, closeT: 0, closeDur: 0, usedFallback: false, fired: 0, hold: 0, holding: false, skipShownAt: -1, lastInput: -9, subKey: null, mode: 'pending', caps: [], subs: [] };
-    sess.skippable = sess.opts.skippable !== false;
+    sess = { id: job.id, job, entry, opts: job.opts || {}, listeners: [], t: 0, real: 0, paused: false, closing: false, closeT: 0, closeDur: 0, usedFallback: false, fired: 0, hold: 0, holding: false, skipShownAt: -1, lastInput: -9, revealed: false, subKey: null, mode: 'pending', caps: [], subs: [], startedAt: performance.now() };
+    sess.skippable = sess.opts.skippable !== false; if (sess.opts.logCues) sess.cueLog = [];
+    const st = MM.state && MM.state.current; if (st && HOSTS[st]) sess.host = st;
     readSettings(); bindBus(); atlas(); castPage(0); castPage(1);
     const cur = MM.audio && typeof MM.audio.current === 'function' ? safe(() => MM.audio.current()) : null; sess.prevMusic = cur && cur.music || null;
     buildDom(); bindInput();
     const sources = sess.opts.engineOnly ? [] : videoSources(entry);
     if ((entry && entry.playback === 'video' || entry && entry.playback === 'auto') && sources.length) startVideo(sources);
-    else if (!startEngine(job.id, false)) { finish(false, 'no-scene'); return; }
-    emit('cine:start', { id: sess.id, title: entry && entry.title, playback: sess.mode, rewardKey: entry && entry.rewardKey });
-    sess.raf = requestAnimationFrame(tick);
+    else if (!startEngine(job.id, false)) { finish(false, 'no-scene'); finalize(); return; }
+    emit('cine:start', { id: sess.id, title: entry && entry.title, playback: sess.mode, rewardKey: entry && entry.rewardKey, host: sess.host || null });
+    startDriver(); safe(render); updateDom();
   }
   function startEngine(id, fallback) {
     const e = engineFor(id); if (!e) return false;
@@ -1051,16 +1200,16 @@ window.MM = window.MM || {};
     const fail = why => {
       if (!sess || sess.video !== v || sess.mode === 'engine') return;
       if (sess.srcs.length) { trySrc(); return; }
-      sess.fallbackReason = why; dropVideo(); if (!startEngine(sess.id, true)) finish(false, 'no-fallback');
+      sess.fallbackReason = why; dropVideo(); if (!startEngine(sess.id, true)) { finish(false, 'no-fallback'); finalize(); }
     };
     const trySrc = () => {
-      clearTimeout(sess.vTimer); const src = sess.srcs.shift(); v.src = src; sess.mode = 'video-pending'; sess.vStart = sess.real;
+      clearTimeout(sess.vTimer); const src = sess.srcs.shift(); v.src = src; sess.mode = 'video-pending';
       sess.vTimer = setTimeout(() => sess && sess.video === v && sess.mode === 'video-pending' && fail('timeout'), api.videoTimeoutMs);
       let p; try { p = v.play(); } catch (e) { fail('play-threw'); return; }
       if (p && p.catch) p.catch(err => { if (sess && sess.video === v && sess.mode === 'video-pending' && v.src.indexOf(src) >= 0) fail(err && err.name === 'NotAllowedError' ? 'autoplay-blocked' : 'play-rejected'); });
     };
     listen(v, 'error', () => fail('error'));
-    listen(v, 'playing', () => { if (!sess || sess.video !== v) return; if (sess.mode === 'video-pending') { sess.mode = 'video'; clearTimeout(sess.vTimer); audio('duck', .7, Infinity); sess.ducked = true; } });
+    listen(v, 'playing', () => { if (!sess || sess.video !== v) return; if (sess.mode === 'video-pending') { sess.mode = 'video'; clearTimeout(sess.vTimer); if (!sess.ducked) { audio('duck', .7, Infinity); sess.ducked = true; } } });
     listen(v, 'ended', () => { if (sess && sess.video === v) finish(false); });
     try { v.defaultPlaybackRate = v.playbackRate = clamp(timeScale, .25, 16); } catch (e) { /* ignore */ }
     trySrc();
@@ -1068,21 +1217,23 @@ window.MM = window.MM || {};
   function dropVideo() {
     const v = sess && sess.video; if (!v) return; clearTimeout(sess.vTimer);
     try { v.pause(); v.removeAttribute('src'); v.load(); } catch (e) { /* ignore */ }
-    v.remove(); sess.video = null; sess.listeners = sess.listeners.filter(([tg, ty, fn, o]) => { if (tg === v) { tg.removeEventListener(ty, fn, o); return false; } return true; });
+    v.remove(); sess.video = null; sess.listeners = sess.listeners.filter(rec => { if (rec[0] === v) { unlisten(rec); return false; } return true; });
   }
 
   // input: Esc skips; Space/Enter/click reveal "Skip ▸" (press again or hold to skip); pointer/keys never reach the game while playing.
   const SKIP_KEYS = { Escape: 1, ' ': 1, Spacebar: 1, Enter: 1 };
   function bindInput() {
-    const reveal = () => { if (!sess.skippable) return; sess.lastInput = sess.real; if (!sess.skipBtn.classList.contains('on')) { sess.skipBtn.classList.add('on'); sess.skipShownAt = sess.real; } };
+    const reveal = () => { if (!sess || !sess.skippable) return; sess.lastInput = sess.real; if (!sess.revealed) { sess.revealed = true; sess.skipShownAt = sess.real; } sess.skipBtn.classList.add('on'); };
     listen(window, 'keydown', e => {
       if (!sess || e.ctrlKey || e.metaKey || e.altKey) return;
       e.stopImmediatePropagation();
+      if (e.key === 'Tab') { sess.lastInput = sess.real; if (sess.skippable) sess.skipBtn.classList.add('on'); return; }
       if (!SKIP_KEYS[e.key]) { reveal(); return; }
+      if (e.target === sess.skipBtn && e.key !== 'Escape') { e.preventDefault(); if (!e.repeat) api.skip(); return; }
       e.preventDefault(); if (!sess.skippable || sess.closing) return;
       if (e.key === 'Escape') { api.skip(); return; }
       if (e.repeat) return;
-      if (sess.skipBtn.classList.contains('on') && sess.real - sess.skipShownAt > .15) { api.skip(); return; }
+      if (sess.revealed && sess.real - sess.skipShownAt > .15) { api.skip(); return; }
       reveal(); sess.holding = 'key';
     }, true);
     listen(window, 'keyup', e => { if (sess && sess.holding === 'key' && SKIP_KEYS[e.key]) { sess.holding = false; sess.hold = 0; } }, true);
@@ -1092,6 +1243,13 @@ window.MM = window.MM || {};
     listen(sess.root, 'pointermove', e => { if (e.movementX || e.movementY) reveal(); });
     listen(sess.root, 'contextmenu', e => e.preventDefault());
     listen(sess.skipBtn, 'click', e => { e.stopPropagation(); api.skip(); });
+    listen(window, 'resize', layout);
+    listen(document, 'visibilitychange', () => {
+      if (!sess) return; fbLast = null;
+      if (document.hidden) { if (sess.video && sess.mode === 'video' && !sess.paused) { sess.hiddenPaused = true; safe(() => sess.video.pause()); } }
+      else if (sess.hiddenPaused) { sess.hiddenPaused = false; if (!sess.paused && sess.video) safe(() => { const p = sess.video.play(); if (p && p.catch) p.catch(() => { }); }); }
+    });
+    if (typeof ResizeObserver === 'function') { sess.ro = new ResizeObserver(() => layout()); sess.ro.observe(sess.root); }
   }
 
   function camAt(shot, p) {
@@ -1133,6 +1291,7 @@ window.MM = window.MM || {};
     if (sc.bars) { const bh = R(30 * EASE.outCubic(seg(t, 0, 1.1))); g.fillStyle = '#000'; g.fillRect(0, 0, W, bh); g.fillRect(0, H - bh, W, bh); }
   }
   function updateDom() {
+    if (!sess || !sess.root) return;
     const t = sess.t, real = sess.real;
     let op = Math.min(1, real / .35);
     if (sess.mode === 'engine' || sess.mode === 'video') op = Math.min(op, sess.dur ? clamp((sess.dur - t) / .45) : 1);
@@ -1144,24 +1303,27 @@ window.MM = window.MM || {};
     if (key !== sess.subKey) { sess.subKey = key; sess.sub.textContent = ''; if (sub) { if (sub.speaker) el('b', null, sess.sub, sub.speaker); sess.sub.appendChild(document.createTextNode(sub.text)); } }
     sess.sub.style.opacity = sub ? Math.min(seg(t, sub.t0, sub.t0 + .25), 1 - seg(t, sub.t1 - .25, sub.t1)).toFixed(3) : '0';
     const btn = sess.skipBtn;
-    if (btn.classList.contains('on') && !sess.holding && real - sess.lastInput > 2.6) btn.classList.remove('on');
+    if (btn.classList.contains('on') && !sess.holding && real - sess.lastInput > 2.6 && document.activeElement !== btn) btn.classList.remove('on');
     btn.style.setProperty('--hold', sess.hold.toFixed(3));
   }
+  // Cues fire exactly once when scene time crosses them (any frame rate); seeking/skipping past never fires them.
   function fireCues(from, to) {
     const cues = sess.cues || [];
-    while (sess.fired < cues.length && cues[sess.fired].t <= to) { const c = cues[sess.fired++]; if (c.t < from - .001) continue; if (c.music) audio('music', c.music, { fade: .9 }); if (c.sfx) audio('sfx', c.sfx, {}); }
+    while (sess.fired < cues.length && cues[sess.fired].t <= to) { const c = cues[sess.fired++]; if (c.t < from - .001) continue; if (c.music) audio('music', c.music, { fade: .9 }); if (c.sfx) audio('sfx', c.sfx, {}); if (sess.cueLog) sess.cueLog.push([c.t, sess.t]); }
   }
-  function tick(now) {
-    if (!sess) return; sess.raf = 0;
+  // One step of the timeline. dt = wall-clock seconds since the previous frame (clamped to 0.1).
+  function tick(dt) {
+    if (!sess) return;
     try {
-      const dt = sess.lastNow == null ? 0 : Math.min(.1, Math.max(0, (now - sess.lastNow) / 1000)); sess.lastNow = now; sess.real += dt;
+      dt = Math.min(.1, Math.max(0, +dt || 0)); sess.real += dt; sess.lastTickAt = performance.now(); sess.ticks = (sess.ticks || 0) + 1;
+      hostCheck(); if (!sess) return;
       if (sess.closing) { sess.closeT += dt; if (sess.closeT >= sess.closeDur) { finalize(); return; } }
       else {
-        if (sess.holding && sess.skippable) { sess.hold = Math.min(1, sess.hold + dt / .7); if (sess.hold >= 1) { api.skip(); } }
+        if (sess.holding && sess.skippable) { sess.hold = Math.min(1, sess.hold + dt / .7); if (sess.hold >= 1) api.skip(); }
         if (!sess.paused && !sess.closing) {
           if (sess.mode === 'engine') { const t0 = sess.t; sess.t = Math.min(sess.dur, sess.t + dt * timeScale); fireCues(t0, sess.t); if (sess.t >= sess.dur) { render(); updateDom(); finish(false); return; } }
           else if (sess.mode === 'video' && sess.video) {
-            const v = sess.video; if (v.currentTime !== sess.vLast) { sess.vLast = v.currentTime; sess.vStall = 0; } else sess.vStall = (sess.vStall || 0) + dt;
+            const v = sess.video; if (v.currentTime !== sess.vLast || v.paused) { sess.vLast = v.currentTime; sess.vStall = 0; } else sess.vStall = (sess.vStall || 0) + dt;
             sess.t = v.currentTime; if (isFinite(v.duration) && v.duration > 0) sess.dur = v.duration;
             if (sess.vStall > 8) { finish(false, 'stalled'); return; }
           }
@@ -1169,8 +1331,7 @@ window.MM = window.MM || {};
       }
       if (!sess || sess.closing && sess.closeDur === 0) return;
       render(); updateDom();
-    } catch (e) { MM.cine.lastError = String(e && e.stack || e); console.warn('[cine] render error', e); finish(false, 'render-error'); return; }
-    if (sess) sess.raf = requestAnimationFrame(tick);
+    } catch (e) { MM.cine.lastError = String(e && e.stack || e); console.warn('[cine] render error', e); finish(false, 'render-error'); finalize(); }
   }
   function finish(skipped, reason) {
     if (!sess || sess.closing) return; const e = sess.sceneEntry || sess.entry || {};
@@ -1179,34 +1340,40 @@ window.MM = window.MM || {};
     if (reason && reason !== 'skip') sess.result.reason = reason;
     sess.closing = true; sess.closeT = 0; sess.closeDur = skipped ? .25 : 0;
     if (sess.video) safe(() => sess.video.pause());
-    if (!skipped) finalize(); else if (!sess.raf) sess.raf = requestAnimationFrame(tick);
+    if (!skipped) { finalize(); return; }
+    // the 0.25 s close fade is advanced by tick(); this timer guarantees resolution even if no frames arrive (hidden tab, stalled host)
+    const s = sess; s.closeTimer = setTimeout(() => { if (sess === s) finalize(); }, 650);
   }
   function finalize() {
     const s = sess; if (!s) return; sess = null;
-    if (s.raf) cancelAnimationFrame(s.raf); clearTimeout(s.vTimer);
-    for (const [tg, ty, fn, o] of s.listeners) safe(() => tg.removeEventListener(ty, fn, o));
+    stopDriver(); clearTimeout(s.vTimer); clearTimeout(s.closeTimer); clearInterval(s.wd);
+    if (s.ro) safe(() => s.ro.disconnect());
+    for (const rec of s.listeners) unlisten(rec);
     s.listeners.length = 0;
-    if (s.video) { safe(() => { s.video.pause(); s.video.removeAttribute('src'); s.video.load(); }); }
+    if (s.video) { safe(() => { s.video.pause(); s.video.removeAttribute('src'); s.video.load(); }); safe(() => s.video.remove()); s.video = null; }
+    const hadFocus = s.root && s.root.contains(document.activeElement);
     safe(() => s.root && s.root.remove()); safe(() => s.style && s.style.remove());
+    if (hadFocus && s.prevFocus && s.prevFocus.isConnected && typeof s.prevFocus.focus === 'function') safe(() => s.prevFocus.focus({ preventScroll: true }));
     if (s.ducked) audio('duck', 0, 0);
     if (s.prevMusic && s.mode === 'engine' && !/^cine_|^ending$/.test(s.prevMusic)) audio('music', s.prevMusic, { fade: 1.2 });
     const r = s.result || { id: s.id, skipped: false, completed: false, usedFallback: false }; r.prevMusic = s.prevMusic;
+    if (s.host) r.host = s.host;
     emit('cine:end', r);
     resolveJob(s.job, r);
-    if (queue.length) { const next = queue.shift(); setTimeout(() => { try { if (sess) queue.unshift(next); else start(next); } catch (e) { console.warn('[cine]', e); finalizeBroken(next); } }, 0); }
+    if (queue.length && !sess) { const next = queue.shift(); try { start(next); } catch (e) { console.warn('[cine]', e); finalizeBroken(next); } }
   }
   function finalizeBroken(job) { if (sess) { sess.result = { id: job.id, skipped: false, completed: false, usedFallback: false, reason: 'error' }; finalize(); } else resolveJob(job, { id: job.id, skipped: false, completed: false, usedFallback: false, reason: 'error' }); }
   function resolveJob(job, r) { safe(() => job.resolve(r)); if (job.opts && typeof job.opts.onEnd === 'function') safe(() => job.opts.onEnd(r)); }
 
   const api = {
-    volume: null, videoTimeoutMs: 4000, scenes: SCENES, lastError: null,
+    volume: null, videoTimeoutMs: 4000, showSkipOnStart: true, useArt: true, container: null, scenes: SCENES, lastError: null,
     play(id, opts = {}) {
       return new Promise(resolve => {
         const job = { id, opts: opts || {}, resolve };
         try {
           if (!api.has(id)) { console.warn('[cine] unknown scene', id); resolveJob(job, { id, skipped: false, completed: false, usedFallback: false, reason: 'unknown-scene' }); return; }
           if (sess) {
-            if (job.opts.force) { queue.unshift(job); if (sess.closing) return; sess.interrupted = true; finish(true, 'interrupted'); return; }
+            if (job.opts.force) { queue.unshift(job); if (sess.closing) { finalize(); return; } sess.interrupted = true; finish(true, 'interrupted'); finalize(); return; }
             if (job.opts.queue === false) { resolveJob(job, { id, skipped: false, completed: false, usedFallback: false, reason: 'busy' }); return; }
             queue.push(job); return;
           }
@@ -1215,11 +1382,16 @@ window.MM = window.MM || {};
       });
     },
     skip() { if (!sess || sess.closing) return false; finish(true, 'skip'); return true; },
+    // End immediately (no fade) and clean up synchronously — for a hosting screen's exit()/cleanup().
+    stop(reason) { if (!sess) return false; if (!sess.closing) finish(true, reason || 'stopped'); finalize(); return true; },
+    // Manual driving (play(id, {manual:true})): the host calls tick(dt) from its update().
+    tick(dt) { if (sess && sess.driver === 'manual') tick(dt); },
+    attach(container) { api.container = container && container.nodeType === 1 ? container : null; return api.container; },
     pause() { if (!sess) return false; sess.paused = true; if (sess.video) safe(() => sess.video.pause()); return true; },
-    resume() { if (!sess) return false; sess.paused = false; if (sess.video && sess.mode === 'video') safe(() => { const p = sess.video.play(); if (p && p.catch) p.catch(() => { }); }); return true; },
+    resume() { if (!sess) return false; sess.paused = false; sess.autoPaused = false; if (sess.video && sess.mode === 'video') safe(() => { const p = sess.video.play(); if (p && p.catch) p.catch(() => { }); }); return true; },
     isPlaying() { return !!sess && !sess.closing; },
     isPaused() { return !!sess && sess.paused; },
-    current() { return sess ? { id: sess.id, t: sess.t, duration: sess.dur, mode: sess.mode, paused: sess.paused, usedFallback: sess.usedFallback, queued: queue.map(j => j.id) } : null; },
+    current() { return sess ? { id: sess.id, t: sess.t, duration: sess.dur, mode: sess.mode, driver: sess.driver, host: sess.host || null, paused: sess.paused, usedFallback: sess.usedFallback, queued: queue.map(j => j.id) } : null; },
     seek(t) { if (!sess || sess.mode !== 'engine') return false; sess.t = clamp(t, 0, sess.dur - .001); sess.fired = (sess.cues || []).filter(c => c.t <= sess.t).length; render(); updateDom(); return true; },
     clearQueue() { const q = queue.splice(0); q.forEach(j => resolveJob(j, { id: j.id, skipped: false, completed: false, usedFallback: false, reason: 'cleared' })); return q.length; },
     setSubtitles(on) { subtitlesOn = !!on; subtitlesSet = true; if (sess) sess.sub.hidden = !subtitlesOn; return subtitlesOn; },
@@ -1234,6 +1406,7 @@ window.MM = window.MM || {};
       const m = manifest(), ids = Array.from(new Set([...Object.keys(m), ...Object.keys(SCENES)]));
       return ids.map(id => { const e = m[id] || {}; return { id, title: e.title || id, trigger: e.trigger || '', playback: e.playback || 'engine', duration: e.duration || 0, hasVideo: !!(e.video && (e.video.webm || e.video.mp4)), engine: !!engineFor(id), replay: e.replay || { allowed: true, unlockMemory: false }, rewardKey: e.rewardKey || null }; });
     },
+    debug() { return { driver: sess && sess.driver, loopSubscribed, fallbackRaf: !!fbRaf, ticks: sess && sess.ticks, layouts: sess && sess.layouts, cueLog: sess && sess.cueLog }; },
     clearCache() { CACHE.clear(); }
   };
   MM.cine = api;

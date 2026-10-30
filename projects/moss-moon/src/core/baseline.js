@@ -349,7 +349,8 @@ function buildDungeonLayout(){
   if(hash(x,y,(world.dungeonSeed||1)+world.floor*41)>.76)dungeonBlocks.push({x,y,variant:Math.floor(hash(y,x,world.floor)*3)});
  }
 }
-function blockedAt(x,y){return world.mode!=='outside'&&dungeonBlocks.some(b=>Math.abs(x-b.x)<.55&&Math.abs(y-b.y)<.55);}
+function blockedAt(x,y){if(window.MM?.hooks&&mmHook('blocked',x,y)===true)return true; // MM seam (phase 3): buildings/interiors add collision via MM.hooks.on('blocked',(x,y)=>bool)
+ return world.mode!=='outside'&&dungeonBlocks.some(b=>Math.abs(x-b.x)<.55&&Math.abs(y-b.y)<.55);}
 function moveActor(actor,dx,dy){
  const ox=actor.x,oy=actor.y;
  let nx=clamp(actor.x+dx,.6,19.4),ny=clamp(actor.y+dy,.6,19.4);
@@ -810,7 +811,7 @@ function updateCombat(dt){
   }
   for(let i=numbers.length-1;i>=0;i--){numbers[i].life-=dt;if(numbers[i].life<=0)numbers.splice(i,1);}
 }
-function clearControls(){keys.clear();touchDirections.clear();document.querySelectorAll('[data-dir]').forEach(b=>b.classList.remove('pressed'));}
+function clearControls(){keys.clear();touchDirections.clear();} // MM seam (phase 3): no [data-dir] pad
 function toggleBroom(){
   if(game.transition)return;
   game.target=null;
@@ -822,6 +823,9 @@ function readInput(){
   let y=(keys.has('s')||(!world.coop&&keys.has('arrowdown'))?1:0)-(keys.has('w')||(!world.coop&&keys.has('arrowup'))?1:0);
   if(!world.coop||touchPlayer===1)for(const direction of touchDirections.values()){x+=vec[direction][0];y+=vec[direction][1];}
   if(x||y){game.target=null;return normalize(x,y);}
+  // MM seam (phase 3): analog axis from the joystick / gamepad stick (screen space, 0.15 deadzone, analog speed).
+  const ax=window.MM?.input?.axis;
+  if(ax){const m=Math.hypot(ax.x,ax.y);if(m>.15){game.target=null;const k=Math.min(1,(m-.15)/.85)/m;return {x:ax.x*k,y:ax.y*k};}}
   if(game.target){
     const here=project(game.x,game.y),target=project(game.target.x,game.target.y);
     const dx=target.x-here.x,dy=target.y-here.y;
@@ -836,7 +840,8 @@ function readInput(){
 function update(dt){
   mmHook('preUpdate',dt); // MM seam S3
   game.elapsed+=dt;
-  updateCombat(dt);
+  if(!simPlayerOnly)updateCombat(dt); // MM seam (phase 3): sim 'player' skips combat/effects
+  else{castCooldown=Math.max(0,castCooldown-dt);game.castRemaining=Math.max(0,game.castRemaining-dt);}
   const movingInput=readInput();
   if(game.transition){
     const t=game.transition; t.elapsed=Math.min(t.duration,t.elapsed+dt);
@@ -887,7 +892,8 @@ function update(dt){
   const cam=window.MM?.camera,focusAt=cam?.focusPoint?.(dt),lead=focusAt?0:(cam?.lookAhead??0);
   const camFactor=1-Math.exp(-dt*(cam?.follow??4.0)),camTX=focusAt?focusAt.x:now.x+game.vx*lead,camTY=focusAt?focusAt.y:now.y+game.vy*lead;
   game.camX+=(camTX-game.camX)*camFactor;game.camY+=(camTY-game.camY)*camFactor;
-  updateWorld(dt);mmHook('postUpdate',dt);uiClock+=dt; // MM seam S3
+  if(!simPlayerOnly)updateWorld(dt); // MM seam (phase 3): sim 'player' = no enemies/farm/raids/clock
+  mmHook('postUpdate',dt);uiClock+=dt; // MM seam S3 (modules check MM.screens.sim())
   return dist;
 }
 
@@ -1154,7 +1160,15 @@ function loop(t){
   while(remaining>0.00001&&!mmPaused()){const step=Math.min(remaining,1/60);update(step);remaining-=step;} // MM seam S2: sim frozen while paused
   draw();requestAnimationFrame(loop);
 }
-requestAnimationFrame(loop);
+// MM seam (phase 3): MM.loop owns the ONE requestAnimationFrame. Baseline exposes simulate/draw to it and never starts
+// its own loop when MM.loop exists. simulate() keeps the ≤1/60 s substepping; mode 'player' = controller + camera only.
+let simPlayerOnly=false;
+function mmSimulate(total,mode){
+  let remaining=Math.min(Math.max(0,total),.2);simPlayerOnly=mode==='player';
+  try{while(remaining>0.00001&&!mmPaused()){const step=Math.min(remaining,1/60);update(step);remaining-=step;}}finally{simPlayerOnly=false;}
+}
+if(window.MM?.loop?.attach)MM.loop.attach({simulate:(dt,mode)=>mmSimulate(dt,mode),draw:()=>draw()});
+else requestAnimationFrame(loop);
 
 window.addEventListener('keydown',e=>{
   if(mmInputBlocked()||e.defaultPrevented)return; // MM seam S2: menus/cinematics/dialogue own the keyboard; preventDefault() claims a key
@@ -1177,11 +1191,7 @@ window.addEventListener('keydown',e=>{
 window.addEventListener('keyup',e=>{keys.delete(e.key.toLowerCase());});
 window.addEventListener('blur',clearControls);
 document.addEventListener('visibilitychange',()=>{if(document.hidden){clearControls();previous=0;}});
-document.querySelectorAll('[data-dir]').forEach(button=>{
-  button.addEventListener('pointerdown',e=>{if(mmInputBlocked())return; /* MM seam S2 */e.preventDefault();button.setPointerCapture(e.pointerId);touchDirections.set(e.pointerId,button.dataset.dir);button.classList.add('pressed');});
-  const release=e=>{touchDirections.delete(e.pointerId);button.classList.remove('pressed');};
-  button.addEventListener('pointerup',release);button.addEventListener('pointercancel',release);button.addEventListener('lostpointercapture',release);
-});
+// MM seam (phase 3): the legacy 9-button [data-dir] touch pad is removed — movement on touch is the analog joystick (MM.input.axis).
 canvas.addEventListener('pointerdown',e=>{
   if(mmInputBlocked()||e.defaultPrevented)return; // MM seam S2
   // Pointer mapping uses the canvas box; index.html sizes the canvas to exactly fill the letterboxed 8:5 stage (no object-fit).

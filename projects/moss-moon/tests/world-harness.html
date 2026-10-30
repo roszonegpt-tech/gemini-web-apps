@@ -17,6 +17,7 @@
   S('src/config/regions-visual.js');
   S('src/core/baseline.js');
   S('src/systems/world-render.js');
+  if (__q.get('wb')) S('src/systems/world-buildings.js');
   if (__q.get('fx')) { S('src/systems/lighting.js'); S('src/systems/fx.js'); S('src/systems/filter.js'); }
 </script>
 <script>

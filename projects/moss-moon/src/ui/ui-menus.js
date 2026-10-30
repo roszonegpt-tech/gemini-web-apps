@@ -19,7 +19,7 @@
 
   // ============================================================ PAUSE
   ui.openPause = function () {
-    if (!ui.stateIs('play') && !ui.stateIs('menu')) return;
+    if (!ui.inGameplay() && !ui.stateIs('menu')) return;
     if (!ui.isOpen('pause')) ui.open('pause');
   };
   ui.resume = function () { ui.closeAll(); ui.syncState(); };
@@ -37,6 +37,7 @@
     ];
     if (D.memories().length) items.push(['Memories', 'film', go('memories')]);
     items.push(['Settings', 'sliders', go('settings')], ['Controls', 'gamepad', go('controls')]);
+    if (MM.flow && typeof MM.flow.startTutorial === 'function' && !ui.stateIs('tutorial') && ui.lastGameState !== 'tutorial') items.push(['Replay Tutorial', 'sprout', () => replayTutorial()]);
     items.forEach(([l, ic, fn, k]) => grid.appendChild(ui.button(l, fn, { icon: ic, key: k })));
     const saveB = ui.button('Save Game', () => doSave(), { icon: 'bookmark' });
     const titleB = ui.button('Save & Return to Title', () => saveAndQuit(), { icon: 'exit', cls: 'mm-btn-ghost' });
@@ -46,6 +47,13 @@
     return { el: p.el, state: 'menu', label: 'Pause menu', back() { ui.resume(); return true; } };
   });
 
+  async function replayTutorial() {
+    const ok = await ui.confirm({ title: 'Replay the tutorial?', body: 'You’ll practise in a separate training yard. Your journey is kept exactly as it is and you return here afterwards.', yes: 'Start tutorial', no: 'Not now', icon: 'sprout' });
+    if (!ok) return;
+    ui.closeAll({ noSync: true });
+    safe(() => MM.flow.startTutorial({ replay: true }));
+  }
+  ui.replayTutorial = replayTutorial;
   function canSave() { return MM.game && typeof MM.game.safeToSave === 'function' ? safe(() => MM.game.safeToSave(), true) !== false : true; }
   function saveNow() {
     if (MM.game && typeof MM.game.saveNow === 'function') return safe(() => MM.game.saveNow(), false);
@@ -67,12 +75,6 @@
     }
     ui.toTitle();
   }
-  ui.toTitle = function () {
-    ui.closeAll();
-    if (MM.game && typeof MM.game.toTitle === 'function') { safe(() => MM.game.toTitle()); }
-    if (!ui.stateIs('title')) ui.go('title');
-    if (!ui.isOpen('title')) ui.open('title');
-  };
   ui.doSave = doSave;
 
   // ============================================================ BOOK (tabbed panels)
@@ -595,7 +597,7 @@
     p.panel.insertBefore(tabs, p.body);
     p.body.appendChild(body);
     const row = (label, desc, control) => h('div', { class: 'mm-set-row' }, h('div', { class: 'mm-set-label' }, h('strong', null, label), desc ? h('small', null, desc) : null), h('div', { class: 'mm-set-ctl' }, control));
-    const set = (k, v) => { ui.setSetting(k, v); ui.applySettings(); if (/^vol/.test(k)) ui.applyAudio(); if (k === 'touchControls' && ui.input) ui.input.updateTouch(); if (k === 'subtitles') safe(() => MM.cine.setSubtitles(!!v)); if (k === 'reducedMotion') safe(() => MM.cine.setReducedMotion(!!v)); };
+    const set = (k, v) => { ui.setSetting(k, v); ui.applySettings(); if (/^vol/.test(k)) ui.applyAudio(); if (/^(touchControls|joystick|haptics)/.test(k) && ui.joystick) ui.joystick.apply(); if (k === 'subtitles') safe(() => MM.cine.setSubtitles(!!v)); if (k === 'reducedMotion') safe(() => MM.cine.setReducedMotion(!!v)); };
     const seg = (k, label, opts, onPick) => { const s = ui.segmented(label, opts, ui.setting(k), (v) => { set(k, v); onPick && onPick(v); }); controls[k] = s; return s; };
     const tog = (k, label) => { const t = ui.toggle(label, !!ui.setting(k), (v) => set(k, v)); controls[k] = t; return t; };
     const slider = (k, label) => {
@@ -620,6 +622,7 @@
           row('Bloom', 'Glow around lights and magic', seg('bloom', 'Bloom', [['off', 'Off'], ['low', 'Low'], ['high', 'High']], custom)),
           row('Particles', null, seg('particles', 'Particles', [['low', 'Low'], ['medium', 'Medium'], ['high', 'High']], custom)),
           row('Screen shake', null, seg('shake', 'Screen shake', [['off', 'Off'], ['low', 'Low'], ['full', 'Full']])),
+          row('Effects intensity', 'Amount of particles, sparks and shockwaves', seg('fxIntensity', 'Effects intensity', [[0.5, 'Subtle'], [1, 'Normal'], [1.5, 'Lavish']])),
           row('Reduce flashes', 'Softens bright flashes from spells and hits', tog('reducedFlashes', 'Reduce flashes')),
           row('Reduce motion', 'Calmer animations, no shake, instant text', tog('reducedMotion', 'Reduce motion')));
       } else if (setTab === 'access') {
@@ -629,13 +632,19 @@
           row('Damage numbers', 'Show numbers when spells hit', tog('damageNumbers', 'Damage numbers')),
           row('Reduce motion', 'Also follows your system setting', tog('reducedMotion', 'Reduce motion')));
       } else {
-        const inGame = !ui.isOpen('title');
+        const inGame = !!(ui.isOpen('pause') || ui.inGameplay() || ['menu', 'dialogue'].includes(ui.state().current));
         body.append(
           row('Autosave', 'Saves at safe moments while you play', tog('autosave', 'Autosave')),
-          row('Touch controls', 'On-screen pad and action buttons', seg('touchControls', 'Touch controls', [['auto', 'Auto'], ['on', 'On'], ['off', 'Off']])),
+          row('Touch controls', 'On-screen joystick and action buttons (Auto = touch screens)', seg('touchControls', 'Touch controls', [['auto', 'Auto'], ['on', 'On'], ['off', 'Off']])),
+          row('Joystick style', 'Floating appears where you touch; fixed stays put', seg('joystickMode', 'Joystick style', [['floating', 'Floating'], ['fixed', 'Fixed']])),
+          row('Joystick side', 'Action buttons sit on the other side', seg('joystickSide', 'Joystick side', [['left', 'Left'], ['right', 'Right']])),
+          row('Joystick size', null, seg('joystickSize', 'Joystick size', [[0.8, 'Small'], [1, 'Medium'], [1.2, 'Large'], [1.4, 'Huge']])),
+          row('Vibration', 'Light haptic taps on supported devices', tog('haptics', 'Vibration')),
+          MM.flow && typeof MM.flow.startTutorial === 'function' && !ui.stateIs('tutorial') ? row('Tutorial', 'Practise the basics in the training yard', ui.button('Replay tutorial', () => (inGame ? replayTutorial() : (ui.closeAll({ noSync: true }), safe(() => MM.flow.startTutorial({ replay: true })))), { icon: 'sprout', id: 'replay-tutorial' })) : null,
+          MM.flow && typeof MM.flow.toIntro === 'function' && !inGame ? row('Intro', 'Watch the opening story again', ui.button('Replay intro', () => { ui.closeAll({ noSync: true }); safe(() => MM.flow.toIntro({ replay: true })); }, { icon: 'film', id: 'replay-intro' })) : null,
           row('Reset settings', 'Restore every option to its default', ui.button('Reset', async () => {
             if (await ui.confirm({ title: 'Reset all settings?', body: 'Audio, graphics and accessibility options return to their defaults. Your save is not affected.', yes: 'Reset settings', danger: true })) {
-              safe(() => ui.settings().reset()); ui.applySettings(); ui.applyAudio(); ui.input && ui.input.updateTouch(); ui.toast('Settings restored to defaults.', 'good'); render();
+              ui.resetSettings(); ui.applySettings(); ui.applyAudio(); ui.joystick && ui.joystick.apply(); ui.toast('Settings restored to defaults.', 'good'); render();
             }
           }, { icon: 'retry', id: 'reset-settings' })),
           row('Erase save data', inGame ? 'Deletes your journey and returns to the title' : 'Permanently deletes your saved journey', ui.button('Erase…', async () => {
@@ -643,7 +652,7 @@
             if (!(await ui.confirm({ title: 'This cannot be undone', body: 'Are you absolutely sure? The save is gone for good.', yes: 'Erase forever', no: 'Keep my save', danger: true }))) return;
             const ok = MM.save && MM.save.erase ? safe(() => MM.save.erase(), true) !== false : safe(() => { localStorage.removeItem('moss-moon-adventure-v1'); return true; }, false);
             ui.toast(ok ? 'Save data erased.' : 'Could not erase save data.', ok ? 'good' : 'warn');
-            if (inGame) ui.toTitle(); else { const t = ui.get('title'); if (t && t.refresh) t.refresh(); render(); }
+            if (inGame) ui.toTitle(); else { ui.emit('ui:saveErased', {}); render(); }
           }, { icon: 'warn', cls: 'mm-btn-danger', id: 'erase-save' })));
       }
       if (!(a && a.noAutofocus)) { const f = body.querySelector('button,input'); if (f) f.dataset.autofocus = '1'; }
@@ -661,7 +670,7 @@
     p.body.appendChild(h('div', { class: 'mm-ctl-grid' },
       table('Keyboard & mouse', 'keyboard', [['W A S D / Arrows', 'Move'], ['Space', 'Cast selected spell'], ['1 – 5', 'Choose spell'], ['E', 'Interact · tend garden'], ['B', 'Mount / land broom'], ['H', 'Drink potion'], ['Click', 'Walk to · target enemy'], ['Esc / P', 'Pause menu'], ['I / K / J / M', 'Inventory · Spells · Journal · Map']]),
       table('Gamepad', 'gamepad', [['Left stick / D-pad', 'Move'], ['A', 'Cast'], ['X', 'Interact'], ['Y', 'Broom'], ['B', 'Potion'], ['LB / RB', 'Cycle spells'], ['Start', 'Pause'], ['Menus', 'D-pad move · A select · B back']]),
-      table('Touch', 'touch', [['Left pad', 'Drag to move'], ['Cast', 'Cast selected spell'], ['Hand', 'Interact'], ['Broom', 'Mount / land'], ['Potion', 'Drink potion'], ['Swap', 'Next spell'], ['Tap enemy', 'Target & cast'], ['❚❚', 'Pause']]),
+      table('Touch', 'touch', [['Joystick', 'Drag to move (floating or fixed)'], ['Cast', 'Cast selected spell'], ['Use', 'Interact · tend garden'], ['Broom', 'Mount / land'], ['Potion', 'Drink potion'], ['Swap', 'Next spell'], ['Tap enemy', 'Target & cast'], ['Pause', 'Pause menu']]),
     ));
     p.body.appendChild(h('p', { class: 'mm-note' }, ui.icon('info'), 'Menus: arrows or WASD move, Enter or Space selects, Esc goes back, Q / E switch tabs.'));
     return { el: p.el, label: 'Controls' };
@@ -713,4 +722,9 @@
     render();
     return { el: p.el, label: 'Memories', refresh: render };
   });
+  // Reusable entry points for the main menu (SCREENS) and others.
+  ui.openSettings = (args) => ui.open('settings', args);
+  ui.openControls = (args) => ui.open('controls', args);
+  ui.openCredits = (args) => ui.open('credits', args);
+  ui.openMemories = (args) => ui.open('memories', args);
 })();

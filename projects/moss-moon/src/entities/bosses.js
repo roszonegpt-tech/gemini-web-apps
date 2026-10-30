@@ -18,7 +18,9 @@
   const freeSpot = (x, y) => { x = clampMap(x); y = clampMap(y); try { if (blockedAt(x, y)) { for (let i = 0; i < 8; i++) { const a = i * Math.PI / 4, nx = clampMap(x + Math.cos(a)), ny = clampMap(y + Math.sin(a)); if (!blockedAt(nx, ny)) return { x: nx, y: ny }; } } } catch (_) { } return { x, y }; };
 
   // =============================================================== combat kit
-  const kit = { telegraphs: [], zones: [], shots: [], now: 0, iframes: 0 };
+  const kit = { telegraphs: [], zones: [], shots: [], timers: [], now: 0, iframes: 0 };
+  // sim-time delayed call (only advances while the world simulates, so it respects every pause/screen policy)
+  kit.later = function (sec, fn) { kit.timers.push({ at: kit.now + sec, fn }); };
   // Telegraph: {shape:'circle'|'line'|'ring', x,y,r | x2,y2,w, dur, kind, friendly, onEnd(tg), safe:[{x,y,r}]}
   kit.telegraph = function (o) {
     const tg = Object.assign({ t: 0, shape: 'circle', r: 1, w: .8, dur: 1, kind: 'danger' }, o);
@@ -40,7 +42,7 @@
     return Math.hypot(x - tg.x, y - tg.y) <= tg.r;
   };
   kit.inZone = (z, p) => Math.hypot(p.x - z.x, p.y - z.y) <= z.r;
-  kit.clear = function () { kit.telegraphs.length = 0; kit.zones.length = 0; kit.shots.length = 0; };
+  kit.clear = function () { kit.telegraphs.length = 0; kit.zones.length = 0; kit.shots.length = 0; kit.timers.length = 0; };
 
   // Player damage (single entry point for all campaign damage). opts: {kind, source, melee, ignoreWard}
   kit.hurt = function (amount, opts) {
@@ -65,6 +67,7 @@
 
   kit.update = function (dt) {
     kit.now += dt;
+    for (let i = kit.timers.length - 1; i >= 0; i--) if (kit.timers[i].at <= kit.now) { const t = kit.timers.splice(i, 1)[0]; try { t.fn(); } catch (e) { console.error('[bosses] timer', e); } }
     for (let i = kit.telegraphs.length - 1; i >= 0; i--) {
       const tg = kit.telegraphs[i]; tg.t += dt;
       if (tg.t >= tg.dur) { kit.telegraphs.splice(i, 1); try { tg.onEnd && tg.onEnd(tg); } catch (e) { console.error('[bosses] telegraph onEnd', e); } }
@@ -188,7 +191,7 @@
         const n = Math.min(3, 4 - have), spots = []; for (let i = 0; i < n; i++) spots.push(around(player(), 1.6, 2.8));
         const w = def(e.mmBoss).attacks.sprouts.windup;
         for (const s of spots) kit.telegraph({ shape: 'circle', x: s.x, y: s.y, r: .55, dur: w, kind: 'danger', onEnd: tg => { spawnAdd(e, 'thorn_sprout', tg.x, tg.y); if (kit.inShape(tg, game.x, game.y)) kit.hurt(6, { kind: 'thorn', source: e }); } });
-        if (!e.mmArmorTold) { e.mmArmorTold = true; setTimeout(() => toast('Thorn sprouts shield the Warden with bark armour — clear them to hurt it fully!'), 900); }
+        if (!e.mmArmorTold) { e.mmArmorTold = true; kit.later(.9, () => toast('Thorn sprouts shield the Warden with bark armour — clear them to hurt it fully!')); }
         return w;
       },
       phase(e, i) { if (i === 1) toast('The Warden\'s bark splits open — it\'s enraged! Faster slams incoming.'); }
@@ -307,7 +310,7 @@
     try { addParticles(e, '#d49bce', '#ffe3bf', 22, 1.3); } catch (_) { }
     emit('boss', { phase: 'phase', id: e.mmBoss, name: d.name, index: i, phaseName: name, hp: e.hp, maxHP: e.maxHP, enemy: e });
     try { brains[e.mmBoss].phase?.(e, i); } catch (err) { console.error('[bosses] phase', err); }
-    setTimeout(() => focus(null), 1300);
+    kit.later(1.3, () => focus(null));
   }
 
   function defeat(e, how) {
@@ -328,7 +331,7 @@
       mmBoss: id, mmPhase: 0, mmState: 'intro', mmT: 0, mmCd: 1.4, mmIdx: 0, mmSpeed: brains[id].speed, mmDmg: d.attacks.contact.dmg, mmRate: d.attacks.contact.rate, mmAtk: 1.5 };
     if (id === 'hollow_moon') e.mmAnchor = { x: e.x, y: e.y };
     enemies.push(e);
-    focus({ x: e.x, y: e.y, hold: 1.5 }); setTimeout(() => focus(null), 1600); shake(3, .4);
+    focus({ x: e.x, y: e.y, hold: 1.5 }); kit.later(1.6, () => focus(null)); shake(3, .4);
     emit('boss', { phase: 'spawn', id, name: d.name, epithet: d.epithet, hp: e.hp, maxHP: e.maxHP, enemy: e });
     if (!opts?.quiet) toast(d.name + ' — ' + d.epithet + '.');
     return e;
@@ -352,7 +355,7 @@
           const w = br[name](e); e.mmAttack = name; e.mmState = name === 'charge' ? 'charge_windup' : 'windup'; e.mmT = 0; e.mmWind = w; e.mmCd = br.cooldown(e);
         }
       } else if (e.mmState === 'windup') { e.mmAnchorTmp = true; if (e.mmT >= e.mmWind) { e.mmState = 'recover'; e.mmT = 0; } }
-      else if (e.mmState === 'charge_windup') { e.mmAnchorTmp = true; }
+      else if (e.mmState === 'charge_windup') { e.mmAnchorTmp = true; if (e.mmT > 3) { e.mmState = 'chase'; e.mmT = 0; } }
       else if (e.mmState === 'dash') {
         e.mmAnchorTmp = true; const d = e.mmDash, dx = d.tx - e.x, dy = d.ty - e.y, L = Math.hypot(dx, dy), step = d.speed * dt;
         if (L <= step) { e.x = d.tx; e.y = d.ty; e.mmState = 'exposed'; e.mmT = 0; e.mmExposed = true; shake(4, .35);
@@ -390,16 +393,16 @@
   B.brains = brains; B.setPhase = setPhase; B.defeat = defeat; B.kit = kit;
 
   // ---------------------------------------------------------------- boss drawing
-  const ART_KEYS = { bramble_warden: ['bramble', 'warden'], mire_heart: ['mire', 'murk', 'swamp'], frost_wyrm: ['wyrm', 'frost', 'rime', 'colossus'], hollow_moon: ['hollow', 'moon'] };
-  const artCache = {};
-  function artName(id, state) {
+  // Boss sprites (art/bosses.px.js): '<name>_<idle|windup>_<s|e>', west = flip of e, no north facing (use s).
+  const ART_BASE = { bramble_warden: 'bramble_warden', mire_heart: 'mire_hag', frost_wyrm: 'frost_wyrm', hollow_moon: 'well_spirit' };
+  function artFor(e, state) {
     if (!MM.art?.has || !MM.art.ready) return null;
-    const key = id + ':' + state; if (key in artCache) return artCache[key];
-    let base = null;
-    if (MM.art.has('boss_' + id)) base = 'boss_' + id;
-    else { const all = (MM.art.names?.('boss_') || []); base = all.find(n => ART_KEYS[id].some(k => n.includes(k)) && !/_(windup|hurt|attack|exposed|hidden)$/.test(n)) || null; }
-    let name = base && MM.art.has(base + '_' + state) ? base + '_' + state : base;
-    artCache[key] = name; return name;
+    const base = ART_BASE[e.mmBoss]; if (!base) return null;
+    const p = project(game.x - e.x, game.y - e.y), side = Math.abs(p.x) > Math.abs(p.y) * 1.2 && p.y < 40;
+    const dir = side ? 'e' : 's', flip = side && p.x < 0;
+    const name = base + '_' + state + '_' + dir, idle = base + '_idle_' + dir;
+    if (MM.art.has(name)) return { name, flip }; if (MM.art.has(idle)) return { name: idle, flip };
+    return null;
   }
   function hpBar(ctx, x, y, w, frac, color) { fill('#2b3a33', x - w / 2 - 1, y - 1, w + 2, 4); fill('#4a3b3b', x - w / 2, y, w, 2); fill(color, x - w / 2, y, Math.max(0, Math.round(w * frac)), 2); }
   B.drawEnemy = function (e, p) {
@@ -414,10 +417,12 @@
     ellipse(p.x, p.y, 20, 5, 'rgba(30,40,34,' + (.3 * hidden) + ')');
     const state = e.mmExposed ? 'exposed' : (e.mmState === 'windup' || e.mmState === 'charge_windup') ? 'windup' : 'idle';
     ctx.save(); ctx.globalAlpha = hidden;
-    const art = artName(e.mmBoss, state);
+    const art = artFor(e, state === 'windup' ? 'windup' : 'idle');
     if (e.flash > 0) ctx.filter = 'brightness(1.6)';
     let drawn = false;
-    if (art) { const flip = (e.artFacing || 'S').includes('W'); drawn = MM.art.draw(ctx, art, p.x, p.y - float, { t, flip }); }
+    if (state === 'windup' && e.mmWindStart == null) e.mmWindStart = t; if (state !== 'windup') e.mmWindStart = null;
+    if (art) drawn = MM.art.draw(ctx, art.name, p.x, p.y - float, { t: state === 'windup' ? t - e.mmWindStart : t, flip: art.flip });
+    e.mmArtDrawn = drawn;
     if (!drawn) {
       ctx.filter = (d.tint || 'none') + (e.flash > 0 ? ' brightness(1.6)' : '') + (state === 'windup' ? ' brightness(1.15)' : '');
       ctx.translate(p.x, p.y - float); ctx.scale(2, 2);
@@ -426,7 +431,7 @@
     ctx.restore();
     // signature overlays (procedural, no text)
     const top = p.y - float - 78;
-    if (e.mmBoss === 'hollow_moon') {
+    if (e.mmBoss === 'hollow_moon' && !e.mmArtDrawn) {
       const r = 15 + Math.sin(t * 2) * 1.5; ctx.globalAlpha = hidden;
       ctx.fillStyle = 'rgba(220,214,255,.9)'; ctx.beginPath(); ctx.arc(p.x, top + 8, r, 0, Math.PI * 2); ctx.fill();
       ctx.fillStyle = 'rgba(28,18,48,.92)'; ctx.beginPath(); ctx.arc(p.x + 6 + Math.sin(t) * 2, top + 6, r * .86, 0, Math.PI * 2); ctx.fill();
@@ -447,13 +452,12 @@
     hpBar(ctx, p.x, p.y - h - 8, 30, q, '#bfe0ff');
   }
   function drawSprout(e, p) {
-    const t = game.elapsed, sway = Math.round(Math.sin(t * 3 + e.id) * 1);
-    ellipse(p.x, p.y, 7, 2, 'rgba(41,56,40,.3)');
     ctx.save(); if (e.flash > 0) ctx.filter = 'brightness(1.5)';
-    fill('#4a3a2a', p.x - 1, p.y - 14, 3, 14); fill('#5f9a55', p.x - 5 + sway, p.y - 16, 4, 3); fill('#5f9a55', p.x + 2 + sway, p.y - 12, 4, 3);
-    fill('#d9d0a8', p.x - 3 + sway, p.y - 19, 1, 3); fill('#d9d0a8', p.x + 4 + sway, p.y - 15, 1, 3); fill('#9fd17d', p.x + sway, p.y - 18, 2, 2);
+    let ok = false;
+    if (MM.art?.has?.('bush_blight')) { ellipse(p.x, p.y, 8, 2, 'rgba(41,56,40,.3)'); ok = MM.art.draw(ctx, 'bush_blight', p.x, p.y); }
+    if (!ok) { ctx.translate(p.x, p.y); ctx.scale(.75, .75); try { drawCastSprite('blight', { x: 0, y: 0 }, e); } catch (_) { } }
     ctx.restore();
-    hpBar(ctx, p.x, p.y - 23, 14, e.hp / e.maxHP, '#bedb97');
+    hpBar(ctx, p.x, p.y - 22, 14, e.hp / e.maxHP, '#bedb97');
   }
 
   MM.bosses = B;

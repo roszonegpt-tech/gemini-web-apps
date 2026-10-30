@@ -52,7 +52,7 @@
     const pw = Math.max(1, Math.round(512 * s * dpr)) / dpr, ph = Math.max(1, Math.round(320 * s * dpr)) / dpr;
     stage.style.width = pw + 'px'; stage.style.height = ph + 'px';
     document.documentElement.style.setProperty('--mm-scale', String(+s.toFixed(4)));
-    const changed = layoutInfo.width !== pw || layoutInfo.height !== ph;
+    const changed = layoutInfo.width !== pw || layoutInfo.height !== ph || layoutInfo.dpr !== dpr;
     layoutInfo = { scale: s, width: pw, height: ph, integer, dpr };
     if (changed) MM.bus.emit('layout', { ...layoutInfo });
   }
@@ -81,9 +81,11 @@
 
   // ------------------------------------------------------------ fallbacks (only without MM.ui)
   const hasUI = () => !!(MM.ui && (typeof MM.ui.open === 'function' || typeof MM.ui.toast === 'function'));
+  const hasFlow = () => !!(MM.flow && typeof MM.flow.start === 'function');
+  const LIVE = ['play', 'interior', 'tutorial'];
   let overlay = null, overlayKind = '', defeatTimer = 0;
   function showOverlay(kind) {
-    hideOverlay(); if (hasUI()) return;
+    hideOverlay(); if (kind === 'title' ? hasFlow() : hasUI()) return;
     const ui = $('mm-ui'); if (!ui) return;
     overlay = document.createElement('div'); overlay.className = 'mm-fallback'; overlay.dataset.kind = kind; overlayKind = kind;
     overlay.setAttribute('role', 'dialog');
@@ -107,20 +109,20 @@
     if (overlayKind === 'title') {
       if (!forceNew && MM.save.hasSave()) { const r = MM.game.continueGame(); if (r.ok) return; toast('Save could not be loaded (' + r.reason + '); starting fresh', 'error'); }
       MM.game.newGame({ name: 'Witch', startCampaign: true });
-    } else if (overlayKind === 'pause') MM.state.go('play');
+    } else if (overlayKind === 'pause') MM.state.go((MM.state.data && MM.state.data.resume) || 'play');
     else if (overlayKind === 'defeat') MM.game.respawnHome();
   }
   window.addEventListener('keydown', (e) => {
-    if (hasUI()) return;
+    if (overlayKind === 'title' ? hasFlow() : hasUI()) return;
     const k = e.key;
     if (overlay && !e.repeat && (k === 'Enter' || k === ' ' || (overlayKind === 'title' && (k === 'n' || k === 'N')) || (overlayKind === 'pause' && k === 'Escape'))) {
       e.preventDefault(); e.stopPropagation(); fallbackConfirm(k === 'n' || k === 'N'); return;
     }
-    if (!overlay && k === 'Escape' && MM.state.is('play')) { e.preventDefault(); MM.state.go('menu', { screen: 'pause', reason: 'key' }); }
+    if (!overlay && k === 'Escape' && LIVE.includes(MM.state.current)) { e.preventDefault(); MM.state.go('menu', { screen: 'pause', reason: 'key', resume: MM.state.current }); }
   }, true);
   MM.bus.on('state', ({ to }) => {
+    if (to === 'title') { if (hasFlow()) hideOverlay(); else showOverlay('title'); return; }
     if (hasUI()) { hideOverlay(); return; }
-    if (to === 'title') showOverlay('title');
     else if (to === 'menu') showOverlay('pause');
     else if (to === 'defeat') { showOverlay('defeat'); defeatTimer = setTimeout(() => { if (MM.state.is('defeat')) MM.game.respawnHome(); }, 2500); }
     else hideOverlay();
@@ -134,8 +136,8 @@
     }
   });
   function pauseForHide() {
-    if (!MM.state.is('play')) return;
-    MM.state.go('menu', { screen: 'pause', reason: 'hidden' });
+    const from = MM.state.current; if (!LIVE.includes(from)) return;
+    MM.state.go('menu', { screen: 'pause', reason: 'hidden', resume: from });
     if (hasUI() && typeof MM.ui.open === 'function') { try { MM.ui.open('pause'); } catch (e) { console.error(e); } }
   }
   document.addEventListener('visibilitychange', () => { if (document.hidden) { saveIfSafe('hidden'); pauseForHide(); } });
@@ -187,6 +189,9 @@
     save: (force) => MM.save.save({ silent: true, force: !!force, reason: 'test' }),
     load: () => MM.save.load(),
     layout: () => ({ ...layoutInfo }),
+    loop: () => MM.loop.stats(),
+    screens: () => MM.screens.stats(),
+    listeners: () => { const o = {}; for (const n of ['state', 'settings', 'save', 'layout', '*']) o[n] = MM.bus.count(n); return o; },
     // Distinct colours in a coarse sample of the scene canvas (painted-ness check).
     canvasColors() {
       const c = $('scene'); if (!c) return 0;
@@ -210,6 +215,10 @@
     window.addEventListener('scroll', () => { if (window.scrollX || window.scrollY) window.scrollTo(0, 0); }, { passive: true });
     window.addEventListener('orientationchange', () => setTimeout(layout, 120));
     if (window.visualViewport) window.visualViewport.addEventListener('resize', layout);
+    // devicePixelRatio changes (zoom, moving between monitors) re-run the integer-scale layout
+    const watchDpr = () => { try { const mq = window.matchMedia('(resolution: ' + (window.devicePixelRatio || 1) + 'dppx)'); mq.addEventListener('change', () => { layout(); watchDpr(); }, { once: true }); } catch (e) { /* ignore */ } };
+    watchDpr();
+    if (MM.loop && !MM.loop.running) MM.loop.start(); // baseline normally starts it via MM.loop.attach
     applyDocSettings(); MM.settings.onChange(applyDocSettings);
     if (MM.audio && typeof MM.audio.applySettings === 'function') {
       const s = MM.settings.all(); try { MM.audio.applySettings({ master: s.volMaster, music: s.volMusic, sfx: s.volSfx, cine: s.volCine }); } catch (e) { console.error(e); }
@@ -217,8 +226,10 @@
     if (!MM.save.available) setTimeout(() => toast('Saving is unavailable in this browser mode — progress lasts until you close the tab.', 'warn'), 600);
     MM.bus.on('save:error', (d) => { if (d && d.reason === 'corrupt') toast(d.restored ? 'Your latest save was damaged; restored the previous one.' : 'Your save was damaged and could not be loaded.', 'error'); });
     MM.bus.emit('boot', { version: MM.version });
+    // Phase 3: the SCREENS agent's MM.flow owns logo -> intro -> title; without it, core's fallback title is used.
+    const h = (location.hash || '').toLowerCase(), auto = h === '#mm-new' || h === '#mm-continue' || h === '#mm-play';
+    if (hasFlow() && !auto) { try { MM.flow.start(); } catch (e) { console.error('[MM boot] MM.flow.start failed', e); } }
     if (MM.state.current === 'boot') MM.state.go('title');
-    const h = (location.hash || '').toLowerCase();
     if (h === '#mm-new') MM.game.newGame({ name: 'Witch', startCampaign: true });
     else if (h === '#mm-continue' || h === '#mm-play') { const r = MM.save.hasSave() ? MM.game.continueGame() : { ok: false }; if (!r.ok) MM.game.newGame({ name: 'Witch', startCampaign: true }); }
   }

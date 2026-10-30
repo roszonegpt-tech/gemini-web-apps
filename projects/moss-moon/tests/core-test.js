@@ -31,6 +31,7 @@ function loadMM(opts = {}) {
     console: { log() {}, warn: (...a) => logs.push(['warn', a.join(' ')]), error: (...a) => logs.push(['error', a.map(String).join(' ')]) },
     performance: { now: () => (opts.clock ? opts.clock.t : Date.now()) }, Date, JSON, Math, Number, String, Object, Array, Map, Set, WeakMap, Error, Promise,
     localStorage: store, matchMedia: () => ({ matches: !!opts.reduced }),
+    setTimeout, clearTimeout, setInterval, clearInterval,
   };
   sandbox.window = sandbox; sandbox.globalThis = sandbox;
   if (opts.baseline) Object.assign(sandbox, opts.baseline(sandbox));
@@ -154,6 +155,10 @@ async function browserTests() {
     await page.goto(url); return { page, errors, context };
   }
   const fileUrl = (p) => 'file://' + p;
+  // Core-only page: index.html minus every non-core module (campaign/UI/FX wrap baseline functions on purpose; core seams are tested in isolation).
+  const CORE_KEEP = ['assets/js/', 'src/core/', 'src/systems/art.js'];
+  const corePage = path.join(ROOT, '__core_test_core.html');
+  fs.writeFileSync(corePage, fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8').replace(/<script src="([^"]+)"><\/script>\n?/g, (m, src) => (CORE_KEEP.some((k) => src.startsWith(k)) ? m : '')));
   try {
     // B1: baseline alone on a bare page (no MM, no shim): S1 null-safety + seams are no-ops.
     const bare = path.join(ROOT, '__core_test_bare.html');
@@ -176,27 +181,28 @@ async function browserTests() {
       await b2.context.close();
     } finally { fs.unlinkSync(bare); }
 
-    // B2: full page — integer scale + letterboxed pointer mapping in several viewports
+    // B2: integer scale + letterboxed pointer mapping in several viewports (core-only page)
     for (const vp of [{ width: 1280, height: 800 }, { width: 700, height: 1000 }, { width: 1500, height: 520 }, { width: 390, height: 844 }]) {
-      const { page, errors, context } = await open(fileUrl(path.join(ROOT, 'index.html')), vp);
+      const { page, errors, context } = await open(fileUrl(corePage), vp);
       await page.waitForFunction(() => window.__mm && window.MM.state.current === 'title');
       // isolate core pointer mapping from whatever the UI module overlays
-      await page.evaluate(() => { window.__mm.newGame({ name: 'Ptr', startCampaign: false }); window.__mm.setState('play'); document.getElementById('mm-ui').style.display = 'none'; });
+      await page.evaluate(() => { window.__mm.newGame({ name: 'Ptr', startCampaign: false }); window.__mm.setState('play'); document.getElementById('mm-ui').style.display = 'none';
+        document.getElementById('scene').addEventListener('pointerdown', () => { const g = window.__mm.game(); window.__camAtClick = { x: g.camX, y: g.camY }; }, true); });
       const lay = await page.evaluate(() => window.__mm.layout());
       const box = await page.locator('#scene').boundingBox();
       // click at canvas px (300, 120) and compare with the expected unprojected tile
       const sx = 300, sy = 120;
       await page.mouse.click(box.x + sx * box.width / 512, box.y + sy * box.height / 320);
-      const res = await page.evaluate(([sx, sy]) => { const g = window.__mm.game(); const p = unproject(sx - 256 + g.camX, sy - 160 + g.camY); return { t: g.target, exp: { x: p.x, y: p.y } }; }, [sx, sy]); // eslint-disable-line no-undef
+      const res = await page.evaluate(([sx, sy]) => { const g = window.__mm.game(), c = window.__camAtClick; const p = unproject(sx - 256 + c.x, sy - 160 + c.y); return { t: g.target, exp: { x: p.x, y: p.y } }; }, [sx, sy]); // eslint-disable-line no-undef
       const good = res.t && Math.abs(res.t.x - Math.min(19.4, Math.max(0.6, res.exp.x))) < 0.15 && Math.abs(res.t.y - Math.min(19.4, Math.max(0.6, res.exp.y))) < 0.15;
       const aspect = Math.abs(box.width / box.height - 1.6) < 0.01, inside = box.x >= -0.5 && box.y >= -0.5 && box.x + box.width <= vp.width + 0.5 && box.y + box.height <= vp.height + 0.5;
       ok('layout+pointer ' + vp.width + 'x' + vp.height, good && aspect && inside && errors.length === 0 && (lay.scale * 1 >= 2 ? lay.integer && Number.isInteger(lay.scale) : true), { lay, box, res, errors });
       await context.close();
     }
 
-    // B3: seams, events and fixes on the real page
+    // B3: seams, events and fixes (core-only page)
     {
-      const { page, errors, context } = await open(fileUrl(path.join(ROOT, 'index.html')));
+      const { page, errors, context } = await open(fileUrl(corePage));
       await page.waitForFunction(() => window.__mm && window.MM.state.current === 'title');
       const r = await page.evaluate(() => {
         /* eslint-disable no-undef */
@@ -316,6 +322,7 @@ async function browserTests() {
       ok('build: --check passes on index.html', !failedLoud);
     }
   } finally {
+    try { fs.unlinkSync(corePage); } catch (e) { /* ignore */ }
     await browser.close();
     fs.rmSync(scratch, { recursive: true, force: true });
   }

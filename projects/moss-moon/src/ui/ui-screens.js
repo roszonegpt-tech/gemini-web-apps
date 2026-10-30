@@ -51,87 +51,14 @@
   };
   function showSky(on) { ui.buildSky(); ui.layers.sky.classList.toggle('mm-on', !!on); }
 
-  // ============================================================ TITLE
-  function saveInfo() {
-    const S = MM.save;
-    let has = false, sum = null;
-    if (S && typeof S.hasSave === 'function') { has = !!safe(() => S.hasSave(), false); sum = has ? safe(() => S.summary(), null) : null; }
-    else {
-      // FALLBACK: read the baseline v1 key directly.
-      const raw = safe(() => localStorage.getItem('moss-moon-adventure-v1'), null);
-      if (raw) { has = true; const w = safe(() => JSON.parse(raw), null); sum = w ? { name: safe(() => JSON.parse(localStorage.getItem('moss-moon-name') || 'null'), null) || 'Witch', level: w.level, day: w.day, chapter: null, savedAt: null } : null; }
-    }
-    return { has, sum, corrupt: has && !sum };
-  }
-  function ago(ts) {
-    if (!ts) return '';
-    const s = Math.max(0, (Date.now() - ts) / 1000);
-    if (s < 60) return 'just now'; if (s < 3600) return Math.floor(s / 60) + ' min ago'; if (s < 86400) return Math.floor(s / 3600) + ' h ago';
-    return Math.floor(s / 86400) + ' days ago';
-  }
-  const CHAPTERS = ['Arrival', 'The Blighted Forest', 'The Whispering Swamp', 'Frostpeak', 'The Moonwell', 'Free Play'];
+  // Title / main menu, logo and intro belong to the SCREENS agent (src/screens/*, MM.flow) since phase 3.
   ui.saveError = null;
-  ui.registerScreen('title', () => {
-    const el = h('div', { class: 'mm-title-screen', role: 'main', 'aria-label': 'Title screen' });
-    const inst = { el, state: 'title', label: 'Moss and Moon — title', noEscape: true, quiet: true };
-    function render() {
-      el.innerHTML = '';
-      const info = saveInfo();
-      const logo = h('header', { class: 'mm-logo' },
-        h('p', { class: 'mm-logo-eyebrow' }, 'A cozy witch’s tale'),
-        h('h1', { class: 'mm-logo-title' }, h('span', null, 'MOSS'), h('span', { class: 'mm-amp' }, '&'), h('span', null, 'MOON')),
-        h('div', { class: 'mm-logo-rule', 'aria-hidden': 'true' }, h('i'), ui.icon('moon'), h('i')),
-        h('p', { class: 'mm-logo-tag' }, 'Restore Moonflower Grove after the Moonwell loses its light.'));
-      const menu = h('nav', { class: 'mm-title-menu', 'aria-label': 'Main menu' });
-      const contSub = info.corrupt ? 'Save data couldn’t be read' : info.has && info.sum ? [info.sum.name, 'Lv ' + (info.sum.level || 1), 'Day ' + (info.sum.day || 1)].filter(Boolean).join(' · ') : 'No saved journey yet';
-      const cont = ui.button('Continue', () => continueGame(), { icon: 'play', cls: (info.has && !info.corrupt ? 'mm-btn-primary ' : '') + 'mm-title-btn', sub: contSub, disabled: !info.has || info.corrupt, id: 'continue' });
-      cont.setAttribute('aria-describedby', 'mm-cont-note');
-      const ng = ui.button('New Game', () => newGame(info), { icon: 'sprout', cls: (!info.has || info.corrupt ? 'mm-btn-primary ' : '') + 'mm-title-btn', id: 'new-game' });
-      if (info.has && !info.corrupt) { menu.append(cont, ng); cont.dataset.autofocus = '1'; } else { menu.append(ng, cont); ng.dataset.autofocus = '1'; }
-      if (info.has && info.sum) {
-        const s = info.sum;
-        menu.insertBefore(h('div', { class: 'mm-save-card', id: 'mm-cont-note' }, ui.icon('bookmark'),
-          h('div', null, h('strong', null, s.name || 'Your journey'), h('span', null, [s.chapter != null ? 'Chapter ' + s.chapter + (CHAPTERS[s.chapter] ? ' · ' + CHAPTERS[s.chapter] : '') : null, s.savedAt ? 'Saved ' + ago(s.savedAt) : null].filter(Boolean).join(' · ') || 'Ready to continue'))), cont.nextSibling);
-      } else {
-        menu.appendChild(h('p', { class: 'mm-title-note', id: 'mm-cont-note' }, info.corrupt ? 'Your previous save was damaged. Start a new journey, or erase it in Settings → Game.' : 'Continue unlocks once you have a saved journey.'));
-      }
-      if (D.memories().length) menu.appendChild(ui.button('Memories', () => ui.open('memories'), { icon: 'film', cls: 'mm-title-btn', id: 'memories' }));
-      menu.append(
-        ui.button('Settings', () => ui.open('settings'), { icon: 'sliders', cls: 'mm-title-btn', id: 'settings' }),
-        ui.button('Controls', () => ui.open('controls'), { icon: 'gamepad', cls: 'mm-title-btn', id: 'controls' }),
-        ui.button('Credits', () => ui.open('credits'), { icon: 'quill', cls: 'mm-title-btn', id: 'credits' }));
-      const foot = h('footer', { class: 'mm-title-foot' }, h('span', null, 'v' + (MM.version || ui.version)), h('span', { class: 'mm-title-hint' }, h('kbd', { class: 'mm-kbd' }, '↑↓'), ' choose  ', h('kbd', { class: 'mm-kbd' }, 'Enter'), ' select'));
-      el.append(h('div', { class: 'mm-title-col' }, logo, menu), foot);
-      if (ui.saveError) {
-        const msg = ui.saveError; ui.saveError = null;
-        setTimeout(() => ui.alert({ title: 'Save data couldn’t be loaded', body: 'Your saved journey appears to be damaged' + (msg && msg.reason ? ' (' + msg.reason + ')' : '') + '. A fresh start is ready; the damaged data was set aside.', icon: 'warn' }), 50);
-      }
-    }
-    inst.refresh = render;
-    inst.onOpen = () => { showSky(true); safe(() => MM.audio && MM.audio.music && MM.audio.music('title', { fade: 1.5 })); };
-    inst.onClose = () => { if (!ui.isOpen('creation')) showSky(false); };
-    render();
-    return inst;
-  });
-  async function newGame(info) {
-    if (info.has && !info.corrupt) {
-      const s = info.sum || {};
-      const ok = await ui.confirm({ title: 'Begin a new journey?', body: 'Your current journey' + (s.name ? ' with ' + s.name : '') + (s.level ? ' (Lv ' + s.level + ', Day ' + (s.day || 1) + ')' : '') + ' will be replaced once the new one is saved.', yes: 'Start fresh', no: 'Keep my save', danger: true, icon: 'sprout' });
-      if (!ok) return;
-    }
-    ui.close('title', { silent: true, noSync: true });
-    ui.open('creation');
-  }
-  async function continueGame() {
-    let r;
-    if (MM.game && typeof MM.game.continueGame === 'function') r = safe(() => MM.game.continueGame(), { ok: false, reason: 'error' });
-    else r = { ok: true }; // FALLBACK: baseline already loaded the v1 save at boot
-    if (r && typeof r.then === 'function') r = await r.catch(() => ({ ok: false, reason: 'error' }));
-    if (r === false || (r && r.ok === false)) { ui.sfx('ui_error'); await ui.alert({ title: 'Couldn’t continue', body: 'The save could not be loaded' + (r && r.reason ? ' (' + r.reason + ')' : '') + '. You can start a new journey instead.', icon: 'warn' }); const t = ui.get('title'); if (t) t.refresh(); return; }
+  ui.toTitle = function () {
     ui.closeAll({ noSync: true });
-    showSky(false);
-    if (['title', 'creation', 'boot'].includes(ui.state().current)) ui.go('play');
-  }
+    if (MM.flow && typeof MM.flow.toTitle === 'function') { safe(() => MM.flow.toTitle()); return; }
+    if (MM.game && typeof MM.game.toTitle === 'function') safe(() => MM.game.toTitle());
+    if (!ui.stateIs('title')) ui.go('title');
+  };
 
   // ============================================================ CHARACTER CREATION
   const LOOK_LABELS = {
@@ -154,7 +81,7 @@
   function makePreview(canvas) {
     const ctx = canvas.getContext('2d');
     const imgs = {}, cache = {};
-    let look = Object.assign({}, LOOK_DEFAULT), dir = 4, pose = 'cycle', t0 = performance.now(), raf = 0, alive = true;
+    let look = Object.assign({}, LOOK_DEFAULT), dir = 4, pose = 'cycle', t0 = performance.now(), off = null, alive = true;
     const ATL = safe(() => ATLAS_DATA, null), PAL = safe(() => PALETTES, null), CK = safe(() => COLOR_KEYS, null), AN = safe(() => ANIMATIONS, null); // eslint-disable-line no-undef
     const anim = (k) => (AN && AN[k]) || { idle: { row: 0, frames: 8, frameMs: 125 }, walk: { row: 8, frames: 8, frameMs: 100 }, cast: { row: 56, frames: 8, frameMs: 60 } }[k];
     function source(style) {
@@ -208,15 +135,14 @@
       if (atlas) ctx.drawImage(atlas, f.frame * 48, (f.row + dir) * 56, 48, 56, x, y, 48 * sc, 56 * sc);
       else { ctx.fillStyle = '#e9cf98'; ctx.font = '600 14px Georgia, serif'; ctx.textAlign = 'center'; ctx.fillText('Preview loading…', W / 2, H / 2); }
       if (api.onPose) api.onPose(f.k);
-      raf = requestAnimationFrame(draw);
     }
     const api = {
       setLook(l) { look = Object.assign({}, look, l); },
       rotate(d) { dir = (dir + d + 8) % 8; },
       dirName: () => PREVIEW_DIRS[dir],
       setPose(p) { pose = p; t0 = performance.now(); },
-      stop() { alive = false; cancelAnimationFrame(raf); },
-      start() { alive = true; raf = requestAnimationFrame(draw); },
+      stop() { alive = false; if (off) { off(); off = null; } },
+      start() { alive = true; if (!off) off = ui.tick(() => draw(performance.now())); }, // shared UI tick (MM.loop) — no own rAF
       ready: () => !!recolored(),
     };
     return api;
@@ -290,8 +216,7 @@
       if (dirty() && !(await ui.confirm({ title: 'Discard your witch?', body: 'Your name and appearance choices will be lost.', yes: 'Discard', no: 'Keep editing', danger: true }))) return true;
       ui.sfx('ui_back');
       ui.close('creation', { silent: true, noSync: true });
-      ui.go('title');
-      if (!ui.isOpen('title')) ui.open('title');
+      ui.toTitle();
       return true;
     }
     function confirm() {
@@ -305,6 +230,7 @@
       prev.stop();
       ui.closeAll({ noSync: true });
       showSky(false);
+      if (MM.flow && typeof MM.flow.afterCreation === 'function') { safe(() => MM.flow.afterCreation(v.name, finalLook)); return; } // phase 3: flow → tutorial or play
       if (MM.game && typeof MM.game.newGame === 'function') safe(() => MM.game.newGame({ name: v.name, look: finalLook }));
       else { MM.game = MM.game || {}; MM.game.name = v.name; } // FALLBACK (no core): keep the name for the HUD
       if (['creation', 'title', 'boot'].includes(ui.state().current)) ui.go('play');
@@ -380,11 +306,11 @@
           if (n === 0) b.dataset.autofocus = '1';
           choicesEl.appendChild(b);
         });
-        requestAnimationFrame(() => ui.focusFirst(choicesEl));
+        setTimeout(() => ui.focusFirst(choicesEl), 0);
       } else {
         more.hidden = false;
         more.querySelector('span').textContent = i < pages.length - 1 ? 'Continue' : 'Close';
-        requestAnimationFrame(() => { if (ui.top() === inst) more.focus(); });
+        setTimeout(() => { if (ui.top() === inst) more.focus(); }, 0);
       }
     }
     function advance() {
@@ -512,17 +438,18 @@
     const r = ui.root();
     r.className = r.className.replace(/\bmm-state-\S+/g, '').trim() + ' mm-state-' + to;
     if (from === 'loading' && to !== 'loading') ui.showLoading(false);
+    if (!['creation', 'ending'].includes(to)) showSky(false); // REQUESTS CORE→UI #1: never leave the backdrop over the game
     switch (to) {
-      case 'title':
-        if (!ui.isOpen('title')) { ui.closeAll({ noSync: true }); ui.open('title'); }
-        showSky(true);
+      case 'title': case 'logo': case 'intro': case 'boot':
+        // SCREENS owns these; make sure no UI screen lingers over them (Settings/Controls/Credits opened from the main menu stay).
+        if (from && from !== to && !['title', 'logo', 'intro', 'boot'].includes(from)) ui.closeAll({ noSync: true });
         break;
       case 'creation':
         if (!ui.isOpen('creation')) { ui.closeAll({ noSync: true }); ui.open('creation'); }
         break;
-      case 'play':
+      case 'play': case 'interior': case 'tutorial':
+        ui.lastGameState = to;
         if (ui.stack.length) ui.closeAll({ noSync: true });
-        showSky(false);
         if (pendingDefeat && from === 'cine') { /* defeat cine finished and campaign returned to play: nothing to show */ pendingDefeat = null; }
         break;
       case 'menu':
@@ -550,10 +477,8 @@
     ui.on('state', ui.onState);
     ui.on('toast', (d) => { if (d) ui.toast(d.text || d, d.kind); });
     ui.on('save:error', (d) => {
-      ui.saveError = d || {};
-      const t = ui.get('title');
-      if (t && ui.top() === t) t.refresh();
-      else if (!t) ui.toast('Your save data could not be read — starting fresh.', 'warn');
+      if (MM.flow) return; // the main menu (SCREENS) reports load problems itself
+      ui.toast('Your save data could not be read' + (d && d.reason ? ' (' + d.reason + ')' : '') + ' — a safe fresh start is ready.', 'warn');
     });
     ui.on('dungeon:complete', (d) => ui.open('dungeonSummary', { data: d || {} }));
     ui.on('defeat', (d) => {
@@ -562,6 +487,10 @@
       if (cur === 'play' || cur === 'menu') ui.open('defeat', { data: pendingDefeat });
     });
     ui.on('ending', (d) => { if (!ui.stateIs('cine') && !ui.isOpen('campaignComplete')) ui.open('campaignComplete', d || {}); });
-    ui.on('memory', () => { const t = ui.get('title'); if (t) t.refresh(); });
+    // Register screen policies for the states the UI owns (only if CORE has not defined them).
+    if (MM.screens && typeof MM.screens.register === 'function') {
+      const reg = (name, def) => { if (!safe(() => MM.screens.def(name), null)) safe(() => MM.screens.register(name, def)); };
+      reg('creation', { sim: 'none', draw: 'none', audio: { music: 'title', ambience: null, keep: true } });
+    }
   };
 })();

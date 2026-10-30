@@ -48,6 +48,15 @@ window.MM = window.MM || {};
   // 0 (day) .. 1 (night), with dusk/dawn ramps
   function darkness() { const t = world.time; if (t >= 0.68 || t < 0.08) return 1; if (t >= 0.56) return (t - 0.56) / 0.12; if (t < 0.18) return 1 - (t - 0.08) / 0.1; return 0; }
 
+  // Only act/draw while the current screen shows the world (Phase 3: MM.screens draw:'world').
+  function worldActive() {
+    try {
+      const sc = MM.screens; if (sc && sc.current && typeof sc.def === 'function') { const d = sc.def(sc.current); if (d) return d.draw === 'world' && d.sim !== 'none'; }
+      const st = MM.state && MM.state.current; if (st) return st === 'play' || st === 'tutorial';
+    } catch (e) { /* fall through */ }
+    return true;
+  }
+  const glyph = () => { try { return MM.input?.glyph?.('interact') || 'E'; } catch (e) { return 'E'; } };
   // ================================================================== public object + options
   const W = MM.world = MM.world || {};
   W.version = 1;
@@ -231,9 +240,16 @@ window.MM = window.MM || {};
     return bake('fg:' + style + which, 132, 84, 0, 0, (g) => {
       const R = (n) => hsh(n, which.length * 13, style.length * 7);
       if (style === 'leafy' || style === 'bunting' && which === 'b') {
-        if (which === 'b') { // ferns rising from the bottom corner
-          for (let f = 0; f < 5; f++) { const bx = 4 + f * 9, len = 26 + R(f) * 30, ang = -1.25 + f * 0.13;
-            for (let s = 0; s < len; s += 3) { const x = bx + Math.cos(ang) * s * 0.9 + s * s * 0.004 * f, y = 84 - Math.sin(-ang) * s; F(g, s < len * 0.3 ? '#2f4b47' : '#46695f', x, y, 2, 2); if (s > 4) { F(g, '#4b7052', x - 4, y - 1, 4, 1); F(g, '#4b7052', x + 2, y - 2, 4, 1); } } }
+        if (which === 'b') { // fern fronds arching up out of the bottom corner
+          for (let f = 0; f < 4; f++) {
+            const bx = 2 + f * 7, len = 34 + R(f) * 22, bend = 0.5 + f * 0.25, col = f % 2 ? '#2f4b47' : '#3c5c45';
+            let px = bx, py = 84;
+            for (let s = 0; s < len; s++) {
+              const k = s / len, ang = -Math.PI / 2 + k * bend * 1.6, x = px + Math.cos(ang), y = py + Math.sin(ang);
+              F(g, col, x, y, 2, 1); px = x; py = y;
+              if (s % 3 === 0 && s > 3) { const lf = Math.round((1 - k) * 6 + 2); for (let q = 1; q <= lf; q++) { F(g, col, x - q, y + q * 0.35, 1, 1); F(g, col, x + 1 + q, y - q * 0.25 + 1, 1, 1); } }
+            }
+          }
           return;
         }
         LINE(g, '#2b2422', 4, [0, 4, 30, 12, 64, 16, 96, 26]); LINE(g, '#3d302a', 2, [40, 14, 58, 30, 66, 40]);
@@ -251,8 +267,12 @@ window.MM = window.MM || {};
         LINE(g, '#2b2422', 4, [0, 2, 40, 8, 90, 6, 132, 12]);
         for (let i = 0; i < 26; i++) { const x = 2 + R(i) * 126, l = 10 + R(i + 5) * 46; for (let y = 6; y < l; y += 2) F(g, y % 6 ? '#4f7a5e' : '#3d5e4a', x + Math.sin(y * 0.3 + i) * 1.5, y, 1 + (y < l * 0.5 ? 1 : 0), 2); }
       } else if (style === 'pine') {
-        LINE(g, '#2b2422', 4, [0, 6, 50, 14, 112, 30]);
-        for (let s = 0; s < 104; s += 3) { const x = s, y = 6 + s * 0.22; LINE(g, '#2f4b47', 1, [x, y, x - 6, y + 9]); LINE(g, '#2f4b47', 1, [x, y, x + 4, y + 10]); F(g, s % 9 ? '#f7f4e9' : '#d6f1fb', x - 2, y - 2, 4, 1); }
+        LINE(g, '#2b2422', 3, [0, 4, 50, 12, 104, 26]);
+        for (let s = 2; s < 100; s += 7) { // needle tufts drooping from the bough, snow resting on top
+          const x = s, y = 4 + s * 0.21, l = 9 + R(s) * 7;
+          for (let k = -3; k <= 3; k++) LINE(g, k % 2 ? '#2f4b47' : '#46695f', 1, [x, y, x + k * 2, y + l - Math.abs(k)]);
+          E(g, '#f7f4e9', x + 1, y - 1, 5, 2); F(g, '#d6f1fb', x - 2, y, 4, 1);
+        }
       } else if (style === 'icicles') {
         F(g, '#1d2638', 0, 0, 132, 6);
         for (let i = 0; i < 16; i++) { const x = 2 + i * 8 + R(i) * 3, l = 8 + R(i + 1) * 26; POLY(g, R(i + 2) > 0.5 ? '#a5d6d8' : '#d6f1fb', [x, 4, x + 5, 4, x + 2, 4 + l]); }
@@ -324,10 +344,10 @@ window.MM = window.MM || {};
     const c = { L: lv.L, mw: lv.mw, restored: restoredOf, h: hsh, noise: noise2, dist: polyDist, near, floor, blocks, region, mode };
     const tiles = new Array(MAPN * MAPN);
     for (let y = 0; y < MAPN; y++) for (let x = 0; x < MAPN; x++) { let f = 'grass_grove'; try { f = cfg.terrain ? cfg.terrain(x, y, c) : f; } catch (e) { console.error('[MM.world] terrain', e); } tiles[x + y * MAPN] = f || 'grass_grove'; }
-    const L = { cfg, region, mode, tiles, items: [], inter: [], npcs: [], decals: [], reserves: [], scat: [], groundFx: [] };
+    const L = { cfg, region, mode, tiles, items: [], inter: [], npcs: [], decals: [], reserves: [], scat: [], groundFx: [], buildings: [] };
     const B = {
       p(s, x, y, o) { const it = Object.assign({ s, x, y }, o || {}); it.ph = hsh(Math.round(x * 97), Math.round(y * 89), 5) * TAU; L.items.push(it); return it; },
-      i(id, x, y, o) { o = o || {}; L.inter.push({ id, x, y, r: o.r || 1.2, prompt: o.prompt || id, kind: o.kind || id, region, action: o.action }); },
+      i(id, x, y, o) { o = o || {}; L.inter.push(Object.assign({}, o, { id, x, y, r: o.r || 1.2, prompt: o.prompt || id, kind: o.kind || id, region, action: o.action })); },
       npc(id, x, y, o) { o = o || {}; const nm = o.name || NPC_INFO[id]?.name || id; const it = B.p('@npc', x, y, { k: 'npc', npc: id, name: nm, r: 0.25 }); L.npcs.push(it); B.i(id, x, y, { prompt: 'Talk to ' + nm, r: 1.4, kind: 'npc' }); return it; },
       decal(s, x, y, o) { L.decals.push(Object.assign({ s, x, y }, o || {})); },
       garland(x1, y1, z1, x2, y2, z2, o) { return B.p('@garland', (x1 + x2) / 2, (y1 + y2) / 2, { k: 'garland', a: [x1, y1, z1], b: [x2, y2, z2], kind: (o || {}).kind || 'bunting' }); },
@@ -335,6 +355,7 @@ window.MM = window.MM || {};
       scatter(spec) { L.scat.push(spec); },
       fx(kind, x, y, o) { L.groundFx.push(Object.assign({ kind, x, y }, o || {})); },
     };
+    if (!dungeon) { try { placeBuildings(L, B, c, cfg); } catch (e) { console.error('[MM.world] buildings', region, e); } }
     try { if (dungeon) buildDungeon(B, c, cfg); else if (cfg.build) cfg.build(B, c); } catch (e) { console.error('[MM.world] build', region, e); }
     // scatter (deterministic)
     const seedBase = (region.length * 131 + (dungeon ? 977 + (world.dungeonSeed || 1) % 997 + floor * 31 : 0)) | 0;
@@ -356,8 +377,13 @@ window.MM = window.MM || {};
     if (sp.minL != null && lvl < sp.minL) return; if (sp.maxL != null && lvl > sp.maxL) return;
     const on = sp.on || (sp.water ? ['water'] : NATURAL), zone = sp.zone || 'any', avoid = sp.avoid || 0.9;
     let placed = 0;
+    const mine = [];
     for (let a = 0; a < n * 40 && placed < n; a++) {
-      const x = 0.35 + hsh(a, si, seedBase + 11) * 19.3, y = 0.35 + hsh(si, a, seedBase + 23) * 19.3;
+      let x = 0.35 + hsh(a, si, seedBase + 11) * 19.3, y = 0.35 + hsh(si, a, seedBase + 23) * 19.3;
+      if (sp.cluster && mine.length && hsh(a, si, seedBase + 29) < 0.72) { // grow natural clumps around earlier picks
+        const b = mine[Math.floor(hsh(a, si, seedBase + 31) * mine.length)], ang = hsh(a, si, seedBase + 37) * TAU, rr = avoid * (1 + hsh(a, si, seedBase + 43) * 0.8);
+        x = clampN(b.x + Math.cos(ang) * rr, 0.35, 19.65); y = clampN(b.y + Math.sin(ang) * rr, 0.35, 19.65);
+      }
       if (!inZone(zone, x, y, L)) continue;
       if (!on.includes(L.tiles[Math.floor(x) + Math.floor(y) * MAPN])) continue;
       if (L.reserves.some(([rx, ry, rr]) => Math.hypot(x - rx, y - ry) < rr + 0.2)) continue;
@@ -370,8 +396,55 @@ window.MM = window.MM || {};
       const flip = hsh(si, a, seedBase + 53) < 0.5;
       if (sp.decal) L.decals.push({ s, x, y, flip, water: !!sp.water, glow: sp.glow });
       else { const it = Object.assign({ s, x, y, flip, _sc: si }, { k: sp.k, r: sp.r, low: sp.low, tall: sp.tall, sway: sp.sway, glow: sp.glow }); it.ph = hsh(a, si, 9) * TAU; L.items.push(it); }
-      placed++;
+      placed++; mine.push({ x, y });
     }
+  }
+  // ---------------------------------------------------------------- buildings (MM.BUILDINGS when present, else regions-visual defaults)
+  function buildingDefs(region, c) {
+    const BD = MM.BUILDINGS;
+    if (BD && BD.placements && Array.isArray(BD.placements[region])) { try { return adaptBuildings(BD, region, c); } catch (e) { console.error('[MM.world] MM.BUILDINGS adapter', e); } }
+    const f = (MM.WORLD_BUILDINGS_DEFAULT || {})[region];
+    try { return f ? f(c) : []; } catch (e) { console.error('[MM.world] default buildings', e); return []; }
+  }
+  function adaptBuildings(BD, region, c) { return BD.placements[region].map((pl) => adaptOne(BD, pl, c)).filter(Boolean); }
+  function adaptOne(BD, pl, c) { return Object.assign({ enterable: true }, pl); } // replaced once MM.BUILDINGS' schema is known
+  function doorInfo(b) {
+    const d = (b.spec && b.spec.door) || b.door || { face: 'L', at: b.fw * 8 };
+    const at = (d.at ?? b.fw * 8) / 16, out = b.approachOut ?? 0.62;
+    if (d.face === 'R') return { face: 'R', x: b.x, y: b.y - at, ax: b.x + out, ay: b.y - at };
+    return { face: 'L', x: b.x - at, y: b.y, ax: b.x - at, ay: b.y + out };
+  }
+  function placeBuildings(L, B, c, cfg) {
+    for (const b of buildingDefs(L.region, c)) {
+      if (!b || !Number.isFinite(b.x) || !Number.isFinite(b.y)) continue;
+      const rect = b.rect || [b.x - b.fw + 0.06, b.y - b.fd + 0.06, b.x - 0.04, b.y - 0.04];
+      const it = B.p('@bld', b.x, b.y, { k: 'building', bld: b, rect, tall: true });
+      const d = b.doorPt = b.doorPt || doorInfo(b);
+      B.i('enter:' + b.id, d.ax, d.ay, { prompt: b.enterable ? 'Enter ' + (b.name || b.id) : (b.lockedReason || 'The door is locked.'), r: 0.95, kind: 'door', building: b.id, locked: !b.enterable, hy: 70 });
+      B.reserve(d.ax, d.ay, 1.1); L.buildings.push(b);
+      it.doorPt = d;
+    }
+    // carve footpaths from each door to the nearest existing path (BFS on tiles, around footprints and water)
+    const pathFam = cfg.pathFamily || 'path_dirt', targets = new Set(cfg.pathTargets || ['path_dirt', 'cobble', 'crypt_flag']);
+    const blocked = (x, y) => L.tiles[x + y * MAPN] === 'water' || L.buildings.some((b) => x + 0.5 > b.x - b.fw && x + 0.5 < b.x && y + 0.5 > b.y - b.fd && y + 0.5 < b.y);
+    for (const b of L.buildings) {
+      const sx = Math.floor(b.doorPt.ax), sy = Math.floor(b.doorPt.ay); if (sx < 0 || sy < 0 || sx >= MAPN || sy >= MAPN) continue;
+      const prev = new Map(), q = [[sx, sy]]; prev.set(sx + sy * MAPN, -1); let hit = null;
+      while (q.length && !hit) {
+        const [x, y] = q.shift();
+        if (targets.has(L.tiles[x + y * MAPN]) && !(x === sx && y === sy)) { hit = [x, y]; break; }
+        for (const [dx, dy] of [[0, 1], [1, 0], [0, -1], [-1, 0]]) { const nx = x + dx, ny = y + dy, k = nx + ny * MAPN; if (nx < 0 || ny < 0 || nx >= MAPN || ny >= MAPN || prev.has(k) || blocked(nx, ny)) continue; prev.set(k, x + y * MAPN); q.push([nx, ny]); }
+        if (prev.size > 160) break;
+      }
+      L.tiles[sx + sy * MAPN] = pathFam;
+      if (hit) { let k = prev.get(hit[0] + hit[1] * MAPN); while (k != null && k >= 0) { if (!targets.has(L.tiles[k])) L.tiles[k] = pathFam; k = prev.get(k); } }
+    }
+  }
+  function buildingSprite(it) {
+    const b = it.bld; if (!b) return null;
+    if (b.art && hasArt(b.art)) return null;
+    if (!it.spr || it.sprKey !== b.spec) { it.spr = MM.worldBuildings ? MM.worldBuildings.get(Object.assign({ fw: b.fw, fd: b.fd }, b.spec || {})) : null; it.sprKey = b.spec; }
+    return it.spr;
   }
   function buildDungeon(B, c, cfg) {
     const blocks = c.blocks || [];
@@ -391,6 +464,8 @@ window.MM = window.MM || {};
   function spriteSize(it) {
     if (it.k === 'npc') return [28, 42, 14, 40];
     if (it.k === 'garland') return [0, 0, 0, 0];
+    if (it.k === 'building') { if (it.bld.art && artGet(it.bld.art)) { const f = artGet(it.bld.art); return [f.w, f.h, f.ax, f.ay]; } const r = buildingSprite(it); if (r) return [r.w, r.h, r.ax, r.ay]; }
+    if (it.s && it.s[0] === '@' && artGet(it.s.slice(1))) { const f = artGet(it.s.slice(1)); return [f.w, f.h, f.ax, f.ay]; }
     if (it.s && it.s[0] === '@') { const d = PROC[it.s.slice(1)]; if (d) return [d[0] + 2, d[1] + 2, d[2] + 1, d[3] + 1]; }
     const f = artGet(it.s); if (f) return [f.w, f.h, f.ax, f.ay];
     const fs = FALLBACK_SIZE[it.k] || [20, 22]; return [fs[0], fs[1], fs[0] / 2, fs[1] - 1];
@@ -403,7 +478,16 @@ window.MM = window.MM || {};
   function prepItem(it) {
     const sz = spriteSize(it); it.w = sz[0]; it.h = sz[1]; it.ax = sz[2]; it.ay = sz[3];
     if (it.r == null && KIND_R[it.k] != null) it.r = KIND_R[it.k];
-    it.depth = project(it.x, it.y).y + (it.dz || 0);
+    const rc0 = itemRect(it);
+    it.depth = rc0 ? project(rc0[0], rc0[1]).y + 0.5 : project(it.x, it.y).y + (it.dz || 0); it.baseDepth = it.depth;
+    if (it.k === 'building') {
+      const r = buildingSprite(it), b = it.bld;
+      if (r) {
+        it.lights = []; it.smoke = null;
+        if (b.litWindows) for (const w of r.windows) it.lights.push({ dx: w.x + w.w / 2 - r.ax, dy: w.y + w.h / 2 - r.ay, r: 26, color: '#ffd98a', flicker: 0.15, night: true, kind: 'window' });
+        if (b.smoke && r.chimney) it.smoke = [[r.chimney.x - r.ax, r.chimney.y - r.ay]];
+      }
+    }
     it.fade = 1;
     if (it.k === 'garland') { const pa = project(it.a[0], it.a[1]).y, pb = project(it.b[0], it.b[1]).y; it.depth = (pa + pb) / 2; }
   }
@@ -531,10 +615,31 @@ window.MM = window.MM || {};
       g.fillRect(Math.round(x), Math.round(y), 2, (i % 3) ? 1 : 2);
     }
   }
+  // Organic transition: paint the higher-ranked neighbour's texture onto this tile in a jagged band along the
+  // shared edge, plus a 1px soft shade at the band's inner border (reads as a slight overhang).
+  const fringeTmp = mk(32, 16);
+  function fringeDraw(g, nf, side, seed, cx, cy) {
+    const [tc, tg] = fringeTmp; tg.clearRect(0, 0, 32, 16); famDraw(tg, nf, seed, 16, 8);
+    const src = tg.getImageData(0, 0, 32, 16), out = tg.createImageData(32, 16), s = src.data, d = out.data;
+    const ph = hsh(seed, side.charCodeAt(1), 13) * 10;
+    for (let py = 0; py < 16; py++) for (let px = 0; px < 32; px++) {
+      const u = (px + 0.5 - 16) / 16, v = (py + 0.5 - 8) / 8; if (Math.abs(u) + Math.abs(v) > 1) continue;
+      let dist, along;
+      if (side === 'ne') { dist = 1 - (u - v); along = u + v; } else if (side === 'nw') { dist = 1 + u + v; along = u - v; }
+      else if (side === 'se') { dist = 1 - (u + v); along = u - v; } else { dist = 1 + u - v; along = u + v; }
+      const w = 0.2 + 0.3 * (0.5 + 0.5 * Math.sin(along * 7 + ph)) * (0.6 + 0.4 * Math.sin(along * 17 + ph * 2)) + (hsh(px, py, seed) < 0.18 ? 0.06 : 0);
+      const i = (py * 32 + px) * 4;
+      if (dist < w) { d[i] = s[i]; d[i + 1] = s[i + 1]; d[i + 2] = s[i + 2]; d[i + 3] = s[i + 3]; }
+      else if (dist < w + 0.09) { d[i] = 20; d[i + 1] = 30; d[i + 2] = 24; d[i + 3] = 42; }
+    }
+    tg.putImageData(out, 0, 0); g.drawImage(tc, cx - 16, cy - 8);
+  }
   function shoreDraw(g, side, cx, cy) { const n = 'edge_shore_' + side; if (hasArt(n)) { MM.art.draw(g, n, cx, cy); return; } edgeDraw(g, 'cobble', side, cx, cy); }
   function buildTerrain() {
     const t0 = nowS();
     if (!S.terrain) { const [c, g] = mk(TCW, TCH); S.terrain = c; S.tg = g; }
+    if (!S.wedge) { const [c, g2] = mk(TCW, TCH); S.wedge = c; S.wg = g2; }
+    S.wg.clearRect(0, 0, TCW, TCH);
     const g = S.tg, cfg = S.cfg || {}; g.clearRect(0, 0, TCW, TCH);
     // 1. island skirt: earth band below the two front edges, with drips (roots / icicles / moss / crystals)
     const sk = cfg.skirt || { a: '#5c4634', b: '#3f3029' }, depth = 30;
@@ -562,18 +667,21 @@ window.MM = window.MM || {};
       for (const [dx, dy, sd] of SIDES) {
         const xx = x + dx, yy = y + dy; if (xx < 0 || yy < 0 || xx >= MAPN || yy >= MAPN) continue;
         const nf = T[xx + yy * MAPN]; if (nf === f) continue;
-        if (f === 'water') continue; // shore lips drawn in the water pass
-        if ((RANK[nf] ?? 3) > rf && EDGE[nf]) edgeDraw(g, nf, sd, cx, cy);
+        if (nf === 'water') continue;
+        if (f === 'water') { fringeDraw(S.wg, nf, sd, xx * 131 + yy * 17 + 3, cx, cy); shoreDraw(S.wg, sd, cx, cy); continue; } // drawn after the animated water
+        if ((RANK[nf] ?? 3) > rf) fringeDraw(g, nf, sd, xx * 131 + yy * 17 + 3, cx, cy);
       }
     }
+    for (const d of S.waterDecals) { const px = OX + (d.x - d.y) * 16, py = OY + (d.x + d.y) * 8; if (!blitArt(S.wg, d.s, px, py, 0, d.flip)) fallbackFlat(S.wg, d.s, px, py); }
     // 5. flat decals (soil beds, flowers, mounds...) in depth order
     const decs = S.decals.slice().sort((a, b) => (a.x + a.y) - (b.x + b.y));
     for (const d of decs) { const px = OX + (d.x - d.y) * 16, py = OY + (d.x + d.y) * 8; if (d.tile) famDraw(g, d.s, Math.round(d.x * 7 + d.y * 13), px, py); else if (!blitArt(g, d.s, px, py, 0, d.flip)) fallbackFlat(g, d.s, px, py); }
     // 6. baked static shadows (buildings: offset footprint; trees/rocks: soft ellipse)
     for (const it of S.items) {
       const px = OX + (it.x - it.y) * 16, py = OY + (it.x + it.y) * 8;
-      if (it.foot) {
-        const a = [it.x, it.y], l = [it.x - it.foot[0], it.y], b = [it.x - it.foot[0], it.y - it.foot[1]], r = [it.x, it.y - it.foot[1]];
+      if (it.foot || it.k === 'building') {
+        const fw = it.foot ? it.foot[0] : it.bld.fw, fd = it.foot ? it.foot[1] : it.bld.fd;
+        const a = [it.x, it.y], l = [it.x - fw, it.y], b = [it.x - fw, it.y - fd], r = [it.x, it.y - fd];
         g.fillStyle = rgba(shadowRGB(), 0.28); g.beginPath();
         [a, l, b, r].forEach((p, i) => { const X = OX + (p[0] - p[1]) * 16 + 7, Y = OY + (p[0] + p[1]) * 8 + 3; if (i) g.lineTo(X, Y); else g.moveTo(X, Y); }); g.closePath(); g.fill();
       } else if (it.k !== 'garland' && it.k !== 'npc' && it.k !== 'fence' && it.w > 9) {
@@ -653,9 +761,8 @@ window.MM = window.MM || {};
     for (const [x, y, r] of S.waterTiles) {
       const cx = ox + (x - y) * 16, cy = oy + (x + y + 1) * 8; if (cx < -20 || cx > 532 || cy < -12 || cy > 332) continue;
       if (anim) MM.art.draw(g, 'water_anim', cx, cy, { frame: Math.floor(t * 2.2 + r * 4) }); else { diamondFill(g, cx, cy, FAM.water[Math.floor(r * 4)]); F(g, '#a5d6d8', cx - 6 + Math.round(Math.sin(t * 1.5 + r * 9) * 3), cy - 1, 5, 1); }
-      for (const [dx, dy, sd] of SIDES) { const nf = tileAt(x + dx, y + dy); if (nf && nf !== 'water') shoreDraw(g, sd, cx, cy); }
     }
-    for (const d of S.waterDecals) { const p = [ox + (d.x - d.y) * 16, oy + (d.x + d.y) * 8 + Math.round(Math.sin(t * 0.9 + d.x * 3) * 0.6)]; if (!blitArt(g, d.s, p[0], p[1], t, d.flip)) fallbackFlat(g, d.s, p[0], p[1]); }
+    if (S.waterTiles.length && S.wedge) g.drawImage(S.wedge, ox - OX, oy - OY);
     // bog shimmer: a few slow ripple glints
     for (let i = 0; i < S.bogTiles.length; i += 3) { const [x, y, r] = S.bogTiles[i], k = (t * 0.35 + r) % 1; if (k > 0.5) continue; const cx = ox + (x - y) * 16, cy = oy + (x + y + 1) * 8; if (cx < -20 || cx > 532 || cy < -12 || cy > 332) continue; g.globalAlpha = 0.5 * (1 - k * 2); g.strokeStyle = '#8fc4c0'; g.lineWidth = 1; g.beginPath(); g.ellipse(cx + (r - 0.5) * 10, cy, 2 + k * 14, 1 + k * 6, 0, 0, TAU); g.stroke(); g.globalAlpha = 1; }
     // dungeon stairs / exit
@@ -708,8 +815,10 @@ window.MM = window.MM || {};
     let a = 1;
     if (it.tall) { const tg = covers(it, sx, sy) ? 0.45 : 1; it.fade += (tg - it.fade) * Math.min(1, S.fdt * 7); a = it.fade; }
     try {
-      if (it.k === 'npc') drawNPC(g, it, sx, sy);
+      if (it.k === 'building') drawBuilding(g, it, sx, sy, a);
+      else if (it.k === 'npc') drawNPC(g, it, sx, sy);
       else if (it.k === 'garland') drawGarland(g, it);
+      else if (it.s[0] === '@' && hasArt(it.s.slice(1))) { blitArt(g, it.s.slice(1), sx, sy, S.t + it.ph, it.flip, a); if (it.k === 'entrance') drawPortal(g, it, sx, sy); }
       else if (it.s[0] === '@') { const b = procBake(it.s.slice(1)); if (b) { blitBake(g, b, sx, sy, it.flip, a); if (it.k === 'entrance') drawPortal(g, it, sx, sy); } else fallbackDraw(g, it, sx, sy); }
       else {
         if (it.k === 'moonwell') drawMoonwellBack(g, it, sx, sy);
@@ -718,6 +827,16 @@ window.MM = window.MM || {};
       }
     } catch (e) { console.error('[MM.world] draw item', it.s, e); }
     S.perf.items += (nowS() - t0) * 1000;
+  }
+  function drawBuilding(g, it, sx, sy, a) {
+    const b = it.bld;
+    if (b.art && hasArt(b.art)) { blitArt(g, b.art, sx, sy, S.t + it.ph, false, a); return; }
+    const r = buildingSprite(it); if (!r) return;
+    const a0 = g.globalAlpha; g.globalAlpha = a0 * a;
+    g.drawImage(r.c, Math.round(sx - r.ax), Math.round(sy - r.ay));
+    const dk = darkness();
+    if (b.litWindows && dk > 0.04 && r.lit) { g.globalAlpha = a0 * a * Math.min(1, dk * 1.1) * (0.92 + 0.08 * Math.sin(S.t * 3 + it.ph)); g.drawImage(r.lit, Math.round(sx - r.ax), Math.round(sy - r.ay)); }
+    g.globalAlpha = a0;
   }
   function drawNPC(g, it, sx, sy) {
     const p = worldToCanvas(game.x, game.y); // eslint-disable-line no-undef
@@ -897,9 +1016,19 @@ window.MM = window.MM || {};
       if (L >= 4) { g.globalAlpha = 0.1 + 0.04 * Math.sin(S.t * 2); F(g, '#d6f1fb', p.x - 5, p.y - 90, 10, 80); g.globalAlpha = 0.07; F(g, '#ffffff', p.x - 2, p.y - 90, 4, 80); }
       g.globalAlpha = 1;
     }
+    drawDoorCue(g);
     drawMarker(g);
     S.perf.emit += (nowS() - t0) * 1000;
     S.perf.n++;
+  }
+  function drawDoorCue(g) {
+    const cur = currentPrompt(); if (!cur || cur.kind !== 'door') return;
+    const it = S.items.find((i) => i.k === 'building' && i.bld.id === cur.building); if (!it) return;
+    const r = buildingSprite(it), p = worldToCanvas(it.x, it.y); if (!r || !r.doors.length) return; // eslint-disable-line no-undef
+    const d = r.doors[0], x = p.x - r.ax + d.x + d.w / 2, y = p.y - r.ay + d.y + d.h * 0.55, pulse = reducedMotion() ? 0.6 : 0.5 + 0.5 * Math.sin(S.t * 3);
+    g.globalCompositeOperation = 'lighter'; g.globalAlpha = 0.10 + 0.08 * pulse;
+    E(g, cur.locked ? '#8f9bb8' : '#ffd98a', x, y, d.w * 0.75, d.h * 0.55); g.globalAlpha = 0.12 + 0.1 * pulse; E(g, cur.locked ? '#c9d2e6' : '#fff3c4', x, y + d.h * 0.2, d.w * 0.5, 4);
+    g.globalCompositeOperation = 'source-over'; g.globalAlpha = 1;
   }
   function drawMarker(g) {
     const it = currentPrompt(); if (!it || it.kind === 'plot') return;
@@ -933,20 +1062,25 @@ window.MM = window.MM || {};
     return best ? { p: best, d: bd } : null;
   }
   function currentPrompt() {
-    if (!S.inter || typeof game === 'undefined') return null; // eslint-disable-line no-undef
+    if (!S.inter || !worldActive()) return null;
     const it = nearestInteractable(game.x, game.y), pl = plotCandidate(); // eslint-disable-line no-undef
     if (pl && (!it || pl.d < (callBase('screenDistance', game, it) ?? 1e9))) { // eslint-disable-line no-undef
       const p = pl.p, seed = SEED_TYPES?.[p.seed]; // eslint-disable-line no-undef
       const prompt = !p.seed ? 'Plant ' + (SEED_TYPES?.[world.seed]?.name || 'seeds') : p.growth >= 100 ? 'Harvest ' + (seed?.name || '') : !p.watered ? 'Water ' + (seed?.name || '') : null; // eslint-disable-line no-undef
-      return prompt ? { id: 'plot', kind: 'plot', prompt, key: 'E', x: p.x, y: p.y, plot: p, region: 'grove' } : null;
+      return prompt ? { id: 'plot', kind: 'plot', prompt, key: glyph(), glyph: glyph(), x: p.x, y: p.y, plot: p, region: 'grove' } : null;
     }
     if (!it) return null;
-    return Object.assign({ key: 'E' }, it);
+    const gl = glyph(); return Object.assign({ key: gl, glyph: gl }, it);
   }
   const FALLBACK = {
     seeds: () => callBase('buySeeds'), brew: () => callBase('brew'), craft: () => callBase('brewBomb'), board: () => callBase('turnInQuest'), shop: () => callBase('sellHarvest'),
     broom: () => callBase('toggleBroom'), dungeon: () => callBase('enterDungeon', false), stairs: () => callBase('advanceFloor'), exit: () => callBase('goRegion', world.region),
     rest: () => { world.time += 0.25; callBase('message', 'You rest a while. Time passes.'); },
+    door: (it) => {
+      if (!it.locked && MM.interiors && typeof MM.interiors.enter === 'function') { try { MM.interiors.enter(it.building, { from: world.region }); return; } catch (e) { console.error('[MM.world] interiors.enter', e); } }
+      callBase('message', it.locked ? it.prompt : 'The door is closed for now.');
+    },
+    sign: () => callBase('message', 'Practice yard: plant, water, harvest — then try a spell on the dummy.'),
     mail: () => callBase('message', 'No letters today — just a pressed moonflower.'),
     well: () => callBase('message', 'Cool, clear water. The bucket creaks.'),
     moonwell: () => callBase('message', ['The Moonwell is dark and silent.', 'A faint glimmer stirs in the Moonwell.', 'The Moonwell hums with moonlight.', 'The Moonwell shines, whole again.'][levels().mw]),
@@ -972,7 +1106,7 @@ window.MM = window.MM || {};
   window.addEventListener('keydown', (e) => {
     if (!W.enabled || e.repeat || e.altKey || e.ctrlKey || e.metaKey) return;
     if ((e.key || '').toLowerCase() !== 'e') return;
-    try { if (MM.isPaused?.() || MM.input?.isBlocked?.()) return; } catch (err) { return; }
+    try { if (MM.isPaused?.() || MM.input?.isBlocked?.() || !worldActive()) return; } catch (err) { return; }
     const tg = e.target; if (tg && tg.closest && tg.closest('input,textarea,select,[contenteditable="true"],[contenteditable=""]')) return;
     const c = currentPrompt(); if (!c || c.kind === 'plot') return; // plots stay with baseline tendPlot
     e.preventDefault(); e.stopImmediatePropagation(); interact(c);
@@ -980,7 +1114,7 @@ window.MM = window.MM || {};
   // tap/click on an interactable's sprite while in range
   try {
     canvas.addEventListener('pointerdown', (e) => { // eslint-disable-line no-undef
-      if (!W.enabled) return; try { if (MM.isPaused?.() || MM.input?.isBlocked?.()) return; } catch (err) { return; }
+      if (!W.enabled) return; try { if (MM.isPaused?.() || MM.input?.isBlocked?.() || !worldActive()) return; } catch (err) { return; }
       const r = canvas.getBoundingClientRect(), x = (e.clientX - r.left) * 512 / r.width, y = (e.clientY - r.top) * 320 / r.height; // eslint-disable-line no-undef
       let best = null, bd = 18;
       for (const i of S.inter) { const p = worldToCanvas(i.x, i.y), h = i.hy || 26; if (x < p.x - 14 || x > p.x + 14 || y < p.y - h - 6 || y > p.y + 6) continue; const d = Math.abs(x - p.x) + Math.abs(y - (p.y - h / 2)) * 0.3; if (d < bd) { bd = d; best = i; } } // eslint-disable-line no-undef
@@ -1064,7 +1198,7 @@ window.MM = window.MM || {};
       H.on('preDraw', preDrawPass, -100);
       H.on('drawGround', postGroundPass, -100);
       S.sentinel = { type: 'custom', x: 0, y: 0, depth: 1e7, draw: () => postEntityPass(ctx) }; // eslint-disable-line no-undef
-      H.on('drawables', (list) => { if (!W.enabled) return; S._pbox = null; for (const d of S.draws) list.push(d); list.push(S.sentinel); }, -100);
+      H.on('drawables', (list) => { if (!W.enabled) return; S._pbox = null; relDepths(); for (const d of S.draws) list.push(d); list.push(S.sentinel); }, -100);
       H.on('postEffects', emissivePass, 50);
       H.on('overlay', overlayPass, 80);
     } else {
@@ -1075,6 +1209,16 @@ window.MM = window.MM || {};
     }
   }
 
+  // Big footprints (buildings, stalls, gates) sort by their back corner; when the player stands behind/beside one
+  // (not in front of either visible face) it is pushed in front of the player instead (and fades via obstruction).
+  function relDepths() {
+    const gx = game.x, gy = game.y, pd = project(gx, gy).y; // eslint-disable-line no-undef
+    for (const d of S.draws) {
+      const it = d.it, rc = it.rect || (it.foot && itemRect(it)); if (!rc) continue;
+      const inFront = gx >= rc[2] - 0.02 || gy >= rc[3] - 0.02;
+      it.depth = d.depth = inFront ? Math.min(it.baseDepth, pd - 0.5) : Math.max(it.baseDepth, pd + 0.5);
+    }
+  }
   // ================================================================== transitions (optional visual helper)
   function overlayPass(g) {
     const tr = S.trans; if (!tr) return;
@@ -1109,6 +1253,7 @@ window.MM = window.MM || {};
     register(id, handler) { if (typeof handler !== 'function') return () => {}; S.handlers.set(id, handler); return () => { if (S.handlers.get(id) === handler) S.handlers.delete(id); }; },
     unregister(id) { S.handlers.delete(id); },
     getLights, lightToScreen,
+    buildings() { return S.items.filter((i) => i.k === 'building').map((i) => ({ id: i.bld.id, type: i.bld.type, name: i.bld.name, x: i.x, y: i.y, fw: i.bld.fw, fd: i.bld.fd, rect: i.rect.slice(), door: Object.assign({}, i.doorPt), enterable: !!i.bld.enterable, lockedReason: i.bld.lockedReason || null })); },
     npcs() { return S.npcs.map((n) => ({ id: n.npc, name: n.name, x: n.x, y: n.y })); },
     obstacles() { return S.obs.map((o) => (o.rect ? { rect: o.rect.slice(), low: o.low } : { x: o.x, y: o.y, r: o.r, low: o.low })); },
     tileAt, transition, rebuild() { markDirty(); bakes.clear(); },

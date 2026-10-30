@@ -21,13 +21,16 @@ const PLANNED = [
   'src/config/cinematics.js', 'src/systems/cinematics.js',
   'src/config/campaign.js', 'src/config/regions-visual.js',
   'src/core/baseline.js',
+  'src/config/buildings.js', 'src/config/tutorial.js', // after baseline (may read its constants), before world-render.js
   'src/entities/bosses.js', 'src/systems/campaign.js', 'src/systems/world-render.js',
+  'src/systems/interiors.js', 'src/systems/interior-render.js',
   'src/systems/lighting.js', 'src/systems/fx.js', 'src/systems/filter.js',
   '@ui',
+  'src/screens/flow.js', 'src/screens/logo.js', 'src/screens/title.js', 'src/screens/intro.js', 'src/screens/tutorial.js',
   'src/core/boot.js',
 ];
-const UI_DEFAULT = ['ui-core.js', 'ui-hud.js', 'ui-menus.js', 'ui-screens.js', 'ui-input.js'];
-const STYLES = ['assets/css/ui.css'];
+const UI_DEFAULT = ['ui-core.js', 'ui-hud.js', 'ui-menus.js', 'ui-screens.js', 'ui-input.js', 'ui-joystick.js'];
+const STYLES = ['assets/css/ui.css', 'assets/css/screens.css'];
 const MIME = { '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif': 'image/gif', '.webp': 'image/webp', '.svg': 'image/svg+xml',
   '.woff2': 'font/woff2', '.woff': 'font/woff', '.ttf': 'font/ttf', '.otf': 'font/otf', '.mp3': 'audio/mpeg', '.ogg': 'audio/ogg', '.wav': 'audio/wav',
   '.mp4': 'video/mp4', '.webm': 'video/webm', '.json': 'application/json', '.ico': 'image/x-icon' };

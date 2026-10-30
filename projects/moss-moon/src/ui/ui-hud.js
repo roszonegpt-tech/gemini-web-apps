@@ -79,6 +79,7 @@
     const sig = spells.map((s) => s.id + (s.unlocked === false ? '0' : '1')).join(',');
     if (sig === hotSig) return;
     hotSig = sig;
+    cache.method = null;
     E.hotbar.innerHTML = '';
     E.slots = spells.map((s, i) => {
       const st = ui.spellStyle(s);
@@ -97,8 +98,15 @@
   hud.promptInfo = function () {
     const g = ui.base.player(), w = ui.base.world();
     if (!g || !w) return null;
-    const near = MM.world && typeof MM.world.nearestInteractable === 'function' ? safe(() => MM.world.nearestInteractable(g.x, g.y), null) : null;
-    if (near && near.prompt) return { text: near.prompt, key: 'E', source: 'world' };
+    const key = ui.glyph('interact');
+    if (MM.world && typeof MM.world.currentPrompt === 'function') {
+      const c = safe(() => MM.world.currentPrompt(), null);
+      if (c && c.prompt) return { text: c.prompt, key, source: c.kind || 'world', dim: !!c.locked };
+      if (!safe(() => w.region === 'grove' && w.mode === 'outside', false)) return null;
+    } else {
+      const near = MM.world && typeof MM.world.nearestInteractable === 'function' ? safe(() => MM.world.nearestInteractable(g.x, g.y), null) : null;
+      if (near && near.prompt) return { text: near.prompt, key, source: 'world' };
+    }
     if (w.region !== 'grove' || w.mode !== 'outside' || !Array.isArray(w.plots)) return null;
     const dist = (p) => safe(() => screenDistance(g, p), Infinity); // eslint-disable-line no-undef
     let best = null, bd = Infinity;
@@ -106,17 +114,18 @@
     if (!best || bd > 52) return null;
     const S = ui.base.seeds();
     const nm = (id) => (S[id] && S[id].name) || id;
-    if (!best.seed) { const n = (w.seeds && w.seeds[w.seed]) || 0; return { text: n > 0 ? 'Plant ' + nm(w.seed) + ' (' + n + ')' : 'No ' + nm(w.seed) + ' seeds', key: 'E', dim: n <= 0, source: 'plot' }; }
-    if (best.growth >= 100) return { text: 'Harvest ' + nm(best.seed), key: 'E', source: 'plot', ready: true };
-    if (!best.watered) return { text: 'Water ' + nm(best.seed), key: 'E', source: 'plot' };
-    return { text: nm(best.seed) + ' · ' + Math.floor(best.growth) + '% grown', key: 'E', dim: true, source: 'plot' };
+    if (!best.seed) { const n = (w.seeds && w.seeds[w.seed]) || 0; return { text: n > 0 ? 'Plant ' + nm(w.seed) + ' (' + n + ')' : 'No ' + nm(w.seed) + ' seeds', key, dim: n <= 0, source: 'plot' }; }
+    if (best.growth >= 100) return { text: 'Harvest ' + nm(best.seed), key, source: 'plot', ready: true };
+    if (!best.watered) return { text: 'Water ' + nm(best.seed), key, source: 'plot' };
+    return { text: nm(best.seed) + ' · ' + Math.floor(best.growth) + '% grown', key, dim: true, source: 'plot' };
   };
 
   // ---------------------------------------------------------------- banner / message / save indicator
   let bannerTimer = 0, lastRegionKey = null;
   hud.banner = function (title, sub) {
     E.banner.innerHTML = '';
-    E.banner.append(h('span', { class: 'mm-banner-orn', 'aria-hidden': 'true' }), h('strong', null, title), sub ? h('small', null, sub) : null);
+    E.banner.append(h('span', { class: 'mm-banner-orn', 'aria-hidden': 'true' }), h('strong', null, title));
+    if (sub) E.banner.append(h('small', null, sub));
     E.banner.classList.remove('mm-show'); void E.banner.offsetWidth; E.banner.classList.add('mm-show');
     clearTimeout(bannerTimer);
     bannerTimer = setTimeout(() => E.banner.classList.remove('mm-show'), 3400);
@@ -124,6 +133,7 @@
   let msgTimer = 0, lastMsg = '', lastPolled = '';
   hud.message = function (text) {
     if (!text) return;
+    if (ui._lastToast && ui._lastToast.text === String(text) && Date.now() - ui._lastToast.t < 1500) return; // already shown as a toast
     if (text === lastMsg && E.msg.classList.contains('mm-show')) { clearTimeout(msgTimer); } else { E.msg.textContent = text; E.msg.classList.remove('mm-show'); void E.msg.offsetWidth; E.msg.classList.add('mm-show'); }
     lastMsg = text;
     clearTimeout(msgTimer);
@@ -142,7 +152,7 @@
 
   // ---------------------------------------------------------------- per-frame update
   function visibleNow() {
-    return ui.stateIs('play') && !ui.isOpen();
+    return ui.inGameplay() && !ui.isOpen();
   }
   let lastText = 0;
   hud.update = function (force) {
@@ -185,6 +195,13 @@
     const now = performance.now();
     if (!force && now - lastText < 150) return;
     lastText = now;
+    const method = ui.method();
+    if (cache.method !== method) {
+      cache.method = method;
+      ui.layers.hud.dataset.method = method;
+      if (E.slots) E.slots.forEach((b, i) => { const k = b.querySelector('.mm-slot-key'); if (k) k.textContent = method === 'gamepad' ? (i === 0 ? 'RB' : '') : method === 'touch' ? '' : String(i + 1); });
+      E.potion.querySelector('.mm-slot-key').textContent = method === 'touch' ? '' : ui.glyph('potion');
+    }
     set('spn', E.spellName, 'text', sel ? sel.name + (sel.cost ? ' · ' + sel.cost + ' mana' : '') : '');
     set('name', E.name, 'text', D.playerName());
     const o = D.objective();
@@ -236,10 +253,6 @@
     lastPolled = m;
   };
 
-  function loop() {
-    try { hud.update(false); } catch (e) { if (!hud._warned) { hud._warned = true; console.error('[MM.ui] HUD update failed', e); } }
-    requestAnimationFrame(loop);
-  }
 
   hud.init = function () {
     hud.build();
@@ -256,10 +269,10 @@
       if (d.name && typeof d.hp === 'number') hud.bossOverride = d.phase === 'defeated' ? null : { name: d.name, hp: d.hp, maxHP: d.maxHP || d.maxHp || 1 };
     });
     ui.on('state', (d) => {
-      if (d && d.to === 'play' && ['loading', 'creation', 'title', 'cine', 'boot'].includes(d.from)) {
-        setTimeout(() => { const r = D.region(); if (r) { lastRegionKey = r.key; if (ui.stateIs('play')) hud.banner(r.name, r.sub || null); } }, 60);
+      if (d && ui.GAME_STATES.includes(d.to) && !ui.GAME_STATES.includes(d.from) && !['menu', 'dialogue'].includes(d.from)) {
+        setTimeout(() => { const r = D.region(); if (r) { lastRegionKey = r.key; if (ui.inGameplay() && !ui.stateIs('interior')) hud.banner(r.name, r.sub || null); } }, 60);
       }
     });
-    requestAnimationFrame(loop);
+    ui.tick(() => hud.update(false));
   };
 })();

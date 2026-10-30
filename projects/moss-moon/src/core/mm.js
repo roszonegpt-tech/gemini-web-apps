@@ -82,6 +82,11 @@
     autosave: { def: true },
     touchControls: { def: 'auto', enum: ['auto', 'on', 'off'] },
     textScale: { def: 1, min: 0.75, max: 1.75 },
+    joystickSize: { def: 1, min: 0.8, max: 1.4 },
+    joystickSide: { def: 'left', enum: ['left', 'right'] },
+    joystickMode: { def: 'floating', enum: ['floating', 'fixed'] },
+    haptics: { def: true },
+    fxIntensity: { def: 1, enum: [0.5, 1, 1.5] },
   };
   const PRESETS = {
     low: { softFilter: 'off', bloom: 'off', particles: 'low' },
@@ -91,7 +96,7 @@
   const PRESET_KEYS = ['softFilter', 'bloom', 'particles'];
   function coerce(key, v) {
     const s = SCHEMA[key]; if (!s) return undefined;
-    if (s.enum) return s.enum.includes(v) ? v : undefined;
+    if (s.enum) { const x = typeof s.def === 'number' ? Number(v) : v; return s.enum.includes(x) ? x : undefined; }
     if (typeof s.def === 'boolean') return typeof v === 'boolean' ? v : (v === 'true' || v === 1 ? true : v === 'false' || v === 0 ? false : undefined);
     const n = Number(v); if (v === null || v === '' || !Number.isFinite(n)) return undefined;
     return Math.min(s.max, Math.max(s.min, n));
@@ -143,47 +148,287 @@
   }
   MM.settings = settings;
 
-  // ------------------------------------------------------------------ state machine + input gate
-  const STATES = ['boot', 'title', 'creation', 'play', 'menu', 'dialogue', 'cine', 'defeat', 'ending', 'loading'];
+  // ------------------------------------------------------------------ screens + state machine (PHASE3_CONTRACT "CORE additions")
+  // Every state is a screen with a policy: sim 'none'|'player'|'world' (what baseline simulates), draw 'none'|'world'|'frozen'|'custom'.
+  const STATES = ['boot', 'logo', 'intro', 'title', 'creation', 'tutorial', 'play', 'interior', 'menu', 'dialogue', 'cine', 'defeat', 'ending', 'loading'];
+  const SIMS = ['none', 'player', 'world'], DRAWS = ['none', 'world', 'frozen', 'custom'];
+  const DEFAULT_DEFS = {
+    boot: { sim: 'none', draw: 'none' }, logo: { sim: 'none', draw: 'none' }, intro: { sim: 'none', draw: 'none' },
+    title: { sim: 'none', draw: 'none' }, creation: { sim: 'none', draw: 'none' },
+    tutorial: { sim: 'world', draw: 'world' }, play: { sim: 'world', draw: 'world' }, interior: { sim: 'player', draw: 'custom' },
+    menu: { sim: 'none', draw: 'frozen' }, dialogue: { sim: 'none', draw: 'world' }, cine: { sim: 'none', draw: 'world' },
+    defeat: { sim: 'none', draw: 'frozen' }, ending: { sim: 'none', draw: 'world' }, loading: { sim: 'none', draw: 'frozen' },
+  };
+  function normDef(name, d) {
+    const out = Object.assign({}, DEFAULT_DEFS[name] || { sim: 'none', draw: 'none' }, d || {});
+    if (!SIMS.includes(out.sim)) { console.warn('[MM.screens] bad sim for ' + name + ':', out.sim); out.sim = (DEFAULT_DEFS[name] || {}).sim || 'none'; }
+    if (!DRAWS.includes(out.draw)) { console.warn('[MM.screens] bad draw for ' + name + ':', out.draw); out.draw = (DEFAULT_DEFS[name] || {}).draw || 'none'; }
+    out.name = name; return out;
+  }
+  const defs = {}; for (const n of STATES) defs[n] = normDef(n);
   function clearControlsSafe() {
     B.call('clearControls');
     const g = B.game(); if (g) { g.target = null; }
+    axis.x = 0; axis.y = 0; axisSource = null;
   }
+  const safeCall = (where, fn, ...a) => { if (typeof fn !== 'function') return undefined; try { return fn(...a); } catch (e) { report('screen ' + where, fn, e); return undefined; } };
+
+  // Resources owned by the CURRENT screen; released on exit (after exit() and cleanup()).
+  let res = { listeners: [], timers: new Set(), mounts: new Set() };
+  const counters = { listened: 0, released: 0, timersMade: 0, timersCleared: 0, mounted: 0, unmounted: 0, transitions: 0 };
+  const hasDoc = typeof document !== 'undefined' && !!document.getElementById;
+  function sceneEl() { return hasDoc ? document.getElementById('scene') : null; }
+  function layerEl(layer) {
+    if (!hasDoc) return null;
+    const id = layer === 'fx' ? 'mm-fx' : layer === 'ui' ? 'mm-ui' : 'mm-screens';
+    let el = document.getElementById(id);
+    if (!el && id === 'mm-screens') { const st = document.getElementById('mm-stage'); if (st) { el = document.createElement('div'); el.id = 'mm-screens'; const fx = document.getElementById('mm-fx'); st.insertBefore(el, fx || null); } }
+    return el;
+  }
+  function releaseResources() {
+    const r = res; res = { listeners: [], timers: new Set(), mounts: new Set() };
+    for (const l of r.listeners) { try { l.target.removeEventListener(l.type, l.fn, l.opts); } catch (e) { /* ignore */ } counters.released++; }
+    for (const t of r.timers) { (t.kind === 'i' ? clearInterval : clearTimeout)(t.id); counters.timersCleared++; }
+    for (const m of r.mounts) m.destroy();
+  }
+  let frozen = null;
+  function snapshotFrozen() {
+    const sc = sceneEl(); if (!sc || !sc.getContext) return;
+    try {
+      frozen = frozen || document.createElement('canvas'); frozen.width = sc.width; frozen.height = sc.height;
+      const f = frozen.getContext('2d'); f.imageSmoothingEnabled = false; f.drawImage(sc, 0, 0);
+      f.fillStyle = 'rgba(8,14,12,.45)'; f.fillRect(0, 0, frozen.width, frozen.height);
+    } catch (e) { frozen = null; }
+  }
+  function stopGameplayAudio() {
+    const A = MM.audio; if (!A || typeof A.loop !== 'function') return;
+    try { const names = (A.list && A.list().loops) || ['broom']; for (const n of names) A.loop(n, false); } catch (e) { /* ignore */ }
+  }
+  function applyPolicy(def, prevDef) {
+    const sc = sceneEl(); if (sc) sc.style.visibility = def.draw === 'none' ? 'hidden' : '';
+    if (def.draw === 'frozen' && prevDef && prevDef.draw !== 'none') snapshotFrozen();
+    if (def.sim === 'none') { clearControlsSafe(); stopGameplayAudio(); }
+    else if (prevDef && prevDef.sim !== def.sim) clearControlsSafe();
+    const au = def.audio, A = MM.audio;
+    if (au && !au.keep && A) {
+      try { if ('music' in au && typeof A.music === 'function') A.music(au.music || null, { fade: au.fade ?? 1 }); } catch (e) { console.error(e); }
+      try { if ('ambience' in au && typeof A.ambience === 'function') A.ambience(au.ambience || null, { fade: au.fade ?? 1 }); } catch (e) { console.error(e); }
+    }
+  }
+
+  const screens = {
+    states: STATES,
+    get current() { return state.current; },
+    def(name) { return defs[name === undefined ? state.current : name] || null; },
+    sim() { return defs[state.current].sim; },
+    drawMode() { const d = defs[state.current]; return d.draw === 'custom' && typeof d.render !== 'function' ? 'world' : d.draw; },
+    // register(name, {sim, draw, audio, enter, exit, update, render, resize, cleanup}) — merged over the state's default policy.
+    register(name, def) {
+      if (!name || typeof name !== 'string') throw new Error('MM.screens.register(name, def)');
+      if (!STATES.includes(name)) { STATES.push(name); state.list.push(name); }
+      defs[name] = normDef(name, def);
+      if (name === state.current) applyPolicy(defs[name], null);
+      bus.emit('screens:register', { name });
+      return defs[name];
+    },
+    listen(target, type, fn, opts) {
+      if (!target || typeof target.addEventListener !== 'function' || typeof fn !== 'function') return () => {};
+      target.addEventListener(type, fn, opts); const rec = { target, type, fn, opts }; res.listeners.push(rec); counters.listened++;
+      const owner = res;
+      return () => { const i = owner.listeners.indexOf(rec); if (i >= 0) { owner.listeners.splice(i, 1); target.removeEventListener(type, fn, opts); counters.released++; } };
+    },
+    // timeout/interval return a cancel() function (with .id). Cleared automatically on exit.
+    timeout(fn, ms) { return timer('t', fn, ms); },
+    interval(fn, ms) { return timer('i', fn, ms); },
+    // mount(name, {w=512, h=320 | 'stage', pixelated=true, layer='screens'|'fx'|'ui'}) -> {canvas, ctx, destroy()}; destroyed on exit.
+    mount(name, o) {
+      o = o || {}; const host = layerEl(o.layer || 'screens');
+      if (!hasDoc) throw new Error('MM.screens.mount needs a DOM');
+      const c = document.createElement('canvas'); c.className = 'mm-screen-canvas'; c.dataset.screen = state.current; c.dataset.name = name || '';
+      const stage = o.w === 'stage' || o.h === 'stage';
+      const size = () => {
+        if (stage) { const st = document.getElementById('mm-stage'), dpr = window.devicePixelRatio || 1, r = st ? st.getBoundingClientRect() : { width: 512, height: 320 };
+          c.width = Math.max(1, Math.round((r.width || 512) * dpr)); c.height = Math.max(1, Math.round((r.height || 320) * dpr)); }
+        else { c.width = o.w || 512; c.height = o.h || 320; }
+      };
+      size();
+      Object.assign(c.style, { position: 'absolute', inset: '0', width: '100%', height: '100%', display: 'block' });
+      if (o.pixelated !== false) c.style.imageRendering = 'pixelated';
+      const ctx = c.getContext('2d'); if (ctx && o.pixelated !== false) ctx.imageSmoothingEnabled = false;
+      if (host) host.appendChild(c);
+      const owner = res;
+      const m = { canvas: c, ctx, name: name || '', stage, resize: () => { if (stage) { size(); if (ctx && o.pixelated !== false) ctx.imageSmoothingEnabled = false; } },
+        destroy() { if (!owner.mounts.has(m)) return; owner.mounts.delete(m); c.remove(); counters.unmounted++; } };
+      res.mounts.add(m); counters.mounted++;
+      return m;
+    },
+    // Leak counters for tests: live = owned by the current screen right now.
+    stats() { return { state: state.current, listeners: res.listeners.length, timers: res.timers.size, mounts: res.mounts.size, ...counters,
+      canvases: hasDoc ? document.querySelectorAll('.mm-screen-canvas').length : 0 }; },
+  };
+  function timer(kind, fn, ms) {
+    const owner = res, rec = { kind, id: 0 };
+    const run = () => { if (kind === 't') { owner.timers.delete(rec); counters.timersCleared++; } safeCall('timer', fn); };
+    rec.id = kind === 'i' ? setInterval(run, ms) : setTimeout(run, ms);
+    owner.timers.add(rec); counters.timersMade++;
+    const cancel = () => { if (owner.timers.delete(rec)) { (kind === 'i' ? clearInterval : clearTimeout)(rec.id); counters.timersCleared++; } };
+    cancel.id = rec.id; return cancel;
+  }
+  bus.on('layout', (d) => {
+    for (const m of res.mounts) m.resize();
+    const def = defs[state.current]; safeCall('resize', def.resize, d && d.width, d && d.height, (d && d.dpr) || window.devicePixelRatio || 1);
+  });
+  MM.screens = screens;
+
+  // go(name, data): prev.exit(next) -> prev.cleanup() -> release prev's listeners/timers/mounts -> apply policy -> next.enter(data, prev).
+  // 'state' {from,to,data} events are emitted after enter, in order; go() called during exit/cleanup runs after the transition.
+  let depth = 0, leaving = false;
+  const deferred = [], emits = [];
   const state = {
     list: STATES.slice(), current: 'boot', prev: null, data: null, since: now(),
     go(name, data) {
-      if (!STATES.includes(name)) { console.warn('[MM.state] unknown state', name); return false; }
+      if (!defs[name]) { console.warn('[MM.state] unknown state', name); return false; }
+      if (leaving) { deferred.push([name, data]); return true; }
       if (name === state.current) return false;
-      const from = state.current;
-      state.prev = from; state.current = name; state.data = data === undefined ? null : data; state.since = now();
-      if (name !== 'play') clearControlsSafe();
-      bus.emit('state', { from, to: name, data: state.data });
+      depth++;
+      try {
+        const from = state.current, prevDef = defs[from];
+        leaving = true;
+        try { safeCall(from + '.exit', prevDef.exit, name); safeCall(from + '.cleanup', prevDef.cleanup); releaseResources(); } finally { leaving = false; }
+        state.prev = from; state.current = name; state.data = data === undefined ? null : data; state.since = now(); counters.transitions++;
+        const def = defs[name];
+        applyPolicy(def, prevDef);
+        emits.push({ from, to: name, data: state.data });
+        safeCall(name + '.enter', def.enter, state.data, from);
+        while (deferred.length) { const [n, d] = deferred.shift(); state.go(n, d); }
+      } finally { depth--; }
+      if (depth === 0) while (emits.length) bus.emit('state', emits.shift());
       return true;
     },
     is(name) { return state.current === name; },
   };
   MM.state = state;
-  MM.isPaused = () => state.current !== 'play';
+  // Paused == the current screen does not simulate (play/tutorial/interior are live).
+  MM.isPaused = () => defs[state.current].sim === 'none';
 
-  let inputBlocked = false;
+  // ------------------------------------------------------------------ input
+  let inputBlocked = false, axisSource = null, method = 'keyboard', touchSeen = false;
+  const axis = { x: 0, y: 0 };
   const ACTIONS = {
     cast: () => B.call('castSpell'), broom: () => B.call('toggleBroom'), tend: () => B.call('tendPlot'), potion: () => B.call('drink'),
     bomb: () => B.call('throwBomb'), spell1: () => B.call('chooseSpell', 0), spell2: () => B.call('chooseSpell', 1), spell3: () => B.call('chooseSpell', 2),
     spell4: () => B.call('chooseSpell', 3), spell5: () => B.call('chooseSpell', 4),
   };
+  const GLYPHS = {
+    keyboard: { move: 'WASD', cast: 'Space', interact: 'E', broom: 'B', potion: 'H', pause: 'Esc', confirm: 'Enter', back: 'Esc', tend: 'E', inventory: 'I', map: 'M', spells: '1–5', click: 'Click' },
+    touch: { move: 'Joystick', cast: 'Tap ✦', interact: 'Tap Interact', broom: 'Tap Broom', potion: 'Tap Potion', pause: 'Tap Pause', confirm: 'Tap', back: 'Tap Back', tend: 'Tap Interact', inventory: 'Tap Bag', map: 'Tap Map', spells: 'Tap a spell', click: 'Tap' },
+    gamepad: { move: 'Left stick', cast: 'A button', interact: 'X button', broom: 'Y button', potion: 'B button', pause: 'Start', confirm: 'A button', back: 'B button', tend: 'X button', inventory: 'Back', map: 'Back', spells: 'LB / RB', click: 'A button' },
+  };
+  function setMethod(m) { if (m !== method) { method = m; bus.emit('input:method', { method: m }); } }
+  const coarse = () => { try { return !!window.matchMedia && window.matchMedia('(pointer: coarse)').matches; } catch (e) { return false; } };
   MM.input = {
     block(on) { inputBlocked = !!on; if (inputBlocked) clearControlsSafe(); bus.emit('input:block', { blocked: inputBlocked }); },
     get blocked() { return inputBlocked; },
+    // Gameplay input is processed only when the current screen simulates (sim !== 'none') and nothing blocks it.
     isBlocked() { return inputBlocked || MM.isPaused(); },
-    // On-screen pad: MM.input.touch(pointerId, 'N'|'NE'|...|null) drives baseline's touchDirections.
-    touch(id, dir) { try { if (dir) touchDirections.set(id, dir); else touchDirections.delete(id); } catch (e) { /* baseline not loaded */ } }, // eslint-disable-line no-undef
+    // Analog move vector in SCREEN space (x right, y down), magnitude 0..1. Baseline readInput() consumes it (0.15 deadzone).
+    axis,
+    setAxis(x, y, source) {
+      x = Number(x) || 0; y = Number(y) || 0; const m = Math.hypot(x, y);
+      if (m > 1) { x /= m; y /= m; }
+      axis.x = x; axis.y = y; axisSource = m > 0 ? (source || 'touch') : null;
+      if (m > 0.15 && source) setMethod(source === 'gamepad' ? 'gamepad' : source === 'keyboard' ? 'keyboard' : 'touch');
+    },
+    get axisSource() { return axisSource; },
+    get method() { return method; },
+    setMethod,
+    glyph(action) { const t = GLYPHS[method] || GLYPHS.keyboard; return t[action] || GLYPHS.keyboard[action] || String(action); },
+    glyphs: GLYPHS,
+    // touchControls setting resolved: 'on' / 'off' / 'auto' = (pointer: coarse) or a touch was seen.
+    touchControls() { const v = settings.get('touchControls'); return v === 'on' ? true : v === 'off' ? false : (touchSeen || coarse()); },
     // One-shot gameplay actions for buttons: cast broom tend potion bomb spell1..spell5. Ignored while blocked.
     action(name) { if (MM.input.isBlocked()) return false; const f = ACTIONS[name]; if (!f) { console.warn('[MM.input] unknown action', name); return false; } return f(); },
     actions: Object.keys(ACTIONS),
   };
+  try {
+    window.addEventListener('keydown', () => setMethod('keyboard'), true);
+    window.addEventListener('pointerdown', (e) => {
+      if (e.pointerType === 'touch' || e.pointerType === 'pen') { if (!touchSeen) { touchSeen = true; bus.emit('input:touch', { on: MM.input.touchControls() }); } setMethod('touch'); }
+      else if (e.pointerType === 'mouse') setMethod('keyboard');
+    }, true);
+    window.addEventListener('blur', () => { if (axisSource) MM.input.setAxis(0, 0); });
+  } catch (e) { /* no DOM */ }
+  // Gamepad: left stick -> MM.input.axis (buttons are mapped by the UI's input module).
+  let padsOn = false;
+  try { window.addEventListener('gamepadconnected', () => { padsOn = true; }); } catch (e) { /* ignore */ }
+  function pollGamepad() {
+    if (!padsOn || !navigator.getGamepads) return;
+    let gp = null; try { gp = Array.from(navigator.getGamepads()).find(Boolean); } catch (e) { return; }
+    if (!gp) { if (axisSource === 'gamepad') MM.input.setAxis(0, 0); return; }
+    if (gp.buttons && gp.buttons.some((b) => b && b.pressed)) setMethod('gamepad');
+    if (MM.input.isBlocked()) return;
+    let x = gp.axes[0] || 0, y = gp.axes[1] || 0; const m = Math.hypot(x, y);
+    if (m > 0.2) { const k = Math.min(1, (m - 0.2) / 0.8) / m; MM.input.setAxis(x * k, y * k, 'gamepad'); }
+    else if (axisSource === 'gamepad') MM.input.setAxis(0, 0);
+  }
+
+  // ------------------------------------------------------------------ loop: the ONE requestAnimationFrame
+  // Other code must not run its own rAF loop (use MM.loop.onTick or a screen's update/render). rAF requests made by anyone
+  // else are counted so tests can assert stats().rafs === 1.
+  const nativeRAF = typeof window.requestAnimationFrame === 'function' ? window.requestAnimationFrame.bind(window) : (cb) => setTimeout(() => cb(now()), 16);
+  const nativeCAF = typeof window.cancelAnimationFrame === 'function' ? window.cancelAnimationFrame.bind(window) : clearTimeout;
+  let foreign = 0, lastForeign = 0, rafId = 0, last = 0, running = false, peak = 1;
+  try {
+    window.requestAnimationFrame = function (cb) { foreign++; return nativeRAF(cb); };
+    window.cancelAnimationFrame = function (id) { if (foreign > 0) foreign--; return nativeCAF(id); };
+  } catch (e) { /* ignore */ }
+  const ticks = [];
+  let baselineApi = null;
+  const loop = {
+    frames: 0, dt: 0,
+    get running() { return running; },
+    // fn(dt) every frame for ALL states — only for services (cinematic timelines, etc.). Returns off().
+    onTick(fn) { if (typeof fn !== 'function') return () => {}; ticks.push(fn); return () => { const i = ticks.indexOf(fn); if (i >= 0) ticks.splice(i, 1); }; },
+    stats() { return { rafs: (running ? 1 : 0) + lastForeign, frames: loop.frames, running, dt: loop.dt, foreign: lastForeign, peak, ticks: ticks.length }; },
+    resetPeak() { peak = (running ? 1 : 0) + lastForeign; },
+    start() { if (running) return; running = true; last = 0; rafId = nativeRAF(frame); },
+    stop() { running = false; if (rafId) nativeCAF(rafId); rafId = 0; },
+    // Baseline registers {simulate(dt, mode), draw()} here instead of running its own rAF loop.
+    attach(api) { baselineApi = api; loop.start(); },
+    get baseline() { return !!baselineApi; },
+  };
+  function renderFrame(def) {
+    const mode = screens.drawMode(), sc = sceneEl();
+    if (mode === 'world') { if (baselineApi) baselineApi.draw(); }
+    else if (mode === 'frozen') { if (frozen && sc) { const c = sc.getContext('2d'); c.drawImage(frozen, 0, 0); } else if (baselineApi) baselineApi.draw(); }
+    else if (mode === 'custom') { if (sc) { const c = sc.getContext('2d'); def.render(c, sc.width, sc.height); } }
+    if (mode !== 'custom' && typeof def.render === 'function') {
+      if (mode === 'none') { let m = null; for (const x of res.mounts) m = x; def.render(m ? m.ctx : null, m ? m.canvas.width : 0, m ? m.canvas.height : 0); }
+      else if (sc) def.render(sc.getContext('2d'), sc.width, sc.height);
+    }
+  }
+  let frameErrors = 0;
+  function frame(t) {
+    if (!running) return;
+    rafId = nativeRAF(frame); // request first: an exception below can never stop the loop
+    lastForeign = foreign; foreign = 0; const r = 1 + lastForeign; if (r > peak) peak = r;
+    const raw = last ? Math.max(0, (t - last) / 1000) : 0; last = t;
+    const dt = Math.min(raw, 0.1); loop.dt = dt; loop.frames++;
+    try {
+      for (const fn of ticks.slice()) { try { fn(dt); } catch (e) { report('loop.onTick', fn, e); } }
+      pollGamepad();
+      const def = defs[state.current];
+      safeCall(state.current + '.update', def.update, dt);
+      const d2 = defs[state.current]; // update may have changed state
+      if (d2.sim !== 'none' && baselineApi) baselineApi.simulate(Math.min(raw, 0.2), d2.sim);
+      renderFrame(defs[state.current]);
+    } catch (e) { if (++frameErrors <= 5) console.error('[MM.loop] frame error', e); }
+  }
+  try { document.addEventListener('visibilitychange', () => { last = 0; }); } catch (e) { /* ignore */ }
+  MM.loop = loop;
 
   // ------------------------------------------------------------------ hooks
-  const HOOK_NAMES = ['preUpdate', 'postUpdate', 'preDraw', 'drawGround', 'drawables', 'light', 'postEffects', 'overlay', 'postDraw'];
+  const HOOK_NAMES = ['preUpdate', 'postUpdate', 'preDraw', 'drawGround', 'drawables', 'light', 'postEffects', 'overlay', 'postDraw', 'blocked'];
   const H = new Map();
   let seq = 0;
   const hooks = {
@@ -260,7 +505,7 @@
   const ORDER = ['world', 'player', 'look', 'meta'];
   const sections = new Map();
   let pending = null; // sections of the last loaded envelope not yet applied (late-registering modules)
-  const UNSAFE_STATES = ['boot', 'title', 'creation', 'cine', 'loading', 'defeat'];
+  const UNSAFE_STATES = ['boot', 'logo', 'intro', 'title', 'creation', 'tutorial', 'cine', 'loading', 'defeat']; // tutorial = sandbox world, never saved
 
   function parseEnvelope(str) {
     if (str == null) return { status: 'none' };

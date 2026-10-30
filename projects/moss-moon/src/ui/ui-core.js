@@ -16,7 +16,7 @@ window.MM = window.MM || {};
       if (k === 'class') el.className = v;
       else if (k === 'text') el.textContent = v;
       else if (k === 'html') el.innerHTML = v;
-      else if (k === 'style' && typeof v === 'object') Object.assign(el.style, v);
+      else if (k === 'style' && typeof v === 'object') { for (const [sk, sv] of Object.entries(v)) { if (sk.startsWith('--')) el.style.setProperty(sk, sv); else el.style[sk] = sv; } }
       else if (k === 'on') for (const [ev, fn] of Object.entries(v)) el.addEventListener(ev, fn);
       else if (k === 'dataset') Object.assign(el.dataset, v);
       else if (v === true) el.setAttribute(k, '');
@@ -68,6 +68,7 @@ window.MM = window.MM || {};
   ui.SETTING_DEFAULTS = {
     quality: 'medium', softFilter: 'low', bloom: 'low', particles: 'medium', shake: 'low', reducedFlashes: false, reducedMotion: false,
     subtitles: true, damageNumbers: true, volMaster: 0.8, volMusic: 0.6, volSfx: 0.8, volCine: 0.8, autosave: true, touchControls: 'auto', textScale: 1,
+    joystickSize: 1, joystickSide: 'left', joystickMode: 'floating', haptics: true, fxIntensity: 1,
   };
   const localSettings = (() => {
     const KEY = 'moss-moon-settings-v1';
@@ -81,24 +82,78 @@ window.MM = window.MM || {};
     };
   })();
   ui.settings = () => (MM.settings && MM.settings.get ? MM.settings : localSettings);
-  ui.setting = (k) => { const v = safe(() => ui.settings().get(k)); return v === undefined || v === null ? ui.SETTING_DEFAULTS[k] : v; };
-  ui.setSetting = (k, v) => safe(() => ui.settings().set(k, v));
+  // Keys the core schema does not know yet (phase-3 additions) are kept in the local store so they still work.
+  ui.setting = (k) => {
+    let v = safe(() => ui.settings().get(k));
+    if ((v === undefined || v === null) && ui.settings() !== localSettings) v = localSettings.get(k);
+    return v === undefined || v === null ? ui.SETTING_DEFAULTS[k] : v;
+  };
+  ui.setSetting = (k, v) => {
+    const S = ui.settings();
+    const known = S === localSettings || !S.schema || Object.prototype.hasOwnProperty.call(S.schema, k);
+    const r = known ? safe(() => S.set(k, v), false) : false;
+    if (S !== localSettings && (!known || r === false)) { localSettings.set(k, v); ui.emit('settings', { key: k, value: v, local: true }); }
+    return r !== false;
+  };
 
   const localState = {
     current: 'boot', prev: null, data: null,
     go(name, data) {
       if (name === this.current) return;
       const from = this.current; this.prev = from; this.current = name; this.data = data || null;
-      if (name !== 'play') ui.base.call('clearControls');
+      if (!ui.GAME_STATES.includes(name)) ui.base.call('clearControls');
       localBus.emit('state', { from, to: name, data });
     },
     is(n) { return this.current === n; },
   };
+  ui.resetSettings = () => { safe(() => ui.settings().reset()); if (ui.settings() !== localSettings) localSettings.reset(); };
   ui.fallbackCore = () => !(MM.state && MM.state.go);
   ui.state = () => (MM.state && MM.state.go ? MM.state : localState);
   ui.stateIs = (n) => ui.state().current === n;
   ui.go = (name, data) => { if (ui.state().current !== name) safe(() => ui.state().go(name, data)); };
-  ui.isPaused = () => (MM.isPaused ? !!MM.isPaused() : localState.current !== 'play');
+  // Gameplay states (phase 3): HUD, joystick and hotkeys only exist while the current screen simulates (sim !== 'none').
+  ui.GAME_STATES = ['play', 'interior', 'tutorial'];
+  ui.simOf = function (name) {
+    const d = safe(() => MM.screens && MM.screens.def && MM.screens.def(name), null);
+    if (d && d.sim) return d.sim;
+    return ui.GAME_STATES.includes(name) ? (name === 'play' || name === 'tutorial' ? 'world' : 'player') : 'none';
+  };
+  ui.inGameplay = () => ui.simOf(ui.state().current) !== 'none';
+  ui.lastGameState = 'play';
+  ui.isPaused = () => (MM.isPaused ? !!MM.isPaused() : !ui.inGameplay());
+
+  // Input method + control glyphs (MM.input.method / MM.input.glyph from CORE; local fallback until it lands).
+  const GLYPHS = {
+    keyboard: { interact: 'E', cast: 'Space', broom: 'B', potion: 'H', pause: 'Esc', inventory: 'I', journal: 'J', map: 'M', spellbook: 'K', spellNext: '1–5', move: 'WASD' },
+    gamepad: { interact: 'X', cast: 'A', broom: 'Y', potion: 'B', pause: 'Start', inventory: 'Start', journal: 'Start', map: 'Back', spellbook: 'Start', spellNext: 'RB', move: 'L-stick' },
+    touch: { interact: 'Use', cast: 'Cast', broom: 'Broom', potion: 'Potion', pause: '❚❚', inventory: '❚❚', journal: '❚❚', map: '❚❚', spellbook: '❚❚', spellNext: 'Swap', move: 'Stick' },
+  };
+  ui.method = function () {
+    const m = safe(() => MM.input && MM.input.method, null);
+    if (m === 'keyboard' || m === 'touch' || m === 'gamepad') return m;
+    const l = ui.input && ui.input.lastInput ? ui.input.lastInput() : 'key';
+    return l === 'touch' ? 'touch' : l === 'pad' ? 'gamepad' : 'keyboard';
+  };
+  ui.glyph = function (action) {
+    const g = safe(() => MM.input && typeof MM.input.glyph === 'function' && MM.input.glyph(action), null);
+    if (g) return String(g);
+    const t = GLYPHS[ui.method()] || GLYPHS.keyboard;
+    return t[action] || GLYPHS.keyboard[action] || action;
+  };
+
+  // One per-frame driver for all UI work: MM.loop.onTick when CORE provides it (single rAF rule), else one local rAF.
+  const tickFns = new Set();
+  let tickDriver = null, lastTs = 0;
+  function runTicks(dt) { tickFns.forEach((f) => { try { f(dt); } catch (e) { if (!f.__warned) { f.__warned = true; console.error('[MM.ui] tick failed', e); } } }); }
+  function ensureDriver() {
+    if (tickDriver) return;
+    if (MM.loop && typeof MM.loop.onTick === 'function') { tickDriver = 'loop'; MM.loop.onTick((dt) => runTicks(dt || 0)); return; }
+    tickDriver = 'raf'; // FALLBACK: only when MM.loop is absent
+    const f = (ts) => { const dt = lastTs ? Math.min(0.1, (ts - lastTs) / 1000) : 0; lastTs = ts; runTicks(dt); requestAnimationFrame(f); };
+    requestAnimationFrame(f);
+  }
+  ui.tick = function (fn) { tickFns.add(fn); ensureDriver(); return () => tickFns.delete(fn); };
+  ui.tickDriver = () => tickDriver;
 
   // ------------------------------------------------------------------ baseline access (bare global names; guarded)
   // Baseline `let/const` bindings (world, game, SPELLS, spellIndex …) are reachable by bare name from classic scripts.
@@ -424,9 +479,10 @@ window.MM = window.MM || {};
       if (['cine', 'loading'].includes(cur)) return;
       let want = null;
       for (let i = ui.stack.length - 1; i >= 0; i--) if (ui.stack[i].state) { want = ui.stack[i].state; break; }
-      if (!want && ui.stack.length) want = 'menu';
+      if (!want && ui.stack.length && !ui.stack.every((s) => s.passive)) want = 'menu';
+      if (want === 'keep') return;
       if (want && want !== cur) ui.go(want);
-      else if (!want && ['menu', 'dialogue'].includes(cur)) ui.go('play');
+      else if (!want && ['menu', 'dialogue'].includes(cur)) ui.go(ui.lastGameState || 'play');
     } finally { syncing = false; }
   };
 
@@ -452,7 +508,7 @@ window.MM = window.MM || {};
     if (!inst.quiet) ui.sfx(inst.overlay ? 'ui_open' : 'ui_open');
     try { inst.onOpen && inst.onOpen(); } catch (e) { console.error(e); }
     ui.syncState();
-    requestAnimationFrame(() => { if (ui.top() === inst && !inst.el.contains(document.activeElement)) ui.focusFirst(inst.el); });
+    setTimeout(() => { if (ui.top() === inst && !inst.el.contains(document.activeElement)) ui.focusFirst(inst.el); }, 0);
     ui.emit('ui:open', { id });
     return inst;
   };
@@ -485,7 +541,7 @@ window.MM = window.MM || {};
         if (top.refresh) safe(() => top.refresh());
       } else if (document.activeElement && root && root.contains(document.activeElement)) {
         document.activeElement.blur();
-        const cv = document.getElementById('scene'); if (cv && cv.focus && ui.stateIs('play')) cv.focus({ preventScroll: true });
+        const cv = document.getElementById('scene'); if (cv && cv.focus && ui.inGameplay()) cv.focus({ preventScroll: true });
       }
     }
     return true;
@@ -552,6 +608,9 @@ window.MM = window.MM || {};
     if (!text) return null;
     ui.root();
     opts = opts || {};
+    const nowT = Date.now();
+    if (ui._lastToast && ui._lastToast.text === String(text) && nowT - ui._lastToast.t < 600) return null; // bus 'toast' + direct call dedupe
+    ui._lastToast = { text: String(text), t: nowT };
     kind = kind || 'info';
     const iconName = opts.icon || { good: 'check', warn: 'warn', quest: 'scroll', item: 'bag', save: 'bookmark', level: 'star', story: 'moon', info: 'sparkle' }[kind] || 'sparkle';
     const t = h('div', { class: 'mm-toast mm-toast-' + kind }, ui.icon(iconName), h('span', null, String(text)));

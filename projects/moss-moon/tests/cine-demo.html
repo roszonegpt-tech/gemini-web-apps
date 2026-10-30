@@ -32,6 +32,20 @@
       return rem.call(this, type, fn, opts);
     };
   })();
+  // Timers / intervals / rAF / ResizeObservers created by the cinematics module (leak + single-rAF checks).
+  (function () {
+    const fromCine = () => String(new Error().stack).indexOf('/src/systems/cinematics.js') >= 0;
+    const timers = new Set(), intervals = new Set(), raf = new Set(); let rafCalls = 0, ro = 0;
+    const st = window.setTimeout, ct = window.clearTimeout, si = window.setInterval, ci = window.clearInterval, rq = window.requestAnimationFrame, ca = window.cancelAnimationFrame;
+    window.setTimeout = function (fn, ms, ...a) { const c = fromCine(); const id = st.call(window, (...x) => { timers.delete(id); if (typeof fn === 'function') fn(...x); }, ms, ...a); if (c) timers.add(id); return id; };
+    window.clearTimeout = id => { timers.delete(id); ct.call(window, id); };
+    window.setInterval = function (fn, ms, ...a) { const id = si.call(window, fn, ms, ...a); if (fromCine()) intervals.add(id); return id; };
+    window.clearInterval = id => { intervals.delete(id); ci.call(window, id); };
+    window.requestAnimationFrame = function (fn) { const c = fromCine(); const id = rq.call(window, now => { raf.delete(id); fn(now); }); if (c) { rafCalls++; raf.add(id); } return id; };
+    window.cancelAnimationFrame = id => { raf.delete(id); ca.call(window, id); };
+    if (window.ResizeObserver) { const RO = window.ResizeObserver; window.ResizeObserver = class extends RO { constructor(cb) { super(cb); this.__c = fromCine(); this.__on = false; } observe(t, o) { if (this.__c && !this.__on) { this.__on = true; ro++; } return super.observe(t, o); } disconnect() { if (this.__on) { this.__on = false; ro--; } return super.disconnect(); } }; }
+    window.__cineRes = () => ({ timers: timers.size, intervals: intervals.size, rafPending: raf.size, rafCalls, ro, videos: document.getElementsByTagName('video').length });
+  })();
 </script>
 </head>
 <body>
@@ -52,6 +66,8 @@
 <script src="../assets/js/atlas-data.js"></script>
 <script src="../assets/js/cast-data.js"></script>
 <script>window.MM = window.MM || {}; MM.CINE_VIDEO_BASE = '../';</script>
+<script src="../assets/js/art-data.js"></script>
+<script src="../src/systems/art.js"></script>
 <script src="../src/systems/cinematics.js"></script>
 <script src="../src/config/cinematics.js"></script>
 <script>

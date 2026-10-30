@@ -24,6 +24,9 @@
   #scene{position:absolute;inset:0;display:block;width:100%;height:100%;margin:0;padding:0;border:0;
     image-rendering:pixelated;image-rendering:crisp-edges;touch-action:none;outline:none;cursor:pointer}
   #scene:focus,#scene:focus-visible{outline:none} /* the canvas holds focus during play; menus show focus rings */
+  /* screen canvases (MM.screens.mount): above #scene, below cinematics (50) and UI (100) */
+  #mm-screens{position:absolute;inset:0;z-index:40;pointer-events:none;overflow:hidden;overflow:clip}
+  #mm-screens>canvas{position:absolute;inset:0;width:100%;height:100%}
   #mm-fx{position:absolute;inset:0;z-index:50;pointer-events:none;overflow:hidden}
   #mm-fx>canvas{position:absolute;inset:0;width:100%;height:100%;image-rendering:pixelated}
   /* overflow:clip — focusing overflowing UI content must never scroll the stage (that would shift the canvas and break pointer mapping) */
@@ -45,6 +48,7 @@
 </style>
 <!-- UI stylesheet (UI agent): uncomment / run `node tools/build.js --sync` once assets/css/ui.css exists. -->
 <!-- MM:STYLES BEGIN -->
+<link rel="stylesheet" href="assets/css/ui.css">
 <!-- MM:STYLES END -->
 </head>
 <body>
@@ -52,6 +56,7 @@
 <div id="mm-app">
   <div id="mm-stage">
     <canvas id="scene" width="512" height="320" tabindex="0" aria-label="Moss and Moon game scene"></canvas>
+    <div id="mm-screens"></div>
     <div id="mm-fx"></div>
     <div id="mm-ui" aria-live="polite"></div>
   </div>
@@ -60,10 +65,9 @@
   Script load order is FIXED (notes/PHASE2_CONTRACT.md "File ownership"). Classic scripts only.
   Only files that exist get a tag; `node tools/build.js --sync` rewrites the block below from the
   planned list in tools/build.js (+ src/ui/MANIFEST.txt). Planned but possibly not-yet-existing:
-    src/systems/cinematics.js  src/config/campaign.js  src/config/regions-visual.js
-    src/entities/bosses.js  src/systems/campaign.js  src/systems/world-render.js
-    src/systems/lighting.js  src/systems/fx.js  src/systems/filter.js
-    src/ui/ui-core.js  src/ui/ui-hud.js  src/ui/ui-menus.js  src/ui/ui-screens.js  src/ui/ui-input.js
+    see PLANNED in tools/build.js (phase 3 adds src/config/buildings.js, src/systems/interiors.js,
+    src/systems/interior-render.js, src/ui/ui-joystick.js, src/config/tutorial.js, src/screens/{flow,logo,title,intro,tutorial}.js,
+    assets/css/screens.css; screens load after the UI files, boot.js last)
 -->
 <!-- MM:SCRIPTS BEGIN -->
 <script src="assets/js/atlas-data.js"></script>
@@ -79,6 +83,8 @@
 <script src="src/config/regions-visual.js"></script>
 <script src="src/core/baseline.js"></script>
 <script src="src/entities/bosses.js"></script>
+<script src="src/systems/campaign.js"></script>
+<script src="src/systems/world-render.js"></script>
 <script src="src/systems/lighting.js"></script>
 <script src="src/systems/fx.js"></script>
 <script src="src/systems/filter.js"></script>
@@ -86,6 +92,7 @@
 <script src="src/ui/ui-hud.js"></script>
 <script src="src/ui/ui-menus.js"></script>
 <script src="src/ui/ui-screens.js"></script>
+<script src="src/ui/ui-joystick.js"></script>
 <script src="src/ui/ui-input.js"></script>
 <script src="src/core/boot.js"></script>
 <!-- MM:SCRIPTS END -->

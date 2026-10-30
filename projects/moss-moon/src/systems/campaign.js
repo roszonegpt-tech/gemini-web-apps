@@ -25,6 +25,18 @@
   const tdist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
   const playerName = () => MM.game?.name || (typeof MM.game?.name === 'function' ? MM.game.name() : null) || 'little witch';
   const inPlay = () => !MM.state || !MM.state.current || MM.state.current === 'play';
+  // Campaign bookkeeping is dormant in the tutorial sandbox and in any screen whose sim policy isn't 'world'.
+  const SANDBOX_STATES = ['tutorial', 'logo', 'intro', 'title', 'creation', 'boot'];
+  function dormant() {
+    try {
+      if (world.region === 'tutorial' || !D.regions[world.region]) return true;
+      const cur = MM.state?.current; if (cur && SANDBOX_STATES.includes(cur)) return true;
+      const sim = MM.screens?.current?.sim ?? MM.screens?.def?.(cur)?.sim; if (sim && sim !== 'world') return true;
+    } catch (_) { }
+    return false;
+  }
+  // timers that die with the current screen when MM.screens exists (phase 3 policy), else plain timeouts
+  const later = (fn, ms) => { try { if (typeof MM.screens?.timeout === 'function') return MM.screens.timeout(fn, ms); } catch (_) { } return setTimeout(fn, ms); };
   let cinePlaying = false; const toastQueue = [];
   function toast(text, kind) {
     if (!text) return;
@@ -93,7 +105,7 @@
     if (!c || c === 'start') return true;
     return String(c).split('|').some(one => {
       const [k, v] = one.split(':');
-      if (k === 'tutorial') return v ? tutorialPast(v) : state.tutorial.done;
+      if (k === 'tutorial') return v ? (state.tutorial.done || state.tutorial.step >= D.tutorial.findIndex(t => t.id === v)) : state.tutorial.done;   // reached step v
       if (k === 'chapter') return state.chapter >= Number(v);
       if (k === 'fragment') return state.fragments.includes(v);
       if (k === 'request') return state.requests[v]?.state === 'done';
@@ -200,7 +212,11 @@
   function pumpCine() {
     if (cineBusy || !cineQ.length) return;
     const job = cineQ.shift(); cineBusy = true; cinePlaying = true;
-    try { if (MM.state?.go && MM.state.current !== 'cine') MM.state.go('cine', { id: job.id }); } catch (e) { console.error(e); }
+    try {
+      const cur = MM.state?.current;
+      if (cur && cur !== 'cine') { V.cineReturn = (cur === 'interior' || cur === 'play') ? { name: cur, data: MM.state.data } : { name: 'play' }; }
+      if (MM.state?.go && cur !== 'cine') MM.state.go('cine', { id: job.id, returnTo: V.cineReturn?.name || 'play' });
+    } catch (e) { console.error(e); }
     let p; try { p = MM.cine.play(job.id, { skippable: true }); } catch (e) { p = Promise.resolve({ id: job.id, skipped: false, reason: 'error' }); }
     Promise.resolve(p).catch(() => ({ id: job.id, skipped: false, reason: 'error' })).then(r => {
       cineBusy = false;
@@ -216,7 +232,11 @@
   function afterCine(next, r) {
     try {
       if (next === 'ending') { enterEnding(); return; }
-      if (MM.state?.go && (MM.state.current === 'cine' || MM.state.current === 'loading')) MM.state.go('play');
+      if (MM.state?.go && (MM.state.current === 'cine' || MM.state.current === 'loading')) {
+        const ret = V.cineReturn || { name: 'play' }; V.cineReturn = null;
+        if (ret.name === 'interior') MM.state.go('interior', Object.assign({}, ret.data || {}, { resume: true, fromCine: true }));
+        else MM.state.go('play');
+      }
     } catch (e) { console.error('[campaign] afterCine', e); }
   }
 
@@ -373,7 +393,7 @@
     return r;
   };
   const _resetPlayer = resetPlayer;
-  resetPlayer = function () { if (V.respawning) return _resetPlayer(); onPlayerDown({ kind: 'baseline' }); };
+  resetPlayer = function () { if (V.respawning || dormant()) return _resetPlayer(); onPlayerDown({ kind: 'baseline' }); };
 
   const _tendPlot = tendPlot;
   tendPlot = function (plot) {
@@ -474,6 +494,7 @@
   };
   const _updateWorld = updateWorld;
   updateWorld = function (dt) {
+    if (dormant()) return _updateWorld(dt);
     let pre = null;
     try { pre = preWorld(dt); } catch (e) { console.error('[campaign] preWorld', e); }
     const r = _updateWorld(dt);
@@ -506,7 +527,7 @@
     // raid timing fix (audit §9 #2) + suppression during tutorial / final / recovery
     if (world.region === 'grove' && world.mode === 'outside' && isNight()) {
       const key = world.time < .10 ? world.day - 1 : world.day;
-      if (state.raidNight === key || !state.tutorial.done || V.finalActive || V.downed || cinePlaying) world.lastRaid = world.day;
+      if (state.raidNight === key || !state.tutorial.done || V.finalActive || V.downed || cinePlaying) world.lastRaid = Math.max(world.lastRaid || 0, key);
     }
     return { lastRaid: world.lastRaid, day: world.day, growth: world.plots.map(p => p.growth) };
   }
@@ -538,7 +559,7 @@
     world.mana = Math.max(0, Math.min(100, world.mana + dt * regen));
     if (pre && world.day !== pre.day) emit('campaign:day', { day: world.day });
     V.tick += dt; V.proxCooldown -= dt;
-    if (V.tick >= .2) { V.tick = 0; proximity(); tutorialPeriodic(); pushObjective(); }
+    if (V.tick >= .2) { V.tick = 0; proximity(); if (!state.tutorial.done && state.started) syncFlowTutorial(); tutorialPeriodic(); pushObjective(); }
     if (world.hp <= 0 && !V.downed) onPlayerDown({ kind: 'hp' });
     V.lastPos = { x: game.x, y: game.y };
   }
@@ -660,6 +681,7 @@
 
   // ================================================================ events from gameplay
   function gameEvent(name, d) {
+    if (dormant()) return;
     if (name === 'plant') { tut('plant', d); }
     else if (name === 'water') { tut('water', d); }
     else if (name === 'harvest') {
@@ -671,6 +693,7 @@
     emit('campaign:' + name, d);
   }
   function onKill(e, source) {
+    if (dormant()) return;
     if (e.mmWell) { BOSS()?.onKill(e); return; }
     const reg = world.region;
     state.counters.kills[reg] = (state.counters.kills[reg] || 0) + 1; state.counters.kills.any++; state.stats.kills++;
@@ -743,13 +766,18 @@
   }
 
   // ---------------------------------------------------------------- Moonwell / restoration / final
-  function moonwellPos() {
+  // Live interactable position from MM.world (fallback: data defaults). id e.g. 'moonwell', 'wren', 'dungeon', 'stairs'.
+  function pointOf(region, id) {
     try {
-      const L = MM.world?.layout?.('grove'); const list = (L && (L.interactables || L.interactions || L.points)) || MM.world?.interactables?.('grove') || [];
-      const m = Array.isArray(list) ? list.find(p => p.id === 'moonwell') : null; if (m && Number.isFinite(m.x)) return { x: m.x, y: m.y, r: m.r || 1.6 };
+      if (region === world.region && typeof MM.world?.interactables === 'function') { const m = (MM.world.interactables() || []).find(p => p.id === id); if (m && Number.isFinite(m.x)) return { x: m.x, y: m.y, r: m.r || 1.2 }; }
+      const L = MM.world?.layout?.(region);
+      const list = [].concat(L?.interactables || [], L?.npcs || []);
+      const m = list.find(p => p.id === id); if (m && Number.isFinite(m.x)) return { x: m.x, y: m.y, r: m.r || 1.2 };
     } catch (_) { }
-    const d = D.interactions.grove.find(p => p.id === 'moonwell'); return { x: d.x, y: d.y, r: d.r };
+    const I = D.interactions, d = (I[region] || []).find(p => p.id === id) || (id === 'dungeon' ? I.dungeon : id === 'stairs' ? I.stairs : id === 'exit' ? I.exit : null);
+    return d ? { x: d.x, y: d.y, r: d.r || 1.2 } : null;
   }
+  function moonwellPos() { return pointOf('grove', 'moonwell') || { x: 13.6, y: 7.0, r: 1.5 }; }
   function placeFragments() {
     const todo = state.fragments.filter(r => !state.placed.includes(r)); if (!todo.length) return false;
     for (const r of todo) restoreRegion(r);
@@ -802,7 +830,7 @@
     const s = state.stats, summary = { title: D.ending.title, text: D.ending.text, unlocks: D.ending.unlocks, playTime: Math.round(s.playTime), kills: s.kills, harvested: s.harvested, crafted: s.crafted, defeats: s.defeats, goldEarned: Math.round(s.goldEarned), day: world.day, level: world.level };
     emit('ending', summary);
     try { if (MM.state?.go) MM.state.go('ending', summary); } catch (e) { console.error(e); }
-    if (!MM.ui) setTimeout(() => { try { if (MM.state?.current === 'ending') MM.state.go('play'); } catch (_) { } }, 1500);
+    if (!MM.ui) later(() => { try { if (MM.state?.current === 'ending') MM.state.go('play'); } catch (_) { } }, 1500);
     requestSave('ending', true);
   }
   function interactMoonwell() {
@@ -814,42 +842,53 @@
   }
 
   // ---------------------------------------------------------------- defeat / recovery
+  // With MM core: baseline resetPlayer() -> MM.game.handleDeath() enters 'defeat'; the defeat screen calls MM.game.respawnHome()
+  // (which applies the 15%/max 25 gold loss) and core emits bus 'respawn'. The campaign adds bookkeeping + penalty text only.
+  function defeatData() {
+    const Df = D.defeat, goldLost = Math.min(Df.goldMax, Math.floor(Math.max(0, world.gold) * Df.goldPct));
+    return { title: Df.title, text: Df.text, penalty: fmt(Df.penaltyText, { gold: goldLost }), goldLost, region: world.region, regionName: D.regions[world.region]?.name, mode: world.mode, floor: world.floor, tip: Df.tips[state.stats.defeats % Df.tips.length], kept: 'Items, fragments, recipes and story progress are kept.' };
+  }
   function onPlayerDown(opts) {
     if (V.downed) return;
-    V.downed = true; const Df = D.defeat;
-    const goldLost = Math.min(Df.goldMax, Math.floor(Math.max(0, world.gold) * Df.goldPct));
-    world.gold = Math.max(0, world.gold - goldLost); world.hp = 1; state.stats.defeats++;
+    const data = defeatData();
+    V.downed = true; state.stats.defeats++;
     if (V.finalActive) abortFinal();
     KIT()?.clear(); V.slow = []; V.chill = 0;
-    const data = { title: Df.title, text: Df.text, penalty: fmt(Df.penaltyText, { gold: goldLost }), goldLost, region: world.region, regionName: D.regions[world.region]?.name, mode: world.mode, floor: world.floor, tip: Df.tips[state.stats.defeats % Df.tips.length], kept: 'Items, fragments, recipes and story progress are kept.' };
     V.lastDefeat = data;
     emit('defeat', data);
+    if (typeof MM.game?.handleDeath === 'function' && MM.state?.go) {
+      world.hp = Math.min(world.hp, 0);
+      V.respawning = true; try { _resetPlayer(); } finally { V.respawning = false; }   // emits 'death' + handleDeath -> 'defeat'
+      if (MM.state.current !== 'defeat') { try { MM.game.handleDeath(); } catch (_) { } }
+      return;
+    }
+    // no core: own fallback (lose gold, wake at home)
+    world.gold = Math.max(0, world.gold - data.goldLost); world.hp = 1;
     try { if (MM.state?.go) MM.state.go('defeat', data); } catch (e) { console.error(e); }
-    if (!MM.ui || !MM.state) setTimeout(recover, MM.state ? 1500 : 0);
+    later(() => recover(), MM.state ? 1500 : 0);
   }
-  function respawnHome() {
-    V.respawning = true; const g = world.gold;
-    try { if (typeof MM.game?.respawnHome === 'function') MM.game.respawnHome(); else _resetPlayer(); }
-    catch (e) { console.error('[campaign] respawn', e); try { _resetPlayer(); } catch (_) { } }
-    finally { V.respawning = false; }
-    world.gold = g; world.hp = heroMaxHP(); world.mana = 100;
-    if (world.region !== 'grove' || world.mode !== 'outside') { V.respawning = true; try { _goRegion('grove'); } finally { V.respawning = false; } }
+  function onRespawned() {
+    if (!V.downed) return;
+    V.downed = false; world.hp = heroMaxHP(); world.mana = 100;
     onAreaChanged();
+    toast('You wake at the homestead, a little bruised. ' + (V.lastDefeat?.penalty || ''), 'info');
+    if (!state.memories.includes('defeat_recover') && MM.cine?.play) playStory('defeat_recover');
   }
   function recover() {
     if (!V.downed) return { ok: false, msg: 'Not downed' };
-    respawnHome(); V.downed = false;
-    const first = !state.memories.includes('defeat_recover');
-    if (first && MM.cine?.play) playStory('defeat_recover');
-    else { try { if (MM.state?.go && MM.state.current === 'defeat') MM.state.go('play'); } catch (_) { } }
-    toast('You wake at the homestead, a little bruised. ' + (V.lastDefeat?.penalty || ''), 'info');
-    requestSave('recover');
+    if (typeof MM.game?.respawnHome === 'function') { MM.game.respawnHome({ goldLoss: V.lastDefeat?.goldLost }); onRespawned(); return { ok: true, msg: 'Recovered at the homestead' }; }
+    V.respawning = true; const g = world.gold;
+    try { _resetPlayer(); } catch (e) { console.error('[campaign] respawn', e); } finally { V.respawning = false; }
+    world.gold = g;
+    if (world.region !== 'grove' || world.mode !== 'outside') { V.respawning = true; try { _goRegion('grove'); } finally { V.respawning = false; } }
+    try { if (MM.state?.go && MM.state.current === 'defeat') MM.state.go('play'); } catch (_) { }
+    onRespawned(); requestSave('recover');
     return { ok: true, msg: 'Recovered at the homestead' };
   }
 
   // ================================================================ travel
   function regionLock(id) {
-    const r = D.regions[id]; if (!r) return 'Unknown place.';
+    const r = D.regions[id]; if (!r) return null;   // regions the campaign doesn't own (e.g. the tutorial sandbox) are never locked here
     const q = r.requires; if (!q) return null;
     if (q.chapterStep && !tutorialPast(q.chapterStep)) return r.lockReason;
     if (q.tutorial && !state.tutorial.done) return r.lockReason;
@@ -861,7 +900,7 @@
   function transition(fn, data) {
     if (MM.state?.go) {
       try { MM.state.go('loading', data); } catch (_) { }
-      setTimeout(() => { try { fn(); } catch (e) { console.error('[campaign] transition', e); } finally { try { if (MM.state.current === 'loading') MM.state.go('play'); } catch (_) { } } }, 650);
+      later(() => { try { fn(); } catch (e) { console.error('[campaign] transition', e); } finally { try { if (MM.state.current === 'loading') MM.state.go('play'); } catch (_) { } } }, 650);
       return true;
     }
     fn(); return false;
@@ -954,8 +993,8 @@
     if (state.chapter === 0) {
       const s = D.tutorial[state.tutorial.step]; const plot = world.plots.find(p => p.seed) || world.plots[0];
       const ptarget = { region: 'grove', x: plot.x, y: plot.y };
-      if (s.id === 'tut_request' || s.id === 'request') { const w = D.interactions.village.find(p => p.id === 'wren'); return mk('tut_request', {}, { region: 'village', x: w.x, y: w.y }, { step: state.tutorial.step }); }
-      if (s.id === 'brew') return mk('tut_brew', {}, { region: 'grove', x: D.interactions.grove[2].x, y: D.interactions.grove[2].y }, { step: state.tutorial.step });
+      if (s.id === 'tut_request' || s.id === 'request') { return mk('tut_request', {}, Object.assign({ region: 'village' }, pointOf('village', 'wren')), { step: state.tutorial.step }); }
+      if (s.id === 'brew') return mk('tut_brew', {}, Object.assign({ region: 'grove' }, pointOf('grove', 'cauldron')), { step: state.tutorial.step });
       return mk(s.objective, {}, ptarget, { step: state.tutorial.step });
     }
     if (state.chapter === 4) return mk('final', {}, mwT);
@@ -965,11 +1004,11 @@
     const reg = D.regions[R], lock = regionLock(R);
     if (lock) {
       const need = reg.requires.broom || reg.requires.broomOr || 1, lv = D.upgrades.broom.levels[Math.min(need, world.broom + 1)];
-      return mk('need_broom', { need, why: lock, cost: costText(broomCost(world.broom + 1)) }, { region: 'village', x: D.interactions.village[1].x, y: D.interactions.village[1].y }, { cost: lv ? broomCost(world.broom + 1) : null });
+      return mk('need_broom', { need, why: lock, cost: costText(broomCost(world.broom + 1)) }, Object.assign({ region: 'village' }, pointOf('village', 'pip')), { cost: lv ? broomCost(world.broom + 1) : null });
     }
     if (world.region !== R) return mk('goto_region', { region: reg.name, why: reg.desc }, { region: R });
-    if (world.mode === 'outside') return mk('enter_dungeon', { dungeon: reg.dungeon.name, region: reg.name }, { region: R, x: D.interactions.dungeon.x, y: D.interactions.dungeon.y });
-    if (world.floor < 3) { const left = enemies.filter(e => e.hp > 0 && !e.dead).length; return left ? mk('descend', { floor: world.floor, left }, { region: R }) : mk('descend_go', {}, { region: R, x: 10, y: 10 }); }
+    if (world.mode === 'outside') return mk('enter_dungeon', { dungeon: reg.dungeon.name, region: reg.name }, Object.assign({ region: R }, pointOf(R, 'dungeon')));
+    if (world.floor < 3) { const left = enemies.filter(e => e.hp > 0 && !e.dead).length; return left ? mk('descend', { floor: world.floor, left }, { region: R }) : mk('descend_go', {}, Object.assign({ region: R }, pointOf(R, 'stairs'))); }
     const b = enemies.find(e => e.mmBoss);
     return mk('boss', { boss: D.bosses[reg.boss].name }, b ? { region: R, x: b.x, y: b.y } : { region: R });
   }
@@ -994,11 +1033,11 @@
     const reg = regionId || world.region, list = [];
     if (world.mode !== 'outside' && !regionId) {
       const left = enemies.some(e => e.hp > 0 && !e.dead), r = D.regions[reg];
-      if (!left && r?.dungeon && (r.dungeon.endless || world.floor < 3)) list.push({ id: 'stairs', x: 10, y: 10, r: 1.2, prompt: 'Take the stairs down' });
-      list.push({ id: 'dungeon_exit', x: 9.7, y: 17.2, r: 1.2, prompt: 'Climb back up' });
+      if (!left && r?.dungeon && (r.dungeon.endless || world.floor < 3)) list.push(Object.assign({ prompt: 'Descend deeper' }, D.interactions.stairs));
+      list.push(Object.assign({ prompt: 'Climb back to the surface' }, D.interactions.exit));
     } else {
-      for (const p of (D.interactions[reg] || [])) list.push(Object.assign({}, p, p.id === 'moonwell' ? { prompt: state.fragments.some(r => !state.placed.includes(r)) ? 'Place the fragment' : state.chapter === 4 ? 'Face the Moonwell' : 'Visit the Moonwell' } : {}));
-      if (D.regions[reg]?.dungeon) list.push(Object.assign({ id: 'dungeon_entrance' }, D.interactions.dungeon, { prompt: 'Enter ' + D.regions[reg].dungeon.name }));
+      for (const p of (D.interactions[reg] || [])) { const live = pointOf(reg, p.id) || p; list.push(Object.assign({}, p, { x: live.x, y: live.y }, p.id === 'moonwell' ? { prompt: state.fragments.some(r => !state.placed.includes(r)) ? 'Place the fragment' : state.chapter === 4 ? 'Face the Moonwell' : 'Visit the Moonwell' } : {})); }
+      if (D.regions[reg]?.dungeon) { const d = pointOf(reg, 'dungeon'); list.push(Object.assign({}, D.interactions.dungeon, d || {}, { prompt: 'Enter ' + D.regions[reg].dungeon.name })); }
     }
     return list.map(p => Object.assign(p, { action: () => interact(p.id) }));
   }
@@ -1011,25 +1050,50 @@
     emit('campaign:talk', { npc, script });
     return { ok: true, dialogue: script };
   }
-  function interact(id) {
-    switch (id) {
+  // Interaction ids (exterior world ids from regions-visual.js + interior furniture ids for MM.interiors). See handoff.
+  function interact(id, ctx) {
+    const [kind, arg] = String(id || '').split(':');
+    switch (kind) {
       case 'moonwell': return interactMoonwell();
       case 'seed_barrel': { const r = claimSeeds(); toast(r.msg, r.ok ? 'good' : 'info'); return r; }
-      case 'cauldron': V.activeCraft = world.region; openUI('crafting'); return { ok: true, open: 'crafting' };
-      case 'travel_board': openUI('travel'); return { ok: true, open: 'travel' };
-      case 'marrow': case 'pip': case 'wren': case 'notice_board': return talk(id === 'notice_board' ? 'board' : id);
-      case 'dungeon_entrance': { const r = enterDungeonCampaign(); toast(r.msg, r.ok ? 'info' : 'warn'); return r; }
+      case 'cauldron': case 'alchemy_table': case 'brewing': case 'brew': V.activeCraft = world.region; openUI('crafting', { from: id }); return { ok: true, open: 'crafting' };
+      case 'bed': case 'rest': { const r = rest(); toast(r.msg, r.ok ? 'good' : 'info'); return r; }
+      case 'travel_board': case 'travel': openUI('travel', { from: id }); return { ok: true, open: 'travel' };
+      case 'shop': case 'shop_counter': case 'counter': { const npc = D.shops[arg] ? arg : (world.region === 'village' || !arg ? 'pip' : 'pip'); api.activeShop = npc; openUI('shop', { npc, from: id }); return { ok: true, open: 'shop', npc }; }
+      case 'herbs': case 'herb_shop': api.activeShop = 'wren'; openUI('shop', { npc: 'wren', from: id }); return { ok: true, open: 'shop', npc: 'wren' };
+      case 'talk': case 'npc': return talk(arg || ctx?.id);
+      case 'marrow': case 'pip': case 'wren': return talk(kind);
+      case 'notice_board': case 'board': return talk('board');
+      case 'dungeon': case 'dungeon_entrance': { const r = enterDungeonCampaign(); toast(r.msg, r.ok ? 'info' : 'warn'); return r; }
       case 'stairs': { const r = nextFloor(); if (!r.ok) toast(r.msg, 'warn'); return r; }
-      case 'dungeon_exit': return exitDungeon();
+      case 'exit': case 'dungeon_exit': { const r = exitDungeon(); if (!r.ok) toast(r.msg, 'info'); return r; }
       default: return { ok: false, msg: 'Nothing happens.' };
     }
   }
+  const WORLD_IDS = ['moonwell', 'seed_barrel', 'cauldron', 'alchemy_table', 'bed', 'travel_board', 'marrow', 'pip', 'wren', 'notice_board', 'shop', 'dungeon', 'stairs', 'exit'];
   let worldRegistered = false;
   function registerWorld() {
     if (worldRegistered || typeof MM.world?.register !== 'function') return;
-    for (const id of ['moonwell', 'seed_barrel', 'cauldron', 'travel_board', 'marrow', 'pip', 'wren', 'notice_board', 'dungeon_entrance', 'stairs', 'dungeon_exit'])
-      try { MM.world.register(id, () => interact(id)); } catch (e) { console.warn('[campaign] world.register', id, e); }
+    for (const id of WORLD_IDS) try { MM.world.register(id, (it) => { interact(id, it); return true; }); } catch (e) { console.warn('[campaign] world.register', id, e); }
     worldRegistered = true;
+  }
+  // Rest (cottage bed exterior/interior): advance a quarter day, crops grow for that time, full heal. Repeatable.
+  function rest(opts) {
+    const inside = MM.state?.current === 'interior';
+    if (world.region !== 'grove' && !opts?.force) return { ok: false, msg: 'You can only rest at home.' };
+    if (world.mode !== 'outside' && !inside) return { ok: false, msg: 'You can only rest at home.' };
+    if (V.finalActive || enemies.some(e => e.hp > 0 && !e.dead && screenDistance(e, game) < 140)) return { ok: false, msg: 'You can\'t rest with danger this close.' };
+    const secs = 30;     // a quarter of a 120 s day
+    for (const p of world.plots) if (p.seed && (p.watered || world.weather === 'Rain') && p.growth < 100) {
+      const c = D.crops[p.seed] || {}, base = 100 / (SEED_TYPES[p.seed]?.time || 30) * (world.cls === 'grove' ? 1.25 : 1) * (state.homestead.level >= 2 ? 1.15 : 1) * (c.nightBonus ? 1.2 : 1);
+      p.growth = Math.min(100, p.growth + base * secs); p.watered = true;
+    }
+    world.time += .25; let newDay = false;
+    if (world.time >= 1) { world.time -= 1; world.day++; world.weather = weatherFor(world.day); newDay = true; emit('day', { day: world.day, season: season(), weather: world.weather, rested: true }); }
+    world.hp = heroMaxHP(); world.mana = 100;
+    emit('campaign:rest', { day: world.day, time: world.time, newDay });
+    requestSave('rest');
+    return { ok: true, msg: newDay ? 'You sleep soundly. A new morning — day ' + world.day + '. The seed barrel has refilled.' : 'You rest a while by the hearth. Time passes; you feel restored.', newDay };
   }
 
   // ================================================================ dialogue
@@ -1298,33 +1362,12 @@
         ctx.fillStyle = 'rgba(48,72,58,.42)'; ctx.beginPath(); ctx.ellipse(p.x, p.y, rx, ry, 0, 0, Math.PI * 2); ctx.fill();
         ctx.strokeStyle = 'rgba(120,160,130,.35)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.ellipse(p.x, p.y, rx * .7, ry * .7, 0, 0, Math.PI * 2); ctx.stroke();
         for (let i = 0; i < 3; i++) { const k = (t * .7 + i * .33) % 1; fill('rgba(170,210,180,' + (1 - k) * .7 + ')', p.x - 8 + i * 8, p.y - 1 - Math.round(k * 4), 2, 2); }
-      } else if (h.kind === 'warm' && !MM.world) {
-        ellipse(p.x, p.y, 7, 2, 'rgba(40,30,30,.3)'); fill('#5d5048', p.x - 4, p.y - 6, 8, 5); const f = Math.floor(t * 10) % 2;
-        fill('#f47c46', p.x - 2, p.y - 11 - f, 4, 5); fill('#ffe3a1', p.x - 1, p.y - 9 - f, 2, 3);
+      } else if (h.kind === 'warm') {
         ctx.fillStyle = 'rgba(255,170,90,.10)'; ctx.beginPath(); ctx.ellipse(p.x, p.y, rx, ry, 0, 0, Math.PI * 2); ctx.fill();
       }
     }
-    if (!MM.world) drawFallbackWorld(t);
     KIT()?.draw(ctx);
   }
-  function drawFallbackWorld(t) {
-    if (world.mode !== 'outside') { if (!enemies.some(e => e.hp > 0)) { const p = worldToCanvas(10, 10); diamond(ctx, p.x, p.y, 22, 11, '#3d3a46'); diamond(ctx, p.x, p.y + 1, 14, 7, '#26242d'); } return; }
-    if (world.region === 'grove') {
-      const m = moonwellPos(), p = worldToCanvas(m.x, m.y), lv = state.moonwell.level;
-      ellipse(p.x, p.y, 16, 7, '#8f978c'); ellipse(p.x, p.y - 1, 12, 5, lv ? 'rgba(170,200,255,' + (.4 + lv * .18) + ')' : '#56605a');
-      if (lv) sparkle(p.x + Math.round(Math.sin(t * 2) * 5), p.y - 4 - Math.round((t * 6) % 6), '#eef4ff', 1 + (lv > 2 ? 1 : 0));
-    }
-    if (world.region === 'village') {
-      for (const n of D.interactions.village) {
-        const p = worldToCanvas(n.x, n.y);
-        if (['marrow', 'pip', 'wren'].includes(n.id)) { ellipse(p.x, p.y, 7, 2, 'rgba(52,69,48,.2)'); ctx.save(); ctx.filter = { marrow: 'none', pip: 'hue-rotate(160deg)', wren: 'hue-rotate(70deg) saturate(1.3)' }[n.id]; drawCastSprite('keeper', p); ctx.restore(); }
-        else if (n.id === 'notice_board') { fill('#6e5642', p.x - 1, p.y - 16, 2, 16); fill('#b89d72', p.x - 8, p.y - 22, 16, 9); fill('#f7f4e9', p.x - 6, p.y - 20, 5, 4); }
-      }
-    }
-    const dd = D.regions[world.region]?.dungeon;
-    if (dd) { const p = worldToCanvas(D.interactions.dungeon.x, D.interactions.dungeon.y); diamond(ctx, p.x, p.y, 26, 13, '#4a443c'); diamond(ctx, p.x, p.y + 1, 18, 9, '#1f1c22'); fill('#8a7a62', p.x - 6, p.y - 2, 12, 1); }
-  }
-
   // ================================================================ start / new game
   function resetWorldForNewGame() {
     world = newWorld(); enemies = []; lootDrops = []; allies = []; party = []; dungeonBlocks = [];
@@ -1342,10 +1385,33 @@
     world.seeds = Object.assign({}, S.seeds); world.harvest = Object.assign({}, S.harvest);
     afterLoad(true);
     selectFirstSpell();
-    emit('campaign:start', {});
-    const p = playStory('intro', { reward: () => addItem('moon_charm', 1) });
+    // The intro cinematic is shown by MM.flow before the main menu (phase 3); the campaign just begins the Arrival chapter.
+    if (!state.memories.includes('intro')) state.memories.push('intro');
+    grantOnce('cine.intro', () => addItem('moon_charm', 1));
+    syncFlowTutorial();
+    emit('campaign:start', { chapter: state.chapter });
+    toast(state.tutorial.done ? 'Welcome home. Elder Marrow is waiting in the village.' : 'Welcome home. The old garden is waiting.', 'story');
     pushObjective(true);
-    return p;
+    requestSave('campaign-start');
+    return Promise.resolve({ ok: true, chapter: state.chapter });
+  }
+  // If the interactive tutorial (MM.flow, persisted in MM.storage 'moss-moon-flow-v1') was completed or skipped, the Arrival
+  // story chain auto-completes: the village opens and Wren's first request is simply offered (no forced re-teaching).
+  function flowTutorialDone() {
+    try {
+      if (typeof MM.flow?.tutorialDone === 'function') return !!MM.flow.tutorialDone();
+      if (MM.flow && typeof MM.flow.tutorialDone === 'boolean') return MM.flow.tutorialDone;
+      if (MM.flow?.flags?.tutorialDone != null) return !!MM.flow.flags.tutorialDone;
+      const raw = MM.storage?.get?.('moss-moon-flow-v1') ?? (() => { try { return localStorage.getItem('moss-moon-flow-v1'); } catch (_) { return null; } })();
+      const o = typeof raw === 'string' ? JSON.parse(raw) : raw; return !!o?.tutorialDone;
+    } catch (_) { return false; }
+  }
+  function syncFlowTutorial() {
+    if (state.tutorial.done || !flowTutorialDone()) return false;
+    state.tutorial.step = D.tutorial.length; state.tutorial.done = true; state.flags.flowTutorial = true;
+    emit('tutorial', { step: state.tutorial.step, id: 'auto', skipped: true });
+    applyChapter(true); applyUnlocks(true); pushObjective(true);
+    return true;
   }
 
   // ================================================================ debug / test helpers (real code paths)
@@ -1397,7 +1463,7 @@
     map() { return { regions: regions(), player: { region: world.region, mode: world.mode, floor: world.floor, x: game.x, y: game.y }, objective: objective(), interactions: interactionsFor() }; },
     status() { const bs = BOSS()?.active?.() || []; return { chapter: state.chapter, chapterName: D.chapters[state.chapter].name, objective: objective(), fragments: { found: state.fragments.slice(), placed: state.placed.slice() }, homestead: state.homestead.level, moonwell: state.moonwell.level, broom: world.broom, hazard: hazardStatus(), buffs: Object.assign({}, state.buffs), cooldowns: Object.assign({}, V.cooldowns), boss: bs[0] || null, downed: V.downed, finalActive: V.finalActive, defeat: V.downed ? V.lastDefeat : null }; },
     hazards: () => V.hazards.map(h => Object.assign({}, h)), hazardStatus, hasBuff, slowPlayer, damageTakenMul, isDown: () => V.downed, onPlayerDown, onBossDefeated, spawnArch, moonwellPos, toast,
-    lastDefeat: () => V.lastDefeat, rest() { if (world.region !== 'grove' || world.mode !== 'outside') return { ok: false, msg: 'You can only rest at home.' }; world.time += .25; world.hp = Math.min(heroMaxHP(), world.hp + (state.homestead.level >= 1 ? heroMaxHP() : 30)); return { ok: true, msg: 'You rest a while by the cottage.' }; },
+    lastDefeat: () => V.lastDefeat, rest, pointOf, isDormant: dormant,
     on(name, fn) { (listeners[name] = listeners[name] || []).push(fn); return () => { listeners[name] = listeners[name].filter(f => f !== fn); }; },
     activeShop: 'pip', debug, playStory, regionLock, version: 1
   };
@@ -1409,12 +1475,18 @@
     trySaveRegister(); registerWorld();
     if (!api._hooked && typeof MM.hooks?.on === 'function') {
       api._hooked = true;
+      try { MM.hooks.on('drawables', (list, project) => {
+        if (dormant() || !MM.art?.has?.('brazier')) return;
+        for (const h of V.hazards) if (h.kind === 'warm') list.push({ type: 'custom', x: h.x, y: h.y, depth: project(h.x, h.y).y, draw: (c, pos) => MM.art.draw(c, 'brazier', pos.x, pos.y, { t: game.elapsed }) });
+      }, 5); } catch (e) { console.warn('[campaign] hooks.on drawables', e); }
       try { MM.hooks.on('drawGround', () => { hookFrame = frameNo; try { drawLayer(); } catch (e) { console.error('[campaign] drawLayer', e); } }, 5); } catch (e) { console.warn('[campaign] hooks.on', e); }
     }
     if (!api._busHooked && typeof MM.bus?.on === 'function') {
       api._busHooked = true;
       MM.bus.on('ready', lateInit);
       MM.bus.on('state', d => { if (d?.to === 'play') flushToasts(); });
+      MM.bus.on('respawn', () => { try { onRespawned(); } catch (e) { console.error('[campaign] respawn', e); } });
+      MM.bus.on('game:new', () => { V.downed = false; V.finalActive = false; });
     }
   }
   if (!trySaveRegister()) fallbackLoad();

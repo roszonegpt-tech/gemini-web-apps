@@ -80,22 +80,27 @@ window.MM = window.MM || {};
   D.regionOrder = ['grove', 'village', 'forest', 'swamp', 'mountain', 'crypt', 'sky'];
 
   // Default interaction points (WORLD may override positions via MM.world.layout()).
+  // Ids match the WORLD agent's interactables (src/config/regions-visual.js); positions are fallbacks only —
+  // MM.campaign reads live positions from MM.world.layout(region).interactables when available.
   D.interactions = {
     grove: [
-      { id: 'moonwell', x: 12.6, y: 4.4, r: 1.6, prompt: 'Visit the Moonwell' },
-      { id: 'seed_barrel', x: 6.3, y: 12.7, r: 1.1, prompt: 'Check the seed barrel' },
-      { id: 'cauldron', x: 11.3, y: 12.3, r: 1.1, prompt: 'Brew at the cauldron' },
-      { id: 'travel_board', x: 9.7, y: 15.6, r: 1.2, prompt: 'Travel' }
+      { id: 'moonwell', x: 13.6, y: 7.0, r: 1.5, prompt: 'Visit the Moonwell' },
+      { id: 'seed_barrel', x: 10.5, y: 12.7, r: 1.1, prompt: 'Check the seed barrel' },
+      { id: 'cauldron', x: 7.9, y: 6.9, r: 1.1, prompt: 'Brew at the cauldron' },
+      { id: 'bed', x: 4.9, y: 6.1, r: 1.0, prompt: 'Rest in the cottage' },
+      { id: 'travel_board', x: 10.7, y: 17.4, r: 1.3, prompt: 'Travel' }
     ],
     village: [
-      { id: 'marrow', x: 7.0, y: 8.2, r: 1.2, prompt: 'Talk to Elder Marrow' },
-      { id: 'pip', x: 12.6, y: 8.4, r: 1.2, prompt: 'Talk to Pip' },
-      { id: 'wren', x: 8.2, y: 12.8, r: 1.2, prompt: 'Talk to Wren' },
-      { id: 'notice_board', x: 10.2, y: 6.4, r: 1.1, prompt: 'Read the notice board' },
-      { id: 'cauldron', x: 6.6, y: 12.0, r: 1.0, prompt: "Use Wren's brewing table" },
-      { id: 'travel_board', x: 11.6, y: 13.4, r: 1.2, prompt: 'Travel' }
+      { id: 'marrow', x: 8.9, y: 7.3, r: 1.2, prompt: 'Talk to Elder Marrow' },
+      { id: 'pip', x: 13.2, y: 11.0, r: 1.2, prompt: 'Talk to Pip' },
+      { id: 'shop', x: 13.6, y: 12.6, r: 1.1, prompt: "Browse Pip's stall" },
+      { id: 'wren', x: 7.0, y: 12.9, r: 1.2, prompt: 'Talk to Wren' },
+      { id: 'notice_board', x: 8.0, y: 7.0, r: 1.1, prompt: 'Read the notice board' },
+      { id: 'cauldron', x: 6.3, y: 12.0, r: 1.0, prompt: "Use Wren's brewing table" },
+      { id: 'travel_board', x: 10.8, y: 17.6, r: 1.3, prompt: 'Travel' }
     ],
-    dungeon: { x: 15.6, y: 15.4, r: 1.3, prompt: 'Enter the dungeon' }   // outside in forest/swamp/mountain/crypt
+    dungeon: { id: 'dungeon', x: 10.0, y: 3.2, r: 1.3, prompt: 'Enter the dungeon' },   // outside in forest/swamp/mountain/crypt
+    stairs: { id: 'stairs', x: 10, y: 10, r: 1.1 }, exit: { id: 'exit', x: 9.7, y: 17.2, r: 1.1 }
   };
   D.home = { x: 9.7, y: 10 };
 
