@@ -1,0 +1,12 @@
+# OS / editor
+.DS_Store
+Thumbs.db
+*.swp
+.vscode/
+.idea/
+# test output
+tests/out/
+*.png
+!assets/**/*.png
+node_modules/
+build/
