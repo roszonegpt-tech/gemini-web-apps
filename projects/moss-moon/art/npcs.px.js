@@ -121,10 +121,14 @@ function marrow(c, F, b, blink, mouth, gest) {
     for (const x of [18, 22, 27]) R(c, x, 37, 1, 9, "j")
     R(c, 14, 38 + b, 18, 1, "a")
     R(c, 12, 31 + b, 3, 5, "b"); hand(c, 11, 35 + b); armDown(c, 30, 31 + b, 8, MR.robe, true)
-    for (let y = 27 + b; y <= 40 + b; y++) { const k = y - 27 - b, x0 = 13 + Math.max(0, k - 8), x1 = M(x0); if (x1 >= x0) { R(c, x0, y, x1 - x0 + 1, 1, "v"); PX(c, x0, y, "l"); R(c, x1 - 1, y, 2, 1, "m") } }
-    for (const y of [32, 36]) R(c, 18, y + b, 10, 1, "m")
-    R(c, 15, hy - 5, 16, 13, "v"); R(c, 17, hy - 6, 12, 1, "v"); R(c, 16, hy - 5, 7, 1, "l"); R(c, 15, hy - 4, 1, 11, "l"); R(c, 29, hy - 4, 2, 12, "m"); R(c, 22, hy - 3, 1, 10, "m")
-    R(c, 17, hy + 7, 12, 2, "q"); PX(c, 17, hy + 7, "c")               // beard ends showing at the sides
+    // shawl: rounded over the shoulders, a point down the back with a fringe
+    for (let y = 28 + b; y <= 39 + b; y++) { const k = y - 28 - b, x0 = k < 2 ? 15 - k : 13 + Math.max(0, k - 5), x1 = M(x0); if (x1 >= x0) { R(c, x0, y, x1 - x0 + 1, 1, "v"); PX(c, x0, y, "l"); R(c, x1 - 1, y, 2, 1, "m") } }
+    for (let x = 19; x <= 26; x += 2) PX(c, x, 37 + b, "m"); PX(c, 22, 40 + b, "l"); PX(c, 23, 40 + b, "m")
+    PM(c, 16, hy + 8, "c")                                            // beard tips peeking at the sides
+    // hood: head-sized, pointed tip falling to the back of the neck
+    R(c, 16, hy - 5, 14, 12, "v"); R(c, 17, hy - 6, 12, 1, "v"); R(c, 15, hy - 3, 1, 9, "v"); R(c, 30, hy - 3, 1, 9, "m")
+    R(c, 17, hy - 5, 6, 1, "l"); R(c, 16, hy - 4, 1, 8, "l"); R(c, 28, hy - 4, 2, 10, "m"); R(c, 22, hy - 4, 1, 9, "m")
+    R(c, 20, hy + 7, 6, 2, "v"); R(c, 21, hy + 9, 4, 1, "m"); PX(c, 22, hy + 10, "m")
   }
 }
 

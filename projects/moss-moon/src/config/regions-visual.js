@@ -22,40 +22,9 @@ window.MM = window.MM || {};
 (function (MM) {
   const R = {};
   const SPAWN = [9.7, 10];
-  // Default exterior buildings (used until/unless MM.BUILDINGS has placements for the region). Sizes follow the
-  // player-derived unit: witch ≈ 39 px tall/24 px wide → door 26×54 px (≥1.35× height), walls 66 px, windows 14×16.
-  const DOOR = { w: 26, h: 54 }, WIN = { w: 14, h: 16, z: 26 };
-  const win = (face, at, o) => Object.assign({ face, at }, WIN, o || {});
-  // building(id, x, y, o): x,y = front ground corner (tile coords); o: fw, fd, name, type, spec (painter spec), door {face, at},
-  // enterable, lockedReason, interior, smoke, art (sprite name used instead of the painter when MM.art has it)
-  const bld = (id, x, y, o) => Object.assign({ id, x, y, enterable: true }, o);
-  MM.WORLD_BUILDINGS_DEFAULT = {
-    grove: (c) => {
-      const L = c.L, base = { fw: 4, fd: 3, wh: 66, rh: 40, door: Object.assign({ face: 'L', at: 24 }, DOOR), windows: [win('L', 50), win('R', 24)], chimney: { at: 44 } };
-      const st = [
-        { wall: 'plank', roofColor: 'moss', ruined: true, weather: 0.9, shuttered: true, steps: 1 },
-        { wall: 'plank', roofColor: 'shingle', weather: 0.5, steps: 2 },
-        { wall: 'plaster', roofColor: 'shingle', weather: 0.3, steps: 2 },
-        { wall: 'plaster', roofColor: 'shingle', weather: 0.15, flowerBoxes: true, porch: { depth: 10 } },
-        { wall: 'plaster', roofColor: 'shingle', weather: 0.1, flowerBoxes: true, ivy: 0.6, porch: { depth: 10 } },
-      ][L];
-      return [bld('cottage', 7.4, 5.2, { type: 'cottage_home', name: 'the cottage', fw: 4, fd: 3, interior: 'cottage', smoke: L >= 2, litWindows: L >= 1, spec: Object.assign({}, base, st, { seed: 11 }) })];
-    },
-    village: () => [
-      bld('elder_house', 6.8, 6.4, { type: 'elder_house', name: "Elder Marrow's house", fw: 4, fd: 3, interior: 'elder_house', smoke: true, litWindows: true,
-        spec: { fw: 4, fd: 3, wh: 66, rh: 42, wall: 'plaster', roofColor: 'red', door: Object.assign({ face: 'L', at: 26 }, DOOR), windows: [win('L', 52), win('R', 22)], steps: 2, weather: 0.15, flowerBoxes: true, seed: 21, chimney: { at: 40 } } }),
-      bld('village_shop', 15.6, 5.2, { type: 'village_shop', name: "Pip's shop", fw: 3.5, fd: 3, interior: 'village_shop', smoke: true, litWindows: true,
-        spec: { fw: 3.5, fd: 3, wh: 66, rh: 40, wall: 'stone', roofColor: 'violet', door: Object.assign({ face: 'L', at: 22 }, DOOR), windows: [win('L', 44), win('R', 24)], awning: { stripes: ['v', 'c'] }, steps: 2, weather: 0.2, seed: 22, chimney: { at: 34 } } }),
-      bld('herbalist_house', 5.6, 15.8, { type: 'herbalist_house', name: "Wren's cottage", fw: 3.5, fd: 3, interior: 'herbalist_house', smoke: true, litWindows: true,
-        spec: { fw: 3.5, fd: 3, wh: 66, rh: 38, wall: 'log', roof: 'thatch', door: Object.assign({ face: 'R', at: 22 }, DOOR), windows: [win('L', 28), win('R', 42, { w: 10 })], porch: { depth: 9 }, ivy: 0.5, flowerBoxes: true, weather: 0.3, seed: 23, chimney: { at: 20 } } }),
-      bld('mill_shed', 17.6, 15.0, { type: 'shed', name: 'the old mill shed', fw: 2.5, fd: 2, enterable: false, lockedReason: 'The shed is barred shut. Pip says the miller took the key to the coast.', smoke: false,
-        spec: { fw: 2.5, fd: 2, wh: 60, rh: 30, wall: 'plank', roofColor: 'slate', locked: true, door: Object.assign({ face: 'R', at: 16 }, DOOR), windows: [win('L', 20, { w: 12 })], steps: 1, weather: 0.6, seed: 24, chimney: false } }),
-    ],
-  };
-
   // ------------------------------------------------------------------ homestead (restoration 0..4)
   const G_PATHS = [
-    [[5.9, 6.1], [5.9, 8.6], [9.6, 8.6]],          // cottage door -> yard
+    [[5.75, 6.3], [5.75, 8.6], [9.6, 8.6]],          // cottage door -> yard
     [[9.6, 8.6], [9.6, 20.5]],                      // lane south (travel board)
     [[9.6, 8.6], [12.2, 7.4], [13.2, 6.9]],         // to the Moonwell
   ];
@@ -72,7 +41,7 @@ window.MM = window.MM || {};
       const cx = x + 0.5, cy = y + 0.5, L = c.L;
       if (pond(cx, cy)) return 'water';
       if (c.near(cx, cy, G_PATHS, 0.62)) return (L === 0 && c.noise(cx, cy, 1.3, 3) < 0.38) ? 'grass_wild' : 'path_dirt';
-      const dw = Math.hypot(cx - 13.6, cy - 6.0);
+      const dw = Math.hypot(cx - 12.9, cy - 5.6);
       if (dw < 1.9) return L >= 2 || c.h(x, y, 9) < 0.45 + L * 0.2 ? 'cobble' : 'grass_wild';
       const wild = [0.98, 0.72, 0.46, 0.24, 0.07][L];
       return c.noise(cx, cy, 3.4, 7) < wild ? 'grass_wild' : 'grass_grove';
@@ -83,9 +52,9 @@ window.MM = window.MM || {};
       B.reserve(8, 11.5, 2.0);                                   // garden plots 7..9 x 11..12
       // Moonwell (state = campaign moonwell level, else derived from restoration)
       const mwS = ['moonwell_dark', 'moonwell_faint', 'moonwell_glow', 'moonwell_restored'][c.mw];
-      B.p(mwS, 13.6, 6.2, { k: 'moonwell', r: 0.85, moonwell: c.mw,
+      B.p(mwS, 13.6, 6.2, { k: 'moonwell', moonwell: c.mw, tall: true, rect: [11.9, 4.5, 13.6, 6.2], noCollide: true,
         lights: c.mw ? [{ dx: 0, dy: -10, r: [0, 34, 60, 90][c.mw] + (L >= 4 ? 20 : 0), color: c.mw >= 3 ? '#c9f3ff' : '#b9a6e6', flicker: 0.08, night: false, kind: 'moonwell' }] : null });
-      B.i('moonwell', 13.6, 7.0, { prompt: 'Visit the Moonwell', r: 1.5, kind: 'moonwell' });
+      B.i('moonwell', 13.3, 6.8, { prompt: 'Visit the Moonwell', r: 1.5, kind: 'moonwell' });
       // garden: soil beds under the six plots + fence on the back/left (front gets a gate gap)
       for (let i = 0; i < 6; i++) B.decal(L >= 1 ? 'soil_wet' : 'soil_dry', 7 + (i % 3), 11 + Math.floor(i / 3), { tile: true });
       const brk = (i) => L === 0 && (i % 2 === 0) ? '_broken' : '';
@@ -102,8 +71,8 @@ window.MM = window.MM || {};
       B.p('cauldron', 7.9, 6.9, { k: 'cauldron', r: 0.32, low: true, lights: [{ dx: 0, dy: -4, r: 18, color: '#ff9a52', flicker: 0.5, night: false, kind: 'fire' }] });
       B.i('cauldron', 7.9, 6.9, { prompt: 'Brew at the cauldron', r: 1.1, kind: 'brew' });
       if (L >= 1) { B.p('alchemy_table', 9.0, 5.9, { k: 'table', r: 0.4, low: true }); B.i('alchemy_table', 9.0, 5.9, { prompt: 'Use the alchemy table', r: 1.0, kind: 'craft' }); }
-      B.p('broom_stand', 7.9, 4.1, { k: 'broom_stand', r: 0.2 });
-      B.i('broom_stand', 7.9, 4.1, { prompt: 'Broom stand', r: 1.0, kind: 'broom' });
+      B.p('broom_stand', 8.6, 4.3, { k: 'broom_stand', r: 0.2 });
+      B.i('broom_stand', 8.6, 4.3, { prompt: 'Broom stand', r: 1.0, kind: 'broom' });
       B.p('woodpile', 3.7, 6.3, { k: 'woodpile', r: 0.3, low: true });
       B.p('@mailbox', 10.9, 7.6, { k: 'mailbox', r: 0.15 });
       B.i('mailbox', 10.9, 7.6, { prompt: 'Check the mailbox', r: 0.9, kind: 'mail' });
@@ -114,12 +83,12 @@ window.MM = window.MM || {};
         B.p('lamp_post', 8.6, 15.2, { k: 'lamp', r: 0.12, lights: [{ dx: 0, dy: -30, r: 34, color: '#ffe0a0', flicker: 0.2, night: true, kind: 'lamp' }] }); }
       if (L >= 3) { B.p('lamp_post', 12.6, 8.4, { k: 'lamp', r: 0.12, lights: [{ dx: 0, dy: -30, r: 34, color: '#ffe0a0', flicker: 0.2, night: true, kind: 'lamp' }] });
         B.p('bench', 12.0, 11.4, { k: 'bench', r: 0.35, low: true });
-        B.garland(7.4, 5.2, 62, 10.7, 9.0, 30, { kind: 'lanterns' }); }
-      if (L >= 1) B.p('lantern', 4.6, 5.8, { k: 'lantern', lights: [{ dx: 0, dy: -8, r: 20, color: '#ffd27a', flicker: 0.3, night: true, kind: 'lantern' }] });
+        B.garland(8.0, 5.6, 64, 10.7, 9.0, 30, { kind: 'lanterns' }); }
+      if (L >= 1) B.p('lantern', 4.3, 6.1, { k: 'lantern', lights: [{ dx: 0, dy: -8, r: 20, color: '#ffd27a', flicker: 0.3, night: true, kind: 'lantern' }] });
       if (L >= 4) { B.p('pumpkin', 6.1, 14.2, { k: 'pumpkin', low: true }); B.p('pumpkin', 5.5, 13.0, { k: 'pumpkin', low: true }); }
       // pond dressing
       B.p('tree_willow', 14.7, 1.3, { k: 'tree', r: 0.35, tall: true, sway: true });
-      B.p('tree_willow', 19.0, 5.2, { k: 'tree', r: 0.35, tall: true, sway: true, flip: true });
+      B.p('tree_willow', 19.2, 4.4, { k: 'tree', r: 0.35, tall: true, sway: true, flip: true });
       B.scatter({ s: ['reeds_0', 'reeds_1'], n: 6, zone: 'shore', avoid: 0.7, k: 'reeds', sway: true });
       B.scatter({ s: ['lilypad'], n: 5, on: ['water'], decal: true, water: true, avoid: 0.8 });
       // trees, bushes, overgrowth, flowers
@@ -163,22 +132,22 @@ window.MM = window.MM || {};
       B.npc('marrow', 8.9, 7.3, { name: 'Elder Marrow' });
       B.p('shop_stall', 13.9, 11.8, { k: 'stall', rect: [13.2, 11.3, 14.6, 12.2] }); B.i('shop', 13.6, 12.6, { prompt: "Browse Pip's stall", r: 1.1, kind: 'shop' });
       B.npc('pip', 13.2, 11.0, { name: 'Pip' });
-      B.p('crate_stack', 15.0, 12.5, { k: 'crate', r: 0.3 }); B.p('barrel', 14.9, 10.6, { k: 'barrel', r: 0.25, low: true }); B.p('crate', 12.6, 13.1, { k: 'crate', r: 0.25, low: true });
+      B.p('crate_stack', 15.2, 11.6, { k: 'crate', r: 0.3 }); B.p('barrel', 14.9, 10.6, { k: 'barrel', r: 0.25, low: true }); B.p('crate', 12.6, 13.1, { k: 'crate', r: 0.25, low: true });
       // Wren's herb corner by her cottage
       B.npc('wren', 7.0, 12.9, { name: 'Wren' });
       B.p('alchemy_table', 6.3, 12.0, { k: 'table', r: 0.4, low: true }); B.i('cauldron', 6.3, 12.0, { prompt: "Use Wren's brewing table", r: 1.0, kind: 'brew' });
-      B.p('bush_berry', 4.4, 11.6, { k: 'bush', sway: true }); B.p('flowers_moon', 5.2, 11.2, { k: 'flowers' }); B.p('sack', 7.6, 13.9, { k: 'sack', low: true });
-      B.decal('flowers_wild', 6.0, 11.0); B.decal('flowers_moon', 4.9, 12.6); B.decal('flowers_wild', 3.8, 12.2);
+      B.p('bush_berry', 4.2, 11.2, { k: 'bush', sway: true }); B.p('flowers_moon', 5.4, 11.1, { k: 'flowers' }); B.p('sack', 7.6, 13.9, { k: 'sack', low: true });
+      B.decal('flowers_wild', 6.0, 11.0); B.decal('flowers_moon', 4.9, 11.2); B.decal('flowers_wild', 3.8, 11.0);
       // street furniture
       const lamp = { k: 'lamp', r: 0.12, lights: [{ dx: 0, dy: -30, r: 36, color: '#ffe0a0', flicker: 0.2, night: true, kind: 'lamp' }] };
-      B.p('lamp_post', 7.2, 9.3, lamp); B.p('lamp_post', 12.5, 12.7, lamp); B.p('lamp_post', 12.4, 5.9, lamp); B.p('lamp_post', 7.0, 14.6, lamp);
+      B.p('lamp_post', 7.2, 9.3, lamp); B.p('lamp_post', 12.5, 12.7, lamp); B.p('lamp_post', 10.8, 6.2, lamp); B.p('lamp_post', 7.8, 15.4, lamp);
       B.p('bench', 8.0, 12.6, { k: 'bench', r: 0.35, low: true }); B.p('bench', 11.6, 6.6, { k: 'bench', r: 0.35, low: true });
       B.p('barrel', 4.4, 7.4, { k: 'barrel', r: 0.25, low: true }); B.p('woodpile', 3.3, 6.9, { k: 'woodpile', low: true });
       B.p('pumpkin', 11.4, 13.4, { k: 'pumpkin', low: true });
-      B.garland(6.8, 6.4, 62, 12.4, 5.9, 30, { kind: 'bunting' });
+      B.garland(6.8, 6.4, 64, 11.0, 5.6, 64, { kind: 'bunting' });
       B.garland(7.2, 9.3, 30, 12.5, 12.7, 30, { kind: 'lanterns' });
       B.p('signpost', 10.8, 17.6, { k: 'signpost', r: 0.2 }); B.i('travel_board', 10.8, 17.6, { prompt: 'Travel', r: 1.3, kind: 'travel' });
-      B.p('fence_x', 15.6, 14.8, { k: 'fence', low: true }); B.p('fence_x', 16.6, 14.8, { k: 'fence', low: true }); B.p('fence_y', 15.1, 15.3, { k: 'fence', low: true });
+      B.p('fence_x', 15.1, 16.0, { k: 'fence', low: true }); B.p('fence_x', 16.1, 16.0, { k: 'fence', low: true }); B.p('woodpile', 14.2, 14.6, { k: 'woodpile', r: 0.3, low: true });
       B.scatter({ s: ['tree_oak_0', 'tree_oak_1', 'tree_oak_2'], n: 12, zone: 'back', avoid: 1.6, k: 'tree', tall: true, sway: true });
       B.scatter({ s: ['tree_oak_0', 'tree_oak_2'], n: 3, zone: 'front', avoid: 2.5, k: 'tree', tall: true, sway: true });
       B.scatter({ s: ['bush_0', 'bush_1', 'bush_berry'], n: 10, zone: 'rim', avoid: 1.0, k: 'bush', sway: true });

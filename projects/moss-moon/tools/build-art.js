@@ -161,7 +161,7 @@ for (const file of files) {
     frames[it.name] = e;
   }
   // Aliases (art/meta.js): extra names for existing sprites, e.g. the baseline's 'prop_tree_0' seam.
-  for (const [al, target] of Object.entries(meta.aliases || {})) if (frames[target]) frames[al] = Object.assign({ alias: target }, frames[target], frames[target].sh ? { autoShadow: true } : {});
+  for (const [al, target] of Object.entries(meta.aliases || {})) if (frames[target]) frames[al] = Object.assign({ alias: target }, frames[target], frames[target].sh && al.startsWith('prop_') ? { autoShadow: true } : {});
   sheets[name] = { png, frames, w: sheet.w, h: sheet.h, data: sheet };
   manifest.sheets[name] = { file: 'assets/images/' + name + '.png', w: sheet.w, h: sheet.h, anchor: cfg.anchor || 'bottom', note: cfg.note || '', frames };
 }

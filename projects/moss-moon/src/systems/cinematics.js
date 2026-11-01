@@ -1111,12 +1111,14 @@ window.MM = window.MM || {};
     const cap = el('div', 'mm-cine-cap', stage), sub = el('div', 'mm-cine-sub', stage); sub.setAttribute('aria-live', 'polite');
     const hint = el('p', 'mm-cine-sr', root, sess.skippable ? 'Cinematic playing. Press Escape, or use the Skip button, to skip.' : 'Cinematic playing.'); hint.id = 'mm-cine-hint'; root.setAttribute('aria-describedby', 'mm-cine-hint');
     const skip = el('button', 'mm-cine-skip', stage); skip.type = 'button'; skip.setAttribute('aria-label', 'Skip cinematic'); el('i', null, skip); el('span', null, skip, 'Skip ▸');
-    if (!sess.skippable) skip.hidden = true;
+    // hosted by the 'intro' screen: it supplies its own persistent, focusable 'Skip intro' button (keys/click/hold still work here)
+    sess.ownSkip = sess.skippable && sess.opts.skipButton !== false && !(sess.host === 'intro' && sess.opts.skipButton !== true);
+    if (!sess.ownSkip) skip.hidden = true;
     (host || document.body).appendChild(root);
     const g = cv.getContext('2d'); g.imageSmoothingEnabled = false;
     Object.assign(sess, { style, root, stage, cv, g, cap, sub, skipBtn: skip, hostEl: host });
     sess.prevFocus = document.activeElement; safe(() => root.focus({ preventScroll: true }));
-    if (sess.skippable && api.showSkipOnStart) { skip.classList.add('on'); sess.lastInput = 0; sess.skipShownAt = 0; }
+    if (sess.ownSkip && api.showSkipOnStart) { skip.classList.add('on'); sess.lastInput = 0; sess.skipShownAt = 0; }
     layout();
   }
   // Re-layout the 8:5 stage in px (CSS container-query sizing is the default; this keeps it exact on resize).

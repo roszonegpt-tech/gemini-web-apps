@@ -176,6 +176,8 @@ window.MM = window.MM || {};
     window.moveActor = wrappedMove;
   }
   wrapMove();
+  // baseline blockedAt() seam: any other baseline caller (spawn checks, load validation) sees the room walls too
+  try { MM.hooks && MM.hooks.on && MM.hooks.on('blocked', (x, y) => { if (!cur) return false; const p = local(x, y); return blockedLocal(p.x, p.y); }); } catch (e) { /* */ }
 
   // ================================================================== interaction targets
   function candidates() {

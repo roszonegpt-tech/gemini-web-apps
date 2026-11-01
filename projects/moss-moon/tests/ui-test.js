@@ -213,7 +213,7 @@ async function startNewGame(page, name) {
     await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: tp(zone.x + zone.r * 0.9, zone.y) });
     await sleep(700);
     await shot(p2, 'joystick-' + tag);
-    const held = await p2.evaluate(() => ({ active: MM.ui.joystick.active, out: MM.ui.joystick.out, axis: MM.input.axis ? { x: MM.input.axis.x, y: MM.input.axis.y } : null, casts: window.__mm ? __mm.events('cast').length : -1 }));
+    const held = await p2.evaluate(() => ({ st: MM.state.current, open: MM.ui.stack.map((s) => s.id), hid: document.querySelector('.mm-layer-touch').className, active: MM.ui.joystick.active, out: MM.ui.joystick.out, axis: MM.input.axis ? { x: MM.input.axis.x, y: MM.input.axis.y } : null, casts: window.__mm ? __mm.events('cast').length : -1 }));
     await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
     await sleep(300);
     const pos1 = await p2.evaluate(() => ({ x: MM.game.player().x, y: MM.game.player().y }));
