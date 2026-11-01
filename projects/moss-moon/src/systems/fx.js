@@ -72,6 +72,24 @@ window.MM = window.MM || {};
     try { if (MM.lighting && MM.lighting.addLight) MM.lighting.addLight({ x: UNX(wx, wy), y: UNY(wx, wy), h: z || 16, r: r * (0.85 + 0.15 * S.fxI), color, intensity: inten * Math.min(1.25, S.fxI), life: life || 0.3, glow: 0.6 }); } catch (e) { /* */ }
   }
   function pulseW(wx, wy, r, c, i, l) { try { if (MM.lighting && MM.lighting.pulse) MM.lighting.pulse(UNX(wx, wy), UNY(wx, wy), r, c, i, l); } catch (e) { /* */ } }
+  // Sprite Fusion VFX via MM.vfx (src/systems/vfx-bridge.js) — layered with the procedural FX below
+  function vfx(name, wx, wy, o) { try { return MM.vfx && MM.vfx.play ? MM.vfx.play(name, UNX(wx, wy), UNY(wx, wy), o || {}) : 0; } catch (e) { return 0; } }
+  function vfxOn(actor, name, o) { try { return MM.vfx && MM.vfx.attach ? MM.vfx.attach(name, actor, o || {}) : 0; } catch (e) { return 0; } }
+  function owns(kind) { try { return !!(MM.vfx && MM.vfx.owns && MM.vfx.owns(kind)); } catch (e) { return false; } }
+  function vhex(h) { return MM.vfx && MM.vfx.hex ? MM.vfx.hex(h) : 0; }
+  function vpal(k) { return MM.vfx && MM.vfx.PAL ? MM.vfx.PAL[k] : undefined; }
+  function vramp(k) { return MM.vfx && MM.vfx.RAMP ? MM.vfx.RAMP[k] : undefined; }
+  const rampC = new Map();
+  function mixHex(c, t, k) { const a = parseInt(c.slice(1, 7), 16), b = parseInt(t.slice(1, 7), 16); const m = (s2) => Math.round(((a >> s2) & 255) * (1 - k) + ((b >> s2) & 255) * k); return '#' + ((1 << 24) | (m(16) << 16) | (m(8) << 8) | m(0)).toString(16).slice(1); }
+  // 6-step ramp (white -> colour -> deep) from any hit colour, for impact/slash 'ramp' options
+  function rampFrom(c) {
+    if (typeof c !== 'string' || c[0] !== '#' || c.length < 7) c = '#fff2c8';
+    let r = rampC.get(c); if (r) return r;
+    r = ['#ffffff', mixHex(c, '#ffffff', 0.6), mixHex(c, '#ffffff', 0.25), c, mixHex(c, '#1a1424', 0.35), mixHex(c, '#1a1424', 0.6)].map(vhex);
+    if (rampC.size > 40) rampC.delete(rampC.keys().next().value);
+    rampC.set(c, r); return r;
+  }
+  function palFrom(c) { return ['#ffffff', mixHex(c, '#ffffff', 0.6), mixHex(c, '#ffffff', 0.25), c, mixHex(c, '#1a1424', 0.35), mixHex(c, '#1a1424', 0.65)]; }
   // MM.art fx sprites (ART agent) where they exist; procedural fallbacks otherwise
   function art() { return MM.art && MM.art.has ? MM.art : null; }
   function hasArt(n) { const a = art(); return !!(a && a.ready !== false && a.has(n)); }
@@ -89,15 +107,21 @@ window.MM = window.MM || {};
   }
   const CRES = [];
   (function makeCrescents() {
-    const b = document.createElement('canvas'); b.width = b.height = 15;
+    // crescent body (silver-blue) with a dark lunar rim so the silhouette survives bloom; drawn hard-edged per heading
+    const b = document.createElement('canvas'); b.width = b.height = 17;
     const x = b.getContext('2d');
-    x.fillStyle = '#b4c8ff'; x.beginPath(); x.arc(7.5, 7.5, 5.5, 0, TAU); x.fill();
-    x.globalCompositeOperation = 'destination-out'; x.beginPath(); x.arc(4.3, 7.5, 5.0, 0, TAU); x.fill();
-    x.globalCompositeOperation = 'source-atop'; x.fillStyle = '#eef3ff'; x.beginPath(); x.arc(10.6, 7.5, 2.4, 0, TAU); x.fill();
+    const disc = (cx, r) => { x.beginPath(); x.arc(cx, 8.5, r, 0, TAU); x.fill(); };
+    x.fillStyle = '#3c4a8a'; disc(8.5, 7.2);
+    x.globalCompositeOperation = 'destination-out'; disc(5.2, 6.4);
+    x.globalCompositeOperation = 'source-over'; x.fillStyle = '#9fb2ee'; disc(8.5, 6.2);
+    x.globalCompositeOperation = 'destination-out'; disc(5.0, 6.2);
+    x.globalCompositeOperation = 'source-atop'; x.fillStyle = '#e6edff'; disc(12.4, 2.3);
     for (let i = 0; i < 16; i++) {
-      const c = document.createElement('canvas'); c.width = c.height = 15;
+      const c = document.createElement('canvas'); c.width = c.height = 17;
       const y = c.getContext('2d'); y.imageSmoothingEnabled = false;
-      y.translate(7.5, 7.5); y.rotate(i / 16 * TAU); y.drawImage(b, -7.5, -7.5);
+      y.translate(8.5, 8.5); y.rotate(i / 16 * TAU); y.drawImage(b, -8.5, -8.5);
+      // quantise alpha to hard pixels (pixel-art edge, no rotated smoothing fringe)
+      const d = y.getImageData(0, 0, 17, 17); for (let k = 3; k < d.data.length; k += 4) d.data[k] = d.data[k] > 110 ? 255 : 0; y.putImageData(d, 0, 0);
       CRES.push(c);
     }
   })();
@@ -338,6 +362,8 @@ window.MM = window.MM || {};
     wave.on = true; wave.t = 0; wave.dur = S.rMotion ? 1.6 : 2.6; wave.wx = wx; wave.wy = wy; wave.region = region || '';
     sfx('region_restored');
     accent(wx, wy, 20, 150, '#e8ffb0', 1, 1.2);
+    vfx('holyLight', wx, wy, { hold: 1.1, width: 9, colors: vramp('heal'), cls: 'spell', seed: 2 });
+    try { if (base()) vfxOn(game, 'powerUp', { palette: vpal('heal'), size: 0.6, cls: 'spell', seed: 3 }); } catch (e) { /* */ }
     shockW(wx, wy, 140, 0.9, 0.05); shake(2, 0.4);
     FX.flash('#f4ffd0', 240, 0.14);
     restoreBoost = 12;
@@ -351,7 +377,7 @@ window.MM = window.MM || {};
       const r = ring(a, b, 4, 6, 26 + 22 * kk, 0.9 + 0.2 * kk, '#bfe9ff', '#ffffff'); if (r) r.a = 0.8;
       spray(a, b, 10, 8 * kk, 10, 1.2, ['#d6f1fb', '#ffffff'], GLW, 1, -16, 1, true, 10);
       accent(a, b, 18, 40 + 30 * kk, '#bfe9ff', 0.7, 0.6);
-      if (kk >= 2) { shockW(a, b, 60, 0.6, 0.04); sfx('moonwell_pulse'); }
+      if (kk >= 2) { shockW(a, b, 60, 0.6, 0.04); sfx('moonwell_pulse'); vfx('holyLight', a, b, { hold: 0.5, width: 6, colors: vramp('moon'), cls: 'spell', seed: 4 }); }
     }, wx, wy, k);
   };
   FX.door = function (x, y, kind) {
@@ -361,6 +387,7 @@ window.MM = window.MM || {};
     accent(wx, wy, 16, 46, '#ffe6b0', 0.9, 0.7);
     decal('column', wx, wy, 0.6, L_WORLD, 6, 6, '#fff0c8', '#ffd890');
     later(0.12, (a, b) => { spray(a, b, 2, 10, 16, 0.9, ['#d8cfae', '#efe6c8'], PX, 1, -4, 2, false, 6); const r = ring(a, b, 0, 4, 18, 0.4, '#ffe6b0', '#fff8e0'); if (r) r.a = 0.6; }, wx, wy);
+    vfx('sparkle', wx, wy, { z: 14, size: 4, flares: 3, warm: vpal('gold'), cool: vpal('moon'), seed: (rnd() * 99) | 0 });
     sfx('door', { volume: kind === 'exit' ? 0.6 : 0.8 });
   };
 
@@ -467,6 +494,8 @@ window.MM = window.MM || {};
         spray(wx, wy, 18, night ? 7 : 4, 8, 0.9, ['#c8d8ff', '#ffffff'], GLW, 1, -6, 1.5, true, 5);
         decal('residue', wx, wy, 0.9, L_GROUND, 8, 8, 'rgba(200,214,255,.35)', '#eef3ff');
         accent(wx, wy, 20, night ? 64 : 48, '#c6d8ff', 0.9, 0.3);
+        vfx('impact', wx, wy, { z: 20, size: night ? 0.55 : 0.45, angle: Math.atan2(HP.ty - HP.y, HP.tx - HP.x), ramp: vramp('moon'), seed: (rnd() * 99) | 0 });
+        vfx('sparkle', wx, wy, { z: 22, size: night ? 7 : 5, flares: night ? 5 : 3, warm: vpal('moon'), cool: vpal('frost'), seed: (rnd() * 99) | 0 });
       },
       draw(ctx, fx, st) {
         const s = fx.spell, t = fx.elapsed, hit = s.hit[0] || 0.3; hand(fx, HP);
@@ -481,8 +510,8 @@ window.MM = window.MM || {};
           }
           ctx.globalAlpha = 1;
           const sx = SX(FP.x), sy = SY(FP.y, FP.z);
-          glowAt(ctx, sx, sy, nightK() > 0.5 ? 6 : 5, '#7f9cff', 0.45);
-          ctx.drawImage(CRES[(((FP.a / TAU) * 16 + 16.5) | 0) % 16], sx - 7, sy - 7);
+          glowAt(ctx, sx, sy, nightK() > 0.5 ? 5 : 4, '#6f86e0', 0.3);
+          ctx.drawImage(CRES[(((FP.a / TAU) * 16 + 16.5) | 0) % 16], sx - 8, sy - 8);
         }
       },
     },
@@ -504,7 +533,8 @@ window.MM = window.MM || {};
         spray(wx, wy, 4, 9, 10, 1.1, ['#ff9a4a', '#ffd36e'], GLW, 1, -14, 1, true, 6);
         spray(wx, wy, 6, 5, 6, 1.4, ['#6a5a52', '#8a7a70'], PUFF, 2, -8, 1, false, 4);
         accent(wx, wy, 12, r * 2.4, '#ffad5c', 1, 0.45);
-        shockW(wx, wy, r * 1.3, 0.35, 0.04); shake(1.5, 0.12);
+        if (!vfx('explosion', wx, wy, { size: 0.36, fire: 1, earth: 0.25, chunks: 2, scorch: 10, shockwave: 34, surface: vhex('#7a6a50'), seed: (rnd() * 99) | 0 })) shockW(wx, wy, r * 1.3, 0.35, 0.04);
+        shake(1.5, 0.12);
       },
       draw(ctx, fx, st) {
         const s = fx.spell, t = fx.elapsed, hit = s.hit[0] || 0.3; hand(fx, HP);
@@ -539,6 +569,7 @@ window.MM = window.MM || {};
         spray(wx, wy, 2, 12, 34, 0.45, ['#7a5b3c', '#9a7a52'], PX, 1, 60, 3, false, 22);
         spray(wx, wy, 4, 6, 18, 0.8, ['#8fd36e', '#c7e990'], LEAF, 1, 16, 2, false, 14);
         accent(wx, wy, 6, r * 1.8, '#9be07a', 0.6, 0.4); shake(1, 0.1);
+        vfx('poison', wx, wy, { kind: 'puddle', size: Math.max(0.25, r / 120), colors: vramp('thorn'), seed: (rnd() * 99) | 0 });
       },
       draw(ctx, fx, st) {
         const s = fx.spell, t = fx.elapsed, hit = s.hit[0] || 0.3, c = fx.from, v = victimOf(fx); if (!v) return;
@@ -574,6 +605,7 @@ window.MM = window.MM || {};
         spray(wx, wy, 16, 12, 30, 0.7, ['#ffffff', '#bfefff', '#8fd3ec'], FLK, 1, 18, 2, false, 10);
         spray(wx, wy, 2, 6, r * 1.6, 0.5, ['#e6fbff'], FLK, 1, 0, 3, false, 0);
         accent(wx, wy, 16, r * 1.6, '#bfe8ff', 0.85, 0.4);
+        vfx('ice', wx, wy, { kind: 'crystals', size: 0.35, palette: vpal('frost'), seed: (rnd() * 99) | 0 });
       },
       draw(ctx, fx, st) {
         const s = fx.spell, t = fx.elapsed, hit = s.hit[0] || 0.3; hand(fx, HP);
@@ -596,10 +628,11 @@ window.MM = window.MM || {};
       },
       update(fx, st, dt) {
         const hit = fx.spell.hit[0] || 0.9, t = fx.elapsed, v = victimOf(fx);
-        if (!st.lock && v) { st.zx = v.x; st.zy = v.y; if (t >= hit - 0.25) st.lock = true; }
+        if (!st.lock && v) { st.zx = v.x; st.zy = v.y; if (t >= hit - 0.45) st.lock = true; }
         if (t >= hit) return;
         const wx = PJX(st.zx, st.zy), wy = PJY(st.zx, st.zy), r = radPx(fx.spell, 'mmStrike', 1.5);
-        if (!st.fell && t >= hit - 0.22) { st.fell = true; sprite('fx_starfall', wx, wy, 0); }
+        if (st.lock && !st.col) { st.col = vfx('holyLight', wx, wy, { hold: 0.22, width: Math.max(5, r / 9), colors: vramp('star'), delay: Math.max(0, hit - 0.42 - t), cls: 'spell', seed: (rnd() * 99) | 0 }) || -1; }
+        if (!st.fell && t >= hit - 0.22) { st.fell = true; if (st.col < 0) sprite('fx_starfall', wx, wy, 0); }
         st.trail += dt; K = 1;
         while (st.trail > 0.05) { st.trail -= 0.05; const a = rnd() * TAU; if (P(wx + Math.cos(a) * r * 0.6, wy + Math.sin(a) * r * 0.3, 100 + rnd() * 30, -Math.cos(a) * 40, -Math.sin(a) * 16, 6, 0.5, rnd() < 0.5 ? '#fff3c8' : '#d6c8ff', GLW, 1, 0, 1, true) < 0) break; }
         pulseW(wx, wy, r * 1.4 * (t / hit), '#fff0c0', 0.5 * (t / hit), 0.05);
@@ -613,6 +646,7 @@ window.MM = window.MM || {};
         spray(wx, wy, 4, 12, 70, 0.4, ['#ffe6a0', '#ffffff'], STR, 1, 50, 3, false, 20);
         spray(wx, wy, 4, 8, r * 1.2, 0.9, ['#d8cfae', '#efe6c8'], PUFF, 2, -6, 3, false, 6);
         accent(wx, wy, 10, r * 2.6, '#fff0c0', 1, 0.6);
+        vfx('sparkle', wx, wy, { z: 10, size: 10, flares: 6, warm: vpal('star'), cool: vpal('moon'), seed: (rnd() * 99) | 0 });
         shockW(wx, wy, r * 1.8, 0.5, 0.06); shake(3.5, 0.3); FX.flash('#fff4d8', 110, 0.16);
       },
       draw(ctx, fx, st) {
@@ -623,7 +657,7 @@ window.MM = window.MM || {};
         glowAt(ctx, sx + 30 * (1 - p), sky, 4 + k * 5, '#ffe9b0', 0.4 + 0.5 * k);
         sparkle(ctx, (sx + 30 * (1 - p)) | 0, sky | 0, 1 + (k * 3 | 0), '#fffbe8');
         const fall = 0.16;
-        if (t > hit - fall && !hasArt('fx_starfall')) {
+        if (t > hit - fall && !hasArt('fx_starfall') && !(st.col > 0)) {
           const f = (t - (hit - fall)) / fall, fx2 = sx + 30 * (1 - p) * (1 - f), fy = sky + (gy - 4 - sky) * f * f;
           for (let i = 0; i < 9; i++) { const b = i / 9; ctx.globalAlpha = 1 - b; dot(ctx, fx2 + b * 16, fy - b * 40, i < 2 ? 3 : 2, i < 3 ? '#ffffff' : '#ffe39a'); }
           ctx.globalAlpha = 1; glowAt(ctx, fx2, fy, 8, '#fff0c0', 0.8);
@@ -689,7 +723,8 @@ window.MM = window.MM || {};
           spray(a, b, 6, 4, 18, 0.9, ['#8fbf6a', '#b8dc8a'], LEAF, 1, 22, 1, false, 18);
           const r = ring(a, b, 2, 3, 16, 0.35, cc, '#fff8dc'); if (r) r.a = 0.8;
           accent(a, b, 10, 34, cc, 0.7, 0.35);
-          later(0.12, (p, q, _x, c2) => trail(p, q, 12, 4, c2), a, b, 0, cc);
+          if (!vfx('pickup', a, b, { z: 6, item: 'orb', palette: palFrom(cc), actor: playerActor, wait: 0.1, seed: (rnd() * 99) | 0 })) later(0.12, (p, q, _x, c2) => trail(p, q, 12, 4, c2), a, b, 0, cc);
+          vfx('sparkle', a, b, { z: 10, size: 5, flares: 3, warm: palFrom(cc).concat(['#2a1e10']), cool: vpal('heal'), seed: (rnd() * 99) | 0 });
         }, wx, wy, 0, c);
         break;
       }
@@ -700,7 +735,10 @@ window.MM = window.MM || {};
         for (let k = 0; k < n; k++) { const a = dir + (rnd() - 0.5) * 1.3, s = (50 + rnd() * 60) * sp; if (P(wx, wy, z || 18, Math.cos(a) * s, Math.sin(a) * s * 0.6, 10 + rnd() * 20, 0.18 + rnd() * 0.14, k & 1 ? c : '#ffffff', STR, 1, 60, 6, false) < 0) break; }
         const d = ring(wx, wy, z || 18, 2, o.ring || 8, 0.14, '#ffffff', c); if (d) d.a = 0.8; break;
       }
-      case 'shield': { const d = decal('shield', wx, wy, 0.8, L_WORLD, 12, 16, col || '#ffe6a8', '#fff8e0'); if (d) d.ref = o.follow || null; sprite('fx_aura_moon', wx, wy, 2, o.follow); break; }
+      case 'shield': {
+        if (!(o.follow && vfxOn(o.follow, 'shield', { radius: 34, hold: 1.1, colors: vpal('gold'), cls: 'attach', seed: 6 }))) { const d = decal('shield', wx, wy, 0.8, L_WORLD, 12, 16, col || '#ffe6a8', '#fff8e0'); if (d) d.ref = o.follow || null; }
+        sprite('fx_aura_moon', wx, wy, 2, o.follow); break;
+      }
       case 'heal': sprite('fx_heal', wx, wy, 0, o.follow); for (let k = 0; k < N(9); k++) P(wx + (rnd() - 0.5) * 16, wy + (rnd() - 0.5) * 6, 4 + rnd() * 20, 0, 0, 14 + rnd() * 10, 0.8 + rnd() * 0.3, k & 1 ? '#b6f59a' : '#e8ffd8', PLUS, 1, 0, 0.5, false); break;
       case 'crit': { K = 0; const d = decal('starburst', wx, wy, 0.3, L_WORLD, 4, 18, '#fff6d6', col || '#ffd77a'); if (d) d.z = z || 22; spray(wx, wy, z || 22, 8, 70, 0.25, ['#ffffff', '#ffd77a'], STR, 1, 0, 6, false, 0); break; }
       case 'burn': K = 3; P(wx + (rnd() - 0.5) * 10, wy + (rnd() - 0.5) * 4, 8 + rnd() * 16, (rnd() - 0.5) * 4, 0, 16 + rnd() * 10, 0.45, rnd() < 0.5 ? '#ffb35c' : '#ff7a3a', rnd() < 0.5 ? GLW : PX, 1, -8, 1, true); break;
@@ -717,7 +755,7 @@ window.MM = window.MM || {};
         accent(wx, wy, 20, 40, '#ffe6a0', 0.5, lead);
         later(lead, (a, b, _c, ff) => {
           K = 2; const fx2 = ff ? PJX(ff.x, ff.y) : a, fy2 = ff ? PJY(ff.x, ff.y) : b;
-          const d = decal('column', fx2, fy2, 1.1, L_WORLD, 9, 9, '#fff0b8', '#ffd77a'); if (d) d.ref = ff;
+          if (!(ff && vfxOn(ff, 'powerUp', { palette: vpal('gold'), size: 0.7, cls: 'spell', seed: 3 }))) { const d = decal('column', fx2, fy2, 1.1, L_WORLD, 9, 9, '#fff0b8', '#ffd77a'); if (d) d.ref = ff; }
           ring(fx2, fy2, 1, 4, 34, 0.7, '#ffe6a0', '#fff8e0');
           for (let k = 0; k < N(22); k++) { const an = rnd() * TAU, r = rnd() * 12; P(fx2 + Math.cos(an) * r, fy2 + Math.sin(an) * r * 0.5, rnd() * 10, 0, 0, 30 + rnd() * 40, 0.9 + rnd() * 0.5, k % 3 ? '#ffe6a0' : '#ffffff', k & 1 ? SPK : GLW, 1, 0, 0.6, true); }
           accent(fx2, fy2, 30, 90, '#ffe6a0', 0.9, 1); shockW(fx2, fy2, 50, 0.45, 0.04); FX.flash('#fff2c0', 140, 0.12);
@@ -744,6 +782,7 @@ window.MM = window.MM || {};
         spray(hx, wy, hz, 4, 6, 0.25, ['#ffd6e0', '#ffffff'], SPK, 1, 0, 2, true, 6);
         later(0.15, (a, b) => {
           K = 2;
+          if (!vfxOn(game, 'heal', { kind: 'heal', palette: vpal('heal'), count: 14, cls: 'spell', seed: 4 }))
           for (let k = 0; k < N(16); k++) { const an = k / 8 * Math.PI, r = 10; P(a + Math.cos(an) * r, b + Math.sin(an) * r * 0.5, 2 + k * 2, -Math.sin(an) * 22, Math.cos(an) * 11, 26, 0.7, k & 1 ? '#ff8aa8' : '#9fbaff', GLW, 1, 0, 0.5, true); }
           later(0.35, (p, q) => { const r = ring(p, q, 0, 4, 22, 0.45, '#b6f59a', '#ffffff'); if (r) r.a = 0.8; accent(p, q, 20, 50, '#ffd0e0', 0.7, 0.4); spray(p, q, 30, 8, 10, 0.8, ['#fff0f4', '#e8ffd8'], SPK, 1, 6, 1, true, 4); }, a, b);
         }, wx, wy);
@@ -790,12 +829,12 @@ window.MM = window.MM || {};
     const sc = S.pScale * Math.min(1.3, S.fxI) * (S.quality === 'low' ? 0.6 : S.quality === 'high' ? 1.15 : 1) * (S.rMotion ? 0.6 : 1);
     if (out) {
       const warm = reg === 'grove' || reg === 'village' || reg === 'moonwell' || reg === 'tutorial';
-      if (night > 0.4 && wth !== 'Rain' && wth !== 'Storm') {
+      if (night > 0.4 && wth !== 'Rain' && wth !== 'Storm' && !owns('fireflies')) {
         if (warm) aTarget[FIREFLY] = 8 + 12 * rest; else if (reg === 'swamp') aTarget[FIREFLY] = 18; else if (reg === 'forest') aTarget[FIREFLY] = 4 + 10 * rest;
       }
       if (night < 0.35 && warm && wth !== 'Rain' && wth !== 'Storm') aTarget[POLLEN] = 8 + 10 * rest;
-      if (reg === 'forest') aTarget[ALEAF] = 7 + (wth === 'Wind' ? 9 : 0); else if (warm && wth === 'Wind') aTarget[ALEAF] = 12;
-      if (reg === 'mountain') aTarget[SNOW] = wth === 'Storm' ? 80 : 48; else if (winter && reg !== 'swamp' && wth !== 'Rain') aTarget[SNOW] = 26;
+      if (!owns('leaves')) { if (reg === 'forest') aTarget[ALEAF] = 7 + (wth === 'Wind' ? 9 : 0); else if (warm && wth === 'Wind') aTarget[ALEAF] = 12; }
+      if (owns('snow')) { /* Sprite Fusion snow field */ } else if (reg === 'mountain') aTarget[SNOW] = wth === 'Storm' ? 80 : 48; else if (winter && reg !== 'swamp' && wth !== 'Rain') aTarget[SNOW] = 26;
       if (reg === 'swamp') aTarget[SPORE] = 14; else if (reg === 'forest' && rest < 0.5) aTarget[SPORE] = 8;
       if (reg === 'crypt') aTarget[MOTE] = 12;
       if (reg === 'sky' || reg === 'moonwell') aTarget[STAR] = 16;
@@ -895,9 +934,9 @@ window.MM = window.MM || {};
     const src = d.source && Number.isFinite(d.source.x) ? d.source : game;
     const wx = PJX(tg.x, tg.y), wy = PJY(tg.x, tg.y), dir = Math.atan2(wy - PJY(src.x, src.y), wx - PJX(src.x, src.y));
     FX.burst('sparks', tg.x, tg.y, { dir, color: col, count: [3, 5, 9, 12][tier], z: 20, ring: [5, 8, 12, 16][tier], speed: [0.7, 1, 1.2, 1.4][tier], cls: 0 });
-    if (tier >= 1) { K = 0; spray(wx, wy, 6, tier, 6, 0.6, ['#a09888', '#c8c0b0'], PUFF, 2, -6, 2, false, 2); }
+    if (tier >= 1) { K = 0; spray(wx, wy, 6, tier, 6, 0.6, ['#a09888', '#c8c0b0'], PUFF, 2, -6, 2, false, 2); vfx('impact', wx, wy, { z: 18, size: [0, 0.3, 0.45, 0.6][tier], angle: dir, ramp: rampFrom(col), seed: (rnd() * 99) | 0 }); }
     if (tier >= 2) { accent(wx, wy, 20, 30 + tier * 8, col, 0.6, 0.18); shake(tier === 3 ? 2 : 1, 0.1); }
-    if (crit) { FX.burst('crit', tg.x, tg.y, { color: col }); sfx('crit', { pan: panOf(wx) }); hitstop(0.05); }
+    if (crit) { FX.burst('crit', tg.x, tg.y, { color: col }); vfx('slash', wx, wy, { z: 18, size: 0.32, facing: Math.cos(dir) < 0 ? -1 : 1, ramp: vramp('gold'), sparkRamp: vramp('gold'), sparks: 4, seed: (rnd() * 99) | 0 }); sfx('crit', { pan: panOf(wx) }); hitstop(0.05); }
     else if (impactSnd <= 0 && hitSnd <= 0) { sfx('hit_enemy', { volume: 0.25 + 0.15 * tier, pan: panOf(wx) }); hitSnd = 0.18; }
   }
   function hitstop(sec) { if (S.rMotion || hitstopT > 0) return; hitstopT = 0.3; FX.slowmo(sec, 0.15); }
@@ -907,6 +946,7 @@ window.MM = window.MM || {};
     const big = !!e.boss;
     if (!big) hitstop(0.04);
     FX.burst('kill', e.x, e.y, { color: KILLC[e.type] || '#cbbbe6', boss: big, sprite: e.type === 'blight' ? 'fx_blight_burst' : 'fx_poof' });
+    if (!big) vfx('sparkle', PJX(e.x, e.y), PJY(e.x, e.y), { z: 16, size: 5, flares: 3, warm: palFrom(KILLC[e.type] || '#cbbbe6').concat(['#1a1424']), cool: vpal('moon'), seed: (rnd() * 99) | 0 });
     sfx('enemy_die', { pan: panOf(PJX(e.x, e.y)) });
     if (big) onBoss({ phase: 'defeated', enemy: e });
   }
@@ -926,6 +966,8 @@ window.MM = window.MM || {};
         FX.flash('#fff2d0', 180, 0.3); shake(4, 0.45); ring(a, b, 2, 8, 96, 0.9, '#ffe6a0', '#ffffff'); shockW(a, b, 120, 0.7, 0.07);
         K = 0; spray(a, b, 20, 30, 80, 1.0, ['#fff6d6', '#ffd77a', '#ffffff'], SPK, 1, 20, 2, true, 50);
         accent(a, b, 20, 140, '#fff0c0', 1, 1); sfx('boss_phase'); sfx('victory', { volume: 0.7 });
+        vfx('explosion', a, b, { size: 0.8, fire: 0.7, earth: 0.6, chunks: 4, scorch: 16, shockwave: 70, cls: 'spell', seed: 7 });
+        vfx('sparkle', a, b, { z: 24, size: 14, flares: 9, warm: vpal('star'), cool: vpal('moon'), cls: 'spell', seed: 8 });
       }, wx, wy);
     } else {
       // phase transition: a controlled pause beat (slow-mo + darkening), then shockwave, flash, shake; embers linger
@@ -933,17 +975,21 @@ window.MM = window.MM || {};
       later(0.32, (a, b) => {
         FX.flash('#ffffff', 140, 0.26); shake(3, 0.3); ring(a, b, 2, 6, 80, 0.8, '#ffb3c6', '#ffffff'); shockW(a, b, 110, 0.6, 0.07);
         sfx('boss_phase', { pan: panOf(a) }); accent(a, b, 20, 120, '#ffc0d0', 0.9, 0.7);
+        vfx('explosion', a, b, { size: 0.6, fire: 0.5, earth: 0.5, chunks: 3, scorch: 10, shockwave: 60, cls: 'spell', seed: 5 });
+        if (e && /hollow/i.test((e.name || '') + (e.mmBoss || '') + (e.mmBossId || '')) && (d.phase === 2 || d.phase === '2')) vfx('blackHole', a, b, { z: 40, radius: 16, life: 3.2, pull: 0.4, cls: 'spell', noGround: true, ext: 0.6, seed: 9 });
         K = 0; spray(a, b, 10, 16, 50, 1.4, ['#ff9a6a', '#ffd0a0'], GLW, 1, -14, 1, true, 20);
       }, wx, wy);
     }
   }
+  const playerActor = { feet() { return [PJX(game.x, game.y) * 2, (PJY(game.x, game.y) - 18) * 2]; } };
   function onPickup(drop, actor) {
     if (!drop || !base() || drop._mmP) return; drop._mmP = true;
     const now = game.elapsed;
     if (lastPick.t === now && lastPick.type === drop.type && lastPick.amount === drop.amount) return;
     lastPick.t = now; lastPick.type = drop.type; lastPick.amount = drop.amount;
     const c = drop.type === 'gold' ? '#ffd770' : drop.type === 'rune' ? '#9cecf0' : '#f0b8f4', wx = PJX(drop.x, drop.y), wy = PJY(drop.x, drop.y);
-    FX.burst('pickup', drop.x, drop.y, { color: c, count: drop.type === 'gold' ? 6 : 8 });
+    if (!vfx('pickup', wx, wy, { z: 4, item: drop.type === 'gold' ? 'coin' : drop.type === 'rune' ? 'orb' : 'gem', palette: drop.type === 'gold' ? vpal('gold') : undefined, actor: playerActor, wait: 0, seed: (rnd() * 99) | 0 }))
+      FX.burst('pickup', drop.x, drop.y, { color: c, count: drop.type === 'gold' ? 6 : 8 });
     const r = ring(wx, wy, 4, 2, 10, 0.25, c, '#ffffff'); if (r) r.a = 0.8;
     later(0.45, (a, b, _c, cc) => { const p = PJX(game.x, game.y), q = PJY(game.x, game.y); K = 2; spray(p, q, 24, 5, 12, 0.4, [cc, '#ffffff'], SPK, 1, 0, 2, true, 6); accent(p, q, 20, 26, cc, 0.5, 0.2); }, wx, wy, 0, c);
     if (drop.type === 'gold' && drop.amount && S.numbers) text('+' + drop.amount, wx, wy, 18, '#ffe08a', 1, 0.9, 12);
@@ -965,7 +1011,7 @@ window.MM = window.MM || {};
     if (!p || !base()) return;
     const stamp = game.elapsed;
     if (p._mmT === stamp && p._mmK === kind) return; p._mmT = stamp; p._mmK = kind;
-    if (kind === 'plant') { FX.burst('soil', p.x, p.y); sfx('plant'); }
+    if (kind === 'plant') { FX.burst('soil', p.x, p.y); vfx('explosion', PJX(p.x, p.y), PJY(p.x, p.y), { size: 0.16, fire: 0, earth: 1.4, chunks: 2, scorch: 0, shockwave: 0, surface: vhex('#7a5b3c'), seed: (rnd() * 99) | 0 }); sfx('plant'); }
     else if (kind === 'water') { FX.burst('water', p.x, p.y); sfx('water'); }
     else if (kind === 'harvest') {
       let c = '#e8d27c'; try { const st = SEED_TYPES[p.seedWas || p.seed]; if (st && st.color) c = st.color; } catch (e) { /* */ }
@@ -1040,6 +1086,7 @@ window.MM = window.MM || {};
       const dir = fx0 ? Math.atan2(PJY(game.x, game.y) - PJY(fx0.x, fx0.y), PJX(game.x, game.y) - PJX(fx0.x, fx0.y)) : undefined;
       if (fx0) { const sl = decal('slash', PJX(game.x, game.y), PJY(game.x, game.y), 0.18, L_WORLD, 10, 14, '#fff2e0', '#ff9a7a'); if (sl) { sl.rot = dir; sl.z = 20; } }
       FX.burst('sparks', game.x, game.y, { color: '#ff9a7a', count: heavy ? 10 : 6, z: 22, dir, cls: 0 });
+      vfx('impact', PJX(game.x, game.y), PJY(game.x, game.y), { z: 20, size: heavy ? 0.45 : 0.3, angle: dir == null ? -1.2 : dir, ramp: vramp('rose'), seed: (rnd() * 99) | 0 });
       if (S.numbers) text('-' + dmg, PJX(game.x, game.y) + 6, PJY(game.x, game.y), 46, '#ff8a7a', heavy ? 2 : 1, 0.8, 12);
       shake(heavy ? 3 : 2, 0.16); sfx('hit_player'); hurtFrom = null;
     } else if (world.hp > prevHp + 0.5 && skipHeal <= 0) {
@@ -1156,10 +1203,14 @@ window.MM = window.MM || {};
     updateAmbient(dt);
   };
   function waveR() { const p = wave.t / wave.dur; return (1 - (1 - p) * (1 - p)) * 640; }
+  const burning = (a) => !!(a.status && a.status.burn);
   function statusFx(e) {
     if (!e || e.hp <= 0 || !e.status) return;
     const st = e.status;
-    if (st.burn && rnd() < 0.8) FX.burst('burn', e.x, e.y);
+    if (st.burn) {
+      if (!e._mmFire || !(MM.vfx && MM.vfx.isActive && MM.vfx.isActive(e._mmFire))) e._mmFire = vfxOn(e, 'fire', { size: e.boss ? 0.5 : 0.3, ramp: vramp('ember'), duration: 30, until: burning, seed: (rnd() * 99) | 0 }) || 0;
+      if (!e._mmFire && rnd() < 0.8) FX.burst('burn', e.x, e.y);
+    }
     if (st.chill && rnd() < 0.35) FX.burst('chill', e.x, e.y);
     if (st.root && rnd() < 0.2) FX.burst('root', e.x, e.y);
     if (st.poison && rnd() < 0.5) FX.burst('poison', e.x, e.y);

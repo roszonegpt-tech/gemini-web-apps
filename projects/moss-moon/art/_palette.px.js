@@ -1,4 +1,4 @@
-// Moss Moon master palette (40 colors) + light ramps + shared helpers.
+// Moss Moon master palette (40 colors + 1 ART2 skin-shadow shade `n`) + light ramps + shared helpers.
 // Included by every art/*.px.js. Keep tools/../art/meta.js `palette` in sync (build audits it).
 pal({
   k: "#263a37", j: "#2f4b47", t: "#46695f", T: "#6a907f",                 // ink + teal shadows
@@ -12,9 +12,10 @@ pal({
   e: "#8a4a40", E: "#d27a55", p: "#e8b8a8", f: "#c95d6a",                 // brick, ember, blossom, berry
   x: "#2e2638", X: "#7b4f7d", z: "#8ff0d0",                               // blight, spirit glow
   u: "#59573a", U: "#8b8a58",                                             // swamp olive
+  n: "#c98f7e",                                                           // ART2: skin shadow / clay (palette 41)
 })
 // dark -> light. Shadows step toward teal (cool), highlights toward cream (warm).
-ramps("kjGghHy", "kjtT", "kdDwWs", "jSrRqc", "daoOY", "xmvlL", "jbBi", "deEp", "efp", "xXl", "kuUW", "qCc", "Tz")
+ramps("kjGghHy", "kjtT", "kdDwWs", "jSrRqc", "daoOY", "xmvlL", "jbBi", "deEp", "efp", "xXl", "kuUW", "qCc", "Tz", "dnp")
 
 const TAU = Math.PI * 2
 

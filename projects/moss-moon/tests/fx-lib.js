@@ -1,18 +1,19 @@
-// Shared Playwright harness for tests/fx-*.js. Loads index.html, injects the core stand-in and the
-// FX modules when index.html does not load them yet, freezes the rAF loop and exposes a stepper.
+// Shared Playwright harness for tests/fx-*.js.
+// Loads index.html (real MM core), starts a game, injects FX modules index.html does not load yet (sfvfx.js,
+// vfx-bridge.js until CORE adds them), stops MM.loop and exposes a deterministic stepper + cast helper.
 const { chromium } = require('playwright');
 const path = require('path');
 const fs = require('fs');
 const ROOT = path.resolve(__dirname, '..');
 const OUT = path.join(ROOT, 'tests', 'out');
 
-// Test copies of the five signature spells (used only when CAMPAIGN has not added them to SPELLS).
+// Test copies of the signature spells (only used when CAMPAIGN's SPELLS entries are missing).
 const TEST_SPELLS = [
-  { id: 'moonbolt', name: 'Moonbolt', school: 'Moon', kind: 'bolt', color: '#a9c4ff', core: '#f1f5ff', damage: 28, hit: [0.3], duration: 0.7, description: 'test' },
-  { id: 'ember_bloom', name: 'Ember Bloom', school: 'Fire', kind: 'fireball', color: '#f47c46', core: '#ffd36e', damage: 44, hit: [0.42], duration: 1.0, status: 'burn', radius: 26, description: 'test' },
-  { id: 'thornbind', name: 'Thornbind', school: 'Nature', kind: 'vines', color: '#6fae5c', core: '#cdeea0', damage: 24, hit: [0.36], duration: 1.1, status: 'root', radius: 22, description: 'test' },
-  { id: 'frostbell', name: 'Frostbell', school: 'Frost', kind: 'shard', color: '#9fdcf0', core: '#ffffff', damage: 30, hit: [0.3], duration: 0.9, status: 'chill', radius: 30, description: 'test' },
-  { id: 'starfall', name: 'Starfall', school: 'Astral', kind: 'meteor', color: '#ffe39a', core: '#fff6d6', damage: 80, hit: [0.9], duration: 1.5, radius: 34, description: 'test' },
+  { id: 'moonbolt', name: 'Moonbolt', school: 'Moon', kind: 'star', color: '#bcd4ff', core: '#f4f8ff', damage: 30, hit: [0.24], duration: 0.62, description: 'test' },
+  { id: 'emberbloom', name: 'Ember Bloom', school: 'Fire', kind: 'fireball', color: '#f47c46', core: '#ffe3a1', damage: 44, hit: [0.5], duration: 1.1, status: 'burn', mmBloom: { r: 1.6, dur: 3 }, description: 'test' },
+  { id: 'thornbind', name: 'Thornbind', school: 'Nature', kind: 'vines', color: '#71ad68', core: '#c7e990', damage: 22, hit: [0.4], duration: 1.35, status: 'root', mmZone: { r: 1.5, dur: 4.5 }, description: 'test' },
+  { id: 'frostbell', name: 'Frostbell', school: 'Frost', kind: 'nova', color: '#a9e4f5', core: '#f0ffff', damage: 34, hit: [0.36], duration: 1.05, status: 'chill', mmPulse: { r: 2.2 }, description: 'test' },
+  { id: 'starfall', name: 'Starfall', school: 'Astral', kind: 'meteor', color: '#f5d58c', core: '#fff9db', damage: 92, hit: [1.05], duration: 1.6, mmStrike: { r: 2.2 }, description: 'test' },
 ];
 
 async function open(opts = {}) {
@@ -22,31 +23,35 @@ async function open(opts = {}) {
   const errors = [];
   page.on('pageerror', (e) => errors.push('pageerror: ' + e.message));
   page.on('console', (m) => { if (m.type() === 'error') errors.push('console: ' + m.text()); });
-  if (opts.clearStorage !== false) await page.addInitScript(() => { try { localStorage.clear(); } catch (e) { /* */ } });
+  await page.addInitScript(() => { try { localStorage.clear(); } catch (e) { /* */ } });
   await page.goto('file://' + path.join(ROOT, 'index.html'));
-  await page.waitForFunction(() => { try { return typeof game === 'object' && !!game; } catch (e) { return false; } });
-  const has = await page.evaluate(() => ({ core: !!(window.MM && MM.hooks && MM.hooks.on), lighting: !!(window.MM && MM.lighting), fx: !!(window.MM && MM.fx), filter: !!(window.MM && MM.filter), campaign: !!(window.MM && MM.campaign) }));
+  await page.waitForFunction(() => { try { return !!(window.MM && MM.game && MM.hooks && typeof game === 'object'); } catch (e) { return false; } });
+  const has = await page.evaluate(() => ({ core: !!(window.MM && MM.loop), lighting: !!MM.lighting, fx: !!MM.fx, filter: !!MM.filter, sf: !!MM.sfvfx, vfx: !!MM.vfx }));
   if (!has.core) await page.addScriptTag({ path: path.join(ROOT, 'tests/fx-standin.js') });
-  for (const [k, f] of [['lighting', 'src/systems/lighting.js'], ['fx', 'src/systems/fx.js'], ['filter', 'src/systems/filter.js']]) if (!has[k]) await page.addScriptTag({ path: path.join(ROOT, f) });
-  await page.evaluate((spells) => {
-    // sound recorder (wraps the real MM.audio when present)
+  const files = [['lighting', 'src/systems/lighting.js'], ['fx', 'src/systems/fx.js'], ['filter', 'src/systems/filter.js'], ['sf', 'src/systems/sfvfx.js'], ['vfx', 'src/systems/vfx-bridge.js']];
+  if (opts.noVfx) files.length = 3;
+  for (const [k, f] of files) if (!has[k]) await page.addScriptTag({ path: path.join(ROOT, f) });
+  await page.evaluate(async (spells) => {
+    if (window.MM.art && MM.art.whenReady) await MM.art.whenReady();
+    if (MM.loop) { try { __mm.newGame({ name: 'Tester' }); } catch (e) { console.error(e); } }
+    if (MM.loop) MM.loop.stop(); else loop = function () {};
     window.__sfx = [];
     const a = MM.audio;
     if (a && a.sfx) { const o = a.sfx; a.sfx = function (id, opt) { window.__sfx.push(id); return o.call(this, id, opt); }; }
     else MM.audio = Object.assign(MM.audio || {}, { sfx(id) { window.__sfx.push(id); return true; } });
     window.__bus = [];
     ['spell:cast', 'spell:impact', 'spell:fail'].forEach((n) => MM.bus.on(n, (d) => window.__bus.push(n + ':' + (d && (d.sig || d.reason || d.id)))));
-    // signature spells: use CAMPAIGN's when present, else test copies
-    const want = ['moonbolt', 'emberbloom', 'thornbind', 'frostbell', 'starfall'];
     window.__sig = {};
-    for (const w of want) { const i = SPELLS.findIndex((s) => MM.fx.sigOf(s) === w); if (i >= 0) window.__sig[w] = i; }
-    for (const s of spells) { const w = MM.fx.sigOf(s); if (window.__sig[w] === undefined) { SPELLS.push(s); window.__sig[w] = SPELLS.length - 1; } }
-    // freeze the real loop; tests step deterministically
-    loop = function () {};
+    for (const s of spells) { const w = MM.fx.sigOf(s); let i = SPELLS.findIndex((x) => MM.fx.sigOf(x) === w); if (i < 0) { SPELLS.push(s); i = SPELLS.length - 1; } window.__sig[w] = i; }
     window.__step = function (n, dt, drawEach) { dt = dt || 1 / 60; for (let i = 0; i < n; i++) { update(dt); if (drawEach !== false) draw(); } if (drawEach === false) draw(); };
-    window.__cast = function (sig) { castCooldown = 0; world.mana = 100; game.transition = null; chooseSpell(window.__sig[sig]); return castSpell(); };
+    // a cast exactly as baseline castSpell records it (bypasses campaign unlock/cooldown gating for tests)
+    window.__cast = function (sig, target) {
+      const spell = SPELLS[window.__sig[sig]], t = target || (typeof spellTarget === 'function' ? spellTarget(game) : null) || dummy;
+      effects.push({ spell, elapsed: 0, from: { x: game.x, y: game.y, height: game.height || 0 }, target: t, caster: game, hitIndex: 0 });
+      game.castRemaining = 0.48; MM.bus.emit('cast', { actor: game, spell, target: t }); return true;
+    };
   }, TEST_SPELLS);
-  await page.waitForTimeout(80);
+  await page.waitForTimeout(50);
   return { browser, page, errors, core: has.core };
 }
 
@@ -56,22 +61,6 @@ async function shot(page, name, scale = 2) {
   fs.writeFileSync(file, Buffer.from(url.split(',')[1], 'base64'));
   return file;
 }
-
-// Standard scene: grove, player near the plaza, dummy target in view.
-async function scene(page, o = {}) {
-  await page.evaluate((o) => {
-    if (o.region && o.region !== world.region) goRegion(o.region);
-    if (o.dungeon) enterDungeon(false);
-    world.time = o.time == null ? 0.3 : o.time; world.weather = o.weather || 'Clear';
-    game.x = o.px == null ? 10.4 : o.px; game.y = o.py == null ? 10.6 : o.py; game.vx = game.vy = 0;
-    const p = project(game.x, game.y); game.camX = p.x; game.camY = p.y - 10;
-    enemies.forEach((e) => { e.attack = 5; e.special = 4; });
-    MM.lighting.setPalette(o.palette || null);
-    if (o.settings) for (const k in o.settings) MM.settings.set(k, o.settings[k]);
-    __step(o.warm == null ? 40 : o.warm);
-  }, o);
-}
-
 // Crop (x,y,w,h in canvas px) of the current scene, nearest-neighbour upscaled.
 async function crop(page, name, x, y, w, h, scale = 4) {
   const url = await page.evaluate(([x, y, w, h, s]) => {
@@ -81,6 +70,20 @@ async function crop(page, name, x, y, w, h, scale = 4) {
   const file = path.join(OUT, name);
   fs.writeFileSync(file, Buffer.from(url.split(',')[1], 'base64'));
   return file;
+}
+// Standard scene: player near the plaza, dummy in view, deterministic time/weather/palette.
+async function scene(page, o = {}) {
+  await page.evaluate((o) => {
+    if (o.region && o.region !== world.region) goRegion(o.region);
+    if (o.dungeon) enterDungeon(false);
+    world.time = o.time == null ? 0.3 : o.time; world.weather = o.weather || 'Clear';
+    game.x = o.px == null ? 10.4 : o.px; game.y = o.py == null ? 10.6 : o.py; game.vx = game.vy = 0;
+    const p = project(game.x, game.y); game.camX = p.x; game.camY = p.y - 10;
+    enemies.forEach((e) => { e.attack = 5; e.special = 4; });
+    MM.lighting.setPalette(o.palette || null);
+    if (o.settings) MM.settings.set(o.settings);
+    __step(o.warm == null ? 40 : o.warm);
+  }, o);
 }
 
 module.exports = { open, shot, crop, scene, OUT, ROOT, TEST_SPELLS };

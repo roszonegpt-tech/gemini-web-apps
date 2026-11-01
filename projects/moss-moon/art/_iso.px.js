@@ -96,3 +96,22 @@ function woodTop(u, v, bw = 4, seed = 1, cols = ["W", "w", "s"]) {
 // light/shade one step along the master ramps (for hand-shading inside shaders)
 const LIGHT1 = { k: "j", j: "t", t: "T", G: "g", g: "h", h: "H", H: "y", d: "D", D: "w", w: "W", W: "s", S: "r", r: "R", R: "q", q: "c", C: "c", a: "o", o: "O", O: "Y", m: "v", v: "l", l: "L", b: "B", B: "i", e: "E", E: "p", x: "m", X: "l", u: "U" }
 const SHADE1 = { y: "H", H: "h", h: "g", g: "G", G: "j", T: "t", t: "j", s: "W", W: "w", w: "D", D: "d", d: "k", c: "q", q: "R", R: "r", r: "S", S: "j", C: "q", Y: "O", O: "o", o: "a", a: "d", L: "l", l: "v", v: "m", m: "x", i: "B", B: "b", b: "j", p: "E", E: "e", e: "d", f: "e", U: "u", u: "k", z: "T" }
+
+// Cabinet front: framed panels (stiles every pw px, rails at the top/bottom), bevel lit on the top-left.
+function panelFace(tone, u, v, len, H, pw = 8, rails = [2, 2]) {
+  const [base, grain, seam, hi] = WOOD[tone]
+  const uu = Math.floor(u), vv = Math.floor(v)
+  if (vv < rails[0] || vv >= H - rails[1] || uu % pw === 0 || uu >= len - 1) return vv === H - 1 ? hi : base
+  if (uu % pw === 1 || vv === H - rails[1] - 1) return seam                      // shadow inside the frame (top-left)
+  if (uu % pw === pw - 1 || vv === rails[0]) return hi                         // lit bevel bottom-right... (light from top-left hits the far edges)
+  return hash(uu >> 2, vv >> 3, 3) < 0.15 && vv % 3 === 0 ? grain : base
+}
+// Vertical tongue-and-groove boards (counters, wainscot)
+function vBoards(tone, u, v, H, bw = 4) {
+  const [base, grain, seam, hi] = WOOD[tone], uu = Math.floor(u), vv = Math.floor(v)
+  if (vv >= H - 2) return vv === H - 1 ? hi : grain
+  if (vv < 1) return seam
+  if (uu % bw === 0) return seam
+  if (uu % bw === 1) return hi
+  return base
+}

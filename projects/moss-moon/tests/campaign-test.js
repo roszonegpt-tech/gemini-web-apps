@@ -219,7 +219,7 @@ async function installHelpers(page) {
   const crypt = await ev(page, () => MM.campaign.travelTo('crypt')); await settle(page);
   const cd = await ev(page, () => { MM.campaign.enterDungeon(); }); await settle(page);
   check('postgame Old Crypt dungeon playable', crypt.ok && (await snap(page)).mode === 'dungeon', crypt.msg);
-  check('postgame spellbook has all baseline spells', (await ev(page, () => MM.campaign.spells().length)) === 30);
+  check('postgame spellbook has all baseline spells', (await ev(page, () => MM.campaign.spells().length)) === (await ev(page, () => SPELLS.length)));
   const playMin = await ev(page, () => Math.round(MM.campaign.state.stats.playTime / 60));
   // ---------------- cine returns to previous state (interior)
   const ret = await ev(page, async () => {
@@ -229,6 +229,14 @@ async function installHelpers(page) {
     const mid = MM.state.current; setTimeout(() => MM.cine.skip(), 50); await p; return { mid, end: MM.state.current };
   });
   check('cine from interior returns to interior', ret.mid === 'cine' && ret.end === 'interior', ret);
+  const inside = await ev(page, () => {
+    const C = MM.campaign; world.hp = 20; const t0 = world.time, d0 = world.day;
+    const r = C.interact('rest', { kind: 'rest' }); const sh = C.interact('shop', { kind: 'shop', npc: 'pip' }); const cr = C.interact('craft', { kind: 'craft' });
+    const tk = C.interact('npc', { kind: 'npc', npc: 'wren' });
+    try { MM.ui?.close?.(); } catch (_) { }
+    return { rest: r.ok, healed: world.hp === heroMaxHP(), advanced: world.day > d0 || world.time > t0, shop: sh.open === 'shop' && sh.npc === 'pip', craft: cr.open === 'crafting', talk: tk.dialogue && tk.dialogue.npc === 'wren', state: MM.state.current };
+  });
+  check('interior furniture actions: bed rest (time+heal), shop counter, brewing, NPC talk', inside.rest && inside.healed && inside.advanced && inside.shop && inside.craft && inside.talk, inside);
   await ev(page, () => MM.state.go('play'));
   check('no page errors in main run', errors.length === 0, errors.slice(0, 5));
   await page.context().close();

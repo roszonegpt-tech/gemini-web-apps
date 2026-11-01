@@ -221,7 +221,7 @@
   // ================================================================== helpers
   const emit = (n, d) => safe(() => MM.bus && MM.bus.emit && MM.bus.emit(n, d));
   const cur = () => (MM.state ? MM.state.current : null);
-  const hasScreen = (n) => !!safe(() => MM.screens && typeof MM.screens.def === 'function' && MM.screens.def(n), false);
+  const hasScreen = (n) => !!safe(() => { const d = MM.screens && typeof MM.screens.def === 'function' && MM.screens.def(n); return d && typeof d.enter === 'function'; }, false);
   const stateOk = (n) => !!safe(() => !MM.state.list || MM.state.list.includes(n), true);
   function go(name, data) {
     if (!MM.state || typeof MM.state.go !== 'function') return false;
@@ -339,7 +339,11 @@
     },
     get started() { return started; },
   };
-  function tutorialAvailable() { return hasScreen('tutorial') || !!(MM.tutorial && stateOk('tutorial') && safe(() => MM.state.list.includes('tutorial'), false)); }
+  // CORE pre-defines a policy for every state, so "available" means the TUTORIAL module registered real behaviour.
+  function tutorialAvailable() {
+    const d = safe(() => MM.screens && MM.screens.def && MM.screens.def('tutorial'), null);
+    return !!(d && typeof d.enter === 'function') || !!(MM.tutorial && typeof MM.tutorial.start === 'function' && stateOk('tutorial'));
+  }
   function startCampaign() { if (MM.campaign && typeof MM.campaign.start === 'function') safe(() => MM.campaign.start()); }
   MM.flow = flow;
 })();

@@ -101,7 +101,7 @@ KINDS.shop = {
     if (vr === 1 && v === 43 && u % 8 === 4) return "d"
     return woodFace(lit ? "lit" : "mid", u, v, 5, 3)
   },
-  floor: (c, vr, s) => planks(c, vr, s, ["s", "W", "w", "c"], 8, true),
+  floor: (c, vr, s) => planks(c, vr, s, ["W", "s", "w", "s"], 8, true),
 }
 // Herbalist (Wren): rubble-stone dado, sage-washed plaster, a rafter with pegs.
 KINDS.herbal = {
@@ -184,9 +184,11 @@ function terracotta(c, vr, s) {
   for (let y = 0; y < 16; y++) for (let x = 0; x < 32; x++) {
     if (!DIA(x, y)) continue
     const m1 = 2 * y - x + 64, m2 = 2 * y + x, a = Math.floor(m1 / 16), b = Math.floor(m2 / 16), am = m1 % 16, bmm = m2 % 16
-    let k = hash(a & 1, b & 1, s + vr) < 0.3 ? "e" : "E"
-    if (am < 2 || bmm < 2) k = "w"
-    else if (am < 4 || bmm < 4) k = k === "E" ? "p" : "E"
+    // squares never straddle a tile seam, so each can take its own tone (no global checker)
+    const tone = hash(a, b * 3 + 1, s + vr * 5), base = tone < 0.18 ? "e" : tone > 0.9 ? "o" : "E"
+    let k = base
+    if (am < 2 || bmm < 2) k = "D"
+    else if ((am < 3 || bmm < 3) && base !== "e") k = "p"
     else if (vr === 2 && am === 9 && bmm > 6 && bmm < 12) k = "e"
     c.px(x, y, k)
   }
@@ -199,8 +201,8 @@ function flags(c, vr, s) {
   for (let y = 0; y < 16; y++) for (let x = 0; x < 32; x++) {
     if (!DIA(x, y)) continue
     const me = cell(x, y), r = cell(x + 1, y) !== me || cell(x, y + 1) !== me, tl = cell(x - 1, y) !== me || cell(x, y - 1) !== me
-    const tone = hash(me, vr, s) < 0.5 ? "R" : "q"
-    c.px(x, y, r ? "r" : tl ? (tone === "R" ? "q" : "c") : tone)
+    const tone = hash(me, vr * 7 + 3, s) < 0.22 ? "q" : "R"
+    c.px(x, y, r ? "r" : tl ? "q" : tone)
   }
   if (vr === 1) sprinkle(c, s, ["r.\n.r"], 1, 2)
   if (vr === 2) sprinkle(c, s, ["h", "g"], 1, 1)
@@ -250,7 +252,7 @@ for (const [kind, K] of Object.entries(KINDS)) {
     sprite(name, { w: 17, h: T0 + 16 + 4 }, (c) => {
       for (let x = 0; x < 16; x++) {
         const col = right ? 16 - x : x, yb = T0 + 15 - Math.ceil((15 - x) / 2)   // bottom diamond row under this column
-        if (door && x >= 3 && x <= 13) { c.px(col, yb + 1, "d"); c.px(col, yb, x === 3 || x === 13 ? "w" : "W"); continue }   // threshold
+        if (door && x >= 3 && x <= 13) { c.px(col, yb + 2, "k"); c.px(col, yb + 1, right ? "S" : "r"); c.px(col, yb, "R"); c.px(col, yb - 1, x % 4 ? "q" : "R"); continue }   // stone threshold
         for (let v = 0; v < LH; v++) c.px(col, yb + 2 - v, v === 0 ? "k" : v < 3 ? (right ? K.low[2] : K.low[1]) : right ? K.low[1] : K.low[0])
         c.px(col, yb + 2 - LH, K.cap[1]); c.px(col, yb + 1 - LH, K.cap[0]); c.px(col, yb - LH, K.cap[0]); c.px(col, yb - 1 - LH, "k")
         if (door && (x === 2 || x === 14)) for (let v = 0; v < LH + 3; v++) c.px(col, yb + 2 - v, v === 0 ? "k" : "d")   // jamb posts

@@ -183,9 +183,9 @@
   // Each brain: attacks(e) -> list of attack names cycled; attack fns create telegraphs; cooldown(e)
   const brains = {
     bramble_warden: {
-      speed: .8, cooldown: e => e.mmPhase >= 1 ? 1.6 : 2.3,
+      speed: .8, cooldown: e => e.mmPhase >= 1 ? 2.0 : 2.5,
       attacks: e => e.mmPhase >= 1 ? ['slam', 'sprouts', 'slam', 'slam'] : ['slam', 'sprouts', 'slam'],
-      slam(e) { const a = def(e.mmBoss).attacks.slam, enr = e.mmPhase >= 1; lines(e, enr ? 5 : 3, enr ? .38 : .45, 6.5, .9, enr ? .85 : a.windup, a.dmg); return enr ? .85 : a.windup; },
+      slam(e) { const a = def(e.mmBoss).attacks.slam, enr = e.mmPhase >= 1; lines(e, enr ? 5 : 3, enr ? .38 : .45, 6.5, .9, enr ? .95 : a.windup, a.dmg); return enr ? .95 : a.windup; },
       sprouts(e) {
         const have = adds(e, 'thorn_sprout').length; if (have >= 4) return brains.bramble_warden.slam(e);
         const n = Math.min(3, 4 - have), spots = []; for (let i = 0; i < n; i++) spots.push(around(player(), 1.6, 2.8));
@@ -288,7 +288,7 @@
           const mw = MM.campaign?.moonwellPos?.() || { x: 12.6, y: 4.4 };
           const well = MM.campaign?.spawnArch?.('shard_wisp', mw.x, mw.y) || null;
           if (well) {
-            const hp = (def(e.mmBoss).well || {}).hp || 520;
+            const hp = (def(e.mmBoss).well || {}).hp || 1500;
             Object.assign(well, { mmWell: true, mmFriendly: true, mmAnchor: { x: mw.x, y: mw.y }, mmOwner: e.id, hp, maxHP: hp, name: 'The Moonwell', type: 'wisp' });
             e.mmWellId = well.id; world.targetId = well.id;
           }
@@ -442,7 +442,7 @@
     if (B.isArmored(e)) { magicRing(p.x, p.y - 34, 26, 14, '#8a6b45'); magicRing(p.x, p.y - 34, 24, 12, '#c8a46d'); }
     if (e.mmInvuln && e.mmBoss === 'mire_heart') { for (let i = 0; i < 5; i++) fill('rgba(170,220,190,.7)', p.x - 12 + i * 6, p.y - 4 - ((t * 20 + i * 7) % 14), 2, 2); }
     if (state === 'windup') { const k = Math.floor(t * 10) % 2; fill(k ? '#ffd27a' : '#ff8a6a', p.x - 1, top - 6, 3, 3); }
-    hpBar(ctx, p.x, top - 2, 44, e.hp / e.maxHP, e.mmInvuln ? '#9aa6c4' : '#e38f67');
+    if (!MM.ui) hpBar(ctx, p.x, top - 2, 44, e.hp / e.maxHP, e.mmInvuln ? '#9aa6c4' : '#e38f67');   // the UI HUD shows a boss bar
   }
   function drawWell(e, p) {
     const t = game.elapsed, q = 1 - e.hp / e.maxHP, h = 24 + Math.round(q * 40);

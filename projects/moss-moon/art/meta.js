@@ -16,6 +16,7 @@ module.exports = {
     e: '#8a4a40', E: '#d27a55', p: '#e8b8a8', f: '#c95d6a',
     x: '#2e2638', X: '#7b4f7d', z: '#8ff0d0',
     u: '#59573a', U: '#8b8a58',
+    n: '#c98f7e',   // ART2 addition: skin shadow (NPC faces/hands)
   },
   sheets: {
     tiles: { anchor: 'center', width: 512, note: '32x16 iso diamonds, anchor = diamond centre (16,8). Side skirts anchor at their top vertex.' },

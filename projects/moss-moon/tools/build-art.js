@@ -17,7 +17,7 @@ const opt = (k) => { const i = args.indexOf(k); return i >= 0 ? args[i + 1] : un
 const PXL = path.join(opt('--pxl') || process.env.PXL_HOME || '/home/user/crsolver/claude-pxl', 'bin/pxl.js');
 const ONLY = opt('--only') ? opt('--only').split(',') : null;
 const PREVIEW = args.includes('--preview');
-const MAX_COLORS = 40;
+const MAX_COLORS = 41;   // 40 master colors + ART2 skin shadow `n`
 
 // ------------------------------------------------------------------ PNG decode / encode (8-bit, non-interlaced)
 function decodePng(buf) {

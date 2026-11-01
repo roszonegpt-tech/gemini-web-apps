@@ -669,7 +669,7 @@
     const table = (title, icon, rows) => h('section', { class: 'mm-ctl-col', tabindex: '0', 'aria-label': title + ' controls' }, h('h3', null, ui.icon(icon), title), h('dl', { class: 'mm-ctl' }, rows.map(([k, v]) => [h('dt', null, k.split(' / ').map((x, i) => [i ? ' ' : null, h('kbd', { class: 'mm-kbd' }, x)])), h('dd', null, v)])));
     p.body.appendChild(h('div', { class: 'mm-ctl-grid' },
       table('Keyboard & mouse', 'keyboard', [['W A S D / Arrows', 'Move'], ['Space', 'Cast selected spell'], ['1 – 5', 'Choose spell'], ['E', 'Interact · tend garden'], ['B', 'Mount / land broom'], ['H', 'Drink potion'], ['Click', 'Walk to · target enemy'], ['Esc / P', 'Pause menu'], ['I / K / J / M', 'Inventory · Spells · Journal · Map']]),
-      table('Gamepad', 'gamepad', [['Left stick / D-pad', 'Move'], ['A', 'Cast'], ['X', 'Interact'], ['Y', 'Broom'], ['B', 'Potion'], ['LB / RB', 'Cycle spells'], ['Start', 'Pause'], ['Menus', 'D-pad move · A select · B back']]),
+      table('Gamepad', 'gamepad', [['Left stick', 'Move'], ['A', 'Cast'], ['X', 'Interact'], ['Y', 'Broom'], ['B', 'Potion'], ['LB / RB', 'Cycle spells'], ['Start', 'Pause'], ['Menus', 'D-pad move · A select · B back']]),
       table('Touch', 'touch', [['Joystick', 'Drag to move (floating or fixed)'], ['Cast', 'Cast selected spell'], ['Use', 'Interact · tend garden'], ['Broom', 'Mount / land'], ['Potion', 'Drink potion'], ['Swap', 'Next spell'], ['Tap enemy', 'Target & cast'], ['Pause', 'Pause menu']]),
     ));
     p.body.appendChild(h('p', { class: 'mm-note' }, ui.icon('info'), 'Menus: arrows or WASD move, Enter or Space selects, Esc goes back, Q / E switch tabs.'));

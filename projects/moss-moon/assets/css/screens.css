@@ -1,0 +1,139 @@
+/* Moss & Moon — out-of-game screens (owner: SCREENS): logo, intro chrome, title / main menu.
+   Palette: ink #263a37 · moss #456b53 · gold #cfaa71 · lavender moonlight #c6aedb · cream #f7f4e9 · teal shadows #2f4b47.
+   Layout is relative to the 8:5 stage (container units), text follows --mm-text-scale, motion follows data-reduced-motion. */
+.mm-scr{--ts:var(--mm-text-scale,1);--serif:"Palatino Linotype",Palatino,"Book Antiqua",Georgia,Charter,"Bitstream Charter","DejaVu Serif",serif;
+  --round:ui-rounded,"Trebuchet MS",system-ui,sans-serif;position:absolute;inset:0;container-type:size;pointer-events:none;color:#f7f4e9;
+  font-family:var(--round);-webkit-font-smoothing:antialiased}
+.mm-scr *{box-sizing:border-box}
+.mm-scr-canvas{image-rendering:pixelated;image-rendering:crisp-edges}
+.mm-scr-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;margin:-1px}
+
+/* ambient fill of the letterbox around the stage (blurred copy of the screen) */
+.mm-scr-ambient{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden;background:#05090a}
+.mm-scr-ambient>canvas{position:absolute;left:50%;top:50%;width:120%;height:120%;transform:translate(-50%,-50%);object-fit:cover;
+  filter:blur(34px) brightness(.55) saturate(1.25);image-rendering:auto}
+.mm-amb-title{background:radial-gradient(ellipse at 60% 30%,#2a2f4e 0%,#101827 45%,#070b10 100%)}
+.mm-amb-logo{background:radial-gradient(ellipse at 50% 35%,#1d1c2e 0%,#0a0f14 50%,#040607 100%)}
+.mm-amb-intro{background:#000}
+
+/* shared skip button */
+.mm-scr-skip{position:absolute;right:2.6%;bottom:4.5%;z-index:3;display:inline-flex;align-items:center;gap:.55em;min-height:44px;min-width:44px;
+  padding:.4em .95em .4em 1.05em;border-radius:999px;border:1px solid rgba(207,170,113,.55);background:rgba(7,12,13,.62);color:#f7f4e9;
+  font:600 calc(clamp(12px,1.9cqw,17px)*var(--ts))/1 var(--round);letter-spacing:.06em;cursor:pointer;pointer-events:auto;opacity:0;
+  transition:opacity .4s,background-color .15s,border-color .15s,box-shadow .15s;-webkit-tap-highlight-color:transparent}
+.mm-scr-skip.mm-on{opacity:.78}
+.mm-scr-skip:hover,.mm-scr-skip:focus-visible{opacity:1;background:rgba(38,58,55,.88);border-color:#eac979}
+.mm-scr-skip:focus-visible{outline:2px solid #f2c46d;outline-offset:3px;box-shadow:0 0 14px rgba(234,201,121,.35)}
+.mm-scr-skip:disabled{opacity:.4;cursor:default}
+.mm-scr-skip-ico{width:.8em;height:.8em;flex:none;background:currentColor;clip-path:polygon(0 0,55% 50%,0 100%,0 0,45% 0,100% 50%,45% 100%,45% 100%)}
+.mm-scr-skip-key{font:700 .72em/1 ui-monospace,monospace;padding:.2em .4em;border:1px solid rgba(247,244,233,.45);border-bottom-width:2px;border-radius:4px;opacity:.8}
+.mm-scr-fade{position:absolute;inset:0;background:#030605;pointer-events:none;opacity:1}
+
+/* ------------------------------------------------------------------ logo */
+.mm-logo{pointer-events:none}
+.mm-logo-top{pointer-events:auto;cursor:pointer}
+.mm-logo-layer{position:absolute;inset:0;will-change:transform}
+.mm-logo-svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+.mm-logo-svg text{font-size:47px;font-weight:700;letter-spacing:3px}
+.mm-logo-main{fill:url(#mmScrLogoFill);stroke:#14201d;stroke-width:2.4px;paint-order:stroke;stroke-linejoin:round}
+.mm-logo-main .amp{fill:#c6aedb}
+.mm-logo-svg .amp{font-style:italic;font-weight:400;font-size:40px}
+.mm-logo-shad{fill:#030706;transform:translate(1.5px,3px)}
+.mm-logo-glow{fill:#c6aedb}
+.mm-logo-sweep{fill:url(#mmScrLogoSweep);mix-blend-mode:screen}
+.mm-logo-svg .mm-logo-tag{fill:#c6aedb;font-size:11.5px;font-weight:400;font-style:italic;letter-spacing:3.5px}
+.mm-scr-canvas-logo{will-change:transform}
+
+/* ------------------------------------------------------------------ intro chrome (lives in #mm-ui above the cinematic) */
+.mm-intro-chrome{z-index:5}
+.mm-intro-chrome .mm-scr-skip{top:2.2%;bottom:auto;right:2.2%;min-height:44px;background:rgba(0,0,0,.55)}
+html.mm-scr-intro .mm-cine-skip{display:none!important}
+
+/* ------------------------------------------------------------------ title / main menu */
+html.mm-scr-title #mm-ui .mm-screen[data-screen="title"],html.mm-scr-title #mm-ui .mm-layer-sky{display:none!important} /* legacy UI title, if still registered */
+.mm-title{container-name:mmtitle;pointer-events:auto}
+.mm-title-ui{position:absolute;inset:0;font-size:calc(clamp(13px,2.05cqw,20px)*var(--ts));opacity:var(--mm-in,1)}
+.mm-title-brand{position:absolute;left:3.2%;top:4.5%;width:47%;margin:0;transform:translateY(calc((1 - var(--mm-in,1)) * -8px));pointer-events:none}
+.mm-title-mark{display:block;width:100%;height:auto;overflow:visible;filter:drop-shadow(0 2px 0 rgba(0,0,0,.55))}
+.mm-title-mark text{font-size:44px;font-weight:700;letter-spacing:2.5px}
+.mm-title-mark .main{fill:url(#mmScrTitleFill);stroke:#14201d;stroke-width:2.2px;paint-order:stroke;stroke-linejoin:round}
+.mm-title-mark .amp{font-style:italic;font-weight:400;font-size:37px}
+.mm-title-mark .main .amp{fill:#c6aedb}
+.mm-title-mark .glow{fill:#c6aedb;opacity:.42}
+.mm-title-mark .shad{fill:#030706}
+.mm-title-mark .sweep{fill:url(#mmScrTitleSweep);opacity:0;mix-blend-mode:screen}
+.mm-title-mark.mm-sweeping .sweep{opacity:1}
+.mm-title-mark .moon{fill:#ebe1f7;filter:drop-shadow(0 0 3px #c6aedb)}
+.mm-title-tag{margin:.15em 0 0 .7em;max-width:24em;font:italic 400 .78em/1.35 var(--serif);color:#e2dcc2;text-shadow:0 1px 0 #000,0 0 8px rgba(0,0,0,.8)}
+
+.mm-title-menu{position:absolute;right:3.2%;bottom:7%;width:37%;max-height:86%;overflow:auto;overscroll-behavior:contain;scrollbar-width:thin;
+  display:flex;flex-direction:column;gap:.42em;padding:.85em .85em .9em;border-radius:10px;
+  background:linear-gradient(180deg,rgba(13,22,24,.78),rgba(7,12,14,.86));border:1px solid rgba(207,170,113,.42);
+  box-shadow:0 0 0 1px rgba(0,0,0,.5),0 10px 30px rgba(0,0,0,.55),inset 0 1px 0 rgba(247,244,233,.06);
+  transform:translateX(calc((1 - var(--mm-in,1)) * 14px))}
+.mm-title-menu::before,.mm-title-menu::after{content:"";position:absolute;width:10px;height:10px;border:2px solid #cfaa71;pointer-events:none}
+.mm-title-menu::before{left:5px;top:5px;border-right:0;border-bottom:0}
+.mm-title-menu::after{right:5px;bottom:5px;border-left:0;border-top:0}
+.mm-title-main{display:grid;gap:.42em}
+.mm-title-grid{display:grid;grid-template-columns:1fr 1fr;gap:.38em;margin-top:.15em}
+
+.mm-mbtn{position:relative;display:flex;flex-direction:column;justify-content:center;align-items:flex-start;gap:.12em;min-height:44px;width:100%;
+  margin:0;padding:.42em .85em .42em 1.25em;border-radius:7px;border:1px solid rgba(207,170,113,.3);background:rgba(38,58,55,.5);color:#f7f4e9;
+  font:600 1em/1.12 var(--serif);letter-spacing:.02em;text-align:left;cursor:pointer;-webkit-tap-highlight-color:transparent;
+  transition:background-color .15s,border-color .15s,box-shadow .15s,transform .15s}
+.mm-mbtn-label{display:block}
+.mm-mbtn-sub{display:block;font:500 .7em/1.2 var(--round);color:#c6aedb;letter-spacing:.02em;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mm-mbtn-main{font-size:1.12em}
+.mm-mbtn-primary{background:linear-gradient(180deg,rgba(84,124,95,.92),rgba(47,75,71,.95));border-color:rgba(234,201,121,.75)}
+.mm-mbtn::before{content:"";position:absolute;left:.45em;top:50%;width:.42em;height:.42em;margin-top:-.21em;background:#eac979;transform:rotate(45deg) scale(0);transition:transform .15s;box-shadow:0 0 6px #eac979}
+.mm-mbtn:hover:not(:disabled){background-color:rgba(69,107,83,.75);border-color:rgba(234,201,121,.8)}
+.mm-mbtn:focus{outline:none}
+.mm-mbtn:focus-visible,.mm-mbtn:focus:not(:hover){outline:2px solid #f2c46d;outline-offset:2px;border-color:#eac979;box-shadow:0 0 16px rgba(234,201,121,.32);transform:translateX(3px)}
+.mm-mbtn:focus::before,.mm-mbtn:hover:not(:disabled)::before{transform:rotate(45deg) scale(1)}
+.mm-mbtn:active:not(:disabled){transform:translateY(1px)}
+.mm-mbtn:disabled{opacity:.48;cursor:not-allowed;background:rgba(20,30,30,.5);border-style:dashed}
+.mm-title-grid .mm-mbtn{align-items:center;text-align:center;padding:.38em .5em;font-size:.9em}
+.mm-title-grid .mm-mbtn::before{left:.4em}
+.mm-title-note{margin:0 .2em;font:400 .72em/1.35 var(--round);color:#e2dcc2;opacity:.9}
+.mm-title-card{display:flex;justify-content:space-between;gap:.8em;margin:-.1em .25em .05em;font:500 .7em/1.3 var(--round);color:#c6aedb}
+.mm-title-card-at{opacity:.8;white-space:nowrap}
+.mm-title-foot{position:absolute;left:3.2%;bottom:3%;display:flex;gap:1.2em;align-items:center;font:500 calc(clamp(10px,1.45cqw,13px)*var(--ts))/1 var(--round);color:rgba(226,220,194,.72);pointer-events:none;text-shadow:0 1px 0 #000}
+.mm-title-foot kbd{font:700 .9em/1 ui-monospace,monospace;padding:.15em .38em;border:1px solid rgba(226,220,194,.45);border-bottom-width:2px;border-radius:4px}
+
+/* compact stages (e.g. 844×390 phones, 512×320 stages) */
+@container mmtitle (max-height: 360px){
+  .mm-title-ui{font-size:calc(clamp(11.5px,2.5cqw,16px)*var(--ts))}
+  .mm-title-menu{bottom:4%;width:42%;max-height:92%;padding:.6em .6em .65em;gap:.32em}
+  .mm-title-main,.mm-title-grid{gap:.3em}
+  .mm-mbtn-main{font-size:1.04em}
+  .mm-title-brand{width:50%;top:4%}
+  .mm-title-foot .mm-title-hint{display:none}
+}
+/* tiny stages (portrait phones: ~390×244): brand on top, full-width menu at the bottom */
+@container mmtitle (max-height: 280px){
+  .mm-title-ui{font-size:calc(clamp(10.5px,3.1cqw,14px)*var(--ts))}
+  .mm-title-brand{left:50%;top:2.5%;width:58%;transform:translateX(-50%)}
+  .mm-title-tag,.mm-title-foot,.mm-title-note,.mm-title-card{display:none}
+  .mm-title-menu{left:2%;right:2%;bottom:2.5%;width:auto;max-height:76%;padding:.45em;gap:.28em;border-radius:8px}
+  .mm-title-main{grid-template-columns:1fr 1fr;gap:.28em}
+  .mm-title-grid{grid-template-columns:1fr 1fr 1fr;gap:.28em;margin:0}
+  .mm-mbtn{padding:.3em .5em .3em 1.05em}
+  .mm-title-grid .mm-mbtn{padding:.3em .3em}
+}
+html[data-reduced-motion] .mm-mbtn,html[data-reduced-motion] .mm-scr-skip{transition:none}
+html[data-reduced-motion] .mm-mbtn:focus-visible,html[data-reduced-motion] .mm-mbtn:focus:not(:hover){transform:none}
+html[data-reduced-motion] .mm-title-brand{transform:none}
+html[data-reduced-motion] .mm-title-menu{transform:none}
+html[data-reduced-motion] .mm-title-brand{transform:none}
+@container mmtitle (max-height: 280px){ html[data-reduced-motion] .mm-title-brand{transform:translateX(-50%)} }
+
+/* fallback modal (only when MM.ui.confirm is missing) */
+.mm-scr-modal{position:absolute;inset:0;z-index:300;display:grid;place-items:center;background:rgba(3,6,6,.6);pointer-events:auto;font-family:ui-rounded,"Trebuchet MS",system-ui,sans-serif}
+.mm-scr-modal-card{max-width:min(92%,26em);padding:1.1em 1.2em;border-radius:10px;background:#0e1818;border:1px solid rgba(207,170,113,.6);color:#f7f4e9;box-shadow:0 10px 40px #000a}
+.mm-scr-modal-card h2{margin:0 0 .4em;font:700 1.2em/1.2 Georgia,serif;color:#f2dfb0}
+.mm-scr-modal-card p{margin:0 0 1em;line-height:1.4;white-space:pre-line}
+.mm-scr-modal-row{display:flex;gap:.6em;justify-content:flex-end;flex-wrap:wrap}
+.mm-scr-btn{min-height:44px;min-width:44px;padding:.5em 1em;border-radius:7px;border:1px solid rgba(207,170,113,.5);background:#1c2c2a;color:#f7f4e9;font:600 1em/1 inherit;cursor:pointer}
+.mm-scr-btn-primary{background:#456b53}
+.mm-scr-btn-danger{background:#8a4a40}
+.mm-scr-btn:focus-visible{outline:2px solid #f2c46d;outline-offset:2px}

@@ -130,7 +130,22 @@
     }
     for (const l of leaves) l.w = when[l.i];
     for (const f of flowers) f.w = when[f.i];
-    S.vine = { pts, when, leaves, flowers };
+    // moss tufts settling on the tops of some letters (cap line ≈ baseline − 0.7 em), with short drips
+    const capA = K.safe(() => { const g = K.canvas(8, 8)[1]; g.font = '700 47px ' + FONT; return g.measureText('M').actualBoundingBoxAscent; }, 33) || 33;
+    const tufts = [], capY = Math.round(BASE - capA + 1), cols = ['#2f4b47', '#456b53', '#688d65', '#87ad7b', '#a6c593'];
+    L.forEach((b, li) => {
+      if (![0, 2, 5, 7, 8].includes(li)) return;
+      const r2 = K.rng(300 + li), span = Math.max(6, Math.round(b.w * (0.35 + r2() * 0.3))), x0 = Math.round(b.x + (b.w - span) * r2()), px = [];
+      for (let x = 0; x < span; x++) {
+        const edge = Math.min(x, span - 1 - x), hh = Math.max(1, Math.min(edge + 1, 1 + Math.floor(r2() * 3.2)));
+        for (let k = 0; k < hh; k++) px.push({ x: x0 + x, y: capY + 1 - k, c: k === hh - 1 ? (r2() < 0.4 ? '#a6c593' : '#87ad7b') : cols[1 + Math.floor(r2() * 2)], o: x + k * 0.5 });
+        px.push({ x: x0 + x, y: capY + 2, c: '#2f4b47', o: x });
+        if (r2() < 0.22) { const d = 2 + Math.floor(r2() * 4); for (let k = 2; k <= d; k++) px.push({ x: x0 + x, y: capY + k, c: k === d ? '#688d65' : '#456b53', o: span + k }); }
+      }
+      px.sort((a, c) => a.o - c.o);
+      tufts.push({ px, w: 0.35 + (li / L.length) * 0.5 });
+    });
+    S.vine = { pts, when, leaves, flowers, tufts };
   }
   function drawVines(g, S, grow, bloom) {
     const V = S.vine; if (!V) return;
@@ -145,6 +160,11 @@
       g.fillStyle = '#4b7052'; g.fillRect(x + sx, y + sy, 1, 1);
       if (k > 0.5) { g.fillStyle = '#688d65'; g.fillRect(x + sx * 2, y + sy * 2, 1, 1); g.fillRect(x + sx, y + sy * 2, 1, 1); g.fillStyle = '#87ad7b'; g.fillRect(x + sx * 2, y + sy, 1, 1); }
       if (k >= 1 && l.big) { g.fillStyle = '#a6c593'; g.fillRect(x + sx * 3, y + sy * 2, 1, 1); g.fillStyle = '#4b7052'; g.fillRect(x + sx * 2, y + sy * 3, 1, 1); }
+    }
+    for (const tf of V.tufts || []) {
+      const k = clamp((grow - tf.w) * 5); if (k <= 0) continue;
+      const n = Math.ceil(k * tf.px.length);
+      for (let i = 0; i < n; i++) { const q = tf.px[i]; g.fillStyle = q.c; g.fillRect(q.x, q.y, 1, 1); }
     }
     if (bloom > 0) for (const f of V.flowers) {
       if (f.w > grow) continue; const k = clamp(bloom * 1.4 - f.ph * 0.05); if (k <= 0) continue;
@@ -228,6 +248,12 @@
     try {
       const n = t.getNumberOfChars();
       for (let i = 0; i < n; i++) { const b = t.getExtentOfChar(i); S.boxes.push({ ch: TITLE[i] || ' ', x: b.x, y: b.y, w: b.width, h: b.height }); }
+      // Pin every glyph to its measured x so per-letter y animation never re-anchors the line (each positioned tspan is a new text chunk).
+      for (const [ti, set] of S.svg.sets.entries()) {
+        const txt = [S.svg.glowT, S.svg.shadT, S.svg.mainT, S.svg.sweepT][ti];
+        set.forEach((sp, i) => sp.setAttribute('x', (S.boxes[i] ? S.boxes[i].x : 0).toFixed(2)));
+        txt.setAttribute('text-anchor', 'start'); txt.removeAttribute('x');
+      }
     } catch (e) { S.boxes = null; }
     if (!S.boxes || !S.boxes.length || !(S.boxes[S.boxes.length - 1].x > S.boxes[0].x)) {
       // layout not available (hidden document): approximate monospaced boxes
@@ -251,7 +277,7 @@
     const T = S.T;
     if (S.leaving) { if (S.t - S.leaving >= (S.rm ? 0.25 : 0.35)) finish(); }
     else if (S.t >= T.end) finish();
-    if (!S.coreRenders && S) render();
+    if (S && !S.coreRenders) render();
   }
   // Timeline values for time t (seconds).
   function timeline(t) {

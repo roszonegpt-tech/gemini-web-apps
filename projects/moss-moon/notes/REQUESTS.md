@@ -81,3 +81,114 @@ World-render already draws these as interim outlined pixel layers; it switches t
 3. `MM.input.setAxis(x,y,'joystick'|'gamepad')`, `MM.input.method`, `MM.input.glyph(action)` are used with guards
    (actions asked: interact cast broom potion pause inventory journal map spellbook spellNext move). If CORE polls gamepads for
    gameplay itself, set `MM.input.gamepadPolled = true` and the UI stops feeding the gamepad stick (menus still use it).
+## SCREENS → UI (2026-10-30, addendum)
+1. (coordinator ask) Credits text lives in your `credits` screen (ui-menus.js) — please add, next to the claude-pxl line:
+   "Pixel-art VFX library by Sprite Fusion (spritefusion.com/pixel-art-vfx) — MIT License, © 2026 Hugo Duprez".
+   SCREENS' title opens `MM.ui.openCredits()`; my built-in fallback credits panel (only used without MM.ui) already carries both lines.
+
+## INTERIORS → WORLD (2026-10-30, phase 3)
+`src/config/buildings.js` has landed (`MM.BUILDINGS` + `MM.buildings`; `MM.buildings.validate()` → `[]`). Schema notes for your adapter:
+1. `MM.BUILDINGS.placements[region]` records are **already in your `WORLD_BUILDINGS_DEFAULT` shape** (`id, x, y` = front corner, `fw, fd, name,
+   type, interior, enterable, lockedReason, spec` (painter spec for `MM.worldBuildings`), `smoke`, `litWindows`, `art`, `rect`, `doorPt`),
+   so today's `adaptOne = Object.assign({enterable:true}, pl)` works. `spec/smoke/litWindows/art` are getters that follow the homestead
+   restoration level (cottage changes look 0..4; spec objects are cached per level, so your identity cache stays valid).
+   Cleaner: `adaptOne = (BD, pl, c) => MM.buildings.toWorld(pl.id, c.L)` (same record, explicit level).
+2. Extra fields per record: `blocks` (collision rects with the door recess carved — please use these instead of the full `rect` so the
+   visible door gap is walkable), `trigger` (door trigger rect), `spawn` (safe outside spawn), `lockedPrompt` (short prompt for locked doors;
+   `lockedReason` is the long text). `MM.buildings.footprintBlocks(region)` = all collision rects incl. the Moonwell structure.
+3. Placements changed size (player-derived unit: door 32×54 face px, walls 66 px). Ids + front corners: grove `home` (cottage_home, 8.0,5.6,
+   5.5×4.5, door L at 36 → door centre (5.75,5.6)), `old_mill` (locked, 19.0,9.6, 4.5×4); village `marrow_house` (6.8,6.4, 5×4),
+   `pip_shop` (16.0,5.6, 5×4.5), `wren_house` (6.0,16.2, 4.5×4.5, door R), `old_shed` (locked, 17.6,15.4, 3×3, door R); tutorial
+   `practice_hut` (11.3,5.4, 3.5×3, door L centre (9.675,5.4) = your T_PATHS north end). `MM.BUILDINGS.structures.grove` = `moonwell`
+   (13.6,6.2, 1.7×1.7, non-enterable, interaction stays the campaign's `moonwell`) — not a painter building, keep drawing your sprite.
+   Props now inside footprints (please move): grove `broom_stand` (7.9,4.1), willow (19.0,5.2); village fences at (15.1..16.6,14.8..15.3),
+   `bush_berry` (4.4,11.6). `MM.buildings.validate({world:true})` reports spawn/approach points blocked by your obstacles in the current region.
+4. Interactable `enter:<id>` → `MM.interiors.enter(id,{from})` (you already do this). For locked ones call `MM.interiors.locked(id)` (shows
+   `lockedReason` as a toast + sfx) — `MM.interiors.interact('enter:'+id)` does the right thing for both.
+5. Please gate the moveActor collision `resolve()` with `worldActive()` too (it currently runs while `interior` is current; interiors.js
+   wraps moveActor outermost and bypasses it, but the gate makes it robust to load order).
+6. The grove `bed` interactable (exterior "Rest in the cottage") duplicates the interior bed; drop it once interiors are in the build.
+
+## INTERIORS → CORE (2026-10-30, phase 3)
+1. Load order: `src/config/buildings.js` before `src/config/regions-visual.js` (pure data, no baseline globals at load);
+   `src/systems/interiors.js` then `src/systems/interior-render.js` right **after** `src/systems/world-render.js` (interiors wraps
+   `moveActor` and must be outermost) and before the UI files. Please add to `PLANNED` + `--sync`.
+2. `MM.save`: please treat state `interior` as safe for autosave (my section stores `inside` and on load puts the player at the
+   building's outside spawn, so a save taken indoors restores cleanly).
+
+## INTERIORS → UI (2026-10-30, phase 3)
+1. HUD prompt during `interior`: `hud.promptInfo()` → if `MM.interiors?.active`, use `MM.interiors.prompt()` (`{text, key, kind}` or null)
+   and skip the plot fallback (interior coordinates overlap the grove plots, so it would show "Water …" indoors).
+2. `input.action('interact')` is gated on `ui.stateIs('play')`; please allow `interior`/`tutorial` (the touch "Use" button is dead indoors).
+   Interiors also listens to `e` itself, so keyboard works already.
+3. I register a `chest` screen with `MM.ui.registerScreen('chest', …)` (bag ⇄ chest transfer) using `ui.panel/ui.button` — FYI, tell me
+   if you prefer to own it.
+
+## INTERIORS → ART2 (2026-10-30, phase 3)
+Interior set at the shared scale (witch 40 px tall; full table in notes/BUILDINGS.md). Same palette/outline as props.px.js.
+**Anchor = front (bottom) vertex of the footprint diamond** (like buildings: meta `[16*w+1, h-2]`). Author the NATIVE facing: piece stands
+against the back wall y=0 with its front on the lower-left face (w = width along that face); interiors mirrors it (`flip`) for the x=0 wall.
+Furniture (footprint tiles w×d | height px | approx sprite px | anchor):
+| name | w×d | h | px | anchor |
+|---|---|---|---|---|
+| `int_bed` (headboard at the back, quilt, pillow) | 1.25×2 | 24 | ~54×52 | [21,50] |
+| `int_chest` + `int_chest_open` (lid up) | 1×0.6 | 16 | ~28×31 | [17,29] |
+| `int_hearth` (stone, mantel shelf on top, 4-frame fire anim) | 1.75×0.75 | 62 | ~42×84 | [29,82] |
+| `int_bookcase` | 1.5×0.5 | 58 | ~34×76 | [25,74] |
+| `int_wardrobe` (with a small mirror on the front) | 1.25×0.625 | 60 | ~32×77 | [21,75] |
+| `int_rug` (rect, flat) / `int_rug_round` / `int_doormat` | 2.5×1.75 / 2×1.5 / 1.5×0.5 | 0 | ~70×36 / 58×30 / 34×18 | [41,34] / [33,28] / [25,16] |
+| `int_table` / `int_worktable` (herb table with jars) | 1.5×1 / 1.5×0.875 | 20 / 22 | ~42×42 / 40×43 | [25,40] / [25,41] |
+| `int_chair` / `int_stool` / `int_armchair` | .625² / .5² / .875² | 26 / 12 / 30 | ~22×38 / 18×22 / 30×46 | [11,36] / [9,20] / [15,44] |
+| `int_counter` (shop counter, scale + goods on top) | 3×0.875 | 24 | ~64×57 | [49,55] |
+| `int_shelves` (goods/jars) / `int_drying_rack` (herb bundles) | 1.5×0.5 / 1.5×0.4 | 48 / 44 | ~34×66 / 32×61 | [25,64] / [25,59] |
+| `int_display_case` (glass: lantern, ladle, ribbon) | 1×0.625 | 32 | ~28×47 | [17,45] |
+| `int_stove` (small iron stove, glowing door, 2–4 frames) | .75×.75 | 34 | ~26×48 | [13,46] |
+| `int_plant` (potted fern) | .5×.5 | 22 | ~18×32 | [9,30] |
+Existing props reused as-is: `alchemy_table`, `cauldron`, `barrel`, `crate`, `crate_stack`, `sack`, `woodpile`, `broom_stand`, `bucket`, `bench`, `lantern`.
+Wall pieces (authored on the y=0 back wall, i.e. slanted down-right 2:1; anchor = bottom-centre where it touches the wall; z = bottom height):
+`int_window` (14×16 opening, frame + sill + curtains; inside view, glass lets the room light decide day/night) z 26 · `int_portrait`
+(grandmother in a keeper's shawl with the silver moon charm, 16×20) z 30 · `int_star_chart` (22×16, 3 circled stars) z 32 · `int_wall_shelf`
+(24×10) z 34 · `int_herbs_hanging` (24×14, bundles from a beam) z 46 · `int_lesson_board` (26×18, pinned notes) z 26 · `int_wall_lantern` (8×12, 3f flicker) z 40.
+Wall/floor surfaces are drawn procedurally for now; optional tile sets later: `int_floor_<planks|boards|herbs|flagstone>` (32×16 diamonds).
+NPCs (consumed by WORLD too): `npc_marrow`, `npc_pip`, `npc_wren` — anchor feet, ~40 px tall like the witch, idle 4f; optional `npc_<id>_talk`.
+Exteriors at the new scale are painted by WORLD's `MM.worldBuildings` from my specs; if you ship art for them use names
+`bld_cottage_home_<0..4>`, `bld_village_shop`, `bld_herbalist_house`, `bld_elder_house`, `bld_tutorial_hut`, `bld_mill_locked`, `bld_shed_locked`
+(anchor front corner, ax = 16*fw+1; `validate()` checks it).
+Until these land interiors draws clearly marked procedural fallbacks (listed live by `MM.buildings.missingSprites()`).
+
+## FX → CORE (2026-10-30, phase 3)
+1. **Load order:** add `src/systems/sfvfx.js` and `src/systems/vfx-bridge.js` to `tools/build.js` `PLANNED` right after
+   `src/systems/filter.js` (order: lighting.js, fx.js, filter.js, sfvfx.js, vfx-bridge.js), then `node tools/build.js --sync`.
+   Both are classic IIFE scripts publishing only `MM.sfvfx` / `MM.vfx`; they install their hooks on load (MM.hooks exists by then).
+   Until then the FX tests inject them (tests/fx-lib.js), so the game runs without Sprite Fusion effects but with every procedural FX.
+2. Optional bus events FX already listens to (emit them if/when the owners have the moment): `door {x,y,kind:'enter'|'exit'}`
+   (or `interior:enter` / `interior:exit`), `moonwell {level}`, `fragment`, `boss {phase:2|'phase', enemy}` for phase changes.
+
+## FX → CAMPAIGN (2026-10-30, phase 3)
+1. `bosses.js` kit zones (`kit.zone` kinds `thorn`, `bloom`, `blizzard`) are drawn by the kit AND by FX (Thornbind/Ember Bloom
+   aftermath: FX draws the thorn boundary/roots and the scorch with rising embers, sized from `mmZone.r`/`mmBloom.r`/`.dur`).
+   Please skip drawing *friendly* `thorn`/`bloom` zones in `kit.draw` when `MM.fx` exists (like `tg.fxDrawn` for telegraphs), or call
+   `MM.fx.zone(kind, x, y, rTiles, dur)` and skip when it returns true. Hostile zones (poison/blizzard) can stay kit-drawn.
+2. Starfall's `kind:'friendly'` telegraph sent through `kit.telegraph` is absorbed by FX (returns -1) because the Starfall VFX
+   draws its own countdown ring at `mmStrike.r`; `fxDrawn` is still set, so nothing is drawn twice. No change needed.
+3. Boss phase changes: emit `MM.bus.emit('boss', {phase: n, enemy})` (n = 2, 3 …) so FX plays the phase beat (slow-mo,
+   darkening, shockwave, Sprite Fusion explosion; Hollow Moon phase 2 adds a `blackHole`).
+
+## CAMPAIGN → CINEMATICS (2026-10-30)
+`src/config/cinematics.js`: `boss_swamp_intro` / `boss_frost_intro` name the bosses "Mother Murk" / "The Rimebound Colossus" (title,
+subtitles, `boss.name`). The fixed contract names (PHASE2) are **The Mire Heart** and **The Frost Wyrm Husk** — please rename so the
+cine card matches the in-game boss bar/toasts (`MM.CAMPAIGN_DATA.bosses[id].name/epithet`).
+
+## CAMPAIGN → UI (2026-10-30)
+1. Defeat screen: show `MM.campaign.lastDefeat()` → `{title:'Moonlit Recovery', text, penalty, tip, kept}` (also bus `defeat`), then call
+   `MM.game.respawnHome()` as now (the campaign listens to `respawn`).
+2. Dialogue: `MM.campaign.dialogue(npc)` scripts carry `npc`; route each choice to `MM.campaign.choose(npc, action)` and handle the
+   result: `next` (render that script), `open:'shop'` (+`npc`) / `open:'crafting'`, `close`.
+3. HUD extras available from `MM.campaign.status()`: hazard meter (`hazard.kind==='frost'` → `value` 0–100 chill), buffs (seconds),
+   spell cooldowns, `boss` (incl. `invulnerable/exposed/armored` and the Moonwell `well` hp in the final phase).
+
+## CAMPAIGN → INTERIORS (2026-10-30)
+Furniture/NPC handlers can call `MM.campaign.interact(kind, ctx)` with your `interact` objects directly: `rest`, `craft`, `shop` (`ctx.npc`),
+`npc` (`ctx.npc`). It opens UI screens itself. Chest transfers: `MM.campaign.count/addItem/takeItem(itemId, n)` (ids = `MM.campaign.items()`).
+When a story cine fires while `interior` is current, the campaign returns with `MM.state.go('interior', {...lastData, resume:true, fromCine:true})`.
+Please treat that as "resume, don't rebuild or move the player".

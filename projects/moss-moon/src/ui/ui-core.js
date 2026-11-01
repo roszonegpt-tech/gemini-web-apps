@@ -135,7 +135,8 @@ window.MM = window.MM || {};
     return l === 'touch' ? 'touch' : l === 'pad' ? 'gamepad' : 'keyboard';
   };
   ui.glyph = function (action) {
-    const g = safe(() => MM.input && typeof MM.input.glyph === 'function' && MM.input.glyph(action), null);
+    const known = safe(() => MM.input.glyphs.keyboard[action] !== undefined, false);
+    const g = known ? safe(() => MM.input.glyph(action), null) : null;
     if (g) return String(g);
     const t = GLYPHS[ui.method()] || GLYPHS.keyboard;
     return t[action] || GLYPHS.keyboard[action] || action;

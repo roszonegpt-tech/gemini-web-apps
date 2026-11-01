@@ -37,6 +37,7 @@
   });
   function buzz(ms) { const c = cfg(); if (c.haptics && navigator.vibrate) safe(() => navigator.vibrate(ms)); }
   J.enabled = function () {
+    if (MM.input && typeof MM.input.touchControls === 'function') { const r = safe(() => MM.input.touchControls(), null); if (r != null) return !!r; }
     const m = ui.setting('touchControls');
     if (m === 'on') return true;
     if (m === 'off') return false;
@@ -54,7 +55,7 @@
     const thumb = h('div', { class: 'mm-joy-thumb' });
     thumb.innerHTML = SVG_THUMB;
     base.appendChild(thumb);
-    const zone = h('div', { class: 'mm-joyzone', 'aria-hidden': 'true' }, base);
+    const zone = h('div', { class: 'mm-joyzone', 'aria-hidden': 'true' });
     const btn = (name, icon, label, cls, glyphAction) => {
       const b = h('button', { type: 'button', class: 'mm-tbtn ' + cls, 'aria-label': label, 'data-act': name }, ui.icon(icon), h('span', null, label));
       let pid = null;
@@ -74,24 +75,24 @@
     const cluster = h('div', { class: 'mm-tacts', role: 'group', 'aria-label': 'Touch actions' },
       cast, btn('interact', 'hand', 'Use', 'mm-tbtn-use'), btn('broom', 'broom', 'Broom', 'mm-tbtn-broom'), btn('potion', 'potion', 'Potion', 'mm-tbtn-potion'),
       btn('spellNext', 'retry', 'Swap', 'mm-tbtn-swap'), btn('pause', 'pause', 'Pause', 'mm-tbtn-pause'));
-    L.append(zone, cluster);
+    L.append(zone, base, cluster);
     E = { L, zone, base, thumb, cluster, cast };
     wire();
     J.apply();
   };
 
-  // Rest position (base centre) in viewport px.
+  // All stick geometry is in client (viewport) px; the touch layer's rect converts to its own box, so this works whether
+  // fixed layers are anchored to the viewport or to a contained stage.
+  const layerRect = () => E.L.getBoundingClientRect();
   function restCenter() {
-    const c = cfg(), r = (BASE * c.size) / 2;
-    const st = getComputedStyle(ui.root());
-    const sl = parseFloat(st.getPropertyValue('--joy-inset-x')) || 0, sb = parseFloat(st.getPropertyValue('--joy-inset-y')) || 0;
-    const mx = 22 + sl + r, my = 22 + sb + r;
-    return { x: c.side === 'left' ? mx : window.innerWidth - mx, y: window.innerHeight - my };
+    const c = cfg(), r = (BASE * c.size) / 2, L = layerRect();
+    const mx = 22 + r, my = 22 + r;
+    return { x: c.side === 'left' ? L.left + mx : L.right - mx, y: L.bottom - my };
   }
   function placeBase(cx, cy) {
-    const r = E.base.offsetWidth / 2 || (BASE * cfg().size) / 2;
-    E.base.style.left = Math.round(cx - r) + 'px';
-    E.base.style.top = Math.round(cy - r) + 'px';
+    const r = E.base.offsetWidth / 2 || (BASE * cfg().size) / 2, L = layerRect();
+    E.base.style.left = Math.round(cx - r - L.left) + 'px';
+    E.base.style.top = Math.round(cy - r - L.top) + 'px';
     J.cx = cx; J.cy = cy;
   }
   J.apply = function () {
@@ -111,7 +112,7 @@
     const rx = Math.round(x * 100) / 100, ry = Math.round(y * 100) / 100;
     if (rx === J.out.x && ry === J.out.y) return;
     J.out = { x: rx, y: ry };
-    if (ui.input) ui.input.setAxis(rx, ry, 'joystick');
+    if (ui.input) ui.input.setAxis(rx, ry, 'touch');
   }
   function move(e) {
     const c = cfg(), R = (BASE * c.size) / 2;
@@ -151,8 +152,9 @@
   };
   function wire() {
     const z = E.zone;
-    z.addEventListener('pointerdown', (e) => {
+    const down = (e) => {
       if (J.id != null || !shouldShow()) return;
+      e.stopPropagation();
       const c = cfg(), R = (BASE * c.size) / 2;
       if (c.mode === 'fixed') {
         const p = restCenter();
@@ -160,7 +162,8 @@
         placeBase(p.x, p.y);
       } else {
         // floating: the base appears under the finger (kept fully on screen)
-        const x = clamp(e.clientX, R + 6, window.innerWidth - R - 6), y = clamp(e.clientY, R + 6, window.innerHeight - R - 6);
+        const L = layerRect();
+        const x = clamp(e.clientX, L.left + R + 6, L.right - R - 6), y = clamp(e.clientY, L.top + R + 6, L.bottom - R - 6);
         placeBase(x, y);
       }
       e.preventDefault(); e.stopPropagation();
@@ -171,10 +174,14 @@
       if (ui.input) ui.input.touchSeen = ui.input.touchSeen || e.pointerType === 'touch';
       buzz(6);
       move(e);
+    };
+    // The zone (floating mode) and the base itself (fixed mode, or a press right on the visible stick) both start a drag.
+    [z, E.base].forEach((el) => {
+      el.addEventListener('pointerdown', down);
+      el.addEventListener('pointermove', (e) => { if (e.pointerId === J.id) { e.preventDefault(); move(e); } });
+      ['pointerup', 'pointercancel', 'lostpointercapture'].forEach((ev) => el.addEventListener(ev, (e) => { if (e.pointerId === J.id) J.release(); }));
+      el.addEventListener('contextmenu', (e) => e.preventDefault());
     });
-    z.addEventListener('pointermove', (e) => { if (e.pointerId === J.id) { e.preventDefault(); move(e); } });
-    ['pointerup', 'pointercancel', 'lostpointercapture'].forEach((ev) => z.addEventListener(ev, (e) => { if (e.pointerId === J.id) J.release(); }));
-    z.addEventListener('contextmenu', (e) => e.preventDefault());
     E.cluster.addEventListener('contextmenu', (e) => e.preventDefault());
   }
   window.addEventListener('blur', () => J.release());

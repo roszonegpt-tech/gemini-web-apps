@@ -189,13 +189,15 @@
       if (edge('start') && ui.top() && ui.top().id === 'pause') ui.resume();
       if (edge('lb') || edge('rb')) { const top = ui.top(); if (top && top.onKey) top.onKey(new KeyboardEvent('keydown', { key: edge('lb') ? 'q' : 'e' })); }
       if (pads.moving) { input.setAxis(0, 0, 'gamepad'); pads.moving = false; }
-    } else if (ui.inGameplay() && !ui.isOpen() && !(MM.input && MM.input.gamepadPolled) && !safe(() => world.coop, false)) { // eslint-disable-line no-undef
-      // left stick (analog, 0.2 deadzone) or d-pad → movement
-      let mx = Math.abs(ax) > 0.2 ? ax : 0, my = Math.abs(ay) > 0.2 ? ay : 0;
-      if (btn(12) || btn(13) || btn(14) || btn(15)) { mx = (btn(15) ? 1 : 0) - (btn(14) ? 1 : 0); my = (btn(13) ? 1 : 0) - (btn(12) ? 1 : 0); }
-      const m = Math.hypot(mx, my); if (m > 1) { mx /= m; my /= m; }
-      const sig = mx.toFixed(2) + ',' + my.toFixed(2);
-      if (sig !== pads.sig) { pads.sig = sig; input.setAxis(mx, my, 'gamepad'); pads.moving = !!(mx || my); }
+    } else if (ui.inGameplay() && !ui.isOpen() && !safe(() => world.coop, false)) { // eslint-disable-line no-undef
+      // Movement: CORE polls the left stick into MM.input.axis; FALLBACK (no CORE axis) feeds stick/d-pad here.
+      if (!(MM.input && (MM.input.gamepadPolled || 'axisSource' in MM.input))) {
+        let mx = Math.abs(ax) > 0.2 ? ax : 0, my = Math.abs(ay) > 0.2 ? ay : 0;
+        if (btn(12) || btn(13) || btn(14) || btn(15)) { mx = (btn(15) ? 1 : 0) - (btn(14) ? 1 : 0); my = (btn(13) ? 1 : 0) - (btn(12) ? 1 : 0); }
+        const m = Math.hypot(mx, my); if (m > 1) { mx /= m; my /= m; }
+        const sig = mx.toFixed(2) + ',' + my.toFixed(2);
+        if (sig !== pads.sig) { pads.sig = sig; input.setAxis(mx, my, 'gamepad'); pads.moving = !!(mx || my); }
+      }
       if (edge('a')) input.action('cast');
       if (edge('x')) input.action('interact');
       if (edge('y')) input.action('broom');
@@ -203,8 +205,7 @@
       if (edge('rb')) input.action('spellNext');
       if (edge('lb')) input.action('spellPrev');
       if (edge('start')) ui.openPause();
-      if (edge('back')) { ui.open('pause'); ui.open('map'); }
-      if (dir || state.a) lastInput = 'pad';
+      if (state.a || state.b || state.x || state.y || Math.hypot(ax, ay) > 0.3) { lastInput = 'pad'; safe(() => MM.input.setMethod && MM.input.setMethod('gamepad')); }
     } else if (pads.moving) { input.setAxis(0, 0, 'gamepad'); pads.moving = false; pads.sig = null; }
     pads.prev = state;
   }
@@ -248,6 +249,7 @@
       r.classList.toggle('mm-portrait', window.innerHeight > window.innerWidth * 1.15);
       // Are fixed layers anchored to the viewport (no transform/contain on an ancestor)? Portrait HUD bands need that.
       const sr = ui.layers.screens.getBoundingClientRect();
+      r.classList.toggle('mm-short', sr.height < 330);
       r.classList.toggle('mm-viewport', Math.abs(sr.width - window.innerWidth) < 2 && Math.abs(sr.height - window.innerHeight) < 2);
       r.classList.toggle('mm-compact', b.width < 700 || b.height < 420);
     };

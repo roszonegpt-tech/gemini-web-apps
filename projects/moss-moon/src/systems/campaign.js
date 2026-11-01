@@ -622,6 +622,7 @@
   function buildHazards() {
     V.hazards = []; V.chill = 0;
     const reg = world.region; if (state.restored[reg]) return;
+    if (world.mode === 'dungeon' && world.floor === 3 && campaignBoss(reg)) return;   // boss arenas are hazard-free: the boss is the hazard
     const spots = D.hazardSpots[reg];
     if (reg === 'forest' || reg === 'swamp') {
       const kind = reg === 'forest' ? 'brambles' : 'bog';
@@ -1056,12 +1057,12 @@
     switch (kind) {
       case 'moonwell': return interactMoonwell();
       case 'seed_barrel': { const r = claimSeeds(); toast(r.msg, r.ok ? 'good' : 'info'); return r; }
-      case 'cauldron': case 'alchemy_table': case 'brewing': case 'brew': V.activeCraft = world.region; openUI('crafting', { from: id }); return { ok: true, open: 'crafting' };
+      case 'cauldron': case 'alchemy_table': case 'brewing': case 'brew': case 'craft': V.activeCraft = world.region; openUI('crafting', { from: id }); return { ok: true, open: 'crafting' };
       case 'bed': case 'rest': { const r = rest(); toast(r.msg, r.ok ? 'good' : 'info'); return r; }
       case 'travel_board': case 'travel': openUI('travel', { from: id }); return { ok: true, open: 'travel' };
-      case 'shop': case 'shop_counter': case 'counter': { const npc = D.shops[arg] ? arg : (world.region === 'village' || !arg ? 'pip' : 'pip'); api.activeShop = npc; openUI('shop', { npc, from: id }); return { ok: true, open: 'shop', npc }; }
+      case 'shop': case 'shop_counter': case 'counter': { const npc = D.shops[arg] ? arg : D.shops[ctx?.npc] ? ctx.npc : 'pip'; api.activeShop = npc; openUI('shop', { npc, from: id }); return { ok: true, open: 'shop', npc }; }
       case 'herbs': case 'herb_shop': api.activeShop = 'wren'; openUI('shop', { npc: 'wren', from: id }); return { ok: true, open: 'shop', npc: 'wren' };
-      case 'talk': case 'npc': return talk(arg || ctx?.id);
+      case 'talk': case 'npc': return talk(arg || ctx?.npc || ctx?.id);
       case 'marrow': case 'pip': case 'wren': return talk(kind);
       case 'notice_board': case 'board': return talk('board');
       case 'dungeon': case 'dungeon_entrance': { const r = enterDungeonCampaign(); toast(r.msg, r.ok ? 'info' : 'warn'); return r; }
@@ -1082,7 +1083,7 @@
     const inside = MM.state?.current === 'interior';
     if (world.region !== 'grove' && !opts?.force) return { ok: false, msg: 'You can only rest at home.' };
     if (world.mode !== 'outside' && !inside) return { ok: false, msg: 'You can only rest at home.' };
-    if (V.finalActive || enemies.some(e => e.hp > 0 && !e.dead && screenDistance(e, game) < 140)) return { ok: false, msg: 'You can\'t rest with danger this close.' };
+    if (V.finalActive || (!inside && enemies.some(e => e.hp > 0 && !e.dead && screenDistance(e, game) < 140))) return { ok: false, msg: 'You can\'t rest with danger this close.' };
     const secs = 30;     // a quarter of a 120 s day
     for (const p of world.plots) if (p.seed && (p.watered || world.weather === 'Rain') && p.growth < 100) {
       const c = D.crops[p.seed] || {}, base = 100 / (SEED_TYPES[p.seed]?.time || 30) * (world.cls === 'grove' ? 1.25 : 1) * (state.homestead.level >= 2 ? 1.15 : 1) * (c.nightBonus ? 1.2 : 1);
@@ -1399,6 +1400,7 @@
   // story chain auto-completes: the village opens and Wren's first request is simply offered (no forced re-teaching).
   function flowTutorialDone() {
     try {
+      if (typeof MM.flow?.flags === 'function') { const f = MM.flow.flags(); if (f && f.tutorialDone) return true; }
       if (typeof MM.flow?.tutorialDone === 'function') return !!MM.flow.tutorialDone();
       if (MM.flow && typeof MM.flow.tutorialDone === 'boolean') return MM.flow.tutorialDone;
       if (MM.flow?.flags?.tutorialDone != null) return !!MM.flow.flags.tutorialDone;
@@ -1464,6 +1466,7 @@
     status() { const bs = BOSS()?.active?.() || []; return { chapter: state.chapter, chapterName: D.chapters[state.chapter].name, objective: objective(), fragments: { found: state.fragments.slice(), placed: state.placed.slice() }, homestead: state.homestead.level, moonwell: state.moonwell.level, broom: world.broom, hazard: hazardStatus(), buffs: Object.assign({}, state.buffs), cooldowns: Object.assign({}, V.cooldowns), boss: bs[0] || null, downed: V.downed, finalActive: V.finalActive, defeat: V.downed ? V.lastDefeat : null }; },
     hazards: () => V.hazards.map(h => Object.assign({}, h)), hazardStatus, hasBuff, slowPlayer, damageTakenMul, isDown: () => V.downed, onPlayerDown, onBossDefeated, spawnArch, moonwellPos, toast,
     lastDefeat: () => V.lastDefeat, rest, pointOf, isDormant: dormant,
+    count, addItem, takeItem: take, itemName, items: () => D.items,
     on(name, fn) { (listeners[name] = listeners[name] || []).push(fn); return () => { listeners[name] = listeners[name].filter(f => f !== fn); }; },
     activeShop: 'pip', debug, playStory, regionLock, version: 1
   };
@@ -1487,6 +1490,7 @@
       MM.bus.on('state', d => { if (d?.to === 'play') flushToasts(); });
       MM.bus.on('respawn', () => { try { onRespawned(); } catch (e) { console.error('[campaign] respawn', e); } });
       MM.bus.on('game:new', () => { V.downed = false; V.finalActive = false; });
+      MM.bus.on('flow:flags', f => { if (f?.tutorialDone && state.started) syncFlowTutorial(); });
     }
   }
   if (!trySaveRegister()) fallbackLoad();

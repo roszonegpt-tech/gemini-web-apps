@@ -149,9 +149,9 @@ async function startNewGame(page, name) {
   check('Esc resumes to play', (await st(page)) === 'play' && !(await page.evaluate(() => MM.ui.isOpen())));
   const r0 = await elapsed(page); await sleep(400); const r1 = await elapsed(page);
   check('resume restores sim', r1 > r0, [r0, r1]);
-  const x0 = await page.evaluate(() => MM.game.player().x + MM.game.player().y);
+  const x0 = await page.evaluate(() => MM.game.player().x - MM.game.player().y);
   await page.keyboard.down('d'); await sleep(500); await page.keyboard.up('d');
-  const x1 = await page.evaluate(() => MM.game.player().x + MM.game.player().y);
+  const x1 = await page.evaluate(() => MM.game.player().x - MM.game.player().y);
   check('gameplay keys restored after resume', Math.abs(x1 - x0) > 0.05, [x0, x1]);
   // other screens via API (screenshots)
   await page.evaluate(() => MM.ui.open('travel')); await sleep(250); await shot(page, 'travel-desktop'); await page.keyboard.press('Escape');
@@ -209,15 +209,16 @@ async function startNewGame(page, name) {
     // a second finger taps Cast while the stick is held (multi-touch)
     const cast = await p2.evaluate(() => { const r = document.querySelector('.mm-tbtn-cast').getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; });
     await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [...tp(zone.x + zone.r * 0.9, zone.y), { x: cast.x, y: cast.y, id: 2, radiusX: 4, radiusY: 4, force: 1 }] });
-    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: tp(zone.x + zone.r * 0.9, zone.y) });
+    // CDP diffs the active point list: listing only finger 1 lifts the Cast finger, the stick stays held
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: tp(zone.x + zone.r * 0.9, zone.y) });
     await sleep(700);
     await shot(p2, 'joystick-' + tag);
-    const held = await p2.evaluate(() => ({ active: MM.ui.joystick.active, out: MM.ui.joystick.out, axis: MM.input.axis || null }));
+    const held = await p2.evaluate(() => ({ active: MM.ui.joystick.active, out: MM.ui.joystick.out, axis: MM.input.axis ? { x: MM.input.axis.x, y: MM.input.axis.y } : null, casts: window.__mm ? __mm.events('cast').length : -1 }));
     await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
     await sleep(300);
     const pos1 = await p2.evaluate(() => ({ x: MM.game.player().x, y: MM.game.player().y }));
     const moved = Math.hypot(pos1.x - pos0.x, pos1.y - pos0.y);
-    check(tag + ': joystick drag moves the player (screen-right)', held.active && held.out.x > 0.6 && moved > 0.3 && (pos1.x - pos0.x) > 0, { moved: +moved.toFixed(2), held });
+    check(tag + ': joystick drag moves the player (screen-right), stick survives a 2nd finger on Cast', held.active && held.out.x > 0.6 && held.axis && held.axis.x > 0.6 && moved > 0.3 && (pos1.x - pos0.x) > 0, { moved: +moved.toFixed(2), held });
     const rel = await p2.evaluate(() => ({ active: MM.ui.joystick.active, out: MM.ui.joystick.out }));
     check(tag + ': release recentres the stick', !rel.active && rel.out.x === 0 && rel.out.y === 0, rel);
     // touch pause button opens the pause menu, joystick hides

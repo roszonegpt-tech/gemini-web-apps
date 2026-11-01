@@ -97,6 +97,7 @@ window.MM = window.MM || {};
   let frame = 0, last = 0, avg = 0, samples = 0, settingsTick = 0, sceneCtx = null;
   F.apply = function (ctx) {
     if (!F.enabled || !ctx) return;
+    try { const sc = MM.screens; if (sc && sc.def) { const d = sc.def(sc.current); if (d && d.sim === 'none') return; } } catch (e) { /* */ }
     sceneCtx = ctx;
     if (--settingsTick <= 0) { settingsTick = 30; readSettings(); }
     if (M.soft === 'off' && M.bloom === 'off') { last = 0; return; }
@@ -170,7 +171,7 @@ window.MM = window.MM || {};
     h.on('postEffects', function (ctx) {
       try { if (MM.fx && MM.fx.drawWorld) MM.fx.drawWorld(ctx); } catch (e) { console.error('[MM.filter] fx', e); }
       F.apply(ctx);
-    }, -100);
+    }, 1000); // lower priority runs first in MM.hooks: the filter paints LAST in postEffects (overlay layer stays crisp)
     try { if (MM.bus && MM.bus.on) MM.bus.on('settings', readSettings); } catch (e) { /* */ }
     try { if (MM.settings && MM.settings.onChange) MM.settings.onChange(readSettings); } catch (e) { /* */ }
     readSettings();

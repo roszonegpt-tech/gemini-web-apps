@@ -340,30 +340,30 @@ window.MM = window.MM || {};
   // ------------------------------------------------------------------ bosses (tuning; behaviour in src/entities/bosses.js)
   D.bosses = {
     bramble_warden: {
-      name: 'The Bramble Warden', epithet: 'Blight-bound heart of the forest', region: 'forest', hp: 1300, kind: 'blight', tint: 'hue-rotate(-25deg) saturate(1.3) brightness(.9)',
+      name: 'The Bramble Warden', epithet: 'Blight-bound heart of the forest', region: 'forest', hp: 3800, kind: 'blight', tint: 'hue-rotate(-25deg) saturate(1.3) brightness(.9)',
       cine: 'boss_forest_intro', reward: { gold: 60, items: { blight_bark: 3, moon_dust: 2 } },
       phases: [{ at: 1, name: 'Rooted' }, { at: .4, name: 'Enraged' }],
-      attacks: { slam: { windup: 1.1, dmg: 16 }, sprouts: { windup: .9, count: 3 }, contact: { dmg: 7, rate: 1.5 } }
+      attacks: { slam: { windup: 1.1, dmg: 11 }, sprouts: { windup: .9, count: 3 }, contact: { dmg: 6, rate: 1.6 } }
     },
     mire_heart: {
-      name: 'The Mire Heart', epithet: 'Drowned voice of the Whispering Swamp', region: 'swamp', hp: 1650, kind: 'slime', tint: 'hue-rotate(80deg) saturate(1.4) brightness(.85)',
+      name: 'The Mire Heart', epithet: 'Drowned voice of the Whispering Swamp', region: 'swamp', hp: 4800, kind: 'slime', tint: 'hue-rotate(80deg) saturate(1.4) brightness(.85)',
       cine: 'boss_swamp_intro', reward: { gold: 90, items: { bog_pearl: 3, moon_dust: 2 } },
       phases: [{ at: 1, name: 'Bubbling' }, { at: .5, name: 'Split' }, { at: .25, name: 'Resurfaced' }],
       attacks: { pools: { windup: 1.0, dmg: 4, dur: 6 }, hands: { windup: .95, dmg: 14 }, contact: { dmg: 8, rate: 1.5 } }
     },
     frost_wyrm: {
-      name: 'The Frost Wyrm Husk', epithet: 'Frozen sentinel of Frostpeak', region: 'mountain', hp: 2100, kind: 'ice', tint: 'saturate(.6) brightness(1.15)',
+      name: 'The Frost Wyrm Husk', epithet: 'Frozen sentinel of Frostpeak', region: 'mountain', hp: 6800, kind: 'ice', tint: 'saturate(.6) brightness(1.15)',
       cine: 'boss_frost_intro', reward: { gold: 120, items: { rime_shard: 3, moon_dust: 3 } },
       phases: [{ at: 1, name: 'Frozen' }, { at: .5, name: 'Cracked' }],
-      attacks: { lances: { windup: 1.0, dmg: 18 }, blizzard: { windup: 1.2, dmg: 3, dur: 5 }, charge: { windup: 1.1, dmg: 20, exposed: 2.6 }, contact: { dmg: 9, rate: 1.5 } },
+      attacks: { lances: { windup: 1.0, dmg: 15 }, blizzard: { windup: 1.2, dmg: 3, dur: 5 }, charge: { windup: 1.1, dmg: 20, exposed: 2.6 }, contact: { dmg: 9, rate: 1.5 } },
       weakness: { Fire: .25 }
     },
     hollow_moon: {
-      name: 'The Hollow Moon', epithet: 'The light that forgot its way home', region: 'grove', hp: 2400, kind: 'spirit', tint: 'grayscale(.6) brightness(.7) contrast(1.2)',
+      name: 'The Hollow Moon', epithet: 'The light that forgot its way home', region: 'grove', hp: 8000, kind: 'spirit', tint: 'grayscale(.6) brightness(.7) contrast(1.2)',
       cine: null, reward: { gold: 150, items: { moon_dust: 5 } },
       phases: [{ at: 1, name: 'Shards' }, { at: .66, name: 'Darkness' }, { at: .33, name: 'Collapse' }],
       attacks: { orbs: { windup: 1.0, dmg: 12 }, pulse: { windup: 1.6, dmg: 22 }, collapse: { windup: 1.1, dmg: 14 }, contact: { dmg: 8, rate: 1.6 } },
-      well: { hp: 520 }
+      well: { hp: 1500 }
     }
   };
 

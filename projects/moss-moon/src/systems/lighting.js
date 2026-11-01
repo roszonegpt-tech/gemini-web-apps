@@ -26,6 +26,8 @@ window.MM = window.MM || {};
 
   // ------------------------------------------------------------------ guards & settings
   function base() { try { return typeof world === 'object' && !!world && typeof game === 'object' && !!game; } catch (e) { return false; } }
+  function simOn() { try { const s = MM.screens; if (s && s.def) { const d = s.def(s.current); if (d && d.sim === 'none') return false; } } catch (e) { /* */ } return true; }
+  function vfxOwns(k) { try { return !!(MM.vfx && MM.vfx.owns && MM.vfx.owns(k)); } catch (e) { return false; } }
   function setting(k, d) { try { const s = MM.settings; if (s && s.get) { const v = s.get(k); return v === undefined || v === null ? d : v; } } catch (e) { /* optional */ } return d; }
   const cfg = { quality: 'medium', pScale: 0.7, rFlash: false, rMotion: false };
   function readSettings() {
@@ -34,7 +36,7 @@ window.MM = window.MM || {};
     cfg.rMotion = !!setting('reducedMotion', false);
     let ps = 0.7; try { if (MM.settings && MM.settings.particleScale) ps = MM.settings.particleScale(); } catch (e) { /* */ }
     cfg.pScale = ps > 0 ? ps : 0.35;
-    const lw = cfg.quality === 'low' ? 128 : 256, lh = lw * 5 / 8;
+    const lw = cfg.quality === 'high' ? 512 : 256, lh = lw * 5 / 8;
     if (lm.width !== lw) { lm.width = lw; lm.height = lh; }
   }
 
@@ -261,11 +263,11 @@ window.MM = window.MM || {};
     let wl = null; try { if (MM.world && MM.world.getLights) wl = MM.world.getLights(); } catch (e) { wl = null; }
     if (wl && wl.length) {
       for (let i = 0; i < wl.length; i++) {
-        const o = wl[i]; if (!o) continue;
-        const fl = o.flicker ? 1 - o.flicker * (0.5 + 0.25 * Math.sin(t * 9.1 + i * 1.7) + 0.25 * Math.sin(t * 23.3 + i)) : 1;
-        const always = o.always || o.kind === 'moonwell' || o.kind === 'magic';
-        const inten = (o.intensity == null ? 0.85 : o.intensity) * fl * (always ? Math.max(0.35, night) : night);
-        pushTile(o.x, o.y, o.h == null ? 18 : o.h, o.r || 56, o.color || '#ffd890', inten, o.glow == null ? 0.5 : o.glow);
+        const o = wl[i]; if (!o || o.on === false) continue;
+        // WORLD precomputes intensity (darkness + flicker) for night lights; others (glows, Moonwell, portals) are always on
+        const inten = (o.intensity == null ? 0.85 : o.intensity) * (o.night ? 1 : Math.max(0.3, night));
+        const r = (o.r || 24) * (o.kind === 'glow' ? 1.6 : 2.2);
+        pushTile(o.x, o.y, o.z == null ? (o.h == null ? 18 : o.h) : o.z, r, o.color || '#ffd890', inten, o.glow == null ? (o.kind === 'glow' ? 0.3 : 0.5) : o.glow);
       }
     } else if (night > 0.05) {
       try {
@@ -317,7 +319,7 @@ window.MM = window.MM || {};
   // ------------------------------------------------------------------ the hook body
   let settingsTick = 0, mistX = 0;
   L.draw = function (ctx) {
-    if (!L.enabled || !base()) return false;
+    if (!L.enabled || !base() || !simOn()) return false;
     if (--settingsTick <= 0) { settingsTick = 30; readSettings(); }
     let dt = lastT < 0 ? 0 : game.elapsed - lastT; lastT = game.elapsed;
     if (!(dt >= 0) || dt > 0.25) dt = 0;
@@ -335,7 +337,16 @@ window.MM = window.MM || {};
     ctx.save();
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     const ar = Math.min(255, amb[0] + bolt * 120), ag = Math.min(255, amb[1] + bolt * 120), ab = Math.min(255, amb[2] + bolt * 110);
-    const lit = ar < 252 || ag < 252 || ab < 252 || ln > 0;
+    const lit = dark > 0.04 && (ar < 252 || ag < 252 || ab < 252);
+    if (!lit && (ar < 252 || ag < 252 || ab < 252)) {
+      const key = ((ar | 0) << 16) | ((ag | 0) << 8) | (ab | 0);
+      if (key !== ambKey) { ambKey = key; ambStr = 'rgb(' + (ar | 0) + ',' + (ag | 0) + ',' + (ab | 0) + ')'; }
+      ctx.globalCompositeOperation = 'multiply'; ctx.fillStyle = ambStr; ctx.fillRect(0, 0, W, H);
+    }
+    if (!lit) { // daytime: only a faint additive glint at spell/impact lights
+      ctx.globalCompositeOperation = 'lighter';
+      for (let i = 0; i < ln; i++) { if (lg[i] <= 0) continue; const a = lg[i] * li[i] * 0.12; if (a < 0.02) continue; const r = lr[i] * 0.5; ctx.globalAlpha = a; ctx.drawImage(sprite(lc[i]), lx[i] + tx - r, ly[i] + ty - r * 0.7, r * 2, r * 1.4); }
+    }
     if (lit) {
       const key = ((ar | 0) << 16) | ((ag | 0) << 8) | (ab | 0);
       if (key !== ambKey) { ambKey = key; ambStr = 'rgb(' + (ar | 0) + ',' + (ag | 0) + ',' + (ab | 0) + ')'; }
@@ -348,8 +359,9 @@ window.MM = window.MM || {};
         lmx.globalAlpha = Math.min(1, li[i] * lightBoost);
         lmx.drawImage(sprite(lc[i]), x - r, y - r * 0.8, r * 2, r * 1.6);
       }
-      ctx.globalCompositeOperation = 'multiply'; ctx.imageSmoothingEnabled = true; ctx.globalAlpha = 1;
+      ctx.globalCompositeOperation = 'multiply'; ctx.imageSmoothingEnabled = false; ctx.globalAlpha = 1;
       ctx.drawImage(lm, 0, 0, W, H);
+      ctx.imageSmoothingEnabled = true;
       // soft additive glow at the brightest sources (warm pools on the ground)
       ctx.globalCompositeOperation = 'lighter';
       for (let i = 0; i < ln; i++) {
@@ -362,7 +374,7 @@ window.MM = window.MM || {};
     }
     ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
     // region mist (swamp, crypt, blighted forest)
-    const mc = outside ? MIST[world.region] : (world.region === 'swamp' ? MIST.swamp : null);
+    const mc = vfxOwns('fog') ? null : outside ? MIST[world.region] : (world.region === 'swamp' ? MIST.swamp : null);
     if (mc) {
       const m = tintedMist(mc), rs = restoration(), a = (world.region === 'forest' ? 0.12 : 0.2) * (1 - 0.5 * rs) * (0.7 + 0.3 * dark);
       mistX = (mistX + dt * (cfg.rMotion ? 2 : 6)) % 256;
@@ -373,7 +385,7 @@ window.MM = window.MM || {};
       for (let x = ox * 0.5 - 256; x < W; x += 320) ctx.drawImage(m, x, 70, 320, 120);
       ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
     }
-    if (outside && (weather === 'Rain' || weather === 'Storm')) drawRain(ctx, dt, weather === 'Storm');
+    if (outside && (weather === 'Rain' || weather === 'Storm') && !vfxOwns('rain')) drawRain(ctx, dt, weather === 'Storm');
     else sn = 0;
     ctx.restore();
     return true;
