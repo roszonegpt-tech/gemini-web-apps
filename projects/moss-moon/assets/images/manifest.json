@@ -1,5 +1,5 @@
 {
- "version": "20261101180708",
+ "version": "20261101213644",
  "palette": {
   "k": "#263a37",
   "j": "#2f4b47",
@@ -819,16 +819,686 @@
     }
    }
   },
+  "exterior": {
+   "file": "assets/images/exterior.png",
+   "w": 1021,
+   "h": 245,
+   "anchor": "bottom",
+   "note": "PHASE3-scale exteriors: bld_* (anchor front ground corner), ext_* face parts (_l SW face / _r SE face; anchor = centre of the bottom edge on the wall), roof edges, chimney, WORLD structures (bottom-centre).",
+   "frames": {
+    "bld_mill_locked": {
+     "x": 0,
+     "y": 0,
+     "w": 150,
+     "h": 208,
+     "ax": 79,
+     "ay": 205,
+     "frames": 1,
+     "fps": 0,
+     "foot": [
+      4.5,
+      4
+     ],
+     "anchorMode": "front"
+    },
+    "bld_shed_locked": {
+     "x": 270,
+     "y": 0,
+     "w": 110,
+     "h": 176,
+     "ax": 55,
+     "ay": 173,
+     "frames": 1,
+     "fps": 0,
+     "foot": [
+      3,
+      3
+     ],
+     "anchorMode": "front"
+    },
+    "bld_tutorial_hut": {
+     "x": 151,
+     "y": 0,
+     "w": 118,
+     "h": 180,
+     "ax": 63,
+     "ay": 177,
+     "frames": 1,
+     "fps": 0,
+     "foot": [
+      3.5,
+      3
+     ],
+     "anchorMode": "front"
+    },
+    "crypt_block": {
+     "x": 91,
+     "y": 209,
+     "w": 32,
+     "h": 34,
+     "ax": 16,
+     "ay": 33,
+     "frames": 1,
+     "fps": 0
+    },
+    "ext_awning_l": {
+     "x": 197,
+     "y": 209,
+     "w": 38,
+     "h": 31,
+     "ax": 19,
+     "ay": 21,
+     "frames": 1,
+     "fps": 0,
+     "face": "L"
+    },
+    "ext_awning_r": {
+     "x": 236,
+     "y": 209,
+     "w": 38,
+     "h": 31,
+     "ax": 19,
+     "ay": 20,
+     "frames": 1,
+     "fps": 0,
+     "face": "R"
+    },
+    "ext_chimney": {
+     "x": 485,
+     "y": 209,
+     "w": 14,
+     "h": 28,
+     "ax": 7,
+     "ay": 27,
+     "frames": 1,
+     "fps": 0
+    },
+    "ext_chimney_mossy": {
+     "x": 500,
+     "y": 209,
+     "w": 14,
+     "h": 28,
+     "ax": 7,
+     "ay": 27,
+     "frames": 1,
+     "fps": 0
+    },
+    "ext_door_boarded_l": {
+     "x": 381,
+     "y": 0,
+     "w": 38,
+     "h": 75,
+     "ax": 19,
+     "ay": 65,
+     "frames": 1,
+     "fps": 0,
+     "face": "L"
+    },
+    "ext_door_boarded_r": {
+     "x": 420,
+     "y": 0,
+     "w": 38,
+     "h": 75,
+     "ax": 19,
+     "ay": 64,
+     "frames": 1,
+     "fps": 0,
+     "face": "R"
+    },
+    "ext_door_frame_l": {
+     "x": 459,
+     "y": 0,
+     "w": 38,
+     "h": 75,
+     "ax": 19,
+     "ay": 65,
+     "frames": 1,
+     "fps": 0,
+     "face": "L"
+    },
+    "ext_door_frame_r": {
+     "x": 498,
+     "y": 0,
+     "w": 38,
+     "h": 75,
+     "ax": 19,
+     "ay": 64,
+     "frames": 1,
+     "fps": 0,
+     "face": "R"
+    },
+    "ext_door_l": {
+     "x": 537,
+     "y": 0,
+     "w": 38,
+     "h": 75,
+     "ax": 19,
+     "ay": 65,
+     "frames": 1,
+     "fps": 0,
+     "face": "L"
+    },
+    "ext_door_open_l": {
+     "x": 576,
+     "y": 0,
+     "w": 38,
+     "h": 75,
+     "ax": 19,
+     "ay": 65,
+     "frames": 1,
+     "fps": 0,
+     "face": "L"
+    },
+    "ext_door_open_r": {
+     "x": 615,
+     "y": 0,
+     "w": 38,
+     "h": 75,
+     "ax": 19,
+     "ay": 64,
+     "frames": 1,
+     "fps": 0,
+     "face": "R"
+    },
+    "ext_door_r": {
+     "x": 654,
+     "y": 0,
+     "w": 38,
+     "h": 75,
+     "ax": 19,
+     "ay": 64,
+     "frames": 1,
+     "fps": 0,
+     "face": "R"
+    },
+    "ext_eave_shingle": {
+     "x": 604,
+     "y": 209,
+     "w": 18,
+     "h": 18,
+     "ax": 9,
+     "ay": 17,
+     "frames": 1,
+     "fps": 0
+    },
+    "ext_eave_shingle_mossy": {
+     "x": 623,
+     "y": 209,
+     "w": 18,
+     "h": 18,
+     "ax": 9,
+     "ay": 17,
+     "frames": 1,
+     "fps": 0
+    },
+    "ext_eave_slate": {
+     "x": 642,
+     "y": 209,
+     "w": 18,
+     "h": 18,
+     "ax": 9,
+     "ay": 17,
+     "frames": 1,
+     "fps": 0
+    },
+    "ext_eave_slate_mossy": {
+     "x": 661,
+     "y": 209,
+     "w": 18,
+     "h": 18,
+     "ax": 9,
+     "ay": 17,
+     "frames": 1,
+     "fps": 0
+    },
+    "ext_eave_thatch": {
+     "x": 680,
+     "y": 209,
+     "w": 18,
+     "h": 18,
+     "ax": 9,
+     "ay": 17,
+     "frames": 1,
+     "fps": 0
+    },
+    "ext_eave_thatch_mossy": {
+     "x": 699,
+     "y": 209,
+     "w": 18,
+     "h": 18,
+     "ax": 9,
+     "ay": 17,
+     "frames": 1,
+     "fps": 0
+    },
+    "ext_flowerbox_l": {
+     "x": 558,
+     "y": 209,
+     "w": 22,
+     "h": 18,
+     "ax": 11,
+     "ay": 12,
+     "frames": 1,
+     "fps": 0,
+     "face": "L"
+    },
+    "ext_flowerbox_r": {
+     "x": 581,
+     "y": 209,
+     "w": 22,
+     "h": 18,
+     "ax": 11,
+     "ay": 11,
+     "frames": 1,
+     "fps": 0,
+     "face": "R"
+    },
+    "ext_foundation_l": {
+     "x": 870,
+     "y": 209,
+     "w": 18,
+     "h": 15,
+     "ax": 9,
+     "ay": 10,
+     "frames": 1,
+     "fps": 0,
+     "face": "L"
+    },
+    "ext_foundation_mossy_l": {
+     "x": 718,
+     "y": 209,
+     "w": 18,
+     "h": 17,
+     "ax": 9,
+     "ay": 12,
+     "frames": 1,
+     "fps": 0,
+     "face": "L"
+    },
+    "ext_foundation_mossy_r": {
+     "x": 737,
+     "y": 209,
+     "w": 18,
+     "h": 17,
+     "ax": 9,
+     "ay": 11,
+     "frames": 1,
+     "fps": 0,
+     "face": "R"
+    },
+    "ext_foundation_r": {
+     "x": 889,
+     "y": 209,
+     "w": 18,
+     "h": 15,
+     "ax": 9,
+     "ay": 9,
+     "frames": 1,
+     "fps": 0,
+     "face": "R"
+    },
+    "ext_ridge_shingle": {
+     "x": 908,
+     "y": 209,
+     "w": 18,
+     "h": 14,
+     "ax": 9,
+     "ay": 13,
+     "frames": 1,
+     "fps": 0
+    },
+    "ext_ridge_shingle_mossy": {
+     "x": 927,
+     "y": 209,
+     "w": 18,
+     "h": 14,
+     "ax": 9,
+     "ay": 13,
+     "frames": 1,
+     "fps": 0
+    },
+    "ext_ridge_slate": {
+     "x": 946,
+     "y": 209,
+     "w": 18,
+     "h": 14,
+     "ax": 9,
+     "ay": 13,
+     "frames": 1,
+     "fps": 0
+    },
+    "ext_ridge_slate_mossy": {
+     "x": 965,
+     "y": 209,
+     "w": 18,
+     "h": 14,
+     "ax": 9,
+     "ay": 13,
+     "frames": 1,
+     "fps": 0
+    },
+    "ext_ridge_thatch": {
+     "x": 984,
+     "y": 209,
+     "w": 18,
+     "h": 14,
+     "ax": 9,
+     "ay": 13,
+     "frames": 1,
+     "fps": 0
+    },
+    "ext_ridge_thatch_mossy": {
+     "x": 1003,
+     "y": 209,
+     "w": 18,
+     "h": 14,
+     "ax": 9,
+     "ay": 13,
+     "frames": 1,
+     "fps": 0
+    },
+    "ext_shutters_open_l": {
+     "x": 0,
+     "y": 209,
+     "w": 32,
+     "h": 36,
+     "ax": 16,
+     "ay": 27,
+     "frames": 1,
+     "fps": 0,
+     "face": "L"
+    },
+    "ext_shutters_open_r": {
+     "x": 33,
+     "y": 209,
+     "w": 32,
+     "h": 36,
+     "ax": 16,
+     "ay": 27,
+     "frames": 1,
+     "fps": 0,
+     "face": "R"
+    },
+    "ext_sign_bracket_l": {
+     "x": 401,
+     "y": 209,
+     "w": 22,
+     "h": 29,
+     "ax": 11,
+     "ay": 23,
+     "frames": 1,
+     "fps": 0,
+     "face": "L"
+    },
+    "ext_sign_bracket_r": {
+     "x": 424,
+     "y": 209,
+     "w": 22,
+     "h": 29,
+     "ax": 11,
+     "ay": 22,
+     "frames": 1,
+     "fps": 0,
+     "face": "R"
+    },
+    "ext_verge_shingle": {
+     "x": 756,
+     "y": 209,
+     "w": 18,
+     "h": 16,
+     "ax": 9,
+     "ay": 15,
+     "frames": 1,
+     "fps": 0
+    },
+    "ext_verge_shingle_mossy": {
+     "x": 775,
+     "y": 209,
+     "w": 18,
+     "h": 16,
+     "ax": 9,
+     "ay": 15,
+     "frames": 1,
+     "fps": 0
+    },
+    "ext_verge_slate": {
+     "x": 794,
+     "y": 209,
+     "w": 18,
+     "h": 16,
+     "ax": 9,
+     "ay": 15,
+     "frames": 1,
+     "fps": 0
+    },
+    "ext_verge_slate_mossy": {
+     "x": 813,
+     "y": 209,
+     "w": 18,
+     "h": 16,
+     "ax": 9,
+     "ay": 15,
+     "frames": 1,
+     "fps": 0
+    },
+    "ext_verge_thatch": {
+     "x": 832,
+     "y": 209,
+     "w": 18,
+     "h": 16,
+     "ax": 9,
+     "ay": 15,
+     "frames": 1,
+     "fps": 0
+    },
+    "ext_verge_thatch_mossy": {
+     "x": 851,
+     "y": 209,
+     "w": 18,
+     "h": 16,
+     "ax": 9,
+     "ay": 15,
+     "frames": 1,
+     "fps": 0
+    },
+    "ext_window_dark_l": {
+     "x": 275,
+     "y": 209,
+     "w": 20,
+     "h": 30,
+     "ax": 10,
+     "ay": 24,
+     "frames": 1,
+     "fps": 0,
+     "face": "L"
+    },
+    "ext_window_dark_r": {
+     "x": 296,
+     "y": 209,
+     "w": 20,
+     "h": 30,
+     "ax": 10,
+     "ay": 24,
+     "frames": 1,
+     "fps": 0,
+     "face": "R"
+    },
+    "ext_window_lit_l": {
+     "x": 317,
+     "y": 209,
+     "w": 20,
+     "h": 30,
+     "ax": 10,
+     "ay": 24,
+     "frames": 1,
+     "fps": 0,
+     "face": "L"
+    },
+    "ext_window_lit_r": {
+     "x": 338,
+     "y": 209,
+     "w": 20,
+     "h": 30,
+     "ax": 10,
+     "ay": 24,
+     "frames": 1,
+     "fps": 0,
+     "face": "R"
+    },
+    "ext_window_shuttered_l": {
+     "x": 359,
+     "y": 209,
+     "w": 20,
+     "h": 30,
+     "ax": 10,
+     "ay": 24,
+     "frames": 1,
+     "fps": 0,
+     "face": "L"
+    },
+    "ext_window_shuttered_r": {
+     "x": 380,
+     "y": 209,
+     "w": 20,
+     "h": 30,
+     "ax": 10,
+     "ay": 24,
+     "frames": 1,
+     "fps": 0,
+     "face": "R"
+    },
+    "hanging_sign": {
+     "x": 515,
+     "y": 209,
+     "w": 24,
+     "h": 22,
+     "ax": 12,
+     "ay": 21,
+     "frames": 1,
+     "fps": 0
+    },
+    "ice_cave": {
+     "x": 752,
+     "y": 0,
+     "w": 68,
+     "h": 50,
+     "ax": 34,
+     "ay": 49,
+     "frames": 1,
+     "fps": 0
+    },
+    "mailbox": {
+     "x": 447,
+     "y": 209,
+     "w": 18,
+     "h": 28,
+     "ax": 9,
+     "ay": 27,
+     "frames": 1,
+     "fps": 0
+    },
+    "mausoleum": {
+     "x": 693,
+     "y": 0,
+     "w": 58,
+     "h": 54,
+     "ax": 29,
+     "ay": 53,
+     "frames": 1,
+     "fps": 0
+    },
+    "notice_board": {
+     "x": 968,
+     "y": 0,
+     "w": 34,
+     "h": 38,
+     "ax": 17,
+     "ay": 37,
+     "frames": 1,
+     "fps": 0
+    },
+    "pillar": {
+     "x": 949,
+     "y": 0,
+     "w": 18,
+     "h": 40,
+     "ax": 9,
+     "ay": 39,
+     "frames": 1,
+     "fps": 0
+    },
+    "pillar_broken": {
+     "x": 466,
+     "y": 209,
+     "w": 18,
+     "h": 28,
+     "ax": 9,
+     "ay": 27,
+     "frames": 1,
+     "fps": 0
+    },
+    "rain_barrel": {
+     "x": 540,
+     "y": 209,
+     "w": 17,
+     "h": 20,
+     "ax": 8,
+     "ay": 19,
+     "frames": 1,
+     "fps": 0
+    },
+    "sunken_arch": {
+     "x": 821,
+     "y": 0,
+     "w": 62,
+     "h": 50,
+     "ax": 31,
+     "ay": 49,
+     "frames": 1,
+     "fps": 0
+    },
+    "thorn_gate": {
+     "x": 884,
+     "y": 0,
+     "w": 64,
+     "h": 48,
+     "ax": 32,
+     "ay": 47,
+     "frames": 1,
+     "fps": 0
+    },
+    "training_dummy": {
+     "x": 66,
+     "y": 209,
+     "w": 24,
+     "h": 36,
+     "ax": 12,
+     "ay": 35,
+     "frames": 1,
+     "fps": 0
+    },
+    "waystone": {
+     "x": 124,
+     "y": 209,
+     "w": 18,
+     "h": 32,
+     "ax": 9,
+     "ay": 31,
+     "frames": 4,
+     "fps": 4
+    }
+   }
+  },
   "furniture": {
    "file": "assets/images/furniture.png",
-   "w": 1015,
-   "h": 185,
+   "w": 997,
+   "h": 237,
    "anchor": "bottom",
    "note": "Interior furniture. Anchor = footprint centre on the floor (foot = [tiles x, tiles y]); *_l against the left/NW back wall, *_r against the right/NE wall; hook:true = hangs from its anchor.",
    "frames": {
     "alchemy_bench_l": {
-     "x": 602,
-     "y": 0,
+     "x": 0,
+     "y": 106,
      "w": 48,
      "h": 57,
      "ax": 24,
@@ -842,8 +1512,8 @@
      "flipOf": "alchemy_bench_r"
     },
     "alchemy_bench_r": {
-     "x": 651,
-     "y": 0,
+     "x": 49,
+     "y": 106,
      "w": 48,
      "h": 57,
      "ax": 24,
@@ -856,8 +1526,8 @@
      ]
     },
     "barrel_apples": {
-     "x": 267,
-     "y": 154,
+     "x": 619,
+     "y": 205,
      "w": 28,
      "h": 23,
      "ax": 14,
@@ -870,8 +1540,8 @@
      ]
     },
     "barrel_water": {
-     "x": 296,
-     "y": 154,
+     "x": 648,
+     "y": 205,
      "w": 28,
      "h": 23,
      "ax": 14,
@@ -884,8 +1554,8 @@
      ]
     },
     "bed_l": {
-     "x": 816,
-     "y": 0,
+     "x": 214,
+     "y": 106,
      "w": 52,
      "h": 53,
      "ax": 26,
@@ -898,8 +1568,8 @@
      ]
     },
     "bed_r": {
-     "x": 869,
-     "y": 0,
+     "x": 267,
+     "y": 106,
      "w": 52,
      "h": 53,
      "ax": 26,
@@ -913,8 +1583,8 @@
      "flipOf": "bed_l"
     },
     "bench_in": {
-     "x": 922,
-     "y": 106,
+     "x": 94,
+     "y": 205,
      "w": 44,
      "h": 31,
      "ax": 22,
@@ -927,7 +1597,7 @@
      ]
     },
     "bookcase_l": {
-     "x": 544,
+     "x": 940,
      "y": 0,
      "w": 28,
      "h": 63,
@@ -942,7 +1612,7 @@
      "flipOf": "bookcase_r"
     },
     "bookcase_r": {
-     "x": 573,
+     "x": 969,
      "y": 0,
      "w": 28,
      "h": 63,
@@ -956,8 +1626,8 @@
      ]
     },
     "candelabra": {
-     "x": 565,
-     "y": 106,
+     "x": 585,
+     "y": 164,
      "w": 17,
      "h": 36,
      "ax": 8,
@@ -966,8 +1636,8 @@
      "fps": 6
     },
     "candle": {
-     "x": 476,
-     "y": 154,
+     "x": 940,
+     "y": 205,
      "w": 7,
      "h": 14,
      "ax": 3,
@@ -976,8 +1646,8 @@
      "fps": 6
     },
     "candles_cluster": {
-     "x": 423,
-     "y": 154,
+     "x": 887,
+     "y": 205,
      "w": 13,
      "h": 15,
      "ax": 6,
@@ -986,8 +1656,8 @@
      "fps": 6
     },
     "cauldron_big": {
-     "x": 261,
-     "y": 106,
+     "x": 81,
+     "y": 164,
      "w": 36,
      "h": 39,
      "ax": 18,
@@ -1000,8 +1670,8 @@
      ]
     },
     "chair_ne": {
-     "x": 708,
-     "y": 106,
+     "x": 818,
+     "y": 164,
      "w": 20,
      "h": 33,
      "ax": 10,
@@ -1014,8 +1684,8 @@
      ]
     },
     "chair_nw": {
-     "x": 729,
-     "y": 106,
+     "x": 839,
+     "y": 164,
      "w": 20,
      "h": 33,
      "ax": 10,
@@ -1029,8 +1699,8 @@
      "flipOf": "chair_ne"
     },
     "chair_se": {
-     "x": 750,
-     "y": 106,
+     "x": 860,
+     "y": 164,
      "w": 20,
      "h": 33,
      "ax": 10,
@@ -1044,8 +1714,8 @@
      "flipOf": "chair_sw"
     },
     "chair_sw": {
-     "x": 771,
-     "y": 106,
+     "x": 881,
+     "y": 164,
      "w": 20,
      "h": 33,
      "ax": 10,
@@ -1058,8 +1728,8 @@
      ]
     },
     "chest": {
-     "x": 325,
-     "y": 154,
+     "x": 704,
+     "y": 205,
      "w": 24,
      "h": 23,
      "ax": 12,
@@ -1072,8 +1742,8 @@
      ]
     },
     "chest_open": {
-     "x": 110,
-     "y": 154,
+     "x": 414,
+     "y": 205,
      "w": 24,
      "h": 27,
      "ax": 12,
@@ -1086,8 +1756,8 @@
      ]
     },
     "chest_opening": {
-     "x": 37,
-     "y": 154,
+     "x": 314,
+     "y": 205,
      "w": 24,
      "h": 27,
      "ax": 12,
@@ -1100,7 +1770,7 @@
      ]
     },
     "counter": {
-     "x": 0,
+     "x": 593,
      "y": 106,
      "w": 48,
      "h": 47,
@@ -1114,8 +1784,8 @@
      ]
     },
     "counter_stall": {
-     "x": 963,
-     "y": 0,
+     "x": 540,
+     "y": 106,
      "w": 52,
      "h": 47,
      "ax": 26,
@@ -1128,8 +1798,8 @@
      ]
     },
     "crate_open": {
-     "x": 156,
-     "y": 154,
+     "x": 508,
+     "y": 205,
      "w": 36,
      "h": 25,
      "ax": 18,
@@ -1142,8 +1812,8 @@
      ]
     },
     "desk_l": {
-     "x": 478,
-     "y": 106,
+     "x": 467,
+     "y": 164,
      "w": 32,
      "h": 39,
      "ax": 16,
@@ -1157,8 +1827,8 @@
      "flipOf": "desk_r"
     },
     "desk_r": {
-     "x": 511,
-     "y": 106,
+     "x": 500,
+     "y": 164,
      "w": 32,
      "h": 39,
      "ax": 16,
@@ -1200,7 +1870,7 @@
      ]
     },
     "herb_rack": {
-     "x": 98,
+     "x": 798,
      "y": 106,
      "w": 28,
      "h": 45,
@@ -1214,8 +1884,8 @@
      ]
     },
     "herbs_hanging": {
-     "x": 350,
-     "y": 154,
+     "x": 750,
+     "y": 205,
      "w": 17,
      "h": 20,
      "ax": 8,
@@ -1224,9 +1894,409 @@
      "fps": 0,
      "hook": true
     },
+    "int_alchemy_table": {
+     "x": 320,
+     "y": 106,
+     "w": 36,
+     "h": 28,
+     "ax": 18,
+     "ay": 50,
+     "frames": 1,
+     "fps": 0,
+     "foot": [
+      1,
+      1
+     ],
+     "anchorMode": "front"
+    },
+    "int_armchair": {
+     "x": 642,
+     "y": 106,
+     "w": 32,
+     "h": 30,
+     "ax": 16,
+     "ay": 44,
+     "frames": 1,
+     "fps": 0,
+     "foot": [
+      0.875,
+      0.875
+     ],
+     "anchorMode": "front"
+    },
+    "int_bed": {
+     "x": 442,
+     "y": 106,
+     "w": 56,
+     "h": 24,
+     "ax": 22,
+     "ay": 48,
+     "frames": 1,
+     "fps": 0,
+     "foot": [
+      1.25,
+      2
+     ],
+     "anchorMode": "front"
+    },
+    "int_bookcase": {
+     "x": 698,
+     "y": 0,
+     "w": 36,
+     "h": 58,
+     "ax": 26,
+     "ay": 76,
+     "frames": 1,
+     "fps": 0,
+     "foot": [
+      1.5,
+      0.5
+     ],
+     "anchorMode": "front"
+    },
+    "int_cauldron": {
+     "x": 298,
+     "y": 164,
+     "w": 28,
+     "h": 22,
+     "ax": 14,
+     "ay": 36,
+     "frames": 6,
+     "fps": 7,
+     "foot": [
+      0.75,
+      0.75
+     ],
+     "anchorMode": "front"
+    },
+    "int_chair": {
+     "x": 925,
+     "y": 106,
+     "w": 24,
+     "h": 26,
+     "ax": 12,
+     "ay": 38,
+     "frames": 1,
+     "fps": 0,
+     "foot": [
+      0.625,
+      0.625
+     ],
+     "anchorMode": "front"
+    },
+    "int_chest": {
+     "x": 460,
+     "y": 205,
+     "w": 30,
+     "h": 16,
+     "ax": 18,
+     "ay": 23,
+     "frames": 1,
+     "fps": 0,
+     "foot": [
+      1,
+      0.6
+     ],
+     "anchorMode": "front"
+    },
+    "int_chest_open": {
+     "x": 554,
+     "y": 164,
+     "w": 30,
+     "h": 16,
+     "ax": 18,
+     "ay": 35,
+     "frames": 1,
+     "fps": 0,
+     "foot": [
+      1,
+      0.6
+     ],
+     "anchorMode": "front"
+    },
+    "int_counter": {
+     "x": 838,
+     "y": 0,
+     "w": 66,
+     "h": 24,
+     "ax": 50,
+     "ay": 61,
+     "frames": 1,
+     "fps": 0,
+     "foot": [
+      3,
+      0.875
+     ],
+     "anchorMode": "front"
+    },
+    "int_display_case": {
+     "x": 718,
+     "y": 106,
+     "w": 30,
+     "h": 32,
+     "ax": 18,
+     "ay": 43,
+     "frames": 1,
+     "fps": 0,
+     "foot": [
+      1,
+      0.625
+     ],
+     "anchorMode": "front"
+    },
+    "int_doormat": {
+     "x": 823,
+     "y": 205,
+     "w": 32,
+     "h": 0,
+     "ax": 24,
+     "ay": 15,
+     "frames": 1,
+     "fps": 0,
+     "foot": [
+      1.5,
+      0.5
+     ],
+     "anchorMode": "front"
+    },
+    "int_drying_rack": {
+     "x": 905,
+     "y": 0,
+     "w": 34,
+     "h": 44,
+     "ax": 26,
+     "ay": 61,
+     "frames": 1,
+     "fps": 0,
+     "foot": [
+      1.5,
+      0.4
+     ],
+     "anchorMode": "front"
+    },
+    "int_hearth": {
+     "x": 348,
+     "y": 0,
+     "w": 46,
+     "h": 62,
+     "ax": 31,
+     "ay": 84,
+     "frames": 4,
+     "fps": 8,
+     "foot": [
+      1.75,
+      0.75
+     ],
+     "anchorMode": "front"
+    },
+    "int_herbs_hanging": {
+     "x": 387,
+     "y": 205,
+     "w": 26,
+     "h": 27,
+     "ax": 13,
+     "ay": 26,
+     "frames": 1,
+     "fps": 0
+    },
+    "int_lesson_board": {
+     "x": 65,
+     "y": 205,
+     "w": 28,
+     "h": 32,
+     "ax": 14,
+     "ay": 31,
+     "frames": 1,
+     "fps": 0
+    },
+    "int_plant": {
+     "x": 760,
+     "y": 164,
+     "w": 20,
+     "h": 22,
+     "ax": 10,
+     "ay": 32,
+     "frames": 1,
+     "fps": 0,
+     "foot": [
+      0.5,
+      0.5
+     ],
+     "anchorMode": "front"
+    },
+    "int_portrait": {
+     "x": 270,
+     "y": 205,
+     "w": 18,
+     "h": 29,
+     "ax": 9,
+     "ay": 28,
+     "frames": 1,
+     "fps": 0
+    },
+    "int_rug": {
+     "x": 654,
+     "y": 164,
+     "w": 68,
+     "h": 0,
+     "ax": 40,
+     "ay": 33,
+     "frames": 1,
+     "fps": 0,
+     "foot": [
+      2.5,
+      1.75
+     ],
+     "anchorMode": "front"
+    },
+    "int_rug_round": {
+     "x": 213,
+     "y": 205,
+     "w": 56,
+     "h": 0,
+     "ax": 32,
+     "ay": 27,
+     "frames": 1,
+     "fps": 0,
+     "foot": [
+      2,
+      1.5
+     ],
+     "anchorMode": "front"
+    },
+    "int_shelves": {
+     "x": 735,
+     "y": 0,
+     "w": 36,
+     "h": 48,
+     "ax": 26,
+     "ay": 66,
+     "frames": 1,
+     "fps": 0,
+     "foot": [
+      1.5,
+      0.5
+     ],
+     "anchorMode": "front"
+    },
+    "int_star_chart": {
+     "x": 289,
+     "y": 205,
+     "w": 24,
+     "h": 28,
+     "ax": 12,
+     "ay": 27,
+     "frames": 1,
+     "fps": 0
+    },
+    "int_stool": {
+     "x": 729,
+     "y": 205,
+     "w": 20,
+     "h": 12,
+     "ax": 10,
+     "ay": 18,
+     "frames": 1,
+     "fps": 0,
+     "foot": [
+      0.5,
+      0.5
+     ],
+     "anchorMode": "front"
+    },
+    "int_stove": {
+     "x": 357,
+     "y": 106,
+     "w": 28,
+     "h": 34,
+     "ax": 14,
+     "ay": 48,
+     "frames": 3,
+     "fps": 6,
+     "foot": [
+      0.75,
+      0.75
+     ],
+     "anchorMode": "front"
+    },
+    "int_table": {
+     "x": 880,
+     "y": 106,
+     "w": 44,
+     "h": 20,
+     "ax": 26,
+     "ay": 38,
+     "frames": 1,
+     "fps": 0,
+     "foot": [
+      1.5,
+      1
+     ],
+     "anchorMode": "front"
+    },
+    "int_wall_lantern": {
+     "x": 856,
+     "y": 205,
+     "w": 10,
+     "h": 17,
+     "ax": 5,
+     "ay": 16,
+     "frames": 3,
+     "fps": 6
+    },
+    "int_wall_shelf": {
+     "x": 677,
+     "y": 205,
+     "w": 26,
+     "h": 23,
+     "ax": 13,
+     "ay": 22,
+     "frames": 1,
+     "fps": 0
+    },
+    "int_wardrobe": {
+     "x": 663,
+     "y": 0,
+     "w": 34,
+     "h": 60,
+     "ax": 22,
+     "ay": 77,
+     "frames": 1,
+     "fps": 0,
+     "foot": [
+      1.25,
+      0.625
+     ],
+     "anchorMode": "front"
+    },
+    "int_window": {
+     "x": 491,
+     "y": 205,
+     "w": 16,
+     "h": 26,
+     "ax": 8,
+     "ay": 25,
+     "frames": 1,
+     "fps": 0
+    },
+    "int_worktable": {
+     "x": 675,
+     "y": 106,
+     "w": 42,
+     "h": 22,
+     "ax": 26,
+     "ay": 43,
+     "frames": 1,
+     "fps": 0,
+     "foot": [
+      1.5,
+      0.875
+     ],
+     "anchorMode": "front"
+    },
     "lamp_hanging": {
-     "x": 214,
-     "y": 154,
+     "x": 566,
+     "y": 205,
      "w": 13,
      "h": 24,
      "ax": 6,
@@ -1236,8 +2306,8 @@
      "hook": true
     },
     "lamp_oil": {
-     "x": 389,
-     "y": 154,
+     "x": 789,
+     "y": 205,
      "w": 11,
      "h": 17,
      "ax": 5,
@@ -1246,8 +2316,8 @@
      "fps": 5
     },
     "loom": {
-     "x": 922,
-     "y": 0,
+     "x": 499,
+     "y": 106,
      "w": 40,
      "h": 51,
      "ax": 20,
@@ -1260,8 +2330,8 @@
      ]
     },
     "plant_flower": {
-     "x": 193,
-     "y": 154,
+     "x": 545,
+     "y": 205,
      "w": 20,
      "h": 25,
      "ax": 10,
@@ -1274,8 +2344,8 @@
      ]
     },
     "plant_pot": {
-     "x": 135,
-     "y": 154,
+     "x": 439,
+     "y": 205,
      "w": 20,
      "h": 27,
      "ax": 10,
@@ -1288,8 +2358,8 @@
      ]
     },
     "plant_tall": {
-     "x": 544,
-     "y": 106,
+     "x": 533,
+     "y": 164,
      "w": 20,
      "h": 39,
      "ax": 10,
@@ -1302,8 +2372,8 @@
      ]
     },
     "potion_shelf_l": {
-     "x": 758,
-     "y": 0,
+     "x": 156,
+     "y": 106,
      "w": 28,
      "h": 55,
      "ax": 14,
@@ -1317,8 +2387,8 @@
      "flipOf": "potion_shelf_r"
     },
     "potion_shelf_r": {
-     "x": 787,
-     "y": 0,
+     "x": 185,
+     "y": 106,
      "w": 28,
      "h": 55,
      "ax": 14,
@@ -1331,8 +2401,8 @@
      ]
     },
     "rug_doormat": {
-     "x": 505,
-     "y": 154,
+     "x": 969,
+     "y": 205,
      "w": 24,
      "h": 12,
      "ax": 12,
@@ -1345,8 +2415,8 @@
      ]
     },
     "rug_rect": {
-     "x": 180,
-     "y": 106,
+     "x": 0,
+     "y": 164,
      "w": 80,
      "h": 40,
      "ax": 40,
@@ -1359,8 +2429,8 @@
      ]
     },
     "rug_round": {
-     "x": 792,
-     "y": 106,
+     "x": 902,
+     "y": 164,
      "w": 64,
      "h": 32,
      "ax": 32,
@@ -1373,8 +2443,8 @@
      ]
     },
     "rug_runner": {
-     "x": 857,
-     "y": 106,
+     "x": 0,
+     "y": 205,
      "w": 64,
      "h": 32,
      "ax": 32,
@@ -1387,8 +2457,8 @@
      ]
     },
     "sack_pile": {
-     "x": 671,
-     "y": 106,
+     "x": 781,
+     "y": 164,
      "w": 36,
      "h": 33,
      "ax": 18,
@@ -1401,8 +2471,8 @@
      ]
     },
     "shelves_l": {
-     "x": 700,
-     "y": 0,
+     "x": 98,
+     "y": 106,
      "w": 28,
      "h": 57,
      "ax": 14,
@@ -1416,8 +2486,8 @@
      "flipOf": "shelves_r"
     },
     "shelves_r": {
-     "x": 729,
-     "y": 0,
+     "x": 127,
+     "y": 106,
      "w": 28,
      "h": 57,
      "ax": 14,
@@ -1459,8 +2529,8 @@
      ]
     },
     "stool": {
-     "x": 368,
-     "y": 154,
+     "x": 768,
+     "y": 205,
      "w": 20,
      "h": 19,
      "ax": 10,
@@ -1473,7 +2543,7 @@
      ]
     },
     "stove_l": {
-     "x": 445,
+     "x": 630,
      "y": 0,
      "w": 32,
      "h": 81,
@@ -1488,7 +2558,7 @@
      "flipOf": "stove_r"
     },
     "stove_r": {
-     "x": 348,
+     "x": 533,
      "y": 0,
      "w": 32,
      "h": 81,
@@ -1502,8 +2572,8 @@
      ]
     },
     "table": {
-     "x": 967,
-     "y": 106,
+     "x": 139,
+     "y": 205,
      "w": 36,
      "h": 31,
      "ax": 18,
@@ -1516,7 +2586,7 @@
      ]
     },
     "table_long": {
-     "x": 127,
+     "x": 827,
      "y": 106,
      "w": 52,
      "h": 43,
@@ -1530,8 +2600,8 @@
      ]
     },
     "table_round": {
-     "x": 0,
-     "y": 154,
+     "x": 176,
+     "y": 205,
      "w": 36,
      "h": 31,
      "ax": 18,
@@ -1544,8 +2614,8 @@
      ]
     },
     "table_set": {
-     "x": 634,
-     "y": 106,
+     "x": 723,
+     "y": 164,
      "w": 36,
      "h": 35,
      "ax": 18,
@@ -1558,7 +2628,7 @@
      ]
     },
     "wardrobe_l": {
-     "x": 478,
+     "x": 772,
      "y": 0,
      "w": 32,
      "h": 69,
@@ -1573,7 +2643,7 @@
      "flipOf": "wardrobe_r"
     },
     "wardrobe_r": {
-     "x": 511,
+     "x": 805,
      "y": 0,
      "w": 32,
      "h": 69,
@@ -1587,7 +2657,7 @@
      ]
     },
     "workbench": {
-     "x": 49,
+     "x": 749,
      "y": 106,
      "w": 48,
      "h": 45,
@@ -3520,6 +4590,50 @@
      "frames": 1,
      "fps": 0,
      "wall": "ne"
+    },
+    "int_floor_planks": {
+     "alias": "ifloor_cottage_0",
+     "x": 747,
+     "y": 78,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "int_floor_boards": {
+     "alias": "ifloor_shop_0",
+     "x": 264,
+     "y": 156,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "int_floor_herbs": {
+     "alias": "ifloor_herbal_0",
+     "x": 0,
+     "y": 156,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "int_floor_flagstone": {
+     "alias": "ifloor_elder_0",
+     "x": 879,
+     "y": 78,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
     }
    }
   },

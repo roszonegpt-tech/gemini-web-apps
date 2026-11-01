@@ -102,6 +102,7 @@
     if (MM.world && typeof MM.world.currentPrompt === 'function') {
       const c = safe(() => MM.world.currentPrompt(), null);
       if (c && c.prompt) return { text: c.prompt, key, source: c.kind || 'world', dim: !!c.locked };
+      if ((c && (c.interior || c.kind === 'interior')) || (MM.interiors && MM.interiors.active) || ui.stateIs('interior')) return null; // indoors: no garden fallback
       if (!safe(() => w.region === 'grove' && w.mode === 'outside', false)) return null;
     } else {
       const near = MM.world && typeof MM.world.nearestInteractable === 'function' ? safe(() => MM.world.nearestInteractable(g.x, g.y), null) : null;

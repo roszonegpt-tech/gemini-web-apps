@@ -166,7 +166,7 @@
     g.globalAlpha = pulse * 0.9; g.drawImage(K.glow(60, '#36636f', 1), WELL.x + px - 60, WELL.y + py - 74);
     g.globalAlpha = 0.6; g.drawImage(K.glow(40, '#9a7444', 1), COTTAGE.x + px - 40, COTTAGE.y + py - 70);
     g.globalCompositeOperation = 'source-over'; g.globalAlpha = 1;
-    drawProps(g, t, px, py);
+    drawProps(g, rm ? 0 : t, px, py); // reduced motion: sprite loops (well shimmer, lamp, smoke) hold still
     // chimney smoke (soft puffs) — cottage_lush chimney sits ~ (+18,-92) from its anchor
     if (!rm) for (const s of S.smoke) { const k = (t * 0.09 * s.s + s.o) % 1, x = COTTAGE.x + px + 14 + k * 26 + Math.sin(k * 6 + s.o * 6) * 3, y = COTTAGE.y + py - 96 - k * 46; g.globalAlpha = (1 - k) * 0.35 * sm(k * 6); g.drawImage(K.glow(Math.round(4 + k * 9), '#8a78a8', 0.8), Math.round(x - 4 - k * 9), Math.round(y - 4 - k * 9)); }
     g.globalAlpha = 1;
@@ -187,7 +187,7 @@
       const a = rm ? 0.7 : clamp(0.25 + 0.75 * Math.sin(t * 1.7 + f.ph * 3)); if (a < 0.05) continue;
       g.globalCompositeOperation = 'lighter'; g.globalAlpha = a * 0.7; const rr = Math.round(3 + f.z * 3); g.drawImage(K.glow(rr, f.c, 1), Math.round(x) - rr, Math.round(y) - rr);
       g.globalCompositeOperation = 'source-over'; g.globalAlpha = a;
-      if (!(MM.art && K.drawNight(g, 'mote_firefly', Math.round(x), Math.round(y) + 2, { t: t + f.ph, bloom: false }))) { g.fillStyle = f.c; g.fillRect(Math.round(x), Math.round(y), 1, 1); }
+      if (!(MM.art && K.drawNight(g, 'mote_firefly', Math.round(x), Math.round(y) + 2, { t: rm ? 0 : t + f.ph, bloom: false }))) { g.fillStyle = f.c; g.fillRect(Math.round(x), Math.round(y), 1, 1); }
     }
     g.globalAlpha = 1; g.globalCompositeOperation = 'source-over';
     // foreground (depth 1.5)
@@ -203,8 +203,8 @@
   }
   const uiFn = (name, screen) => () => {
     const ui = MM.ui; if (!ui) return false;
-    if (typeof ui[name] === 'function') { K.safe(() => ui[name]()); return true; }
-    if (typeof ui.open === 'function' && ui.screens && ui.screens[screen]) { K.safe(() => ui.open(screen)); return true; }
+    if (typeof ui[name] === 'function') { K.keepState([screen], () => K.safe(() => ui[name]())); return true; }
+    if (typeof ui.open === 'function' && ui.screens && ui.screens[screen]) { K.keepState([screen], () => K.safe(() => ui.open(screen))); return true; }
     return false;
   };
   const CREDITS_FALLBACK = 'Moss & Moon — the project and its contributors.\nPixel art tooling: claude-pxl by crsolver — MIT License.\nPixel-art VFX library by Sprite Fusion (spritefusion.com/pixel-art-vfx) — MIT License, © 2026 Hugo Duprez.\nMusic & sound: procedural Web Audio, generated in your browser.';

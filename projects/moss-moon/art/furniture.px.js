@@ -551,3 +551,279 @@ pair("stairs", { fw: 1, fd: 2, up: 78 }, (c, g) => {
   for (const i of [0, 7]) { const [x, y] = P(g, 0, i * 4 + 2, i * 8 + 8); c.vline(x, y - 12, 12, "D") }
   const [x0, y0] = P(g, 0, 2, 20), [x1, y1] = P(g, 0, 30, 76); c.line(x0, y0, x1, y1, "w")
 })
+
+// ================================================================================================
+// INTERIORS set (notes/REQUESTS.md "INTERIORS -> ART2"): exact footprints from MM.BUILDINGS furniture table.
+// Native facing: against the back wall y=0 (front = lower-left/SW face); interiors mirrors with flip for the x=0 wall.
+// Anchor = FRONT (bottom) vertex of the footprint diamond: [16*w + 1 (+ left margin), bottom diamond row].
+function intF(name, fw, fd, o, draw) {
+  const g = furnGeo({ fw, fd, up: o.up, ml: o.ml ?? 1, mr: o.mr ?? 1, mb: 1 }), opts = { w: g.w, h: g.h }
+  const outline = o.outline === undefined ? "k" : o.outline, pad = outline ? 1 : 0; if (outline) opts.outline = outline
+  if (o.frames) { opts.frames = o.frames; opts.fps = o.fps || 6; anim(name, opts, (c) => draw(c, g)) } else sprite(name, opts, (c) => draw(c, g))
+  meta(name, { ax: g.fx + pad, ay: g.fy - 1 + pad, foot: [fw, fd], h: o.h, anchorMode: "front" })
+}
+const QUILT = ["B", "i", "C", "b", "B", "c"]
+intF("int_bed", 1.25, 2, { up: 22, h: 24 }, (c, g) => {
+  const B = 20, A = 32
+  for (const [b, a] of [[0, A - 2], [B - 2, A - 2], [B - 2, 0], [0, 0]]) box(c, g, b, a, 2, 2, 0, 4, flat("D", "D", "d"))
+  box(c, g, 0, 0, B, A, 3, 5, woodSh(4))
+  box(c, g, 1, 2, B - 2, A - 4, 8, 3, flat("C", "q", "R"))
+  box(c, g, 2, A - 9, B - 4, 6, 11, 3, (f, u, v) => f === "T" ? (v < 2 ? "q" : "c") : f === "L" ? "C" : "q")                 // pillow
+  box(c, g, 0, 1, B, 21, 8, 5, (f, u, v) => {                                                                            // patchwork quilt
+    if (f === "T") { if (u % 4 < 0.6 || v % 4 < 0.6) return "b"; const k = QUILT[(Math.floor(u / 4) * 2 + Math.floor(v / 4) * 3) % 6]; return k }
+    if (v < 1.2 && Math.floor(u) % 3 === 1) return null
+    if (v < 1.5) return "b"
+    const k = QUILT[Math.floor(u / 4) % 6]; return f === "L" ? k : SHADE1[k] || k
+  })
+  box(c, g, 0, 0, B, 2, 3, 11, woodSh(5))                                                                                // footboard
+  box(c, g, 0, A - 2, B, 2, 3, 21, (f, u, v) => f === "T" ? "W" : f === "L" ? (Math.floor(u) % 5 === 0 ? "D" : v > 16 ? "W" : "w") : "D")   // headboard
+  const [hx, hy] = P(g, 10, A - 2, 20); c.px(hx, hy, "o"); c.px(hx + 1, hy - 1, "a")
+})
+const chestLid = (f, u, v) => f === "T" ? (Math.floor(v) === 3 || Math.floor(v) === 12 ? "R" : v > 13 ? "W" : "w") : (Math.floor(u) === 3 || Math.floor(u) === 12 ? (f === "L" ? "R" : "r") : f === "L" ? (v > 2.5 ? "W" : "w") : "D")
+const chestBox = (c, g) => box(c, g, 0, 0, 16, 10, 0, 11, (f, u, v) => f === "T" ? "w" : Math.floor(u) === 3 || Math.floor(u) === 12 ? (f === "L" ? "r" : "S") : v < 1 ? "d" : woodFace(f === "L" ? "lit" : "mid", u, v, 4, 6))
+intF("int_chest", 1, 0.6, { up: 10, h: 16 }, (c, g) => {
+  chestBox(c, g); box(c, g, 0, 0, 16, 10, 11, 4, chestLid)
+  const [x, y] = P(g, 8, 0, 10); c.grid(x - 1, y - 2, ".o.\noOo\n.a.")
+})
+intF("int_chest_open", 1, 0.6, { up: 22, h: 16 }, (c, g) => {
+  box(c, g, 0, 8, 16, 2, 11, 13, (f, u, v) => f === "L" ? (Math.floor(u) === 3 || Math.floor(u) === 12 ? "r" : v > 11 ? "W" : "D") : f === "T" ? "W" : "d")
+  chestBox(c, g)
+  box(c, g, 1, 1, 14, 8, 10.5, 0.5, (f, u, v) => (hash(Math.floor(u), Math.floor(v), 3) < 0.35 ? "O" : hash(Math.floor(u), Math.floor(v), 4) < 0.3 ? "l" : "D"))
+  const [x, y] = P(g, 7, 4, 11); c.px(x, y - 1, "Y"); c.px(x, y - 2, "c"); c.px(x + 3, y, "z")
+})
+const stoneSh = (f, u, v) => { if (f === "T") return "R"; const row = Math.floor(v / 5), off = row % 2 ? 3 : 0; if (v % 5 < 1 || (Math.floor(u) + off) % 7 === 0) return f === "L" ? "r" : "S"; const h = hash(Math.floor((u + off) / 7), row, 5); return f === "L" ? (h < 0.3 ? "q" : "R") : h < 0.3 ? "R" : "r" }
+intF("int_hearth", 1.75, 0.75, { up: 64, h: 62, frames: 4, fps: 8, ml: 2, mr: 2 }, (c, g) => {
+  const B = 28, A = 12
+  box(c, g, 4, 4, 20, 8, 26, 36, stoneSh)
+  box(c, g, 0, 0, B, A, 0, 26, (f, u, v) => (f === "L" && u > 6 && u < 21 && v < 17) ? (v > 15 || u < 8 || u > 19 ? "S" : v > 13 ? "k" : "x") : stoneSh(f, u, v))
+  box(c, g, -1.5, -1, B + 3, A + 2, 24, 3, flat("w", "W", "D"))
+  for (let u = 8; u < 20; u++) { const [x, y] = P(g, B - u, 0, 1); c.px(x, y, "D"); c.px(x, y - 1, u % 3 ? "d" : "e") }
+  for (let u = 8; u < 20; u++) {
+    const [x, y0] = P(g, B - u, 0, 3), k = c.phase * TAU
+    const h = Math.max(1, Math.round(5 + 3 * Math.sin((u - 8) / 11 * Math.PI) + Math.sin(k + u * 1.9) * 1.5))
+    for (let j = 0; j < h; j++) c.px(x, y0 - j, j > h * 0.65 ? "E" : j > h * 0.3 ? "O" : "Y")
+  }
+  const at = (b, s) => { const [x, y] = P(g, b, 5, 27); const r = s.split("\n"); c.grid(x, y - r.length, s) }
+  at(23, ".Y\n.O\n.c\n.c\nac"); at(7, "BiB\nBBB\nbBb"); at(15, "C.\nCC\nqC")
+  const [ex, ey] = P(g, 14, 0, 0); c.px(ex + (c.frame % 2 ? 1 : -1), ey - 1, c.frame % 2 ? "o" : "E")
+})
+intF("int_bookcase", 1.5, 0.5, { up: 60, h: 58 }, (c, g) => {
+  const H = 58
+  box(c, g, 0, 0, 24, 8, 0, H, (f, u, v) => {
+    if (f === "T") return v < 1 || v > 23 ? "w" : "W"
+    if (f === "R") return v > H - 2 ? "w" : "D"
+    if (u < 1.5 || u > 22.5 || v < 2 || v > H - 3) return v > H - 3 || u < 1.5 ? "W" : "w"
+    return booksOn(f, u, v - 2 - Math.floor((v - 2) / 46) * 0, 0, 9, true) ?? (v > 47 ? (Math.floor(u) % 6 === 2 && v < 54 ? "a" : "j") : "j")
+  })
+  const [x, y] = P(g, 22, 0, H); c.hline(x - 1, y - 1, 3, "W")
+  const [ox, oy] = P(g, 12, 0, 49); c.grid(ox - 2, oy - 4, ".C.\nCqC\nqCq\n.q.")   // a skull-white jug on the top shelf
+})
+intF("int_wardrobe", 1.25, 0.625, { up: 62, h: 60 }, (c, g) => {
+  box(c, g, 0, 0, 20, 10, 0, 4, flat("d", "D", "d"))
+  box(c, g, 0, 0, 20, 10, 4, 52, (f, u, v) => {
+    if (f === "T") return "w"
+    if (f === "R") return panelFace("dark", u, v, 10, 52, 10, [3, 3])
+    if (u < 1 || u > 19) return u < 1 ? "W" : "D"
+    if (Math.floor(u) === 10) return "d"
+    if (u > 6 && u < 14 && v > 30 && v < 46) { const du = (u - 10) / 3.6, dv = (v - 38) / 7.5, r = du * du + dv * dv; if (r < 1) return r > 0.7 ? "o" : (u - 10) + (v - 38) * 0.5 > 1 && (u - 10) + (v - 38) * 0.5 < 3 ? "c" : v > 38 ? "i" : "B" }   // oval mirror
+    const pu = u < 10 ? u - 1 : u - 11
+    if (v < 2 || v > 49 || pu < 1 || pu > 7.8) return "w"
+    if (pu < 1.8 || v > 48) return "W"
+    if ((Math.floor(u) === 8 || Math.floor(u) === 12) && v > 22 && v < 26) return "O"
+    return "D"
+  })
+  box(c, g, -0.5, -0.5, 21, 11, 56, 3, flat("W", "w", "D"))
+})
+function rugQuad(c, g, A, B, f) { floorQuad(c, g.fx, g.fy, A, B, f) }
+intF("int_rug", 2.5, 1.75, { up: 0, h: 0, outline: null, ml: 0, mr: 0 }, (c, g) => rugQuad(c, g, 28, 40, (a, b) => {
+  if (b < 1.5 || b > 38.5) return Math.floor(a) % 2 ? "C" : null
+  if (a < 1 || a > 27 || b < 3 || b > 37) return "e"
+  if (a < 3 || a > 25 || b < 5 || b > 35) return "o"
+  const ca = Math.abs(a - 14), cb = Math.abs(b - 20)
+  if (Math.abs(ca + cb / 2 - 7) < 0.8) return "o"
+  if (ca + cb / 2 < 6) return (ca + cb) % 4 < 2 ? "E" : "p"
+  return (Math.floor(a / 3) + Math.floor(b / 3)) % 5 === 0 ? "E" : "e"
+}))
+intF("int_rug_round", 2, 1.5, { up: 0, h: 0, outline: null, ml: 0, mr: 0 }, (c, g) => rugQuad(c, g, 24, 32, (a, b) => {
+  const da = (a - 12) / 12, db = (b - 16) / 16, r = Math.sqrt(da * da + db * db)
+  if (r > 0.98) return null
+  if (r > 0.88) return "m"
+  const ring = ["L", "l", "C", "v", "l", "p", "l", "v", "l"][Math.floor(r * 9)]
+  return ring === "v" ? ((Math.floor(a) + Math.floor(b)) % 2 ? "v" : "m") : ring
+}))
+intF("int_doormat", 1.5, 0.5, { up: 0, h: 0, outline: null, ml: 0, mr: 0 }, (c, g) => rugQuad(c, g, 8, 24, (a, b) => (a < 1 || a > 7 || b < 1 || b > 23 ? "D" : (Math.floor(a) + Math.floor(b)) % 2 ? "W" : "w")))
+intF("int_table", 1.5, 1, { up: 18, h: 20 }, (c, g) => tableTop(c, g, 24, 16, 20, () => {
+  const at = (b, a, s) => { const [x, y] = P(g, b, a, 20); c.grid(x, y - s.split("\n").length, s) }
+  at(16, 9, ".WW.\nWsWW\nwWWw"); at(7, 5, "Bi\nBB"); at(10, 11, ".Y\n.O\n.c\nac")
+}))
+intF("int_worktable", 1.5, 0.875, { up: 24, h: 22 }, (c, g) => tableTop(c, g, 24, 14, 22, () => {
+  const at = (b, a, s) => { const [x, y] = P(g, b, a, 22); const r = s.split("\n"); c.grid(x - 1, y - r.length, s) }
+  at(21, 8, ".a.\nBiB\nBBB\nbBb"); at(17, 9, ".r.\nlLl\nlvl\nlvl"); at(12, 6, "r.\nRr.\nRRr\n.SS"); at(7, 8, "h.g.\nGhgG\n.GG."); at(4, 4, ".a.\nfpf\nfff")
+}))
+function chairAt(c, g, S, D, top, cushion) {
+  const legs = [[0.5, 0.5], [D - 2, 0.5], [0.5, D - 2], [D - 2, D - 2]].sort((p, q) => q[0] + q[1] - p[0] - p[1])
+  for (const b of [0.5, D - 2]) box(c, g, b, D - 2, 1.5, 1.5, S, top - S, flat("W", "w", "D"))
+  box(c, g, 0, D - 2, D, 1.5, S + 6, 2, flat("W", "w", "D")); box(c, g, 0, D - 2, D, 1.5, top - 4, 4, flat("s", "W", "w"))
+  for (const [b, a] of legs) box(c, g, b, a, 1.5, 1.5, 0, S - 1, flat("w", "w", "D"))
+  box(c, g, 0, 0, D, D - 1, S - 2, 2, (f, u, v) => f === "T" ? (cushion ? (u + v < 5 ? "v" : "X") : u + v < 5 ? "s" : "W") : f === "L" ? (cushion ? "X" : "w") : cushion ? "m" : "D")
+}
+intF("int_chair", 0.625, 0.625, { up: 28, h: 26 }, (c, g) => chairAt(c, g, 12, 10, 26, false))
+intF("int_stool", 0.5, 0.5, { up: 10, h: 12 }, (c, g) => {
+  for (const [b, a] of [[5.5, 5.5], [5.5, 1], [1, 5.5], [1, 1]]) box(c, g, b, a, 1.5, 1.5, 0, 11, flat("w", "w", "D"))
+  box(c, g, 0.5, 0.5, 7, 7, 3, 1, flat("D", "D", "d"))
+  const cx = Math.round(g.cx), cy = Math.round(g.cy) - 12; c.ellipse(cx, cy, 5, 2, "w"); c.ellipse(cx, cy - 1, 5, 2, "W"); c.hline(cx - 3, cy - 2, 3, "s")
+})
+intF("int_armchair", 0.875, 0.875, { up: 30, h: 30 }, (c, g) => {
+  const D = 14, cloth = (f, u, v) => f === "T" ? ((Math.floor(u) + Math.floor(v)) % 5 === 0 ? "v" : "X") : f === "L" ? (Math.floor(v) === 1 ? "m" : "X") : "m"
+  box(c, g, 0, D - 4, D, 4, 2, 28, (f, u, v) => f === "L" ? (v > 25 ? "v" : Math.floor(u) % 5 === 2 && v > 14 && v < 24 ? "m" : "X") : cloth(f, u, v))   // tufted back
+  box(c, g, D - 3, 0, 3, D - 4, 2, 16, cloth)                                                                                     // far arm
+  for (const [b, a] of [[D - 2, 0], [0, 0]]) box(c, g, b, a, 2, 2, 0, 3, flat("D", "D", "d"))
+  box(c, g, 3, 0, D - 6, D - 4, 2, 10, (f, u, v) => f === "T" ? (u + v < 5 ? "v" : "X") : f === "L" ? (v < 2 ? "m" : "X") : "m")   // seat cushion
+  box(c, g, 0, 0, 3, D - 4, 2, 16, (f, u, v) => f === "T" ? "v" : f === "L" ? (v > 13 ? "v" : "X") : "m")                          // near arm
+  const [x, y] = P(g, 7, 4, 13); c.grid(x - 2, y - 2, ".CC\nCcC")                                                                   // knitted cushion
+})
+intF("int_counter", 3, 0.875, { up: 30, h: 24 }, (c, g) => {
+  const B = 48, A = 14
+  box(c, g, 0, 0, B, A, 0, 22, (f, u, v) => f === "T" ? "W" : v < 1.5 ? "d" : vBoards(f === "L" ? "lit" : "mid", u, v, 22, 4))
+  box(c, g, -1, -1, B + 2, A + 2, 22, 2, (f, u, v) => f === "T" ? woodTop(u, v, 4, 2, ["W", "w", "s"]) : f === "L" ? "W" : "D")
+  const at = (b, a, s) => { const [x, y] = P(g, b, a, 24); const r = s.split("\n"); c.grid(x - 1, y - r.length, s) }
+  at(42, 7, "...a...\n..aOa..\n.a.a.a.\nrr.a.rr\n.SSSSS."); at(32, 6, "llll\nlCCl\nvvvv"); at(24, 8, ".O.\nOYO\naaa"); at(16, 6, "iBi\nBBB\nbBb"); at(8, 7, ".ff.\nfpfe\neffe")
+})
+function rackShelves(c, g, B, A, H, rows, fill) {
+  box(c, g, 0, 0, B, A, 0, H, (f, u, v) => {
+    if (f === "T") return "W"; if (f === "R") return "D"
+    if (u < 1.5 || u > B - 1.5) return u < 1.5 ? "W" : "w"
+    if (v < 2 || v > H - 2) return "w"
+    for (const r of rows) if (v >= r && v < r + 1) return "d"
+    return "j"
+  })
+  fill()
+}
+intF("int_shelves", 1.5, 0.5, { up: 50, h: 48 }, (c, g) => rackShelves(c, g, 24, 8, 48, [2, 17, 32], () => {
+  const put = (b, z, s) => { const [x, y] = P(g, b, 0, z); const r = s.split("\n"); c.grid(x - 1, y - r.length + 1, s) }
+  put(21, 3, ".a.\nBiB\nBBB\nbBb"); put(16, 3, "WWW\nwWw\nwww"); put(11, 3, ".r.\nRqR\nRRR\nrRr"); put(6, 3, "O.O\nOOO\naoa")
+  put(21, 18, "lLl\nvlv"); put(16, 18, ".c.\nCcC\nCCC\nqCq"); put(10, 18, "ee\npe\nee"); put(5, 18, ".S.\nrRr\nrrr")
+  put(21, 33, "hgh\nGgG\nwWw"); put(15, 33, "fp.\nfff\n.e."); put(8, 33, "WWWW\nwwww\nDDDD")
+}))
+intF("int_drying_rack", 1.5, 0.4, { up: 46, h: 44 }, (c, g) => {
+  for (const b of [22, 1]) box(c, g, b, 2, 1.5, 2, 0, 44, flat("W", "w", "D"))
+  for (const z of [42, 28, 14]) box(c, g, 0, 2.5, 24, 1, z, 1, flat("W", "w", "D"))
+  const bundle = (b, z, k1, k2) => { const [x, y] = P(g, b, 3, z); c.px(x, y + 1, "W"); c.px(x, y + 2, "e"); for (let j = 0; j < 7; j++) { const w = j < 2 ? 1 : j < 5 ? 2 : 1; for (let dx = -w; dx <= w; dx++) c.px(x + dx, y + 3 + j, (dx + j) % 3 === 0 ? k2 : k1) } }
+  const ks = [["g", "G"], ["v", "m"], ["h", "g"], ["O", "a"], ["p", "E"], ["H", "h"], ["l", "v"], ["g", "G"], ["y", "h"]]
+  let i = 0; for (const z of [41, 27, 13]) for (const b of [19, 12, 5]) { const [k1, k2] = ks[i++]; bundle(b, z, k1, k2) }
+})
+intF("int_display_case", 1, 0.625, { up: 30, h: 32 }, (c, g) => {
+  box(c, g, 0, 0, 16, 10, 0, 14, (f, u, v) => f === "T" ? "W" : f === "L" ? panelFace("mid", u, v, 16, 14, 8, [2, 2]) : panelFace("dark", u, v, 10, 14, 10, [1, 1]))
+  // goods on the shelf (behind the glass)
+  const [x, y] = P(g, 8, 5, 14)
+  c.grid(x - 6, y - 9, "..S.......\n.SOS......\n.SYS...a..\n.SOS..a...\n.SSS.aaa..\n.....aaa..")   // lantern + ladle
+  c.grid(x + 2, y - 4, "ff.\nfpf\n.f.f")                                                                   // ribbon
+  box(c, g, 0, 0, 16, 10, 14, 16, (f, u, v) => {                                                            // glass box: frame + see-through panes
+    const edge = f === "T" ? (u < 1 || v < 1 || u > 9 || v > 15) : (u < 1 || v > 15 || (f === "L" ? u > 15 : u > 9))
+    if (edge) return f === "R" ? "D" : "w"
+    if (f === "T") return (Math.floor(u + v) % 7 === 0) ? "c" : null
+    return (Math.floor(u) + Math.floor(15 - v)) % 9 === 0 ? "c" : (Math.floor(u) + Math.floor(15 - v)) % 9 === 1 ? "i" : null
+  })
+})
+intF("int_stove", 0.75, 0.75, { up: 36, h: 34, frames: 3, fps: 6 }, (c, g) => {
+  box(c, g, 4, 4, 4, 4, 18, 16, (f, u, v) => (Math.floor(v) % 8 === 0 ? "R" : f === "L" ? "r" : "S"))
+  for (const [b, a] of [[1, 9], [9, 9], [9, 1], [1, 1]]) box(c, g, b, a, 2, 2, 0, 4, flat("S", "S", "j"))
+  box(c, g, 0, 0, 12, 12, 4, 14, (f, u, v) => {
+    if (f === "T") return u < 2 || v < 2 ? "r" : "S"
+    if (f === "L" && u > 2 && u < 10 && v > 3 && v < 10) { if (u < 3.2 || u > 9 || v < 4.2 || v > 9) return "j"; return Math.floor(u) % 2 === 0 ? "k" : v < 6 ? (c.frame === 1 ? "O" : "E") : "e" }
+    if (v > 12.5) return f === "L" ? "R" : "r"
+    return f === "L" ? (u < 1.5 ? "r" : "S") : "j"
+  })
+  if (c.frame !== 2) { const [x, y] = P(g, 3, 3, 18); c.px(x, y - 2 - c.frame, "L") }
+})
+intF("int_plant", 0.5, 0.5, { up: 24, h: 22 }, (c, g) => {
+  const cx = Math.round(g.cx), cy = Math.round(g.cy) + 2
+  c.poly([cx - 4, cy - 7, cx + 4, cy - 7, cx + 3, cy, cx - 3, cy], "E"); c.poly([cx + 1, cy - 7, cx + 4, cy - 7, cx + 3, cy, cx + 1, cy], "e"); c.hline(cx - 5, cy - 8, 10, "p"); c.hline(cx - 5, cy - 7, 10, "E")
+  c.grid(cx - 7, cy - 22, "......h......\n...h..g..h...\n..hg..g.gG...\n.hg.hggg.Gg..\nhg..hgGgg.Gg.\ng..hg.g.G..G.\n.hg.hggG.Gg..\nhg..hgGgg..G.\n..g..gGg.G...\n....gGGG.....\n.....GGG.....\n.....GGG.....\n......G......")
+})
+intF("int_alchemy_table", 1, 1, { up: 34, h: 28 }, (c, g) => tableTop(c, g, 16, 16, 16, () => {
+  const at = (b, a, s) => { const [x, y] = P(g, b, a, 16); const r = s.split("\n"); c.grid(x - 1, y - r.length, s) }
+  at(12, 8, "...S...\n..SrS..\n...r...\n..BiB..\n.BzzzB.\n.BzczB.\n..BBB..\n.Saaa..\nSE.O.E."); at(5, 10, "..i.\n.ii.\niiBB\nBffB\n.BB."); at(4, 3, "llll\nlCCl\nvvvv")
+}))
+intF("int_cauldron", 0.75, 0.75, { up: 24, h: 22, frames: 6, fps: 7 }, (c, g) => {
+  const cx = Math.round(g.cx), cy = Math.round(g.cy) + 1, k = c.phase * TAU
+  c.ellipse(cx, cy, 8, 3, "S"); c.ellipse(cx, cy - 1, 6, 2, "d")
+  for (let i = 0; i < 10; i++) { const x = cx - 5 + i, h = 2 + Math.round(1.5 + Math.sin(k + i) * 1.2); for (let j = 0; j < h; j++) c.px(x, cy - 1 - j, j > h - 2 ? "E" : j > 0 ? "O" : "Y") }
+  c.ellipse(cx, cy - 9, 9, 6, "j"); c.ellipse(cx - 1, cy - 10, 8, 5, "S"); c.ellipse(cx - 3, cy - 11, 4, 3, "r"); c.px(cx - 5, cy - 12, "R")
+  c.ellipse(cx, cy - 15, 9, 2, "r"); c.hline(cx - 8, cy - 16, 11, "R"); c.ellipse(cx, cy - 15, 7, 1, "k"); c.ellipse(cx, cy - 15, 6, 1, "z"); c.hline(cx - 3 + (c.frame % 3), cy - 15, 3, "c")
+  for (const [bx, ph] of [[-3, 0], [2, 2], [4, 4]]) { const t = (c.frame + ph) % 6; if (t < 3) c.px(cx + bx, cy - 16 - t, t === 2 ? "i" : "z") }
+  const t = c.phase, sx = cx - 1 + Math.round(Math.sin(t * TAU)), sy = cy - 20 - Math.round(t * 4); c.px(sx, sy, "L")
+})
+
+// ---------------------------------------------------------------- wall decor for the y=0 back wall (slants down-right 2:1)
+// Default bottom-centre anchor: the point where the piece's centre touches the wall at its z (interiors adds floor(w/4)).
+function wallDeco(name, w, h, f, anim) {
+  const H = h + Math.floor((w - 1) / 2), body = (c) => { for (let x = 0; x < w; x++) for (let v = 0; v < h; v++) { const k = f(x, v, c.frame || 0); if (k) c.px(x, h - 1 - v + Math.floor(x / 2), k) } }
+  if (anim) anim_(name, { w, h: H, frames: anim, fps: 6, outline: "k" }, body); else sprite(name, { w, h: H, outline: "k" }, body)
+}
+const anim_ = (n, o, fn) => anim(n, o, fn)
+wallDeco("int_window", 14, 18, (u, v) => {
+  if (v < 2) return v === 0 ? "d" : "W"                                                      // sill
+  if (u === 0 || u === 13 || v === 17) return "D"
+  if (v >= 14 && v <= 16) return (u + v) % 2 ? "l" : "L"                                     // valance
+  if ((u <= 2 && v > 4 + u * 2) || (u >= 11 && v > 4 + (13 - u) * 2)) return (u + v) % 2 ? "l" : "v"   // tied curtains
+  if (u === 7 || v === 9) return "D"
+  if ((u === 2 || u === 8) && (v === 12 || v === 7)) return "c"
+  return v > 10 ? "i" : v > 5 ? "B" : "b"
+})
+wallDeco("int_portrait", 16, 20, (u, v) => {
+  const du = (u - 7.5) / 7.6, dv = (v - 9.5) / 9.8, r = du * du + dv * dv
+  if (r > 1) return null
+  if (r > 0.74) return r > 0.87 ? "a" : "O"
+  if (v < 6) return u % 2 ? "m" : "v"                                                        // keeper's shawl
+  if (v === 6 && u >= 7 && u <= 8) return "L"                                                // silver moon charm
+  if (v === 6 && u > 4 && u < 11) return "l"
+  if (v >= 7 && v <= 12 && u >= 6 && u <= 9) return v === 10 && (u === 6 || u === 9) ? "k" : u === 9 ? "n" : "p"
+  if (v >= 13 && v <= 16 && u >= 5 && u <= 10) return v === 16 || u === 10 ? "r" : "R"
+  if (v >= 9 && v <= 12 && (u === 5 || u === 10)) return "r"
+  return v > 14 ? "t" : "T"
+})
+wallDeco("int_star_chart", 22, 16, (u, v) => {
+  if (u === 0 || u === 21) return v % 3 ? "D" : "w"                                          // scroll rods
+  if (v === 0 || v === 15) return "q"
+  const stars = [[5, 10], [11, 5], [16, 11]], dots = [[3, 4], [8, 12], [13, 9], [18, 4], [9, 7], [15, 2], [19, 13]]
+  for (const [x, y] of stars) { const d = Math.max(Math.abs(u - x), Math.abs(v - y)); if (d === 0) return "O"; if (d === 2 && (u === x || v === y || Math.abs(u - x) === 2)) return "e" }
+  for (const [x, y] of dots) if (u === x && v === y) return "v"
+  if (Math.abs((v - 10) - (u - 5) * -5 / 6) < 0.5 && u > 5 && u < 11) return "R"           // constellation lines
+  if (Math.abs((v - 5) - (u - 11) * 6 / 5) < 0.5 && u > 11 && u < 16) return "R"
+  return (u + v * 3) % 11 === 0 ? "C" : "c"
+})
+wallDeco("int_wall_shelf", 24, 10, (u, v) => {
+  if (v === 0 && (u === 3 || u === 20)) return "D"
+  if (v === 1 && (u === 3 || u === 20)) return "d"
+  if (v === 2) return "W"
+  if (v === 1) return u > 0 && u < 23 ? "w" : null
+  if (v < 1) return null
+  const it = [[1, 3, 5, "B", "i"], [5, 2, 4, "e", "p"], [8, 2, 3, "O", "o"], [11, 4, 3, "l", "L"], [16, 3, 6, "G", "h"], [20, 2, 4, "C", "c"]]
+  for (const [x, w, h, k1, k2] of it) if (u >= x && u < x + w && v >= 3 && v < 3 + h) return u === x ? k2 : k1
+  return null
+})
+wallDeco("int_herbs_hanging", 24, 14, (u, v) => {
+  if (v === 13) return u % 4 === 0 ? "d" : "D"                                               // beam
+  if (v === 12) return u % 4 === 1 ? "a" : null
+  const B = [[2, "g", "G", 9], [7, "v", "m", 8], [12, "O", "a", 10], [17, "h", "g", 8], [21, "p", "E", 7]]
+  for (const [x, k1, k2, len] of B) { const dv = 12 - v, dx = u - x; if (dv >= 1 && dv <= 2 && dx === 0) return dv === 2 ? "e" : "W"; if (dv > 2 && dv <= len && Math.abs(dx) <= (dv < 5 ? 1 : dv < len - 1 ? 2 : 1)) return (dx + dv) % 3 === 0 ? k2 : k1 }
+  return null
+})
+wallDeco("int_lesson_board", 26, 18, (u, v) => {
+  if (u === 0 || u === 25 || v === 0 || v === 17) return u === 0 || v === 17 ? "W" : "D"
+  const notes = [[3, 9, 6, 6, "c"], [11, 10, 5, 5, "C"], [18, 8, 6, 7, "c"], [5, 2, 7, 5, "C"], [15, 2, 6, 5, "c"]]
+  for (const [x, y, w, h, k] of notes) if (u >= x && u < x + w && v >= y && v < y + h) {
+    if (u === x + Math.floor(w / 2) && v === y + h - 1) return "f"                            // pin
+    return (v - y) % 2 === 1 && u > x && u < x + w - 1 ? "R" : k
+  }
+  return (u * 3 + v * 7) % 13 === 0 ? "w" : "a"                                              // cork
+})
+wallDeco("int_wall_lantern", 8, 12, (u, v, f) => {
+  if (v === 11 && u >= 3 && u <= 4) return "S"
+  if (v >= 1 && v <= 9 && (u === 1 || u === 6)) return "S"
+  if (v === 10 || v === 0) return u >= 1 && u <= 6 ? "S" : null
+  if (u >= 2 && u <= 5 && v >= 2 && v <= 8) { if (u === 2) return "c"; const flick = f === 1 ? (v > 5 ? "O" : "Y") : f === 2 ? (v > 6 ? "o" : "O") : "Y"; return v >= 4 && v <= 6 && u >= 3 && u <= 4 ? flick : "O" }
+  if (v >= 1 && v <= 9 && u >= 2 && u <= 5) return "S"
+  return null
+}, 3)

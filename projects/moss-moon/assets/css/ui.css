@@ -41,7 +41,8 @@
 .mm-layer-loading { position: fixed; inset: 0; z-index: 8; display: grid; place-items: center; opacity: 0; transition: opacity .35s; background: radial-gradient(ellipse at 50% 40%, rgba(20, 44, 52, .92), rgba(4, 11, 13, .97)); visibility: hidden; }
 .mm-layer-loading.mm-on { opacity: 1; visibility: visible; pointer-events: auto; }
 .mm-layer-toasts { position: absolute; inset: auto; left: 50%; top: calc(max(12px, var(--st)) + 6.2em); transform: translateX(-50%); width: min(30em, 92%); z-index: 9; display: flex; flex-direction: column; align-items: center; gap: 6px; }
-.mm-has-screen .mm-layer-toasts, .mm-portrait.mm-viewport .mm-layer-toasts { position: fixed; top: calc(max(10px, var(--st)) + 4px); }
+.mm-tall.mm-viewport .mm-layer-toasts { position: fixed; top: calc(max(10px, var(--st)) + 4px); }
+.mm-has-screen .mm-layer-toasts { position: fixed; top: auto; bottom: max(14px, calc(var(--sb) + 10px)); flex-direction: column-reverse; }
 .mm-state-cine .mm-layer-screens, .mm-state-cine .mm-layer-hud, .mm-state-cine .mm-layer-touch, .mm-state-cine .mm-layer-sky { visibility: hidden; }
 
 /* ---------------------------------------------------------------- moonlit sky (title / creation / ending) */
@@ -274,17 +275,17 @@
 .mm-compact .mm-time span { display: none; }
 
 /* portrait phones: HUD bands above / below the stage */
-.mm-portrait.mm-viewport .mm-layer-hud { position: fixed; font-size: .9em; }
-.mm-portrait.mm-viewport .mm-hud-tl { width: auto; right: calc(max(12px, var(--sr)) + 10.5em); }
-.mm-portrait.mm-viewport .mm-objective { display: flex; position: fixed; left: max(12px, var(--sl)); right: max(12px, var(--sr)); top: auto; bottom: calc(100% - var(--stage-top, 0px) + 8px); }
-.mm-portrait.mm-viewport .mm-hud-tl .mm-objective { position: static; }
-.mm-portrait.mm-viewport .mm-hud-tc { position: fixed; top: calc(var(--stage-top, 0px) + 8px); width: calc(100% - 24px); }
-.mm-portrait.mm-viewport .mm-hud-bc { position: fixed; bottom: auto; top: calc(100% - var(--stage-bottom, 0px) - 6.6em); }
-.mm-portrait.mm-viewport .mm-time span { display: block; }
-.mm-portrait.mm-viewport .mm-banner strong { font-size: 1.35em; }
+.mm-tall.mm-viewport .mm-layer-hud { position: fixed; font-size: .9em; }
+.mm-tall.mm-viewport .mm-hud-tl { width: auto; right: calc(max(12px, var(--sr)) + 10.5em); }
+.mm-tall.mm-viewport .mm-objective { display: flex; position: fixed; left: max(12px, var(--sl)); right: max(12px, var(--sr)); top: auto; bottom: calc(100% - var(--stage-top, 0px) + 8px); }
+.mm-tall.mm-viewport .mm-hud-tl .mm-objective { position: static; }
+.mm-tall.mm-viewport .mm-hud-tc { position: fixed; top: calc(var(--stage-top, 0px) + 8px); width: calc(100% - 24px); }
+.mm-tall.mm-viewport .mm-hud-bc { position: fixed; bottom: auto; top: calc(100% - var(--stage-bottom, 0px) - 6.6em); }
+.mm-tall.mm-viewport .mm-time span { display: block; }
+.mm-tall.mm-viewport .mm-banner strong { font-size: 1.35em; }
 
 /* ---------------------------------------------------------------- touch: analog joystick + action cluster */
-.mm-layer-touch { display: none; --joy-size: 140px; }
+.mm-layer-touch { display: none; }
 .mm-touch .mm-layer-touch { display: block; }
 .mm-touch .mm-pausebtn { display: none; }
 .mm-joyzone { position: absolute; bottom: 0; width: min(48%, 460px); height: min(62%, 480px); pointer-events: auto; touch-action: none; -webkit-touch-callout: none; }
@@ -292,7 +293,7 @@
 .mm-layer-touch[data-side="right"] .mm-joyzone { right: 0; }
 .mm-layer-touch[data-mode="fixed"] .mm-joyzone { pointer-events: none; }
 .mm-joy { pointer-events: auto; }
-.mm-joy { position: absolute; left: 0; top: 0; width: var(--joy-size); height: var(--joy-size); border-radius: 50%; touch-action: none; opacity: .62;
+.mm-joy { position: absolute; left: 0; top: 0; width: var(--joy-size, 140px); height: var(--joy-size, 140px); border-radius: 50%; touch-action: none; opacity: .62;
   filter: drop-shadow(0 6px 14px rgba(0, 0, 0, .45)); transition: left .22s ease-out, top .22s ease-out, opacity .2s; --joy-mag: 0; --joy-ang: 0deg; }
 .mm-joy > svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 .mm-joy.mm-active { opacity: 1; transition: opacity .1s; }
@@ -319,13 +320,21 @@
 .mm-tbtn-potion { --x: 56px; --y: 128px; color: #f7a3b6; }
 .mm-tbtn-swap { --x: 4px; --y: 134px; width: 50px; height: 50px; }
 .mm-tbtn-pause { --x: 4px; --y: 196px; width: 48px; height: 48px; }
-.mm-portrait.mm-viewport .mm-tacts { height: 252px; }
-.mm-short .mm-tacts { width: 236px; height: 160px; }
-.mm-short .mm-tbtn-use { --x: 104px; --y: 6px; }
-.mm-short .mm-tbtn-broom { --x: 110px; --y: 76px; }
-.mm-short .mm-tbtn-potion { --x: 174px; --y: 8px; }
-.mm-short .mm-tbtn-swap { --x: 6px; --y: 104px; }
-.mm-short .mm-tbtn-pause { --x: 58px; --y: 106px; }
+.mm-tall.mm-viewport .mm-tacts { height: 252px; }
+.mm-short .mm-tacts { width: 196px; height: 166px; }
+.mm-short .mm-tbtn { width: 48px; height: 48px; }
+.mm-short .mm-tbtn span { font-size: 9px; }
+.mm-short .mm-tbtn .mm-ic svg { width: 19px; height: 19px; }
+.mm-short .mm-tbtn-cast { --x: 4px; --y: 4px; width: 72px; height: 72px; }
+.mm-short .mm-tbtn-cast .mm-ic svg { width: 28px; height: 28px; }
+.mm-short .mm-tbtn-use { --x: 82px; --y: 6px; width: 52px; height: 52px; }
+.mm-short .mm-tbtn-potion { --x: 142px; --y: 6px; }
+.mm-short .mm-tbtn-broom { --x: 86px; --y: 66px; }
+.mm-short .mm-tbtn-swap { --x: 4px; --y: 84px; width: 46px; height: 46px; }
+.mm-short .mm-tbtn-pause { --x: 56px; --y: 118px; width: 44px; height: 44px; }
+/* short contained stage + touch: the cluster replaces the hotbar/potion slot */
+.mm-touch.mm-short .mm-hotrow, .mm-touch.mm-short .mm-spellname { display: none; }
+.mm-touch.mm-short .mm-hud-bc { bottom: auto; top: 46%; }
 
 /* ---------------------------------------------------------------- creation */
 .mm-panel-create { width: min(940px, 100%); }

@@ -25,6 +25,8 @@ function boss(id, w, h, paint) {
   for (const f of ["s", "e"]) {
     anim(`${id}_idle_${f}`, { w, h, frames: 4, fps: 5, outline: "k" }, (c) => paint(c, f, "idle", c.phase, c.frame))
     anim(`${id}_windup_${f}`, { w, h, frames: 3, fps: 6, loop: false, outline: "k" }, (c) => paint(c, f, "windup", c.frame / 2, c.frame))
+    // ART2: hit reaction (plays once): pale flash along the ramps, then a recoil frame
+    anim(`${id}_hurt_${f}`, { w, h, frames: 2, fps: 8, loop: false, outline: "k" }, (c) => { paint(c, f, "idle", 0.5, 2); if (c.frame === 0) c.light(undefined, 2); else c.shade((x, y) => y < h * 0.45, 1, 0.5) })
   }
 }
 
@@ -58,9 +60,14 @@ boss("bramble_warden", 64, 72, (c, f, pose, ph, k) => {
   c.hline(hx - 7 + (e ? 4 : 0), hy - 2, e ? 11 : 15, "d")
   const eyeCol = pose === "windup" ? "Y" : "O"
   const sockets = e ? [[hx + 1, hy], [hx + 6, hy]] : [[hx - 5, hy], [hx + 3, hy]]
-  for (const [ex, ey] of sockets) { c.rect(ex - 1, ey - 1, 4, 3, "x"); eye(c, ex, ey, eyeCol, pose === "windup" ? "c" : null) }
-  const mouth = pose === "windup" ? 3 : 1, mx = e ? hx : hx - 4
-  c.rect(mx, hy + 5, 9, mouth + 1, "x"); for (let x = mx; x < mx + 9; x += 2) { c.px(x, hy + 5, "q"); c.px(x + 1, hy + 5 + mouth, "C") }
+  sockets.forEach(([ex, ey], i) => {
+    const inward = e ? (i ? -1 : 1) : i ? -1 : 1                                   // brows slant down toward the nose: a scowl
+    c.rect(ex - 1, ey, 4, 2, "x"); c.line(ex - 1, ey - 1 - (inward > 0 ? 0 : 1), ex + 2, ey - 1 - (inward > 0 ? 1 : 0), "d"); c.px(ex + (inward > 0 ? 2 : -1), ey - 1, "x")
+    eye(c, ex, ey, eyeCol, pose === "windup" ? "c" : null)
+  })
+  const mouth = pose === "windup" ? 3 : 1, mx = e ? hx - 1 : hx - 5
+  for (let x = 0; x < 10; x++) { const y = hy + 5 + (x % 3 === 1 ? 1 : 0); c.vline(mx + x, y, mouth + (x % 2), "x") }
+  c.px(mx + 2, hy + 5, "C"); c.px(mx + 2, hy + 6, "q"); c.px(mx + 7, hy + 5, "C"); if (mouth > 1) { c.px(mx + 4, hy + 6 + mouth, "q"); c.px(mx + 4, hy + 5 + mouth, "C") }
   c.grid(hx - 5, hy - 11, "gGg.g\n.g.Gg")
   // crown of dead branches
   const crown = [[-8, -12, -14, -24], [-3, -10, -5, -27], [3, -10, 6, -26], [8, -12, 15, -22]]
@@ -132,11 +139,11 @@ boss("frost_wyrm", 80, 72, (c, f, pose, ph, k) => {
   }
   // body: vertebrae + rib shards, thicker toward the bottom
   for (let i = 0; i < pts.length - 1; i++) {
-    const [x, y] = pts[i], [x2, y2] = pts[i + 1], wv = Math.round(10 - i * 0.5)
+    const [x, y] = pts[i], [x2, y2] = pts[i + 1], wv = Math.round(15 - i * 0.55)
     c.line(x, y, x2, y2, "R", wv)
   }
   for (let i = 0; i < pts.length - 1; i++) {
-    const [x, y] = pts[i], wv = Math.round(10 - i * 0.5)
+    const [x, y] = pts[i], wv = Math.round(15 - i * 0.55)
     c.hline(x - Math.floor(wv / 2), y, wv, "S")                                   // segment joints
     if (i % 2 === 0 && i < 11) { const rl = Math.round(wv / 2) + 2; c.line(x - rl, y, x - rl - 4, y + 5, "C", 2); c.line(x + rl, y, x + rl + 4, y + 5, "q", 2); c.px(x - rl - 4, y + 6, "R"); c.px(x + rl + 4, y + 6, "r") }    // ribs
     if (i % 2 === 1 && i < 12) { const s = 4 + (i % 4); c.poly([x - 2, y - 1, x + 1, y - 1 - s, x + 3, y - 1], "i"); c.line(x - 1, y - 2, x + 1, y - s, "c"); c.px(x + 2, y - 2, "B") }   // ice shards on spine
@@ -151,15 +158,22 @@ boss("frost_wyrm", 80, 72, (c, f, pose, ph, k) => {
     c.grid(sx + 4, sy + 2, "c.c.c"); eye(c, sx + 3, sy - 2, pose === "windup" ? "c" : "z")
     c.line(sx - 4, sy - 4, sx - 12, sy - 11, "C", 2); c.line(sx, sy - 6, sx - 6, sy - 14, "q", 2); c.px(sx - 12, sy - 12, "i"); c.px(sx - 6, sy - 15, "i")
   } else {
-    c.ellipse(sx, sy, 10, 7, "c"); c.poly([sx - 7, sy + 3, sx + 7, sy + 3, sx + 4, sy + 11 + jaw, sx - 4, sy + 11 + jaw], "C")
-    if (jaw) c.rect(sx - 3, sy + 4, 6, jaw, "j")
-    c.grid(sx - 3, sy + 3, "c.c.c.c"); eye(c, sx - 5, sy - 1, pose === "windup" ? "c" : "z"); eye(c, sx + 3, sy - 1, pose === "windup" ? "c" : "z")
-    c.line(sx - 6, sy - 4, sx - 13, sy - 12, "C", 2); c.line(sx + 6, sy - 4, sx + 13, sy - 12, "q", 2); c.px(sx - 13, sy - 13, "i"); c.px(sx + 13, sy - 13, "i")
-    c.recolor({ c: "C" }, (x, y) => x > sx + 3 && y < sy + 3 && c.is(x, y, "c"))
-  }
+    // south: broad horned skull seen head-on, heavy brow, deep sockets, separate lower jaw that drops in the windup
+    c.ellipse(sx, sy - 1, 12, 8, "c"); c.ellipse(sx - 2, sy - 3, 8, 5, "c"); c.ellipse(sx + 4, sy, 7, 6, "C")
+    c.poly([sx - 8, sy + 3, sx + 8, sy + 3, sx + 6, sy + 9, sx - 6, sy + 9], "C")                              // upper muzzle
+    c.hline(sx - 10, sy - 4, 21, "q"); c.hline(sx - 9, sy - 5, 8, "L")                                          // brow ridge
+    for (const ox of [-6, 3]) { c.rect(sx + ox, sy - 3, 4, 3, "x"); eye(c, sx + ox + 1, sy - 2, pose === "windup" ? "c" : "z") }
+    c.px(sx - 2, sy + 4, "j"); c.px(sx + 1, sy + 4, "j")                                                         // nostrils
+    if (jaw) c.rect(sx - 5, sy + 9, 11, jaw, "m"); if (jaw > 1) c.hline(sx - 3, sy + 9 + jaw - 1, 7, "X")      // throat glow
+    c.poly([sx - 7, sy + 9 + jaw, sx + 7, sy + 9 + jaw, sx + 5, sy + 13 + jaw, sx - 5, sy + 13 + jaw], "q")      // lower jaw
+    c.hline(sx - 5, sy + 13 + jaw, 11, "R")
+    for (let x = -5; x <= 5; x += 2) { c.px(sx + x, sy + 9, "c"); c.px(sx + x + 1, sy + 8 + jaw, jaw ? "c" : "C") }   // fangs top + bottom
+    c.line(sx - 8, sy - 5, sx - 15, sy - 14, "C", 2); c.line(sx + 8, sy - 5, sx + 15, sy - 14, "q", 2); c.px(sx - 16, sy - 15, "i"); c.px(sx + 16, sy - 15, "i")
+    c.line(sx - 11, sy - 1, sx - 17, sy - 4, "q"); c.line(sx + 11, sy - 1, sx + 17, sy - 4, "R")                // cheek spurs
+    c.recolor({ c: "C", C: "q" }, (x, y) => x > sx + 5 && y < sy + 13 && c.is(x, y, "cC"))
   // frost breath gathering in the windup
   if (pose === "windup" && k > 0) {
-    const bx = e ? sx + 16 : sx, by = e ? sy + 3 : sy + 11
+    const bx = e ? sx + 16 : sx, by = e ? sy + 3 : sy + 10 + Math.ceil(k)
     c.circ(bx, by, k, "i"); c.px(bx, by, "c"); if (k === 2) { c.px(bx - 3, by - 2, "L"); c.px(bx + 3, by + 1, "L") }
   }
   // drifting snow

@@ -31,6 +31,8 @@ window.MM = window.MM || {};
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
   const safe = (fn, fallback) => { try { const r = fn(); return r === undefined ? fallback : r; } catch (e) { return fallback; } };
+  // append that skips null/false (Element.append would print "null")
+  ui.add = (el, ...kids) => { kids.flat(Infinity).forEach((k) => { if (k != null && k !== false) el.append(k); }); return el; };
   ui.h = h; ui.esc = esc; ui.clamp = clamp; ui.safe = safe;
 
   // Button helper: always type=button, optional icon, label, hint (sub text) and keyboard hint.
@@ -361,6 +363,10 @@ window.MM = window.MM || {};
   // Cooldown fraction 0..1 remaining for a spell entry.
   D.cooldown = function (s) {
     if (!s) return 0;
+    const now = performance.now();
+    if (!D._st || now - D._stT > 120) { D._st = ui.camp('status') || null; D._stT = now; }
+    const left = D._st && D._st.cooldowns ? D._st.cooldowns[s.id] : undefined;
+    if (typeof left === 'number' && s.cooldown > 0) return clamp(left / s.cooldown, 0, 1);
     const v = ui.camp('spellCooldown', s.id);
     if (v && typeof v === 'object' && v.total > 0) return clamp(v.left / v.total, 0, 1);
     if (typeof v === 'number') return clamp(v, 0, 1);

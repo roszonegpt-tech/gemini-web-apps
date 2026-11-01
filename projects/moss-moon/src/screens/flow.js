@@ -177,10 +177,22 @@
   // Focus helpers for screen menus (roving focus over a list of buttons).
   kit.focus = (el) => { if (el && el.focus) safe(() => el.focus({ preventScroll: true })); };
 
+  // Open a UI panel over a sim:'none' screen (title) without MM.ui.syncState() turning the state into 'menu': while fn()
+  // runs, the named UI screen factories mark their instance state 'keep' (a value ui.syncState already honours).
+  kit.keepState = function (ids, fn) {
+    const ui = MM.ui, saved = {};
+    const quiet = safe(() => MM.screens.def(MM.state.current).sim === 'none', false);
+    if (quiet && ui && ui.screens) for (const id of ids) {
+      const f = ui.screens[id]; if (typeof f !== 'function') continue;
+      saved[id] = f;
+      ui.screens[id] = function () { const inst = f.apply(this, arguments) || {}; if (!inst.state) inst.state = 'keep'; return inst; };
+    }
+    try { return fn(); } finally { for (const id in saved) ui.screens[id] = saved[id]; }
+  };
   // Small accessible modal (only used when MM.ui.confirm/alert are missing).
   kit.confirm = function (opts) {
     opts = opts || {};
-    if (MM.ui && typeof MM.ui.confirm === 'function') { const p = safe(() => MM.ui.confirm(opts), null); if (p && typeof p.then === 'function') return p; }
+    if (MM.ui && typeof MM.ui.confirm === 'function') { const p = kit.keepState(['confirm'], () => safe(() => MM.ui.confirm(opts), null)); if (p && typeof p.then === 'function') return p; }
     return new Promise((resolve) => {
       const host = document.getElementById('mm-ui') || document.body, prev = document.activeElement;
       const yes = kit.el('button', { type: 'button', class: 'mm-scr-btn mm-scr-btn-primary' + (opts.danger ? ' mm-scr-btn-danger' : ''), text: opts.yes || 'OK' });
@@ -199,7 +211,7 @@
       host.appendChild(box); kit.focus(opts.danger && no ? no : yes);
     });
   };
-  kit.alert = (opts) => (MM.ui && typeof MM.ui.alert === 'function' ? safe(() => MM.ui.alert(opts), Promise.resolve()) : kit.confirm(Object.assign({ yes: 'OK', no: null }, opts)));
+  kit.alert = (opts) => (MM.ui && typeof MM.ui.alert === 'function' ? kit.keepState(['confirm'], () => safe(() => MM.ui.alert(opts), Promise.resolve())) : kit.confirm(Object.assign({ yes: 'OK', no: null }, opts)));
   kit.toast = (text, kind) => safe(() => (MM.ui && MM.ui.toast ? MM.ui.toast(text, kind) : MM.boot && MM.boot.toast ? MM.boot.toast(text, kind) : null));
 
   // ================================================================== persistent first-run flags

@@ -39,7 +39,7 @@
       '<path fill="#0f2427" d="M0 524 C260 486 520 514 800 502 S1300 474 1600 512 V600 H0Z"/>' + near +
       '<path fill="#0a181b" d="M0 560 C300 540 600 556 900 550 S1400 540 1600 556 V600 H0Z"/>' +
       '<g fill="#cdb8ff" class="mm-blooms">' + flowers + '</g></svg>';
-    L.append(
+    ui.add(L, 
       h('div', { class: 'mm-sky' },
         h('div', { class: 'mm-sky-stars mm-s1', style: { boxShadow: stars(110, 1) } }),
         h('div', { class: 'mm-sky-stars mm-s2', style: { boxShadow: stars(50, 1.4) } }),
@@ -208,7 +208,7 @@
     p.body.appendChild(h('div', { class: 'mm-create' }, preview, opts));
     const backB = ui.button('Back', () => back(), { icon: 'left', cls: 'mm-btn-ghost', silent: true, id: 'creation-back' });
     const goB = ui.button('Begin Journey', () => confirm(), { icon: 'moon', cls: 'mm-btn-primary', id: 'creation-confirm' });
-    p.foot.append(backB, goB);
+    ui.add(p.foot, backB, goB);
     prev.setLook(look);
 
     const dirty = () => !!nameIn.value.trim() || Object.keys(look).some((k) => look[k] !== start[k]);
@@ -266,7 +266,7 @@
     const inst = { el, state: 'dialogue', label: 'Dialogue', quiet: true };
     function speakerOf(pg) { return pg.speaker || script.speaker || ''; }
     function setPortrait(pg) {
-      const sp = speakerOf(pg), id = String(pg.portrait || script.portrait || script.npcId || sp).toLowerCase();
+      const sp = speakerOf(pg), id = String(pg.portrait || script.portrait || script.npc || script.npcId || sp).toLowerCase();
       portrait.innerHTML = '';
       const art = MM.art;
       const artName = pg.portrait || script.portrait;
@@ -333,21 +333,26 @@
     inst.onClose = () => { clearInterval(timer); a.resolve && a.resolve(chosen); };
     return inst;
   });
+  // Choices are routed through MM.campaign.choose(npc, action) → {next | open:'shop'|'crafting' (+npc) | close, msg?}.
   ui.dialogue = function (script) {
+    const npc = script && (script.npc || script.npcId);
     return new Promise((resolve) => {
       const inst = ui.open('dialogue', { script, resolve: (action) => {
         resolve(action);
-        if (action != null && script && script.npcId && MM.campaign && typeof MM.campaign.choose === 'function') {
-          setTimeout(() => {
-            const next = safe(() => MM.campaign.choose(script.npcId, action), null);
-            if (next && (next.pages || next.text)) ui.dialogue(Object.assign({ npcId: script.npcId }, next));
-          }, 0);
-        }
+        if (action == null || !npc || !ui.hasCamp('choose')) return;
+        setTimeout(() => {
+          const r = safe(() => MM.campaign.choose(npc, action), null);
+          if (!r) return;
+          if (r.msg && !r.next) ui.toast(r.msg, r.ok === false ? 'warn' : 'good');
+          if (r.next && (r.next.pages || r.next.text)) ui.dialogue(Object.assign({ npc }, r.next));
+          else if (r.open) ui.open(r.open, { npc: r.npc || npc });
+          else if (r.pages || r.text) ui.dialogue(Object.assign({ npc }, r));
+        }, 0);
       }, allowDuplicate: true });
       if (!inst) resolve(null);
     });
   };
-  ui.talk = function (npcId) { const s = ui.camp('dialogue', npcId); if (s) return ui.dialogue(Object.assign({ npcId }, s)); return Promise.resolve(null); };
+  ui.talk = function (npc) { const s = ui.camp('dialogue', npc); if (s) return ui.dialogue(Object.assign({ npc }, s)); return Promise.resolve(null); };
 
   // ============================================================ DUNGEON SUMMARY
   function fmtTime(sec) { sec = Math.max(0, Math.round(sec || 0)); return Math.floor(sec / 60) + ':' + String(sec % 60).padStart(2, '0'); }
@@ -356,7 +361,7 @@
     const p = ui.panel({ title: d.title || 'Dungeon Cleared', subtitle: [d.regionName || (d.region && D.regionName(d.region)), d.floors ? d.floors + ' floors' : null].filter(Boolean).join(' · ') || 'The darkness lifts', icon: 'crown', cls: 'mm-panel-summary', foot: true });
     const stat = (icon, label, val) => h('div', { class: 'mm-stat' }, ui.icon(icon), h('strong', null, String(val)), h('small', null, label));
     const loot = Array.isArray(d.loot) ? d.loot : [];
-    p.body.append(
+    ui.add(p.body, 
       h('div', { class: 'mm-stat-grid' }, stat('hourglass', 'Time', fmtTime(d.time)), stat('sword', 'Defeated', d.kills || 0), stat('star', 'Experience', '+' + (d.xp || 0)), stat('coin', 'Gold', '+' + (d.gold || 0))),
       d.boss ? h('p', { class: 'mm-summary-line' }, ui.icon('crown'), (typeof d.boss === 'string' ? d.boss : 'The guardian') + ' has fallen.') : null,
       d.fragment ? h('p', { class: 'mm-summary-line mm-good' }, ui.icon('moon'), 'You recovered a Lunar Fragment!') : null,
@@ -370,23 +375,25 @@
 
   // ============================================================ DEFEAT — Moonlit Recovery
   ui.registerScreen('defeat', (a) => {
-    const d = a.data || a || {};
+    const d = Object.assign({}, ui.camp('lastDefeat') || {}, a.data || {});
+    if (d.goldLost == null && d.goldLoss != null) d.goldLost = d.goldLoss;
     const w = ui.base.world();
     const lost = d.goldLost != null ? d.goldLost : null;
     const el = h('div', { class: 'mm-defeat-screen' });
-    const p = ui.panel({ title: 'Moonlit Recovery', subtitle: 'The moon would not let you fall alone.', icon: 'moon', cls: 'mm-panel-defeat', close: false, foot: true });
-    p.body.append(
-      h('p', { class: 'mm-defeat-lead' }, 'Your strength gave out' + (d.region ? ' in ' + D.regionName(d.region) : '') + '. A soft silver light carried you home, and you wake by the cottage hearth.'),
+    const p = ui.panel({ title: d.title || 'Moonlit Recovery', subtitle: 'The moon would not let you fall alone.', icon: 'moon', cls: 'mm-panel-defeat', close: false, foot: true });
+    ui.add(p.body, 
+      h('p', { class: 'mm-defeat-lead' }, d.text || ('Your strength gave out' + (d.region ? ' in ' + (d.regionName || D.regionName(d.region)) : '') + '. A soft silver light carried you home, and you wake by the cottage hearth.')),
       h('ul', { class: 'mm-penalty' },
-        h('li', { class: 'mm-bad' }, ui.icon('coin'), lost != null ? 'You dropped ' + lost + ' gold on the way home.' : 'You lose 15% of your gold (at most 25g).'),
-        h('li', { class: 'mm-good' }, ui.icon('check'), 'Story items, fragments, equipment and seeds are all safe.'),
-        h('li', { class: 'mm-good' }, ui.icon('heart'), 'Health and mana are restored.')),
+        h('li', { class: 'mm-bad' }, ui.icon('coin'), d.penalty || (lost != null ? 'You dropped ' + lost + ' gold on the way home.' : 'You lose 15% of your gold (at most 25g).')),
+        h('li', { class: 'mm-good' }, ui.icon('check'), d.kept || 'Story items, fragments, equipment and seeds are all safe.'),
+        h('li', { class: 'mm-good' }, ui.icon('heart'), 'Health and mana are restored when you wake.')),
+      d.tip ? h('p', { class: 'mm-note' }, ui.icon('sparkle'), d.tip) : null,
       w ? h('p', { class: 'mm-note' }, ui.icon('coin'), 'Gold now: ' + Math.floor(w.gold || 0)) : null);
     const home = ui.button('Wake at the Homestead', () => recover(false), { cls: 'mm-btn-primary', icon: 'home', id: 'defeat-home' });
     home.dataset.autofocus = '1';
     const canRetry = ui.hasCamp('retry') || (d.region && !['grove', 'village'].includes(d.region));
     const retry = canRetry ? ui.button('Retry ' + (d.region ? D.regionName(d.region) : 'encounter'), () => recover(true), { icon: 'retry', id: 'defeat-retry' }) : null;
-    p.foot.append(retry, home);
+    ui.add(p.foot, retry, home);
     function recover(again) {
       ui.closeAll({ noSync: true });
       if (MM.game && typeof MM.game.respawnHome === 'function') safe(() => MM.game.respawnHome());
@@ -410,11 +417,11 @@
       const [ic, label] = STAT_LABELS[k] || ['star', k.replace(/([A-Z])/g, ' $1').replace(/^./, (c) => c.toUpperCase())];
       grid.appendChild(h('div', { class: 'mm-stat' }, ui.icon(ic), h('strong', null, k === 'playTime' ? fmtTime(v) : Math.round(v).toLocaleString()), h('small', null, label)));
     });
-    p.body.append(h('p', { class: 'mm-defeat-lead' }, 'The fragments are home, the grove glows at night, and the village sings again. The garden still needs tending, and the old crypt still whispers…'), grid);
+    ui.add(p.body, h('p', { class: 'mm-defeat-lead' }, 'The fragments are home, the grove glows at night, and the village sings again. The garden still needs tending, and the old crypt still whispers…'), grid);
     const cont = ui.button('Continue Playing', () => { ui.closeAll({ noSync: true }); showSky(false); ui.go('play'); }, { cls: 'mm-btn-primary', icon: 'play', id: 'ending-continue' });
     cont.dataset.autofocus = '1';
     const mem = D.memories().length ? ui.button('Memories', () => ui.open('memories'), { icon: 'film' }) : null;
-    p.foot.append(mem, cont);
+    ui.add(p.foot, mem, cont);
     return { el: p.el, state: 'ending', label: 'Campaign complete', noEscape: true, onOpen: () => { showSky(true); ui.sfx('quest_complete'); }, onClose: () => showSky(false) };
   });
 

@@ -368,11 +368,12 @@ sprite("spell_moonbeam", { base: "_badge" }, (c) => c.grid(3, 2, `
 
 // ------------------------------------------------------------------ UI ornaments
 sprite("ui_corner", { w: 15, h: 15, outline: "k" }, (c) => {
-  // gilded L-bracket with a crescent and a curl of moss
-  c.hline(0, 0, 15, "O"); c.vline(0, 0, 15, "O"); c.hline(1, 1, 13, "a"); c.vline(1, 1, 13, "a")
-  c.grid(3, 3, ".LL.\nLc..\nLc..\n.LL.")
-  c.grid(7, 3, "..g.\n.ghg\ng..."); c.grid(3, 8, "h.\ngg\n.g\n.G")
-  c.px(13, 2, "o"); c.px(2, 13, "o")
+  // ART2: gilded bracket with a bevel, a crescent medallion in the crook, a mossy vine with a bud, curled filigree tips
+  c.hline(0, 0, 15, "O"); c.vline(0, 0, 15, "O"); c.hline(1, 1, 12, "a"); c.vline(1, 1, 12, "a"); c.px(0, 0, "Y"); c.px(1, 0, "Y"); c.px(0, 1, "Y")
+  c.grid(12, 0, "OO.\n.aO\n..o"); c.grid(0, 12, "O..\naO.\n.o.")                                      // curled tips
+  c.circ(5, 5, 3, "a"); c.circ(5, 5, 2, "m"); c.grid(4, 3, "LL\nL.\nLl"); c.px(3, 5, "L"); c.px(6, 6, "v")   // crescent medallion
+  c.grid(8, 3, ".hg..\ng..G.\n...gh"); c.grid(3, 8, ".h\ng.\nGg\n.g\n.h")                                // vine along both arms
+  c.px(12, 5, "p"); c.px(4, 12, "l"); c.px(9, 2, "y")
 })
 sprite("ui_divider", { w: 47, h: 7, outline: "k" }, (c) => {
   c.hline(0, 3, 47, "a"); c.hline(2, 2, 18, "o"); c.hline(27, 2, 18, "o")

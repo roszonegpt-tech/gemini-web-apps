@@ -150,7 +150,7 @@ async function nothingSimulated(p, label) {
       const f0 = await p.evaluate(() => document.activeElement && document.activeElement.id);
       await p.keyboard.press('ArrowDown'); const f1 = await p.evaluate(() => document.activeElement.id);
       await p.keyboard.press('s'); const f2 = await p.evaluate(() => document.activeElement.id);
-      await p.keyboard.press('d'); const f3 = await p.evaluate(() => document.activeElement.id);
+      await p.keyboard.press('a'); const f3 = await p.evaluate(() => document.activeElement.id);
       const b = await snap(p);
       check('title: arrows/WASD move menu focus', f0 !== f1 && f1 !== f2 && f2 !== f3, [f0, f1, f2, f3]);
       check('title: WASD does not move the witch', a.x === b.x && a.y === b.y && a.elapsed === b.elapsed);

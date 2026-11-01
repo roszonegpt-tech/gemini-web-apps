@@ -125,7 +125,8 @@ tileSet("ice", (c, v, s) => {
 // ------------------------------------------------------------------ Old Crypt flagstones
 tileSet("crypt_flag", (c, v, s) => {
   const cell = (x, y) => { const [i, j] = isoUV(x, y), a = Math.floor(i * 2), b = Math.floor(j * 2 + (a % 2) * 0.5 + (v % 2) * 0.25); return a + "," + b }
-  stones(c, cell, (id) => (hash(id.length, id.charCodeAt(0) + id.charCodeAt(2) * 7, v) < 0.3 ? "R" : "r"), "S", "R", null)
+  // ART2 fix: per-stone tone from the real cell coords (the old char-code hash made a light/dark checker)
+  stones(c, cell, (id) => { const [a, b] = id.split(",").map(Number); return hash(a * 7 + 3, b * 13 + 5, v + 2) < 0.2 ? "R" : "r" }, "S", "R", null)
   if (v === 1) sprinkle(c, s, ["g", "gg"], 2, 0)
   if (v === 2) sprinkle(c, s, ["S.\n.S", "S"], 1)                          // crack
   if (v === 3) sprinkle(c, s, ["l"], 1)                                    // a glint of moon-dust
@@ -195,3 +196,24 @@ skirt("side_earth", "g", "D", "d", "k", "w")
 skirt("side_stone", "R", "r", "S", "j", "R")
 skirt("side_snow", "c", "L", "l", "m", "c")
 skirt("side_crypt", "r", "S", "m", "x", null)
+
+// ------------------------------------------------------------------ ART2: corner fringes (fix "per side only" gaps)
+// edge_<kind>_<n|e|s|w>: a small tuft at that VERTEX of this tile. Draw it when the diagonal neighbour across the vertex is the
+// other surface but neither adjacent side is (inner corner); outer corners are covered by the two side fringes plus this piece.
+const VERTS = { n: [15.5, 0], s: [15.5, 15], w: [0.5, 7.5], e: [30.5, 7.5] }
+function cornerFringe(name, cols, r0, seed, tip) {
+  for (const [vn, [vx, vy]] of Object.entries(VERTS)) sprite(`edge_${name}_${vn}`, T, (c) => {
+    const rr = c.rng(seed + vn.charCodeAt(0))
+    for (let y = 0; y < 16; y++) for (let x = 0; x < 32; x++) {
+      if (!DIA(x, y)) continue
+      const d = Math.abs(x - vx) / 2 + Math.abs(y - vy), lim = r0 + (rr() < 0.4 ? 1 : 0)
+      if (d < lim - 1) c.px(x, y, cols[0]); else if (d < lim) c.px(x, y, cols[1])
+      else if (tip && d < lim + 1 && rr() < 0.25) c.px(x, y, tip)
+    }
+  })
+}
+cornerFringe("grass", ["H", "h"], 3, 41, "h")
+cornerFringe("wild", ["h", "g"], 3.5, 43, "g")
+cornerFringe("shore", ["i", "c"], 2, 47, null)
+cornerFringe("snow", ["c", "L"], 3.5, 53, null)
+cornerFringe("moss", ["G", "g"], 3, 59, "g")

@@ -30,6 +30,7 @@ module.exports = {
     // ART2 sheets: anchors come from @@meta lines printed by the art files (art/_iso.px.js meta()).
     furniture: { anchor: 'bottom', width: 1024, note: 'Interior furniture. Anchor = footprint centre on the floor (foot = [tiles x, tiles y]); *_l against the left/NW back wall, *_r against the right/NE wall; hook:true = hangs from its anchor.' },
     interior: { anchor: 'center', width: 1024, note: 'Interior floors (ifloor_<kind>_0..3) and walls (iwall_<kind>_<piece>_<l|r>, corner, end_l/r, low[door]_sw/se) per kind cottage|shop|herbal|elder|hut. Every piece anchors at the centre of the floor tile whose edge it stands on.' },
+    exterior: { anchor: 'bottom', width: 1024, note: 'PHASE3-scale exteriors: bld_* (anchor front ground corner), ext_* face parts (_l SW face / _r SE face; anchor = centre of the bottom edge on the wall), roof edges, chimney, WORLD structures (bottom-centre).' },
     npcs: { anchor: 'bottom', width: 1024, note: 'Villagers in the witch 48x56 cell, foot (24,49): npc_<marrow|pip|wren>_<idle|talk>_<s|e|n>; west = e flipped. cat_idle_<s|e>.' },
   },
   anchors: {},
@@ -55,6 +56,7 @@ module.exports.aliases = {
   prop_tree_0: 'tree_oak_0', prop_tree_1: 'tree_oak_1', prop_tree_2: 'tree_oak_2',
   prop_lamp: 'lamp_post', prop_bench: 'bench', prop_flowers: 'flowers_wild', prop_rock: 'rock_moss',
   // ART2: WORLD's NPC seam (art authored facing east, flipped to face the player)
+  int_floor_planks: 'ifloor_cottage_0', int_floor_boards: 'ifloor_shop_0', int_floor_herbs: 'ifloor_herbal_0', int_floor_flagstone: 'ifloor_elder_0',
   npc_marrow: 'npc_marrow_idle_e', npc_pip: 'npc_pip_idle_e', npc_wren: 'npc_wren_idle_e',
 };
 // Contact shadows: [rx, ry] of a soft ellipse drawn under the anchor when MM.art.draw gets {shadow:true}

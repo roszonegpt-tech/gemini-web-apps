@@ -156,6 +156,11 @@ async function startNewGame(page, name) {
   // other screens via API (screenshots)
   await page.evaluate(() => MM.ui.open('travel')); await sleep(250); await shot(page, 'travel-desktop'); await page.keyboard.press('Escape');
   await page.evaluate(() => MM.ui.open('shop', { npc: 'pip' })); await sleep(250); await shot(page, 'shop-desktop');
+  await page.keyboard.press('Escape'); await sleep(150);
+  const talk = page.evaluate(() => MM.ui.talk('pip')); await sleep(1500); await shot(page, 'dialogue-npc-desktop');
+  const choice = await page.evaluate(() => { const b = Array.from(document.querySelectorAll('.mm-choice')).find((x) => /wares|shop|buy/i.test(x.textContent)); if (b) b.click(); return b ? b.textContent : null; }); await talk; await sleep(300);
+  check('NPC dialogue choice routes through campaign.choose → shop', !choice || (await top(page)) === 'shop', choice);
+  if ((await top(page)) !== 'shop') await page.evaluate(() => MM.ui.open('shop', { npc: 'pip' }));
   check('shop opens with stock', await page.evaluate(() => document.querySelectorAll('[data-screen="shop"] .mm-row').length > 0));
   await page.keyboard.press('Escape'); await sleep(150);
   const dlg = page.evaluate(() => MM.ui.dialogue({ speaker: 'Elder Marrow', pages: [{ text: 'The Moonwell remembers your grandmother. It will remember you, too.' }, { text: 'Will you help?', choices: [{ label: 'Of course.', action: 'yes' }, { label: 'Tell me more first.', action: 'more' }] }] }));

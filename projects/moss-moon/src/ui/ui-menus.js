@@ -43,7 +43,7 @@
     const titleB = ui.button('Save & Return to Title', () => saveAndQuit(), { icon: 'exit', cls: 'mm-btn-ghost' });
     const o = D.objective();
     const objEl = o ? h('div', { class: 'mm-pause-obj' }, ui.icon('flag'), h('div', null, h('small', null, 'Current objective'), h('strong', null, o.title), o.hint ? h('span', null, o.hint) : null)) : null;
-    p.body.append(resume, objEl, grid, h('div', { class: 'mm-pause-row' }, saveB, titleB));
+    ui.add(p.body, resume, objEl, grid, h('div', { class: 'mm-pause-row' }, saveB, titleB));
     return { el: p.el, state: 'menu', label: 'Pause menu', back() { ui.resume(); return true; } };
   });
 
@@ -108,7 +108,7 @@
   function detail(item, actions) {
     const box = h('div', { class: 'mm-detail' });
     if (!item) { box.appendChild(ui.empty('sparkle', 'Select an item', 'Choose something on the left to see details.')); return box; }
-    box.append(
+    ui.add(box, 
       h('div', { class: 'mm-detail-head' }, h('div', { class: 'mm-detail-icon' }, ui.itemIcon(item, 48)), h('div', null, h('h3', null, item.name || titleCase(item.id)), item.sub ? h('span', { class: 'mm-detail-sub' }, item.sub) : null)),
       item.desc ? h('p', { class: 'mm-detail-desc' }, item.desc) : null,
       item.stats && item.stats.length ? h('dl', { class: 'mm-stats' }, item.stats.map(([k, v]) => [h('dt', null, k), h('dd', null, String(v))])) : null,
@@ -155,7 +155,7 @@
     const sortSeg = ui.segmented('Sort items', [['group', 'Type'], ['name', 'Name'], ['count', 'Count']], invSort, (v) => { invSort = v; render(); });
     const list = h('div', { class: 'mm-inv-list' }), side = h('div', { class: 'mm-inv-side' });
     const goldEl = h('span', { class: 'mm-gold mm-gold-lg' }, ui.icon('coin'), h('span'));
-    p.body.append(h('div', { class: 'mm-toolbar' }, h('span', { class: 'mm-toolbar-label' }, ui.icon('sort'), 'Sort'), sortSeg, goldEl), h('div', { class: 'mm-split' }, list, side));
+    ui.add(p.body, h('div', { class: 'mm-toolbar' }, h('span', { class: 'mm-toolbar-label' }, ui.icon('sort'), 'Sort'), sortSeg, goldEl), h('div', { class: 'mm-split' }, list, side));
     function render() {
       const inv = getInventory();
       goldEl.lastChild.textContent = String(Math.floor((W() && W().gold) || 0));
@@ -180,7 +180,7 @@
           if (it.id === invSel) cell.dataset.autofocus = '1';
           grid.appendChild(cell);
         });
-        list.append(h('h4', { class: 'mm-group-title' }, g.name), grid);
+        ui.add(list, h('h4', { class: 'mm-group-title' }, g.name), grid);
       });
       showDetail(flat.find((i) => i.id === invSel));
     }
@@ -216,7 +216,7 @@
   ui.registerScreen('equipment', () => {
     const { p, inst } = book('equipment', 'Gear that strengthens your magic');
     const slotsEl = h('div', { class: 'mm-eq-slots' }), list = h('div', { class: 'mm-inv-list' }), side = h('div', { class: 'mm-inv-side' });
-    p.body.append(slotsEl, h('div', { class: 'mm-split' }, list, side));
+    ui.add(p.body, slotsEl, h('div', { class: 'mm-split' }, list, side));
     const itemStats = (it) => [it.slot && ['Slot', titleCase(it.slot)], it.rarity && ['Rarity', it.rarity], it.power != null && ['Power', '+' + it.power], it.affix && ['Affix', it.affix], it.maxSockets ? ['Sockets', (it.sockets || 0) + ' / ' + it.maxSockets] : null].filter(Boolean);
     function render() {
       const eq = getEquipment();
@@ -515,7 +515,7 @@
     let tab = 'buy', sel = null, qty = 1;
     const seg = ui.segmented('Shop mode', [['buy', 'Buy'], ['sell', 'Sell']], tab, (v) => { tab = v; sel = null; qty = 1; render(); });
     const list = h('div', { class: 'mm-inv-list' }), side = h('div', { class: 'mm-inv-side' });
-    p.body.append(h('div', { class: 'mm-toolbar' }, seg, goldEl), h('div', { class: 'mm-split' }, list, side));
+    ui.add(p.body, h('div', { class: 'mm-toolbar' }, seg, goldEl), h('div', { class: 'mm-split' }, list, side));
     const inst = { el: p.el, label: 'Shop', state: 'menu' };
     const shopData = () => ui.camp('shop', npc) || fallbackShop();
     function entries() {
@@ -613,10 +613,10 @@
     function render() {
       body.innerHTML = '';
       if (setTab === 'audio') {
-        body.append(row('Master volume', null, slider('volMaster', 'Master volume')), row('Music', null, slider('volMusic', 'Music volume')), row('Sound effects', null, slider('volSfx', 'Sound effects volume')), row('Cinematics', 'Voice-over and story scenes', slider('volCine', 'Cinematic volume')));
+        ui.add(body, row('Master volume', null, slider('volMaster', 'Master volume')), row('Music', null, slider('volMusic', 'Music volume')), row('Sound effects', null, slider('volSfx', 'Sound effects volume')), row('Cinematics', 'Voice-over and story scenes', slider('volCine', 'Cinematic volume')));
       } else if (setTab === 'graphics') {
         const custom = () => { if (ui.setting('quality') !== 'custom') { ui.setSetting('quality', 'custom'); controls.quality && controls.quality.setValue('custom'); } };
-        body.append(
+        ui.add(body, 
           row('Quality preset', 'Sets filter, bloom and particles together', seg('quality', 'Quality preset', [['low', 'Low'], ['medium', 'Medium'], ['high', 'High'], ['custom', 'Custom']], (v) => { const q = QUALITY[v]; if (q) Object.entries(q).forEach(([k, x]) => { set(k, x); controls[k] && controls[k].setValue(x); }); })),
           row('Soft filter', 'Gentle painterly softening of the scene', seg('softFilter', 'Soft filter', [['off', 'Off'], ['low', 'Low'], ['medium', 'Medium']], custom)),
           row('Bloom', 'Glow around lights and magic', seg('bloom', 'Bloom', [['off', 'Off'], ['low', 'Low'], ['high', 'High']], custom)),
@@ -626,14 +626,14 @@
           row('Reduce flashes', 'Softens bright flashes from spells and hits', tog('reducedFlashes', 'Reduce flashes')),
           row('Reduce motion', 'Calmer animations, no shake, instant text', tog('reducedMotion', 'Reduce motion')));
       } else if (setTab === 'access') {
-        body.append(
+        ui.add(body, 
           row('Subtitles', 'Captions for cinematics', tog('subtitles', 'Subtitles')),
           row('Text size', 'Scales all menus and HUD text', seg('textScale', 'Text size', [[0.9, 'Small'], [1, 'Default'], [1.15, 'Large'], [1.3, 'Huge']])),
           row('Damage numbers', 'Show numbers when spells hit', tog('damageNumbers', 'Damage numbers')),
           row('Reduce motion', 'Also follows your system setting', tog('reducedMotion', 'Reduce motion')));
       } else {
         const inGame = !!(ui.isOpen('pause') || ui.inGameplay() || ['menu', 'dialogue'].includes(ui.state().current));
-        body.append(
+        ui.add(body, 
           row('Autosave', 'Saves at safe moments while you play', tog('autosave', 'Autosave')),
           row('Touch controls', 'On-screen joystick and action buttons (Auto = touch screens)', seg('touchControls', 'Touch controls', [['auto', 'Auto'], ['on', 'On'], ['off', 'Off']])),
           row('Joystick style', 'Floating appears where you touch; fixed stays put', seg('joystickMode', 'Joystick style', [['floating', 'Floating'], ['fixed', 'Fixed']])),
@@ -684,6 +684,7 @@
       h('dl', null,
         h('dt', null, 'Game design, code & writing'), h('dd', null, 'The Moss & Moon project — built in the open as a small multi-agent collaboration'),
         h('dt', null, 'Pixel art tooling'), h('dd', null, h('strong', null, 'claude-pxl'), ' by ', h('strong', null, 'crsolver'), ' — MIT License'),
+        h('dt', null, 'Pixel-art VFX library'), h('dd', null, h('strong', null, 'Sprite Fusion'), ' (spritefusion.com/pixel-art-vfx) — MIT License, © 2026 Hugo Duprez'),
         h('dt', null, 'Original character & spell demo'), h('dd', null, 'Isometric Witch Character Demo (baseline of this project)'),
         h('dt', null, 'Music & sound'), h('dd', null, 'Procedural Web Audio score and effects, generated in your browser'),
         h('dt', null, 'Type'), h('dd', null, 'Your system’s serif and rounded fonts — no downloads')),

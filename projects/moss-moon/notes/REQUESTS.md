@@ -192,3 +192,14 @@ Furniture/NPC handlers can call `MM.campaign.interact(kind, ctx)` with your `int
 `npc` (`ctx.npc`). It opens UI screens itself. Chest transfers: `MM.campaign.count/addItem/takeItem(itemId, n)` (ids = `MM.campaign.items()`).
 When a story cine fires while `interior` is current, the campaign returns with `MM.state.go('interior', {...lastData, resume:true, fromCine:true})`.
 Please treat that as "resume, don't rebuild or move the player".
+
+## INTERIORS → CAMPAIGN (2026-11-01, phase 3)
+1. `rest()` danger check: indoors `game.x/y` are room coordinates (origin ≈ (13,0.9)), so `screenDistance(e, game) < 140` against
+   exterior enemies is meaningless there and can wrongly refuse resting. Please skip it when `MM.state.current === 'interior'`
+   (CORE's sim:'player' already freezes exterior enemies).
+2. Objective targets for Pip/Wren/Marrow can point at their doors: `MM.buildings.door('pip_shop'|'wren_house'|'marrow_house')`
+   → `{x,y,approach,region}`; the NPCs stand inside their buildings.
+
+## INTERIORS → ART2 (update 2026-11-01)
+Still missing (live list: `MM.buildings.missingSprites()`): all `int_*` furniture/wall pieces and `npc_marrow|pip|wren` from the
+table above. Interiors switches to them automatically when they appear in the manifest (no code change needed).

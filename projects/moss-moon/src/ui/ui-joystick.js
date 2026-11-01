@@ -30,7 +30,7 @@
 
   // ---------------------------------------------------------------- settings
   const cfg = () => ({
-    size: clamp(Number(ui.setting('joystickSize')) || 1, 0.8, 1.4),
+    size: clamp(Number(ui.setting('joystickSize')) || 1, 0.8, 1.4) * (ui.root().classList.contains('mm-short') ? 0.74 : 1),
     side: ui.setting('joystickSide') === 'right' ? 'right' : 'left',
     mode: ui.setting('joystickMode') === 'fixed' ? 'fixed' : 'floating',
     haptics: ui.setting('haptics') !== false,
@@ -68,6 +68,8 @@
       const up = (e) => { if (e.pointerId === pid) { pid = null; b.classList.remove('mm-pressed'); } };
       ['pointerup', 'pointercancel', 'lostpointercapture'].forEach((ev) => b.addEventListener(ev, up));
       b.addEventListener('click', (e) => { if (e.detail === 0 && ui.input) ui.input.action(name); }); // keyboard / assistive activation
+      // Cancel the touch's compatibility click: otherwise it lands on whatever opened under the finger (e.g. the pause panel's ×).
+      b.addEventListener('touchstart', (e) => { if (e.cancelable) e.preventDefault(); }, { passive: false });
       b.dataset.glyph = glyphAction || name;
       return b;
     };
@@ -181,6 +183,7 @@
       el.addEventListener('pointermove', (e) => { if (e.pointerId === J.id) { e.preventDefault(); move(e); } });
       ['pointerup', 'pointercancel', 'lostpointercapture'].forEach((ev) => el.addEventListener(ev, (e) => { if (e.pointerId === J.id) J.release(); }));
       el.addEventListener('contextmenu', (e) => e.preventDefault());
+      el.addEventListener('touchstart', (e) => { if (e.cancelable && shouldShow()) e.preventDefault(); }, { passive: false });
     });
     E.cluster.addEventListener('contextmenu', (e) => e.preventDefault());
   }

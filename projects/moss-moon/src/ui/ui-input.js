@@ -246,12 +246,13 @@
       r.style.setProperty('--stage-bottom', Math.round(Math.max(0, window.innerHeight - b.bottom)) + 'px');
       r.style.setProperty('--stage-left', Math.round(b.left) + 'px');
       r.style.setProperty('--stage-w', Math.round(b.width) + 'px');
-      r.classList.toggle('mm-portrait', window.innerHeight > window.innerWidth * 1.15);
+      r.classList.toggle('mm-tall', window.innerHeight > window.innerWidth * 1.15);
       // Are fixed layers anchored to the viewport (no transform/contain on an ancestor)? Portrait HUD bands need that.
       const sr = ui.layers.screens.getBoundingClientRect();
       r.classList.toggle('mm-short', sr.height < 330);
       r.classList.toggle('mm-viewport', Math.abs(sr.width - window.innerWidth) < 2 && Math.abs(sr.height - window.innerHeight) < 2);
       r.classList.toggle('mm-compact', b.width < 700 || b.height < 420);
+      if (ui.joystick && !ui.joystick.active) ui.joystick.apply();
     };
     measure();
     window.addEventListener('resize', measure);

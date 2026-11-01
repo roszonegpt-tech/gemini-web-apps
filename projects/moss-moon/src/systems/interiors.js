@@ -84,7 +84,8 @@ window.MM = window.MM || {};
   // ================================================================== current interior instance
   let cur = null;            // {id, building, I, O, items, decor, npc, t0, armed, from, fade}
   let exiting = false, lastExit = -10, resumeArmed = false;
-  const O_OF = (I) => ({ x: Math.round((10 - I.W / 2) * 4) / 4, y: Math.round((10 - I.D / 2) * 4) / 4 });
+  // room origin in the baseline's 0.6..19.4 movement box, far from the grove plots/dummy so no exterior proximity logic fires
+  const O_OF = (I) => ({ x: Math.min(13, 18.8 - I.W), y: 0.9 });
   const local = (x, y) => ({ x: x - cur.O.x, y: y - cur.O.y });
 
   function buildInstance(bid) {
@@ -458,6 +459,12 @@ window.MM = window.MM || {};
   }
   function registerWorldDoors() {
     if (!MM.world || typeof MM.world.register !== 'function') return false;
+    // HUD reads MM.world.currentPrompt(); while indoors answer with the interior prompt (exterior prompts disappear)
+    if (typeof MM.world.currentPrompt === 'function' && !MM.world.currentPrompt.__interiors) {
+      const _cp = MM.world.currentPrompt;
+      const cp = function () { if (cur) { const p = prompt(); return p ? { id: p.id, kind: p.kind, prompt: p.text, key: p.key, glyph: p.glyph, interior: cur.id } : { id: 'interior', kind: 'interior', prompt: null }; } return _cp.apply(this, arguments); };
+      cp.__interiors = true; MM.world.currentPrompt = cp;
+    }
     for (const b of BU.list()) MM.world.register('enter:' + b.id, () => { interact('enter:' + b.id); return true; });
     return true;
   }
