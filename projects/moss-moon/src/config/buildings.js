@@ -158,7 +158,7 @@ window.MM = window.MM || {};
   const placements = {
     grove: [
       { id: 'home', type: 'cottage_home', x: 8.0, y: 5.6 },
-      { id: 'old_mill', type: 'mill', x: 19.0, y: 16.8 },
+      { id: 'old_mill', type: 'mill', x: 19.0, y: 4.5 },
       { id: 'old_shed', type: 'shed', x: 6.2, y: 16.4 },
     ],
     village: [

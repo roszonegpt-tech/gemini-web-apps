@@ -209,7 +209,7 @@
     const o = D.objective();
     set('ot', E.objTitle, 'text', o ? o.title : '');
     set('oh', E.objHint, 'text', o ? (o.hint || o.why || '') : '');
-    E.obj.hidden = !o;
+    E.obj.hidden = !o || (window.MM && MM.state && MM.state.current === 'tutorial'); // the tutorial HUD owns the objective card
     const t = D.time();
     if (t) {
       set('tm', E.timeMain, 'text', 'Day ' + t.day + ' · ' + t.label);

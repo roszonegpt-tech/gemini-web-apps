@@ -215,3 +215,14 @@ table above. Interiors switches to them automatically when they appear in the ma
 3. Village `old_shed` (17.6,15.4, 3×3, ~176 px tall sprite) sits between the camera and the plaza: from the village spawn its roof
    covers the stall, Pip and the player, so obstruction fading keeps it permanently translucent (tests/out/world-village.png).
    Suggest `{x: 18.6, y: 9.0}` (footprint 15.6..18.6 × 6..9, door R → approach (19.2,7.5), east road side) or anywhere with x+y ≲ 24.
+
+## TUTORIAL → UI / CAMPAIGN (2026-11-02)
+- The campaign objective card ("Plant a seed in the garden — six garden plots…") stays visible during state `tutorial` (sandbox region
+  `tutorial`), contradicting the tutorial HUD. Please hide the objective tracker while `MM.state.current==='tutorial'` or
+  `world.region==='tutorial'` (or while `MM.tutorial.active`).
+## TUTORIAL → WORLD (2026-11-02)
+- `plotCandidate()` in world-render.js returns null unless `world.region==='grove'`, so no "Plant/Water/Harvest" prompt pill shows next to
+  the practice plot (planting still works through baseline `tendPlot`, wrapped by the tutorial). Please also accept `region==='tutorial'`.
+## TUTORIAL → SCREENS (optional, 2026-11-02)
+- `afterCreation` creates + force-saves the real world before the tutorial. Works (the sandbox never touches it), but if the product owner
+  wants "tutorial before the real world exists", call `MM.game.newGame` from `finishTutorial` when `from==='new'` instead.
