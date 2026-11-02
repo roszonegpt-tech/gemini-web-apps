@@ -6,7 +6,7 @@ window.MM = window.MM || {};
   'use strict';
   const MM = window.MM;
   if (MM.ui && MM.ui.__mm) return;
-  const ui = MM.ui = { __mm: true, ready: false, version: '0.2.0', screens: {}, stack: [], _readyFns: [] };
+  const ui = MM.ui = { __mm: true, ready: false, version: '0.3.0', screens: {}, stack: [], _readyFns: [] };
 
   // ------------------------------------------------------------------ tiny DOM helpers
   function h(tag, attrs, ...kids) {

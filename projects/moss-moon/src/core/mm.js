@@ -6,7 +6,7 @@
 (function () {
   'use strict';
   const MM = window.MM = window.MM || {};
-  MM.version = '0.2.0';
+  MM.version = '0.3.0';
   MM.legacyUI = false;                                   // baseline per-frame sidebar DOM writes (off: menus replace them)
   MM.baselineDraw = { damageNumbers: true, labels: true }; // FX/UI may set false to take over canvas text
   const now = () => (window.performance && performance.now ? performance.now() : Date.now());
