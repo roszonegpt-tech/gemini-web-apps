@@ -610,7 +610,11 @@ window.MM = window.MM || {};
     try { return f ? f(c) : []; } catch (e) { console.error('[MM.world] default buildings', e); return []; }
   }
   function adaptBuildings(BD, region, c) { return BD.placements[region].map((pl) => adaptOne(BD, pl, c)).filter(Boolean); }
-  function adaptOne(BD, pl, c) { return Object.assign({ enterable: true }, pl); } // replaced once MM.BUILDINGS' schema is known
+  function adaptOne(BD, pl, c) {
+    const r = MM.buildings && MM.buildings.toWorld ? MM.buildings.toWorld(pl.id, c.L) : Object.assign({ enterable: true }, pl);
+    if (r && Array.isArray(r.art)) r.art = r.art.find((n) => hasArt(n)) || null;
+    return r;
+  }
   function doorInfo(b) {
     const d = (b.spec && b.spec.door) || b.door || { face: 'L', at: b.fw * 8 };
     const at = (d.at ?? b.fw * 8) / 16, out = b.approachOut ?? 0.62;
@@ -623,7 +627,7 @@ window.MM = window.MM || {};
       const rect = b.rect || [b.x - b.fw + 0.06, b.y - b.fd + 0.06, b.x - 0.04, b.y - 0.04];
       const it = B.p('@bld', b.x, b.y, { k: 'building', bld: b, rect, tall: true });
       const d = b.doorPt = b.doorPt || doorInfo(b);
-      B.i('enter:' + b.id, d.ax, d.ay, { prompt: b.enterable ? 'Enter ' + (b.name || b.id) : (b.lockedReason || 'The door is locked.'), r: 0.95, kind: 'door', building: b.id, locked: !b.enterable, hy: 70 });
+      B.i('enter:' + b.id, d.ax, d.ay, { prompt: b.enterable ? 'Enter ' + (b.name || b.id) : (b.lockedPrompt || b.lockedReason || 'The door is locked.'), r: 0.95, kind: 'door', building: b.id, locked: !b.enterable, reason: b.lockedReason, hy: 70 });
       B.reserve(d.ax, d.ay, 1.1); L.buildings.push(b);
       it.doorPt = d;
     }
@@ -706,7 +710,11 @@ window.MM = window.MM || {};
     for (let y = 0; y < MAPN; y++) for (let x = 0; x < MAPN; x++) { const f = L.tiles[x + y * MAPN]; if (f === 'water') S.waterTiles.push([x, y, hsh(x, y, 3)]); else if (f === 'swamp_bog') S.bogTiles.push([x, y, hsh(x, y, 4)]); }
     // obstacles
     S.obs = [];
+    S.blocks = [];
+    try { if (!S.dungeon && MM.buildings && MM.buildings.footprintBlocks) S.blocks = MM.buildings.footprintBlocks(L.region).map((b) => b.rect); } catch (e) { console.error('[MM.world] footprintBlocks', e); }
+    if (!S.blocks.length) for (const it of S.items) if (it.k === 'building') for (const rc of (it.bld.blocks || [it.rect])) S.blocks.push(rc);
     for (const it of S.items) {
+      if (it.k === 'building' || it.noCollide) continue;
       const rc = itemRect(it);
       if (rc) S.obs.push({ rect: rc, low: !!it.low, it });
       else if (it.r) S.obs.push({ x: it.x, y: it.y, r: it.r, low: !!it.low, it });
@@ -1280,8 +1288,11 @@ window.MM = window.MM || {};
     broom: () => callBase('toggleBroom'), dungeon: () => callBase('enterDungeon', false), stairs: () => callBase('advanceFloor'), exit: () => callBase('goRegion', world.region),
     rest: () => { world.time += 0.25; callBase('message', 'You rest a while. Time passes.'); },
     door: (it) => {
-      if (!it.locked && MM.interiors && typeof MM.interiors.enter === 'function') { try { MM.interiors.enter(it.building, { from: world.region }); return; } catch (e) { console.error('[MM.world] interiors.enter', e); } }
-      callBase('message', it.locked ? it.prompt : 'The door is closed for now.');
+      try {
+        if (MM.interiors && typeof MM.interiors.interact === 'function') { MM.interiors.interact('enter:' + it.building); return; }
+        if (!it.locked && MM.interiors && typeof MM.interiors.enter === 'function') { MM.interiors.enter(it.building, { from: world.region }); return; }
+      } catch (e) { console.error('[MM.world] interiors', e); }
+      callBase('message', it.locked ? (it.reason || it.prompt) : 'The door is closed for now.');
     },
     sign: () => callBase('message', 'Practice yard: plant, water, harvest — then try a spell on the dummy.'),
     mail: () => callBase('message', 'No letters today — just a pressed moonflower.'),
@@ -1332,7 +1343,7 @@ window.MM = window.MM || {};
     window.moveActor = function (actor, dx, dy) {
       const ox = actor.x, oy = actor.y;
       const r = _moveActor(actor, dx, dy);
-      if (W.enabled && W.options.collision && world.mode === 'outside' && S.obs) { try { resolve(actor, ox, oy, dx, dy); } catch (e) { console.error('[MM.world] collision', e); } }
+      if (W.enabled && W.options.collision && world.mode === 'outside' && S.obs && worldActive()) { try { resolve(actor, ox, oy, dx, dy); } catch (e) { console.error('[MM.world] collision', e); } }
       return r;
     };
   }
@@ -1403,6 +1414,15 @@ window.MM = window.MM || {};
       S.sentinel = { type: 'custom', x: 0, y: 0, depth: 1e7, draw: () => postEntityPass(ctx) }; // eslint-disable-line no-undef
       H.on('drawables', (list) => { if (!W.enabled) return; S._pbox = null; relDepths(); for (const d of S.draws) list.push(d); list.push(S.sentinel); }, -100);
       H.on('postEffects', emissivePass, 50);
+      // building/structure footprints (door recess carved) -> baseline blockedAt(); never traps: a block the player already stands in is ignored
+      H.on('blocked', (x, y) => {
+        if (!W.enabled || !W.options.collision || world.mode !== 'outside' || !S.blocks || !S.blocks.length || !worldActive()) return false;
+        const R = 0.2, gx = game.x, gy = game.y; // eslint-disable-line no-undef
+        for (const r of S.blocks) {
+          if (x > r[0] - R && x < r[2] + R && y > r[1] - R && y < r[3] + R) { if (gx > r[0] - R && gx < r[2] + R && gy > r[1] - R && gy < r[3] + R) continue; return true; }
+        }
+        return false;
+      });
       H.on('overlay', overlayPass, 80);
     } else {
       // no MM core: intercept the ground blit and the post-effects call
@@ -1459,6 +1479,7 @@ window.MM = window.MM || {};
     buildings() { return S.items.filter((i) => i.k === 'building').map((i) => ({ id: i.bld.id, type: i.bld.type, name: i.bld.name, x: i.x, y: i.y, fw: i.bld.fw, fd: i.bld.fd, rect: i.rect.slice(), door: Object.assign({}, i.doorPt), enterable: !!i.bld.enterable, lockedReason: i.bld.lockedReason || null })); },
     npcs() { return S.npcs.map((n) => ({ id: n.npc, name: n.name, x: n.x, y: n.y })); },
     obstacles() { return S.obs.map((o) => (o.rect ? { rect: o.rect.slice(), low: o.low } : { x: o.x, y: o.y, r: o.r, low: o.low })); },
+    blocks() { return (S.blocks || []).map((r) => r.slice()); },
     tileAt, transition, rebuild() { markDirty(); bakes.clear(); },
     regionVisual(id) { return RV()[id] || null; },
     perf(reset) { const p = S.perf, n = Math.max(1, p.n), r = { frames: p.n, groundMs: p.ground / n, itemsMs: p.items / n, postMs: p.post / n, emissiveMs: p.emit / n, totalMs: (p.ground + p.items + p.post + p.emit) / n, lastBuildMs: p.build, lastTerrainMs: p.terrain || 0, particles: S.parts.length }; if (reset) Object.assign(p, { n: 0, ground: 0, items: 0, post: 0, emit: 0 }); return r; },

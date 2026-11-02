@@ -31,6 +31,8 @@ module.exports = {
     furniture: { anchor: 'bottom', width: 1024, note: 'Interior furniture. Anchor = footprint centre on the floor (foot = [tiles x, tiles y]); *_l against the left/NW back wall, *_r against the right/NE wall; hook:true = hangs from its anchor.' },
     interior: { anchor: 'center', width: 1024, note: 'Interior floors (ifloor_<kind>_0..3) and walls (iwall_<kind>_<piece>_<l|r>, corner, end_l/r, low[door]_sw/se) per kind cottage|shop|herbal|elder|hut. Every piece anchors at the centre of the floor tile whose edge it stands on.' },
     exterior: { anchor: 'bottom', width: 1024, note: 'PHASE3-scale exteriors: bld_* (anchor front ground corner), ext_* face parts (_l SW face / _r SE face; anchor = centre of the bottom edge on the wall), roof edges, chimney, WORLD structures (bottom-centre).' },
+    env: { anchor: 'bottom', note: 'Environment details/storytelling props (bottom-centre ground point). *_frost / *_wet recolours. hook:true = anchor is the hang point.' },
+    screens: { anchor: 'center', note: 'Logo/title elements for SCREENS: moon_large (3f), moon_small, vine_corner/divider/drape, mote_glow/spark (4f), banner_stone (+ _l/_m/_r 9-slice).' },
     npcs: { anchor: 'bottom', width: 1024, note: 'Villagers in the witch 48x56 cell, foot (24,49): npc_<marrow|pip|wren>_<idle|talk>_<s|e|n>; west = e flipped. cat_idle_<s|e>.' },
   },
   anchors: {},
@@ -62,7 +64,8 @@ module.exports.aliases = {
 // Contact shadows: [rx, ry] of a soft ellipse drawn under the anchor when MM.art.draw gets {shadow:true}
 // (aliases used by the baseline seams draw it automatically, since the baseline skips its own shadow then).
 const groundShadow = (n, w, h) => { const rx = Math.max(4, Math.round(Math.min(w, 40) * 0.36)); return [rx, Math.max(2, Math.round(rx / 3))]; };
-for (const s of ['nature', 'props', 'crops', 'bosses']) module.exports.sheets[s].shadow = groundShadow;
+for (const s of ['nature', 'props', 'crops', 'bosses', 'exterior']) module.exports.sheets[s].shadow = groundShadow;
 module.exports.sheets.nature.shadow = (n, w, h) => (/lilypad|flowers|snow_mound/.test(n) ? null : groundShadow(n, w, h));
 module.exports.sheets.crops.shadow = (n, w, h) => (/_seed$|soil_/.test(n) ? null : [5, 2]);
+module.exports.sheets.env.shadow = (n, w, h) => (/mushroom_ring|lantern_string|stepping|roots|flowers/.test(n) ? null : groundShadow(n, w, h));
 module.exports.sheets.props.shadow = (n, w, h) => (/^fence_[xy]/.test(n) ? null : groundShadow(n, w, h));

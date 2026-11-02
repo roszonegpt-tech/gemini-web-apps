@@ -68,7 +68,7 @@ window.MM = window.MM || {};
   let nid = 1, active = 0, made = 0, finished = 0, culled = 0;
   const counts = { burst: 0, spell: 0, attach: 0, ambient: 0 };
   // rough extents (units) per effect for the dirty rect / culling: [halfWidth, up, down]
-  const EXT = { explosion: [130, 150, 50], impact: [50, 50, 30], slash: [110, 90, 60], sparkle: [90, 80, 80], heal: [80, 170, 20], powerUp: [110, 200, 30], holyLight: [90, 640, 50], ice: [110, 120, 30],
+  const EXT = { explosion: [170, 190, 90], impact: [50, 50, 30], slash: [110, 90, 60], sparkle: [90, 80, 80], heal: [80, 170, 20], powerUp: [150, 240, 70], holyLight: [260, 680, 160], ice: [110, 120, 30],
     poison: [110, 110, 40], fire: [50, 90, 20], shield: [80, 110, 30], pickup: [60, 80, 40], movement: [140, 90, 30], energy: [90, 90, 90], lightning: [110, 640, 40], blackHole: [260, 260, 260], muzzleFlash: [60, 40, 40], blood: [60, 40, 30] };
   function slot(cls) {
     let r = null;
@@ -248,7 +248,7 @@ window.MM = window.MM || {};
       ctx.drawImage(off, x0, y0, w, h, x0, y0, w, h);
       if (S.quality !== 'low') {
         lx2.putImageData(limg, 0, 0, x0, y0, w, h);
-        ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = (S.rFlash ? 0.3 : 0.55) * Math.min(1.2, 0.7 + 0.3 * S.fxI);
+        ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = (S.rFlash ? 0.22 : 0.4) * Math.min(1.2, 0.7 + 0.3 * S.fxI);
         ctx.drawImage(loff, x0, y0, w, h, x0, y0, w, h);
       }
       ctx.restore();

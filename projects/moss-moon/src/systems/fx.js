@@ -920,8 +920,7 @@ window.MM = window.MM || {};
     if (!S.numbers) return;
     let x, y; try { x = n.x == null ? dummy.x : n.x; y = n.y == null ? dummy.y : n.y; } catch (e) { return; }
     const dotK = DOT_COLORS[n.color], crit = !!n.crit;
-    const t = text(n.value, PJX(x, y) + OFFS[offsIdx++ % OFFS.length], PJY(x, y), dotK ? 34 : 40, n.color || '#fff4d6', crit ? 2 : 1, dotK ? 0.7 : 0.85, dotK ? 9 : 14);
-    if (crit && t) t.pop = 0.1;
+    text(n.value, PJX(x, y) + OFFS[offsIdx++ % OFFS.length], PJY(x, y), dotK ? 34 : 40, n.color || '#fff4d6', crit ? 2 : 1, dotK ? 0.7 : 0.85, dotK ? 9 : 14);
   }
   // impact feedback for every hit, sized by meaning (share of the target's max HP)
   function onHit(d) {
@@ -1080,7 +1079,7 @@ window.MM = window.MM || {};
     if (prevHp < 0) { prevHp = world.hp; prevWard = world.ward || 0; prevLevel = world.level; }
     if (world.level > prevLevel) onLevel(world.level);
     if (world.hp < prevHp - 0.5 && skipHeal <= 0) {
-      const dmg = Math.round(prevHp - world.hp), max = (function () { try { return heroMaxHP(); } catch (e) { return 100; } })(), heavy = dmg >= max * 0.12;
+      const dmg = Math.round(prevHp - world.hp), max = (function () { try { return heroMaxHP(); } catch (e) { return 100; } })(), heavy = dmg >= max * 0.25;
       hurtT = S.rFlash ? 0.25 : 0.4;
       const fx0 = hurtFrom && Number.isFinite(hurtFrom.x) ? hurtFrom : null;
       const dir = fx0 ? Math.atan2(PJY(game.x, game.y) - PJY(fx0.x, fx0.y), PJX(game.x, game.y) - PJX(fx0.x, fx0.y)) : undefined;
@@ -1494,7 +1493,7 @@ window.MM = window.MM || {};
     ctx.globalAlpha = 1;
     for (let i = 0; i < TMAX; i++) {
       const tx = T[i]; if (!tx.on) continue;
-      const k = 1 - tx.life / tx.ttl, f = tx.life / tx.ttl, s = tx.pop > 0 ? tx.s + 1 : tx.s;
+      const k = 1 - tx.life / tx.ttl, f = tx.life / tx.ttl, s = tx.pop > 0 && tx.s === 1 ? 2 : tx.s;
       const z = tx.z + tx.rise * (1 - (1 - k) * (1 - k));
       const w = textWidth(tx.str, s), sx = SX(tx.wx + tx.vx * k) - (w >> 1), sy = SY(tx.wy, z);
       ctx.globalAlpha = f < 0.3 ? f / 0.3 : 1;
