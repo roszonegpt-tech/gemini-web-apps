@@ -122,6 +122,37 @@ layout:'wide'|'home'|'well',glow,blaze,lit,over,crops,actors…})`, `region(...)
 manifest (`duration`, subtitles, cues) must match the scene's shot times.
 
 ## Testing
-`node tests/cine-test.js` (≈60 s, 54 checks; exits non-zero on failure). Screenshots go to
+`node tests/cine-test.js` (≈90 s, 83 checks; exits non-zero on failure). Screenshots go to
 `tests/out/cine-<id>-{start,mid,end}.png` plus `cine-reduced-motion-boss_forest_intro.png`.
 `tests/cine-demo.html` is a manual player with subtitle, reduced-motion and speed toggles.
+
+## Phase 3 (PHASE3_CONTRACT "CINEMATICS amendments")
+- **No private rAF.** Timelines are driven by `MM.loop.onTick(dt)`: one subscription per playback, released at the end.
+  - If `MM.loop` is absent, or never ticks within 1.5 s, a guarded fallback rAF is used (≤1 pending).
+  - A host can drive it manually: `play(id,{manual:true})`, then call `MM.cine.tick(dt)` from its `update(dt)`.
+- **Frame-rate independent.** Time accumulates from `dt` (clamped ≤0.1). Cues fire once when crossed. Hold-to-skip, fades and the
+  skip-button timeout are dt-based too. Tested at 20/30/60/144 fps: same cues, each within one frame, same end time.
+- **Resize.** The 8:5 stage is re-laid out in px on window `resize` and through a `ResizeObserver` on the overlay (disconnected at the end).
+- **Tab visibility.** Hidden → no time passes (MM.loop and the fallback both reset dt). Visible → no spike. A playing video
+  pauses while hidden and resumes after. The audio duck stays held until cleanup.
+- **Hosting.**
+  - State `intro` (src/screens/intro.js calls `play('intro',{skippable,force,replay})`): that screen owns the persistent,
+    focusable "Skip intro" button, so ours is hidden. Esc, press-twice/hold Space/Enter, and click-hold still skip. Captions
+    and reduced motion are unchanged; replays are unlimited.
+  - State `cine` (campaign).
+  - While hosted, listeners go through `MM.screens.listen` (and are also removed by us).
+  - The pause `menu` (and `loading`) states pause the cinematic.
+  - Any other state change ends it: `skipped:true, reason:'state-exit'`.
+  - `MM.cine.stop(reason)` ends it synchronously (for a screen's `exit()`).
+  - `MM.cine.attach(el)` / `play(id,{container})` choose the overlay host.
+- **Cleanup on every exit path** (end, Esc, stop, state-exit, force, video missing/real). DOM, listeners, timers, intervals,
+  rAF, ResizeObservers, `<video>`, audio duck, onTick and focus are all restored. Verified 20× in `tests/cine-test.js`.
+- **Accessibility.** The overlay takes focus and returns it afterwards. A screen-reader hint names the skip keys. Our Skip
+  button shows for the first ~2.6 s and on any input, and is reachable with Tab.
+- **Art.** The cottage (`cottage_ruined/mended/lush`), Moonwell (`moonwell_dark/faint/glow/restored`), village houses
+  (`house_village_0..2`) and `lantern` come from `MM.art`, the game's own claude-pxl sprites, untouched apart from a
+  multiply night tint. Lit windows are the sprites' own warm pixels; beams, glows and smoke stay procedural. The procedural
+  painters are only a fallback (no `MM.art`, or `MM.cine.useArt=false`).
+- **Story.** Three lunar fragments, matching the campaign: one falls into each corrupted region during the intro, and they
+  return together in the ending. The premise line covers farming, neighbours and the three pieces of the moon. Boss
+  names match src/config/campaign.js (Bramble Warden, Mire Heart, Frost Wyrm Husk).

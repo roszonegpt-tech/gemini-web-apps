@@ -53,4 +53,15 @@ composition, panorama seams, boss texture, actor placement above the letterbox b
   injects its own window listeners during element screenshots.
 - The single-file build would need videos inlined. Engine scenes need nothing extra (they only use `ATLAS_DATA` and
   `CAST_PAGE_DATA` when present).
-- rAF-driven: a hidden tab pauses the cinematic, and it resumes when the tab is visible again.
+- Driven by `MM.loop.onTick` (no private rAF; guarded fallback only without MM.loop). A hidden tab freezes the timeline with no dt spike.
+
+## Phase 3 update
+- See the "Phase 3" section in notes/CINEMATICS.md. New API:
+  - `stop(reason)`, `tick(dt)` (with `play(...,{manual:true})`), `attach(el)`, `debug()`;
+  - `play` options `container`, `skipButton`, `logCues`;
+  - `current()` adds `driver` and `host`.
+- Tests:
+  - `node tests/cine-test.js`: ALL PASSED (83 checks, run twice). It adds single-rAF/driver, frame-rate, visibility, resize,
+    hosting (cine/intro/menu/state-exit), `stop()` and 20× cleanup checks.
+  - `tests/screens-test.js`: 60/60 pass. `tests/smoke.js`: pass, including single rAF.
+  - Real-page `index.html#mm-intro`: replayed 3×; host 'intro', driver 'loop', rafs 1; Esc → title, overlay removed, no errors.

@@ -356,10 +356,11 @@ window.MM = window.MM || {};
 
   // ================================================================== HUD (DOM, moonlit style; keyboard + touch operable)
   const CSS = `
-  .mm-tut{position:fixed;left:50%;top:calc(8px + env(safe-area-inset-top,0px));transform:translateX(-50%);z-index:4;width:min(94vw,420px);
+  .mm-tut{position:fixed;right:calc(12px + env(safe-area-inset-right,0px));top:calc(clamp(58px,10.5vh,96px) + env(safe-area-inset-top,0px));z-index:4;width:min(44vw,360px);
     pointer-events:auto;padding:8px 11px 8px;border-radius:12px;color:var(--cream,#f4ecd6);font-family:var(--sans,system-ui,sans-serif);
-    background:linear-gradient(180deg,rgba(21,51,55,.94),rgba(8,22,25,.94));border:1px solid var(--gold-dim,rgba(207,170,113,.42));
+    background:linear-gradient(180deg,rgba(21,51,55,.98),rgba(8,22,25,.98));border:1px solid var(--gold-dim,rgba(207,170,113,.42));
     box-shadow:0 0 0 1px rgba(8,22,25,.8),0 6px 22px rgba(0,0,0,.45),inset 0 1px 0 rgba(236,210,155,.18);transition:opacity .2s}
+  @media (max-aspect-ratio:4/5){.mm-tut{top:auto;right:auto;left:50%;transform:translateX(-50%);width:min(94vw,420px);bottom:calc(50% + 31.25vw + 8px)}}
   .mm-tut.mm-tut-off{opacity:0;visibility:hidden;pointer-events:none}
   .mm-tut.mm-tut-pop{animation:mmTutPop .45s ease-out}
   @keyframes mmTutPop{0%{box-shadow:0 0 0 2px #ecd29b,0 0 26px rgba(236,210,155,.7)}100%{box-shadow:0 0 0 1px rgba(8,22,25,.8),0 6px 22px rgba(0,0,0,.45)}}
@@ -371,7 +372,7 @@ window.MM = window.MM || {};
   .mm-tut .mm-tut-hint{margin-top:5px;color:var(--moss,#9fd197);font-size:.86em}
   .mm-tut kbd{display:inline-block;min-width:1.6em;padding:0 .4em;border-radius:5px;border:1px solid var(--gold,#cfaa71);background:rgba(207,170,113,.14);
     color:var(--gold-hi,#ecd29b);font:600 .92em var(--mono,monospace);text-align:center}
-  .mm-tut-row{display:flex;align-items:flex-end;gap:8px;margin-top:5px}.mm-tut-row .mm-tut-hint{flex:1;margin:0}
+  .mm-tut-row{display:flex;flex-wrap:wrap;align-items:flex-end;gap:6px 8px;margin-top:5px}.mm-tut-row .mm-tut-hint{flex:1;margin:0}
   .mm-tut-btns{display:flex;gap:6px;flex:none}
   .mm-tut button{pointer-events:auto;min-height:32px;padding:3px 9px;border-radius:8px;cursor:pointer;font:inherit;font-size:.84em;color:var(--cream,#f4ecd6);
     background:rgba(30,68,72,.85);border:1px solid var(--gold-dim,rgba(207,170,113,.42))}

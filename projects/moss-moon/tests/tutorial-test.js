@@ -22,7 +22,7 @@ const fs = require('fs');
     await p.goto('file://' + file + '#mm-title');
     await p.waitForFunction(() => window.MM && MM.tutorial && MM.flow && MM.state.current === 'title' && MM.art && MM.art.ready, null, { timeout: 20000 });
     await p.evaluate(() => {
-      window.__tl = []; MM.bus.on('tutorial:end', (d) => { window.__tl.push({ d, world: JSON.stringify(world), game: JSON.stringify(game), save: localStorage.getItem('moss-moon-save-v2'), state: MM.state.current, flags: MM.flow.flags() }); });
+      window.__tl = []; MM.bus.on('tutorial:end', (d) => { window.__tl.push({ d, world: JSON.stringify(world), game: JSON.stringify(game), save: localStorage.getItem('moss-moon-save-v2'), state: MM.state.current, flags: MM.flow.flags(), camp: MM.campaign ? JSON.stringify(MM.campaign.state) : '' }); });
       window.__steps = []; MM.bus.on('tutorial:step', (d) => window.__steps.push(d));
     });
     return { ctx, p };
@@ -41,6 +41,7 @@ const fs = require('fs');
           const r = await ev(([x, y]) => { const c = document.getElementById('scene').getBoundingClientRect(), s = worldToCanvas(x, y); return { cx: c.left + s.x * c.width / 512, cy: c.top + s.y * c.height / 320, dist: Math.hypot(game.x - x, game.y - y) }; }, [x, y]);
           if (r.dist < d) return true;
           await p.mouse.click(r.cx, r.cy); await wait(700);
+          if ((await ev(() => MM.state.current)) === 'dialogue') { await p.keyboard.press('Escape'); await wait(250); } // clicked a sprite in reach
         }
         return (await ev(([x, y]) => Math.hypot(game.x - x, game.y - y), [x, y])) < d;
       };
@@ -79,7 +80,7 @@ const fs = require('fs');
         const tr = await ev(() => MM.buildings.get('practice_hut').approach || null);
         if (tr) await walkTo(tr.x, tr.y, 0.3); await wait(600);
       }
-      check('enter-hut', (await ev(() => MM.state.current)) === 'interior' && (await step()) === 'exit', { state: await ev(() => MM.state.current), step: await step() });
+      check('enter-hut', (await ev(() => MM.state.current)) === 'interior' && (await step()) === 'exit', { state: await ev(() => MM.state.current), step: await step(), pos: await ev(() => [game.x, game.y]), door });
       await wait(400); await shot('04-exit-inside');
       await wait(2000); check('inside-idle-no-advance', (await step()) === 'exit');
       // walk out of the doorway with the real controller (click-to-move target set to the doorway)
@@ -101,7 +102,7 @@ const fs = require('fs');
       await press('e');
       check('harvest', (await step()) === 'cast', await step());
       await wait(2000); check('cast-early-not-counted', (await step()) === 'cast');
-      await walkTo(11.6, 11.5, 0.6);
+      await walkTo(12.0, 9.9, 0.6);
       await shot('07-cast');
       await press(' '); await wait(1200);
       check('cast-at-dummy', (await step()) === 'potion' && (await ev(() => dummy.hp < dummy.maxHP || true)), await ev(() => [MM.tutorial.step, dummy.hp]));
@@ -154,8 +155,8 @@ const fs = require('fs');
       await wait(500);
       await ev(() => { MM.ui && MM.ui.closeAll && MM.ui.closeAll({ silent: true }); if (MM.state.current !== 'play') MM.state.go('play'); });
       await wait(300);
-      const before = await ev(() => ({ world: JSON.stringify(world), save: localStorage.getItem('moss-moon-save-v2'), camp: MM.campaign ? JSON.stringify(MM.campaign.state) : '' }));
-      await ev(() => MM.flow.startTutorial({ replay: true })); await wait(300);
+      // capture the real state and enter the tutorial in the same task (play keeps simulating otherwise)
+      const before = await ev(() => { const r = { world: JSON.stringify(world), save: localStorage.getItem('moss-moon-save-v2'), camp: MM.campaign ? JSON.stringify(MM.campaign.state) : '' }; MM.flow.startTutorial({ replay: true }); return r; }); await wait(300);
       check('replay-from-play', (await ev(() => MM.state.current)) === 'tutorial');
       await p.keyboard.down('a'); await wait(900); await p.keyboard.up('a');
       await ev(() => { game.x = 7.6; game.y = 11.6; }); await p.keyboard.press('e'); await wait(150);
@@ -166,11 +167,11 @@ const fs = require('fs');
       await cancel.click(); await wait(500);
       check('skip-cancel-stays', (await ev(() => MM.state.current)) === 'tutorial' && (await ev(() => MM.tutorial.active)) && (await ev(() => MM.flow.flags().tutorialDone)) === false, await ev(() => MM.state.current));
       await p.click('.mm-tut [data-act="skip"]'); await wait(400);
-      await p.locator('#mm-ui button', { hasText: 'Skip tutorial' }).last().click(); await wait(700);
+      await p.locator('#mm-ui button:not([data-act])', { hasText: 'Skip tutorial' }).last().click(); await wait(700);
       const tl = await ev(() => window.__tl[window.__tl.length - 1]);
       check('skip-world-identical', tl && tl.world === before.world);
       check('skip-save-identical', tl && tl.save === before.save);
-      check('skip-campaign-identical', (await ev(() => (MM.campaign ? JSON.stringify(MM.campaign.state) : ''))) === before.camp);
+      check('skip-campaign-identical', tl && tl.camp === before.camp);
       check('skip-flow-play-flag', (await ev(() => MM.state.current)) === 'play' && (await ev(() => MM.flow.flags().tutorialDone)) === true);
       // abort (quit to title from the tutorial's pause menu) never persists the flag and restores the world
       await ev(() => MM.flow.resetFlags());
@@ -223,7 +224,7 @@ const fs = require('fs');
       await ev(() => MM.ui && MM.ui.closeAll && MM.ui.closeAll()); await wait(300);
       check('touch-sign', (await ev(() => MM.tutorial.step)) === 'enter', await ev(() => [MM.tutorial.step, game.x, game.y]));
       await p.locator('.mm-tut [data-act="skip"]').tap(); await wait(400);
-      await p.locator('#mm-ui button', { hasText: 'Skip tutorial' }).last().tap(); await wait(700);
+      await p.locator('#mm-ui button:not([data-act])', { hasText: 'Skip tutorial' }).last().tap(); await wait(700);
       check('touch-skip', (await ev(() => MM.state.current)) === 'play' && (await ev(() => MM.flow.flags().tutorialDone)) === true);
       const hud = await ev(() => { const r = document.querySelector('.mm-tut'); return r ? r.getBoundingClientRect().width : 0; });
       check('touch-hud-gone', hud === 0);

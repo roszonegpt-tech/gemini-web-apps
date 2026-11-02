@@ -18,6 +18,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 async function boot(browser, opts) {
   const ctx = await browser.newContext(Object.assign({ viewport: { width: 1280, height: 800 } }, opts || {}));
   const page = await ctx.newPage();
+  page.setDefaultTimeout(15000);
   page.errors = [];
   page.on('pageerror', (e) => page.errors.push('pageerror: ' + e.message));
   page.on('console', (m) => { if (m.type() === 'error') page.errors.push('console: ' + m.text()); });
@@ -168,9 +169,12 @@ async function startNewGame(page, name) {
   await page.evaluate(() => MM.ui.open('travel')); await sleep(250); await shot(page, 'travel-desktop'); await page.keyboard.press('Escape');
   step('shop'); await page.evaluate(() => MM.ui.open('shop', { npc: 'pip' })); await sleep(250); await shot(page, 'shop-desktop'); step('shop-shot');
   await page.keyboard.press('Escape'); await sleep(150);
-  step('talk'); const talk = page.evaluate(() => { MM.ui.talk('pip'); return true; }); await sleep(1500); step('talk-shot'); await shot(page, 'dialogue-npc-desktop'); step('choice');
-  const choice = await page.evaluate(() => { const b = Array.from(document.querySelectorAll('.mm-choice')).find((x) => /wares|shop|buy/i.test(x.textContent)); if (b) b.click(); return b ? b.textContent : null; }); await talk; await sleep(300);
-  check('NPC dialogue choice routes through campaign.choose → shop', !choice || (await top(page)) === 'shop', choice);
+  step('talk'); page.evaluate(() => { MM.ui.talk('pip'); return true; }); await sleep(1500); await shot(page, 'dialogue-npc-desktop');
+  for (let i = 0; i < 8 && !(await page.$('.mm-choice')); i++) { await page.keyboard.press('Enter'); await sleep(250); }
+  const choice = await page.$('.mm-choice >> text=/stall|wares|shop/i');
+  if (choice) await choice.click({ timeout: 5000 });
+  await sleep(500);
+  check('NPC dialogue choice routes through campaign.choose → shop', !!choice && (await top(page)) === 'shop', await top(page));
   if ((await top(page)) !== 'shop') await page.evaluate(() => MM.ui.open('shop', { npc: 'pip' }));
   check('shop opens with stock', await page.evaluate(() => document.querySelectorAll('[data-screen="shop"] .mm-row').length > 0));
   await page.keyboard.press('Escape'); await sleep(150);

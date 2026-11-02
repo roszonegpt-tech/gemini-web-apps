@@ -29,7 +29,7 @@ window.MM = window.MM || {};
     region: 'tutorial',
     spawn: { x: 9.7, y: 10, facing: 'S' },
     plot: { x: 8.2, y: 11.3 },
-    dummy: { x: 12.6, y: 10.9 },       // the baseline dummy is moved here while the sandbox lives (restored after)
+    dummy: { x: 12.8, y: 8.6 },        // (inside WORLD's reserved clearing at 12,9) the baseline dummy is moved here while the sandbox lives (restored after)
     sign: { x: 11.2, y: 9.0, id: 'tutorial_sign' },
     hut: 'practice_hut',
     give: { seeds: { wheat: 3 }, seed: 'wheat', potions: 1 },
