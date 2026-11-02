@@ -30,6 +30,7 @@
     if (name === 'pause') { ui.openPause(); return true; }
     if (name === 'spellNext' || name === 'spellPrev') { input.cycleSpell(name === 'spellNext' ? 1 : -1); return true; }
     if (name === 'interact') {
+      if (MM.interiors && MM.interiors.active && typeof MM.interiors.interact === 'function') { safe(() => MM.interiors.interact()); return true; }
       if (MM.world && typeof MM.world.interact === 'function') { const r = safe(() => MM.world.interact(), false); if (r) return true; }
       if (MM.input && typeof MM.input.action === 'function' && (MM.input.actions || []).includes('tend')) return safe(() => MM.input.action('tend'), false) !== false;
       input.press('e'); return true;

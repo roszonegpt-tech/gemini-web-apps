@@ -115,6 +115,8 @@ window.MM = window.MM || {};
   ui.go = (name, data) => { if (ui.state().current !== name) safe(() => ui.state().go(name, data)); };
   // Gameplay states (phase 3): HUD, joystick and hotkeys only exist while the current screen simulates (sim !== 'none').
   ui.GAME_STATES = ['play', 'interior', 'tutorial'];
+  ui.FRONT_STATES = ['boot', 'logo', 'intro', 'title', 'creation'];
+  ui.flushToasts = () => { if (ui.layers && ui.layers.toasts) ui.layers.toasts.innerHTML = ''; ui._lastToast = null; };
   ui.simOf = function (name) {
     const d = safe(() => MM.screens && MM.screens.def && MM.screens.def(name), null);
     if (d && d.sim) return d.sim;
@@ -486,7 +488,9 @@ window.MM = window.MM || {};
       if (['cine', 'loading'].includes(cur)) return;
       let want = null;
       for (let i = ui.stack.length - 1; i >= 0; i--) if (ui.stack[i].state) { want = ui.stack[i].state; break; }
-      if (!want && ui.stack.length && !ui.stack.every((s) => s.passive)) want = 'menu';
+      // Panels opened over front-end states (title/logo/intro/creation: settings, controls, credits, confirm…) keep that state;
+      // only panels opened during gameplay pause it ('menu').
+      if (!want && ui.stack.length && !ui.stack.every((s) => s.passive) && (ui.GAME_STATES.includes(cur) || ['menu', 'dialogue'].includes(cur))) want = 'menu';
       if (want === 'keep') return;
       if (want && want !== cur) ui.go(want);
       else if (!want && ['menu', 'dialogue'].includes(cur)) ui.go(ui.lastGameState || 'play');
@@ -615,6 +619,8 @@ window.MM = window.MM || {};
     if (!text) return null;
     ui.root();
     opts = opts || {};
+    // Gameplay toasts never show over logo/intro/title/creation (sim 'none' front-end); UI panel feedback still does.
+    if (ui.FRONT_STATES.includes(ui.state().current) && !ui.isOpen() && !opts.force) return null;
     const nowT = Date.now();
     if (ui._lastToast && ui._lastToast.text === String(text) && nowT - ui._lastToast.t < 600) return null; // bus 'toast' + direct call dedupe
     ui._lastToast = { text: String(text), t: nowT };

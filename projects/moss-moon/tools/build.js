@@ -24,7 +24,7 @@ const PLANNED = [
   'src/config/buildings.js', 'src/config/tutorial.js', // after baseline (may read its constants), before world-render.js
   'src/entities/bosses.js', 'src/systems/campaign.js', 'src/systems/world-render.js',
   'src/systems/interiors.js', 'src/systems/interior-render.js',
-  'src/systems/lighting.js', 'src/systems/fx.js', 'src/systems/filter.js',
+  'src/systems/lighting.js', 'src/systems/fx.js', 'src/systems/filter.js', 'src/systems/sfvfx.js', 'src/systems/vfx-bridge.js',
   '@ui',
   'src/screens/flow.js', 'src/screens/logo.js', 'src/screens/title.js', 'src/screens/intro.js', 'src/screens/tutorial.js',
   'src/core/boot.js',

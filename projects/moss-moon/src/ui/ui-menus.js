@@ -684,7 +684,7 @@
       h('dl', null,
         h('dt', null, 'Game design, code & writing'), h('dd', null, 'The Moss & Moon project — built in the open as a small multi-agent collaboration'),
         h('dt', null, 'Pixel art tooling'), h('dd', null, h('strong', null, 'claude-pxl'), ' by ', h('strong', null, 'crsolver'), ' — MIT License'),
-        h('dt', null, 'Pixel-art VFX library'), h('dd', null, h('strong', null, 'Sprite Fusion'), ' (spritefusion.com/pixel-art-vfx) — MIT License, © 2026 Hugo Duprez'),
+        h('dt', null, 'Pixel-art VFX'), h('dd', null, 'Pixel-art VFX by ', h('strong', null, 'Sprite Fusion'), ' (spritefusion.com/pixel-art-vfx) — MIT, © 2026 Hugo Duprez'),
         h('dt', null, 'Original character & spell demo'), h('dd', null, 'Isometric Witch Character Demo (baseline of this project)'),
         h('dt', null, 'Music & sound'), h('dd', null, 'Procedural Web Audio score and effects, generated in your browser'),
         h('dt', null, 'Type'), h('dd', null, 'Your system’s serif and rounded fonts — no downloads')),

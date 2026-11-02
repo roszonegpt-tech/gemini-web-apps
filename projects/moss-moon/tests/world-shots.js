@@ -38,6 +38,9 @@ const path = require('path');
   for (const r of ['forest', 'swamp', 'mountain', 'crypt']) await shot('dungeon-' + r, at(r, 10, 9, "enterDungeon(false); enemies = enemies.slice(0, 2);"));
   await shot('grove4-night', at('grove', 11, 7, 'MM.world.setRestoration(4); world.time = .8;'), 900);
   await shot('village-night', at('village', 9.7, 10, 'world.time = .8;'), 900);
+  await shot('tutorial', at('tutorial', 9.7, 9, "if (!REGIONS.tutorial) REGIONS.tutorial = { name: 'Practice Yard', tint: null, mob: 'slime', level: 1 };".replace(/^/, '') ).replace("goRegion('tutorial');", "if (!REGIONS.tutorial) REGIONS.tutorial = { name: 'Practice Yard', tint: null, mob: 'slime', level: 1 }; goRegion('tutorial');"));
+  await shot('door-cue', at('grove', 5.75, 6.25, 'MM.world.setRestoration(3); world.time = .75;'), 900);
+  await shot('village-shed', at('village', 18.1, 13.9, 'world.time = .3;'));
   await shot('grove0-edge', at('grove', 17.5, 16.5, 'MM.world.setRestoration(0);'));
   // behaviour checks
   const info = await p.evaluate(() => {

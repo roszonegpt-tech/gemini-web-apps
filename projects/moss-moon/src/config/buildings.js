@@ -158,13 +158,13 @@ window.MM = window.MM || {};
   const placements = {
     grove: [
       { id: 'home', type: 'cottage_home', x: 8.0, y: 5.6 },
-      { id: 'old_mill', type: 'mill', x: 19.0, y: 9.6 },
+      { id: 'old_mill', type: 'mill', x: 19.0, y: 16.8 },
+      { id: 'old_shed', type: 'shed', x: 6.2, y: 16.4 },
     ],
     village: [
       { id: 'marrow_house', type: 'elder_house', x: 6.8, y: 6.4 },
       { id: 'pip_shop', type: 'village_shop', x: 16.0, y: 5.6 },
       { id: 'wren_house', type: 'herbalist_house', x: 6.0, y: 16.2 },
-      { id: 'old_shed', type: 'shed', x: 17.6, y: 15.4 },
     ],
     tutorial: [
       { id: 'practice_hut', type: 'tutorial_hut', x: 11.3, y: 5.4 },

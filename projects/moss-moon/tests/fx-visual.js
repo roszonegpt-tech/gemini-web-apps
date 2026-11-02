@@ -38,8 +38,8 @@ async function strip(page, name, frames, box, scale = 3) {
     await scene(page, { region: 'swamp', time: 0.85, warm: 120 }); await shot(page, `fx-palette-swamp-night.png`);
     await scene(page, { region: 'mountain', time: 0.35, warm: 120 }); await shot(page, `fx-palette-frost.png`);
     await scene(page, { region: 'forest', time: 0.45, warm: 120 }); await shot(page, `fx-palette-forest.png`);
-    await page.evaluate(() => goRegion('crypt')); await scene(page, { dungeon: true, warm: 90 }); await shot(page, `fx-palette-dungeon.png`);
-    await page.evaluate(() => goRegion('grove')); await scene(page, {});
+    await scene(page, { region: 'crypt', dungeon: true, warm: 90 }); await shot(page, `fx-palette-dungeon.png`);
+    await page.evaluate(() => { world.region = 'grove'; world.mode = 'outside'; world.floor = 0; dungeonBlocks = []; drawGround(); MM.bus.emit('region', { id: 'grove' }); }); await scene(page, {});
   }
   // ---------- signature spells (mid-effect 2x shots + strips)
   if (want('spells')) {

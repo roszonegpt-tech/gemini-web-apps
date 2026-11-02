@@ -686,7 +686,8 @@ window.MM = window.MM || {};
     const sz = spriteSize(it); it.w = sz[0]; it.h = sz[1]; it.ax = sz[2]; it.ay = sz[3];
     if (it.r == null && KIND_R[it.k] != null) it.r = KIND_R[it.k];
     const rc0 = itemRect(it);
-    it.depth = rc0 ? project(rc0[0], rc0[1]).y + 0.5 : project(it.x, it.y).y + (it.dz || 0); it.baseDepth = it.depth;
+    // multi-tile footprints sort at their nearer side corner: correct vs. everything in front of either face and behind either back edge
+    it.depth = rc0 ? Math.min(project(rc0[0], rc0[3]).y, project(rc0[2], rc0[1]).y) : project(it.x, it.y).y + (it.dz || 0); it.baseDepth = it.depth;
     if (it.k === 'building') {
       const r = buildingSprite(it), b = it.bld;
       if (r) {
@@ -1015,7 +1016,21 @@ window.MM = window.MM || {};
     if (it.depth <= project(game.x, game.y).y) return false; // eslint-disable-line no-undef
     const bx = S._pbox || (S._pbox = playerBox());
     const l = sx - it.ax, tp = sy - it.ay, r = l + it.w, b = sy - 2;
-    return bx[0] < r && bx[2] > l && bx[1] < b && bx[3] > tp + 4;
+    if (!(bx[0] < r && bx[2] > l && bx[1] < b && bx[3] > tp + 4)) return false;
+    if (it.k !== 'building') return true;
+    // buildings: sample the real sprite alpha at the player's head/torso/feet instead of the (mostly empty) bbox
+    const cx = (bx[0] + bx[2]) / 2, pts = [[cx, bx[1] + 5], [cx, (bx[1] + bx[3]) / 2], [cx - 6, bx[3] - 3], [cx + 6, bx[3] - 3]];
+    return pts.some(([x, y]) => spriteAlphaAt(it, x - (sx - it.ax), y - (sy - it.ay)) > 0);
+  }
+  const alphaCache = new Map();
+  function spriteAlphaAt(it, x, y) {
+    x = Math.floor(x); y = Math.floor(y); if (x < 0 || y < 0 || x >= it.w || y >= it.h) return 0;
+    let key, src, sx0 = 0, sy0 = 0;
+    if (it.bld && it.bld.art && artGet(it.bld.art)) { const f = artGet(it.bld.art); key = it.bld.art; src = f.img; sx0 = f.x; sy0 = f.y; }
+    else { const r = buildingSprite(it); if (!r) return 0; key = r; src = r.c; }
+    let d = alphaCache.get(key);
+    if (!d) { const [c, g] = mk(it.w, it.h); g.drawImage(src, sx0, sy0, it.w, it.h, 0, 0, it.w, it.h); d = g.getImageData(0, 0, it.w, it.h).data; alphaCache.set(key, d); }
+    return d[(y * it.w + x) * 4 + 3];
   }
   function swayPx(it) { if (!it.sway || reducedMotion()) return 0; const wind = world.weather === 'Wind' ? 1.6 : 1; return Math.round(Math.sin(S.t * 1.25 + it.ph) * 0.9 * wind + Math.sin(S.t * 0.53 + it.ph * 2) * 0.4); }
   function drawCustom(c, pos, d) { drawItem(d.it, pos.x, pos.y); }
@@ -1045,8 +1060,18 @@ window.MM = window.MM || {};
     const r = buildingSprite(it); if (!r) return;
     const a0 = g.globalAlpha; g.globalAlpha = a0 * a;
     g.drawImage(r.c, Math.round(sx - r.ax), Math.round(sy - r.ay));
-    const dk = darkness();
-    if (b.litWindows && dk > 0.04 && r.lit) { g.globalAlpha = a0 * a * Math.min(1, dk * 1.1) * (0.92 + 0.08 * Math.sin(S.t * 3 + it.ph)); g.drawImage(r.lit, Math.round(sx - r.ax), Math.round(sy - r.ay)); }
+    const dk = darkness(), sp = b.spec || {}, locked = !b.enterable || sp.locked, Z = sp.foundation ?? 5;
+    // ART2 parts over the painted shell: framed door, framed windows (lit at night / shuttered when locked), flower boxes
+    const at = (face, u, z) => (face === 'R' ? [sx + u, sy - u / 2 - z] : [sx - u, sy - u / 2 - z]);
+    const part = (n, face, u, z, al) => { const nm = n + '_' + (face === 'R' ? 'r' : 'l'); if (!hasArt(nm)) return false; const q = at(face, u, z); return blitArt(g, nm, q[0], q[1], S.t, false, al == null ? a : a * al); };
+    if (sp.door) part(locked ? 'ext_door_boarded' : 'ext_door', sp.door.face || 'L', sp.door.at, 0);
+    for (const w of sp.windows || []) {
+      const shut = locked || sp.shuttered;
+      if (!part(shut ? 'ext_window_shuttered' : 'ext_window_dark', w.face, w.at, w.z ?? 26)) continue;
+      if (!shut && b.litWindows && dk > 0.04) part('ext_window_lit', w.face, w.at, w.z ?? 26, Math.min(1, dk * 1.1));
+      if (sp.flowerBoxes && !shut) part('ext_flowerbox', w.face, w.at, (w.z ?? 26) - 2);
+    }
+    if (b.litWindows && dk > 0.04 && r.lit && !hasArt('ext_window_lit_l')) { g.globalAlpha = a0 * a * Math.min(1, dk * 1.1) * (0.92 + 0.08 * Math.sin(S.t * 3 + it.ph)); g.drawImage(r.lit, Math.round(sx - r.ax), Math.round(sy - r.ay)); }
     g.globalAlpha = a0;
   }
   function drawNPC(g, it, sx, sy) {
@@ -1054,8 +1079,12 @@ window.MM = window.MM || {};
     const want = p.x < sx - 2 ? true : p.x > sx + 2 ? false : it.flipNow;
     it.flipNow = want; const t = S.t + it.ph;
     softShadow(g, sx, sy, 8, 3, 0.26);
-    const art = 'npc_' + it.npc;
-    if (hasArt(art)) { MM.art.draw(g, art, sx, sy, { t, flip: want }); return; }
+    const dx = p.x - sx, dy = p.y - sy, near = Math.hypot(game.x - it.x, game.y - it.y) < 1.6; // eslint-disable-line no-undef
+    const dir = Math.abs(dx) > Math.abs(dy) * 1.2 ? 'e' : dy < 0 ? 'n' : 's';
+    const talk = near && currentPrompt()?.id === it.npc;
+    for (const n of ['npc_' + it.npc + '_' + (talk ? 'talk' : 'idle') + '_' + dir, 'npc_' + it.npc + '_idle_' + dir, 'npc_' + it.npc]) {
+      if (hasArt(n)) { MM.art.draw(g, n, sx, sy, { t, flip: dir === 'e' ? dx < 0 : (dir === 's' ? false : false) }); return; }
+    }
     const bob = reducedMotion() ? 0 : (Math.floor(t * 1.6) % 2), blink = (t % 3.7) < 0.13 ? 1 : 0;
     blitBake(g, npcBake(it.npc, bob, blink), sx, sy, want);
   }

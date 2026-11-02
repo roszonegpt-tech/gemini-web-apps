@@ -132,8 +132,9 @@
     bannerTimer = setTimeout(() => E.banner.classList.remove('mm-show'), 3400);
   };
   let msgTimer = 0, lastMsg = '', lastPolled = '';
+  hud.clearMessage = function () { clearTimeout(msgTimer); if (E.msg) { E.msg.classList.remove('mm-show'); E.msg.textContent = ''; } lastMsg = ''; };
   hud.message = function (text) {
-    if (!text) return;
+    if (!text || !ui.inGameplay()) return;
     if (ui._lastToast && ui._lastToast.text === String(text) && Date.now() - ui._lastToast.t < 1500) return; // already shown as a toast
     if (text === lastMsg && E.msg.classList.contains('mm-show')) { clearTimeout(msgTimer); } else { E.msg.textContent = text; E.msg.classList.remove('mm-show'); void E.msg.offsetWidth; E.msg.classList.add('mm-show'); }
     lastMsg = text;

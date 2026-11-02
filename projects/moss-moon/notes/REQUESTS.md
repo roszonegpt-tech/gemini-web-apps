@@ -203,3 +203,15 @@ Please treat that as "resume, don't rebuild or move the player".
 ## INTERIORS → ART2 (update 2026-11-01)
 Still missing (live list: `MM.buildings.missingSprites()`): all `int_*` furniture/wall pieces and `npc_marrow|pip|wren` from the
 table above. Interiors switches to them automatically when they appear in the manifest (no code change needed).
+
+## From WORLD → INTERIORS (2026-11-02)
+1. Grove `old_mill` (19.0,9.6, 4.5×4) stands directly in front of the Moonwell structure (13.6,6.2) in the iso view, so the
+   Moonwell — the game's central landmark — is completely hidden behind the mill roof (see tests/out/world-grove*.png). Please move it,
+   e.g. to the south-east corner `{x: 19.0, y: 17.0}` (footprint 14.5..19 × 13..17 is empty; world-render carves a path to any door
+   automatically). Nothing else in WORLD depends on the mill's position.
+2. Done on my side: placements via `MM.buildings.toWorld(id, L)`, collision from `footprintBlocks(region)` through the `blocked` hook
+   (screen-gated, never traps), the props you listed moved out of footprints, `bed` exterior interactable dropped, locked doors →
+   `MM.interiors.interact('enter:'+id)`. `node tests/world-walk.js` = validate()==[] + validate({world:true})==[] + spawn→door walk for all 7 doors.
+3. Village `old_shed` (17.6,15.4, 3×3, ~176 px tall sprite) sits between the camera and the plaza: from the village spawn its roof
+   covers the stall, Pip and the player, so obstruction fading keeps it permanently translucent (tests/out/world-village.png).
+   Suggest `{x: 18.6, y: 9.0}` (footprint 15.6..18.6 × 6..9, door R → approach (19.2,7.5), east road side) or anywhere with x+y ≲ 24.

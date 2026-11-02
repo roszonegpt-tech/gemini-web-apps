@@ -1565,7 +1565,7 @@ window.MM = window.MM || {};
     });
     ['goRegion', 'enterDungeon', 'advanceFloor', 'resetPlayer', 'respawnAtHome', 'restoreAdventure', 'newAdventure'].forEach((n) => wrap(n, (orig) => function () { const r = orig.apply(this, arguments); try { onRegion(); } catch (e) { /* */ } return r; }));
     wrap('update', (orig) => function (dt) {
-      if (slow > 0) { slow -= dt; dt *= slowScale; if (slow <= 0) slowScale = 1; }
+      if (slow > 0) { slow -= dt; dt *= slowScale; if (slow <= 0) { slow = 0; slowScale = 1; } }
       return orig.call(this, dt);
     });
   }

@@ -60,6 +60,15 @@ async function startNewGame(page, name) {
   check('title screen not owned by UI (SCREENS agent)', await page.evaluate(() => !MM.ui.screens.title));
   if (await page.evaluate(() => !!(MM.loop && MM.loop.stats))) check('single rAF loop (MM.loop)', await page.evaluate(() => MM.loop.stats().rafs === 1 && MM.ui.tickDriver() === 'loop'), await page.evaluate(() => MM.loop.stats()));
 
+  // panels over the main menu keep the front-end state; gameplay toasts are suppressed there
+  await page.evaluate(() => { if (MM.state.current !== 'title') MM.state.go('title'); });
+  await sleep(300);
+  await page.evaluate(() => { MM.bus.emit('toast', { text: 'Gameplay toast', kind: 'warn' }); MM.ui.openSettings(); });
+  await sleep(250);
+  check('settings over title keeps state title', (await st(page)) === 'title' && (await top(page)) === 'settings');
+  check('gameplay toast suppressed on title', await page.evaluate(() => !/Gameplay toast/.test(document.querySelector('.mm-layer-toasts').textContent)));
+  await page.keyboard.press('Escape'); await sleep(150);
+  check('closing settings stays on title', (await st(page)) === 'title' && !(await page.evaluate(() => MM.ui.isOpen())));
   // creation
   await page.evaluate(() => (MM.flow && MM.flow.newGame ? MM.flow.newGame() : MM.ui.open('creation')));
   await page.waitForFunction(() => MM.ui.isOpen('creation'), null, { timeout: 5000 });
@@ -154,10 +163,12 @@ async function startNewGame(page, name) {
   const x1 = await page.evaluate(() => MM.game.player().x - MM.game.player().y);
   check('gameplay keys restored after resume', Math.abs(x1 - x0) > 0.05, [x0, x1]);
   // other screens via API (screenshots)
+  const step = (n) => console.log('  · ' + n);
+  step('travel');
   await page.evaluate(() => MM.ui.open('travel')); await sleep(250); await shot(page, 'travel-desktop'); await page.keyboard.press('Escape');
-  await page.evaluate(() => MM.ui.open('shop', { npc: 'pip' })); await sleep(250); await shot(page, 'shop-desktop');
+  step('shop'); await page.evaluate(() => MM.ui.open('shop', { npc: 'pip' })); await sleep(250); await shot(page, 'shop-desktop'); step('shop-shot');
   await page.keyboard.press('Escape'); await sleep(150);
-  const talk = page.evaluate(() => MM.ui.talk('pip')); await sleep(1500); await shot(page, 'dialogue-npc-desktop');
+  step('talk'); const talk = page.evaluate(() => { MM.ui.talk('pip'); return true; }); await sleep(1500); step('talk-shot'); await shot(page, 'dialogue-npc-desktop'); step('choice');
   const choice = await page.evaluate(() => { const b = Array.from(document.querySelectorAll('.mm-choice')).find((x) => /wares|shop|buy/i.test(x.textContent)); if (b) b.click(); return b ? b.textContent : null; }); await talk; await sleep(300);
   check('NPC dialogue choice routes through campaign.choose → shop', !choice || (await top(page)) === 'shop', choice);
   if ((await top(page)) !== 'shop') await page.evaluate(() => MM.ui.open('shop', { npc: 'pip' }));

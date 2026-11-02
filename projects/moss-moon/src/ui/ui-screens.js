@@ -446,6 +446,7 @@
     r.className = r.className.replace(/\bmm-state-\S+/g, '').trim() + ' mm-state-' + to;
     if (from === 'loading' && to !== 'loading') ui.showLoading(false);
     if (!['creation', 'ending'].includes(to)) showSky(false); // REQUESTS CORE→UI #1: never leave the backdrop over the game
+    if (ui.FRONT_STATES.includes(to)) { ui.flushToasts(); if (ui.hud && ui.hud.clearMessage) ui.hud.clearMessage(); }
     switch (to) {
       case 'title': case 'logo': case 'intro': case 'boot':
         // SCREENS owns these; make sure no UI screen lingers over them (Settings/Controls/Credits opened from the main menu stay).

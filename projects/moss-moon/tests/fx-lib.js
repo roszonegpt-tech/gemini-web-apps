@@ -74,8 +74,8 @@ async function crop(page, name, x, y, w, h, scale = 4) {
 // Standard scene: player near the plaza, dummy in view, deterministic time/weather/palette.
 async function scene(page, o = {}) {
   await page.evaluate((o) => {
-    if (o.region && o.region !== world.region) goRegion(o.region);
-    if (o.dungeon) enterDungeon(false);
+    if (o.region && o.region !== world.region) { try { goRegion(o.region); } catch (e) { /* */ } if (world.region !== o.region) { world.region = o.region; world.mode = 'outside'; world.floor = 0; MM.bus.emit('region', { id: o.region }); drawGround(); } }
+    if (o.dungeon) { try { enterDungeon(false); } catch (e) { /* */ } if (world.mode === 'outside') { world.mode = 'dungeon'; world.floor = 1; world.dungeonSeed = 7; buildDungeonLayout(); drawGround(); } }
     if (!o.keepEnemies) { enemies.length = 0; lootDrops.length = 0; effects.length = 0; world.ward = 0; world.hp = heroMaxHP(); MM.fx.clear(); if (MM.vfx) MM.vfx.clear(true); }
     world.time = o.time == null ? 0.3 : o.time; world.weather = o.weather || 'Clear';
     game.x = o.px == null ? 10.4 : o.px; game.y = o.py == null ? 10.6 : o.py; game.vx = game.vy = 0;
