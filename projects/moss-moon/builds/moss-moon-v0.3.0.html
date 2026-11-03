@@ -21,7 +21,9 @@
   /* 8:5 stage. boot.js sets an exact px size (integer device-pixel scale when >=2x fits); this is the CSS-only fallback. */
   #mm-stage{position:relative;flex:none;aspect-ratio:8/5;width:min(100%,calc((100dvh - var(--mm-safe-t) - var(--mm-safe-b))*1.6));
     max-height:100%;overflow:hidden;overflow:clip;background:#000;box-shadow:0 0 0 1px #0006,0 18px 60px #000a;user-select:none;-webkit-user-select:none}
-  #scene{position:absolute;inset:0;display:block;width:100%;height:100%;margin:0;padding:0;border:0;
+  html.mm-fill #mm-app{padding:0}
+  html.mm-fill #mm-stage{box-shadow:none;max-height:none}
+  #scene{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:block;width:var(--mm-cw,100%);height:var(--mm-ch,100%);margin:0;padding:0;border:0;
     image-rendering:pixelated;image-rendering:crisp-edges;touch-action:none;outline:none;cursor:pointer}
   #scene:focus,#scene:focus-visible{outline:none} /* the canvas holds focus during play; menus show focus rings */
   /* screen canvases (MM.screens.mount): above #scene, below cinematics (50) and UI (100) */
@@ -682,6 +684,16 @@
 .mm-compact .mm-hud-tc { top: 30%; width: 70%; }
 .mm-compact .mm-banner strong { font-size: 1.35em; }
 
+/* ---------------------------------------------------------------- fill screen (game view covers the whole screen)
+   The HUD overlays the world edge to edge; with touch controls the Cast/Swap buttons replace the hotbar and the
+   interaction prompt sits above the thumb zones. */
+.mm-fill .mm-layer-hud { font-size: .9em; }
+.mm-fill .mm-hud-tl { width: min(19em, 64%); }
+.mm-fill .mm-objective { display: flex; }
+.mm-fill.mm-touch .mm-hotrow, .mm-fill.mm-touch .mm-spellname { display: none; }
+.mm-fill.mm-touch .mm-hud-bc { bottom: calc(max(12px, var(--sb)) + 15.5em); }
+.mm-fill .mm-layer-toasts { top: calc(max(12px, var(--st)) + 12.5em); }
+
 </style>
 <style>/* assets/css/screens.css */
 /* Moss & Moon — out-of-game screens (owner: SCREENS): logo, intro chrome, title / main menu.
@@ -823,6 +835,19 @@ html[data-reduced-motion] .mm-title-brand{transform:none}
 .mm-scr-btn-primary{background:#456b53}
 .mm-scr-btn-danger{background:#8a4a40}
 .mm-scr-btn:focus-visible{outline:2px solid #f2c46d;outline-offset:2px}
+
+/* tall containers (portrait phones, fill-screen mode): brand on top, full-width menu on the bottom */
+@container mmtitle (max-aspect-ratio: 4/5){
+  .mm-title-ui{font-size:calc(clamp(14px,4cqw,18px)*var(--ts))}
+  .mm-title-brand{left:50%;top:7%;width:88%;transform:translateX(-50%)}
+  .mm-title-tag{margin:.5em auto 0;max-width:20em;text-align:center}
+  .mm-title-menu{left:4%;right:4%;bottom:max(3%,env(safe-area-inset-bottom,0px));width:auto;max-height:68%;padding:.7em .7em .75em}
+  .mm-title-grid{grid-template-columns:1fr 1fr 1fr;gap:.38em}
+  .mm-title-grid .mm-mbtn{font-size:.82em;padding:.38em .25em}
+  .mm-title-foot{display:none}
+}
+html[data-reduced-motion] .mm-title-brand{transform:none}
+@container mmtitle (max-aspect-ratio: 4/5){ html[data-reduced-motion] .mm-title-brand{transform:translateX(-50%)} }
 
 </style>
 
@@ -1014,6 +1039,7 @@ frames:{"cobble_0":{"x":261,"y":0,"w":32,"h":16,"ax":16,"ay":8,"frames":1,"fps":
     joystickSide: { def: 'left', enum: ['left', 'right'] },
     joystickMode: { def: 'floating', enum: ['floating', 'fixed'] },
     haptics: { def: true },
+    fillScreen: { def: 'auto', enum: ['auto', 'on', 'off'] },
     fxIntensity: { def: 1, enum: [0.5, 1, 1.5] },
   };
   const PRESETS = {
@@ -1180,7 +1206,9 @@ frames:{"cobble_0":{"x":261,"y":0,"w":32,"h":16,"ax":16,"ay":8,"frames":1,"fps":
         else { c.width = o.w || 512; c.height = o.h || 320; }
       };
       size();
-      Object.assign(c.style, { position: 'absolute', inset: '0', width: '100%', height: '100%', display: 'block' });
+      // 512x320 art canvases cover the stage in fill mode (--mm-cw/--mm-ch set by boot.js; 100% otherwise); 'stage' canvases always match the stage.
+      Object.assign(c.style, stage ? { position: 'absolute', inset: '0', width: '100%', height: '100%', display: 'block' }
+        : { position: 'absolute', left: '50%', top: '50%', width: 'var(--mm-cw,100%)', height: 'var(--mm-ch,100%)', transform: 'translate(-50%,-50%)', display: 'block' });
       if (o.pixelated !== false) c.style.imageRendering = 'pixelated';
       const ctx = c.getContext('2d'); if (ctx && o.pixelated !== false) ctx.imageSmoothingEnabled = false;
       if (host) host.appendChild(c);
@@ -3758,7 +3786,18 @@ window.MM = window.MM || {};
   // Re-layout the 8:5 stage in px (CSS container-query sizing is the default; this keeps it exact on resize).
   function layout() {
     if (!sess || !sess.root) return; const r = sess.root.getBoundingClientRect(); if (!(r.width > 0 && r.height > 0)) return;
-    const w = Math.min(r.width, r.height * 1.6), h = w / 1.6; sess.stage.style.width = w.toFixed(2) + 'px'; sess.stage.style.height = h.toFixed(2) + 'px'; sess.layouts = (sess.layouts || 0) + 1;
+    // Fill-screen mode (portrait phones): the stage is the whole host and the 8:5 canvas covers it (centre crop); captions and
+    // subtitles stay laid out against the visible area. Otherwise the 8:5 stage is letterboxed inside the host.
+    const fill = !!(window.MM && MM.boot && MM.boot.layout && MM.boot.layout().fill), cs = sess.cv.style;
+    if (fill) {
+      const cw = Math.max(r.width, r.height * 1.6), ch = cw / 1.6;
+      sess.stage.style.width = r.width.toFixed(2) + 'px'; sess.stage.style.height = r.height.toFixed(2) + 'px';
+      Object.assign(cs, { position: 'absolute', left: '50%', top: '50%', width: cw.toFixed(2) + 'px', height: ch.toFixed(2) + 'px', maxWidth: 'none', transform: 'translate(-50%,-50%)' });
+    } else {
+      const w = Math.min(r.width, r.height * 1.6), h = w / 1.6; sess.stage.style.width = w.toFixed(2) + 'px'; sess.stage.style.height = h.toFixed(2) + 'px';
+      Object.assign(cs, { position: '', left: '', top: '', width: '', height: '', maxWidth: '', transform: '' });
+    }
+    sess.layouts = (sess.layouts || 0) + 1;
     if (sess.mode === 'engine' && (sess.paused || sess.driver === 'manual')) safe(render);
   }
   function bufs() { return cached('bufs', () => ({ work: mkCanvas(W, H), a: mkCanvas(W, H), b: mkCanvas(W, H) })); }
@@ -22423,7 +22462,7 @@ window.MM = window.MM || {};
   ui.SETTING_DEFAULTS = {
     quality: 'medium', softFilter: 'low', bloom: 'low', particles: 'medium', shake: 'low', reducedFlashes: false, reducedMotion: false,
     subtitles: true, damageNumbers: true, volMaster: 0.8, volMusic: 0.6, volSfx: 0.8, volCine: 0.8, autosave: true, touchControls: 'auto', textScale: 1,
-    joystickSize: 1, joystickSide: 'left', joystickMode: 'floating', haptics: true, fxIntensity: 1,
+    joystickSize: 1, joystickSide: 'left', joystickMode: 'floating', haptics: true, fxIntensity: 1, fillScreen: 'auto',
   };
   const localSettings = (() => {
     const KEY = 'moss-moon-settings-v1';
@@ -23964,6 +24003,7 @@ window.MM = window.MM || {};
         const inGame = !!(ui.isOpen('pause') || ui.inGameplay() || ['menu', 'dialogue'].includes(ui.state().current));
         ui.add(body, 
           row('Autosave', 'Saves at safe moments while you play', tog('autosave', 'Autosave')),
+          row('Fill screen', 'Game view covers the whole screen (crops the sides on tall phones). Auto = portrait screens only', seg('fillScreen', 'Fill screen', [['auto', 'Auto'], ['on', 'On'], ['off', 'Off']])),
           row('Touch controls', 'On-screen joystick and action buttons (Auto = touch screens)', seg('touchControls', 'Touch controls', [['auto', 'Auto'], ['on', 'On'], ['off', 'Off']])),
           row('Joystick style', 'Floating appears where you touch; fixed stays put', seg('joystickMode', 'Joystick style', [['floating', 'Floating'], ['fixed', 'Fixed']])),
           row('Joystick side', 'Action buttons sit on the other side', seg('joystickSide', 'Joystick side', [['left', 'Left'], ['right', 'Right']])),
@@ -25024,12 +25064,14 @@ window.MM = window.MM || {};
     // Stage geometry → CSS vars (portrait phones place HUD bands above/below the stage).
     const cv = document.getElementById('scene');
     const measure = () => {
-      const r = ui.root(), b = cv ? cv.getBoundingClientRect() : r.getBoundingClientRect();
+      const r = ui.root(), stg = document.getElementById('mm-stage') || cv, b = stg ? stg.getBoundingClientRect() : r.getBoundingClientRect();
+      const fill = document.documentElement.classList.contains('mm-fill');
       r.style.setProperty('--stage-top', Math.round(b.top) + 'px');
       r.style.setProperty('--stage-bottom', Math.round(Math.max(0, window.innerHeight - b.bottom)) + 'px');
       r.style.setProperty('--stage-left', Math.round(b.left) + 'px');
       r.style.setProperty('--stage-w', Math.round(b.width) + 'px');
-      r.classList.toggle('mm-tall', window.innerHeight > window.innerWidth * 1.15);
+      r.classList.toggle('mm-fill', fill);
+      r.classList.toggle('mm-tall', !fill && window.innerHeight > window.innerWidth * 1.15);
       // Are fixed layers anchored to the viewport (no transform/contain on an ancestor)? Portrait HUD bands need that.
       const sr = ui.layers.screens.getBoundingClientRect();
       r.classList.toggle('mm-short', sr.height < 330);
@@ -25039,7 +25081,8 @@ window.MM = window.MM || {};
     };
     measure();
     window.addEventListener('resize', measure);
-    if (window.ResizeObserver && cv) new ResizeObserver(measure).observe(cv);
+    if (window.ResizeObserver && (document.getElementById('mm-stage') || cv)) new ResizeObserver(measure).observe(document.getElementById('mm-stage') || cv);
+    ui.on('layout', measure);
     ui.measure = measure;
     ui._markReady();
     const cur = ui.state().current;
@@ -26775,13 +26818,27 @@ window.MM = window.MM || {};
     const h = app.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
     if (!(w > 0 && h > 0)) return;
     const dpr = window.devicePixelRatio || 1;
-    let s = Math.min(w / 512, h / 320), integer = false;
-    if (s * dpr >= 2) { s = Math.floor(s * dpr + 1e-6) / dpr; integer = true; }
-    const pw = Math.max(1, Math.round(512 * s * dpr)) / dpr, ph = Math.max(1, Math.round(320 * s * dpr)) / dpr;
+    // Fill mode: the stage is the whole screen and the 512x320 canvases cover it (centre crop) instead of sitting in a letterboxed box.
+    const pref = MM.settings ? MM.settings.get('fillScreen') : 'auto';
+    const fill = pref === 'on' || (pref !== 'off' && w / h < 1.2);
+    let s = Math.min(w / 512, h / 320), integer = false, pw, ph;
+    if (fill) {
+      const W = app.clientWidth, H = app.clientHeight; // fill mode drops the safe-area padding: the game runs edge to edge (the HUD keeps its own safe-area insets)
+      s = Math.max(W / 512, H / 320);
+      if (s * dpr >= 2) { s = Math.ceil(s * dpr - 1e-6) / dpr; integer = true; }
+      pw = W; ph = H;
+      const cw = Math.round(512 * s * dpr) / dpr, ch = Math.round(320 * s * dpr) / dpr;
+      document.documentElement.style.setProperty('--mm-cw', cw + 'px'); document.documentElement.style.setProperty('--mm-ch', ch + 'px');
+    } else {
+      if (s * dpr >= 2) { const si = Math.floor(s * dpr + 1e-6) / dpr; if (si >= s * 0.9) { s = si; integer = true; } } // snap to whole device pixels unless that would shrink the stage by >10% (phones in landscape)
+      pw = Math.max(1, Math.round(512 * s * dpr)) / dpr; ph = Math.max(1, Math.round(320 * s * dpr)) / dpr;
+      document.documentElement.style.setProperty('--mm-cw', '100%'); document.documentElement.style.setProperty('--mm-ch', '100%');
+    }
     stage.style.width = pw + 'px'; stage.style.height = ph + 'px';
+    document.documentElement.classList.toggle('mm-fill', fill);
     document.documentElement.style.setProperty('--mm-scale', String(+s.toFixed(4)));
-    const changed = layoutInfo.width !== pw || layoutInfo.height !== ph || layoutInfo.dpr !== dpr;
-    layoutInfo = { scale: s, width: pw, height: ph, integer, dpr };
+    const changed = layoutInfo.width !== pw || layoutInfo.height !== ph || layoutInfo.dpr !== dpr || layoutInfo.fill !== fill;
+    layoutInfo = { scale: s, width: pw, height: ph, integer, dpr, fill };
     if (changed) MM.bus.emit('layout', { ...layoutInfo });
   }
 
@@ -26947,7 +27004,7 @@ window.MM = window.MM || {};
     const watchDpr = () => { try { const mq = window.matchMedia('(resolution: ' + (window.devicePixelRatio || 1) + 'dppx)'); mq.addEventListener('change', () => { layout(); watchDpr(); }, { once: true }); } catch (e) { /* ignore */ } };
     watchDpr();
     if (MM.loop && !MM.loop.running) MM.loop.start(); // baseline normally starts it via MM.loop.attach
-    applyDocSettings(); MM.settings.onChange(applyDocSettings);
+    applyDocSettings(); MM.settings.onChange(() => { applyDocSettings(); layout(); });
     if (MM.audio && typeof MM.audio.applySettings === 'function') {
       const s = MM.settings.all(); try { MM.audio.applySettings({ master: s.volMaster, music: s.volMusic, sfx: s.volSfx, cine: s.volCine }); } catch (e) { console.error(e); }
     }

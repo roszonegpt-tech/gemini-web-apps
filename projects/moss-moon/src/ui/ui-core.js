@@ -70,7 +70,7 @@ window.MM = window.MM || {};
   ui.SETTING_DEFAULTS = {
     quality: 'medium', softFilter: 'low', bloom: 'low', particles: 'medium', shake: 'low', reducedFlashes: false, reducedMotion: false,
     subtitles: true, damageNumbers: true, volMaster: 0.8, volMusic: 0.6, volSfx: 0.8, volCine: 0.8, autosave: true, touchControls: 'auto', textScale: 1,
-    joystickSize: 1, joystickSide: 'left', joystickMode: 'floating', haptics: true, fxIntensity: 1,
+    joystickSize: 1, joystickSide: 'left', joystickMode: 'floating', haptics: true, fxIntensity: 1, fillScreen: 'auto',
   };
   const localSettings = (() => {
     const KEY = 'moss-moon-settings-v1';

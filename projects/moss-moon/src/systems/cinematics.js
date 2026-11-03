@@ -1124,7 +1124,18 @@ window.MM = window.MM || {};
   // Re-layout the 8:5 stage in px (CSS container-query sizing is the default; this keeps it exact on resize).
   function layout() {
     if (!sess || !sess.root) return; const r = sess.root.getBoundingClientRect(); if (!(r.width > 0 && r.height > 0)) return;
-    const w = Math.min(r.width, r.height * 1.6), h = w / 1.6; sess.stage.style.width = w.toFixed(2) + 'px'; sess.stage.style.height = h.toFixed(2) + 'px'; sess.layouts = (sess.layouts || 0) + 1;
+    // Fill-screen mode (portrait phones): the stage is the whole host and the 8:5 canvas covers it (centre crop); captions and
+    // subtitles stay laid out against the visible area. Otherwise the 8:5 stage is letterboxed inside the host.
+    const fill = !!(window.MM && MM.boot && MM.boot.layout && MM.boot.layout().fill), cs = sess.cv.style;
+    if (fill) {
+      const cw = Math.max(r.width, r.height * 1.6), ch = cw / 1.6;
+      sess.stage.style.width = r.width.toFixed(2) + 'px'; sess.stage.style.height = r.height.toFixed(2) + 'px';
+      Object.assign(cs, { position: 'absolute', left: '50%', top: '50%', width: cw.toFixed(2) + 'px', height: ch.toFixed(2) + 'px', maxWidth: 'none', transform: 'translate(-50%,-50%)' });
+    } else {
+      const w = Math.min(r.width, r.height * 1.6), h = w / 1.6; sess.stage.style.width = w.toFixed(2) + 'px'; sess.stage.style.height = h.toFixed(2) + 'px';
+      Object.assign(cs, { position: '', left: '', top: '', width: '', height: '', maxWidth: '', transform: '' });
+    }
+    sess.layouts = (sess.layouts || 0) + 1;
     if (sess.mode === 'engine' && (sess.paused || sess.driver === 'manual')) safe(render);
   }
   function bufs() { return cached('bufs', () => ({ work: mkCanvas(W, H), a: mkCanvas(W, H), b: mkCanvas(W, H) })); }

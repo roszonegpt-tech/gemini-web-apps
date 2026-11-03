@@ -21,7 +21,9 @@
   /* 8:5 stage. boot.js sets an exact px size (integer device-pixel scale when >=2x fits); this is the CSS-only fallback. */
   #mm-stage{position:relative;flex:none;aspect-ratio:8/5;width:min(100%,calc((100dvh - var(--mm-safe-t) - var(--mm-safe-b))*1.6));
     max-height:100%;overflow:hidden;overflow:clip;background:#000;box-shadow:0 0 0 1px #0006,0 18px 60px #000a;user-select:none;-webkit-user-select:none}
-  #scene{position:absolute;inset:0;display:block;width:100%;height:100%;margin:0;padding:0;border:0;
+  html.mm-fill #mm-app{padding:0}
+  html.mm-fill #mm-stage{box-shadow:none;max-height:none}
+  #scene{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:block;width:var(--mm-cw,100%);height:var(--mm-ch,100%);margin:0;padding:0;border:0;
     image-rendering:pixelated;image-rendering:crisp-edges;touch-action:none;outline:none;cursor:pointer}
   #scene:focus,#scene:focus-visible{outline:none} /* the canvas holds focus during play; menus show focus rings */
   /* screen canvases (MM.screens.mount): above #scene, below cinematics (50) and UI (100) */

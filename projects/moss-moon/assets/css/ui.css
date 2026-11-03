@@ -630,3 +630,13 @@
 /* small stages: region banner sits below the vitals row instead of over it */
 .mm-compact .mm-hud-tc { top: 30%; width: 70%; }
 .mm-compact .mm-banner strong { font-size: 1.35em; }
+
+/* ---------------------------------------------------------------- fill screen (game view covers the whole screen)
+   The HUD overlays the world edge to edge; with touch controls the Cast/Swap buttons replace the hotbar and the
+   interaction prompt sits above the thumb zones. */
+.mm-fill .mm-layer-hud { font-size: .9em; }
+.mm-fill .mm-hud-tl { width: min(19em, 64%); }
+.mm-fill .mm-objective { display: flex; }
+.mm-fill.mm-touch .mm-hotrow, .mm-fill.mm-touch .mm-spellname { display: none; }
+.mm-fill.mm-touch .mm-hud-bc { bottom: calc(max(12px, var(--sb)) + 15.5em); }
+.mm-fill .mm-layer-toasts { top: calc(max(12px, var(--st)) + 12.5em); }

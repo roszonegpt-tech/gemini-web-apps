@@ -1,6 +1,8 @@
 # Changelog
 
 ## Unreleased
+- **Fill screen**: on portrait screens the game view, logo, main menu and cinematics now cover the whole screen (centre crop of the 512×320 canvas) instead of sitting in a small 8:5 box; new Settings → Fill screen (Auto / On / Off). Landscape keeps the full 8:5 view, now scaled to use more of the screen.
+- Full-screen UI layers moved to a body-level host (`#mm-ui-vp`) so no ancestor can clip them (iOS artifact viewer fix).
 - See `TODO.md`.
 
 ## 0.3.0 — 2026-11-02

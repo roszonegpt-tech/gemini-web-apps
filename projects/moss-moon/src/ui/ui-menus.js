@@ -635,6 +635,7 @@
         const inGame = !!(ui.isOpen('pause') || ui.inGameplay() || ['menu', 'dialogue'].includes(ui.state().current));
         ui.add(body, 
           row('Autosave', 'Saves at safe moments while you play', tog('autosave', 'Autosave')),
+          row('Fill screen', 'Game view covers the whole screen (crops the sides on tall phones). Auto = portrait screens only', seg('fillScreen', 'Fill screen', [['auto', 'Auto'], ['on', 'On'], ['off', 'Off']])),
           row('Touch controls', 'On-screen joystick and action buttons (Auto = touch screens)', seg('touchControls', 'Touch controls', [['auto', 'Auto'], ['on', 'On'], ['off', 'Off']])),
           row('Joystick style', 'Floating appears where you touch; fixed stays put', seg('joystickMode', 'Joystick style', [['floating', 'Floating'], ['fixed', 'Fixed']])),
           row('Joystick side', 'Action buttons sit on the other side', seg('joystickSide', 'Joystick side', [['left', 'Left'], ['right', 'Right']])),

@@ -13,7 +13,7 @@ Static HTML/JS/CSS, no server, no dependencies. **Version 0.3.0.**
 `logo → intro cinematic (first run) → main menu → New Game → character creation → interactive tutorial (first time / on request) → play`.
 Pause → Inventory, Equipment, Spellbook, Crafting, Journal, Map, Settings, Controls, Save. Enterable buildings: your cottage,
 Pip's shop, Wren's house, Elder Marrow's house (and the tutorial hut). Locked: the old mill and shed.
-Logo, intro, main menu and character creation are real separate states: the world is neither drawn nor simulated behind them.
+On portrait phones the game fills the whole screen (Settings → Fill screen: Auto/On/Off). Logo, intro, main menu and character creation are real separate states: the world is neither drawn nor simulated behind them.
 
 ## Controls
 | | Keyboard / mouse | Touch | Gamepad |

@@ -137,3 +137,16 @@ html[data-reduced-motion] .mm-title-brand{transform:none}
 .mm-scr-btn-primary{background:#456b53}
 .mm-scr-btn-danger{background:#8a4a40}
 .mm-scr-btn:focus-visible{outline:2px solid #f2c46d;outline-offset:2px}
+
+/* tall containers (portrait phones, fill-screen mode): brand on top, full-width menu on the bottom */
+@container mmtitle (max-aspect-ratio: 4/5){
+  .mm-title-ui{font-size:calc(clamp(14px,4cqw,18px)*var(--ts))}
+  .mm-title-brand{left:50%;top:7%;width:88%;transform:translateX(-50%)}
+  .mm-title-tag{margin:.5em auto 0;max-width:20em;text-align:center}
+  .mm-title-menu{left:4%;right:4%;bottom:max(3%,env(safe-area-inset-bottom,0px));width:auto;max-height:68%;padding:.7em .7em .75em}
+  .mm-title-grid{grid-template-columns:1fr 1fr 1fr;gap:.38em}
+  .mm-title-grid .mm-mbtn{font-size:.82em;padding:.38em .25em}
+  .mm-title-foot{display:none}
+}
+html[data-reduced-motion] .mm-title-brand{transform:none}
+@container mmtitle (max-aspect-ratio: 4/5){ html[data-reduced-motion] .mm-title-brand{transform:translateX(-50%)} }

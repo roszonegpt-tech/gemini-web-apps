@@ -86,6 +86,7 @@
     joystickSide: { def: 'left', enum: ['left', 'right'] },
     joystickMode: { def: 'floating', enum: ['floating', 'fixed'] },
     haptics: { def: true },
+    fillScreen: { def: 'auto', enum: ['auto', 'on', 'off'] },
     fxIntensity: { def: 1, enum: [0.5, 1, 1.5] },
   };
   const PRESETS = {
@@ -252,7 +253,9 @@
         else { c.width = o.w || 512; c.height = o.h || 320; }
       };
       size();
-      Object.assign(c.style, { position: 'absolute', inset: '0', width: '100%', height: '100%', display: 'block' });
+      // 512x320 art canvases cover the stage in fill mode (--mm-cw/--mm-ch set by boot.js; 100% otherwise); 'stage' canvases always match the stage.
+      Object.assign(c.style, stage ? { position: 'absolute', inset: '0', width: '100%', height: '100%', display: 'block' }
+        : { position: 'absolute', left: '50%', top: '50%', width: 'var(--mm-cw,100%)', height: 'var(--mm-ch,100%)', transform: 'translate(-50%,-50%)', display: 'block' });
       if (o.pixelated !== false) c.style.imageRendering = 'pixelated';
       const ctx = c.getContext('2d'); if (ctx && o.pixelated !== false) ctx.imageSmoothingEnabled = false;
       if (host) host.appendChild(c);

@@ -242,12 +242,14 @@
     // Stage geometry → CSS vars (portrait phones place HUD bands above/below the stage).
     const cv = document.getElementById('scene');
     const measure = () => {
-      const r = ui.root(), b = cv ? cv.getBoundingClientRect() : r.getBoundingClientRect();
+      const r = ui.root(), stg = document.getElementById('mm-stage') || cv, b = stg ? stg.getBoundingClientRect() : r.getBoundingClientRect();
+      const fill = document.documentElement.classList.contains('mm-fill');
       r.style.setProperty('--stage-top', Math.round(b.top) + 'px');
       r.style.setProperty('--stage-bottom', Math.round(Math.max(0, window.innerHeight - b.bottom)) + 'px');
       r.style.setProperty('--stage-left', Math.round(b.left) + 'px');
       r.style.setProperty('--stage-w', Math.round(b.width) + 'px');
-      r.classList.toggle('mm-tall', window.innerHeight > window.innerWidth * 1.15);
+      r.classList.toggle('mm-fill', fill);
+      r.classList.toggle('mm-tall', !fill && window.innerHeight > window.innerWidth * 1.15);
       // Are fixed layers anchored to the viewport (no transform/contain on an ancestor)? Portrait HUD bands need that.
       const sr = ui.layers.screens.getBoundingClientRect();
       r.classList.toggle('mm-short', sr.height < 330);
@@ -257,7 +259,8 @@
     };
     measure();
     window.addEventListener('resize', measure);
-    if (window.ResizeObserver && cv) new ResizeObserver(measure).observe(cv);
+    if (window.ResizeObserver && (document.getElementById('mm-stage') || cv)) new ResizeObserver(measure).observe(document.getElementById('mm-stage') || cv);
+    ui.on('layout', measure);
     ui.measure = measure;
     ui._markReady();
     const cur = ui.state().current;

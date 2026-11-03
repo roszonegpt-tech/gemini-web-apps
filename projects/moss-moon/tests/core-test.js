@@ -196,7 +196,10 @@ async function browserTests() {
       const res = await page.evaluate(([sx, sy]) => { const g = window.__mm.game(), c = window.__camAtClick; const p = unproject(sx - 256 + c.x, sy - 160 + c.y); return { t: g.target, exp: { x: p.x, y: p.y } }; }, [sx, sy]); // eslint-disable-line no-undef
       const good = res.t && Math.abs(res.t.x - Math.min(19.4, Math.max(0.6, res.exp.x))) < 0.15 && Math.abs(res.t.y - Math.min(19.4, Math.max(0.6, res.exp.y))) < 0.15;
       const aspect = Math.abs(box.width / box.height - 1.6) < 0.01, inside = box.x >= -0.5 && box.y >= -0.5 && box.x + box.width <= vp.width + 0.5 && box.y + box.height <= vp.height + 0.5;
-      ok('layout+pointer ' + vp.width + 'x' + vp.height, good && aspect && inside && errors.length === 0 && (lay.scale * 1 >= 2 ? lay.integer && Number.isInteger(lay.scale) : true), { lay, box, res, errors });
+      const covers = box.x <= 0.5 && box.y <= 0.5 && box.x + box.width >= vp.width - 0.5 && box.y + box.height >= vp.height - 0.5;
+      // fill mode (portrait): the 512x320 canvas covers the screen (centre crop); otherwise it is contained, on whole device pixels unless that would shrink it by >10%
+      const scaleOk = lay.fill ? covers && lay.stageFills !== false : (inside && (lay.scale < 2 || lay.integer || Math.floor(lay.scale * lay.dpr) / lay.dpr < lay.scale * 0.9));
+      ok('layout+pointer ' + vp.width + 'x' + vp.height, good && aspect && scaleOk && errors.length === 0, { lay, box, res, errors });
       await context.close();
     }
 

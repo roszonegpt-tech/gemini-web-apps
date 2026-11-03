@@ -47,13 +47,27 @@
     const h = app.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
     if (!(w > 0 && h > 0)) return;
     const dpr = window.devicePixelRatio || 1;
-    let s = Math.min(w / 512, h / 320), integer = false;
-    if (s * dpr >= 2) { s = Math.floor(s * dpr + 1e-6) / dpr; integer = true; }
-    const pw = Math.max(1, Math.round(512 * s * dpr)) / dpr, ph = Math.max(1, Math.round(320 * s * dpr)) / dpr;
+    // Fill mode: the stage is the whole screen and the 512x320 canvases cover it (centre crop) instead of sitting in a letterboxed box.
+    const pref = MM.settings ? MM.settings.get('fillScreen') : 'auto';
+    const fill = pref === 'on' || (pref !== 'off' && w / h < 1.2);
+    let s = Math.min(w / 512, h / 320), integer = false, pw, ph;
+    if (fill) {
+      const W = app.clientWidth, H = app.clientHeight; // fill mode drops the safe-area padding: the game runs edge to edge (the HUD keeps its own safe-area insets)
+      s = Math.max(W / 512, H / 320);
+      if (s * dpr >= 2) { s = Math.ceil(s * dpr - 1e-6) / dpr; integer = true; }
+      pw = W; ph = H;
+      const cw = Math.round(512 * s * dpr) / dpr, ch = Math.round(320 * s * dpr) / dpr;
+      document.documentElement.style.setProperty('--mm-cw', cw + 'px'); document.documentElement.style.setProperty('--mm-ch', ch + 'px');
+    } else {
+      if (s * dpr >= 2) { const si = Math.floor(s * dpr + 1e-6) / dpr; if (si >= s * 0.9) { s = si; integer = true; } } // snap to whole device pixels unless that would shrink the stage by >10% (phones in landscape)
+      pw = Math.max(1, Math.round(512 * s * dpr)) / dpr; ph = Math.max(1, Math.round(320 * s * dpr)) / dpr;
+      document.documentElement.style.setProperty('--mm-cw', '100%'); document.documentElement.style.setProperty('--mm-ch', '100%');
+    }
     stage.style.width = pw + 'px'; stage.style.height = ph + 'px';
+    document.documentElement.classList.toggle('mm-fill', fill);
     document.documentElement.style.setProperty('--mm-scale', String(+s.toFixed(4)));
-    const changed = layoutInfo.width !== pw || layoutInfo.height !== ph || layoutInfo.dpr !== dpr;
-    layoutInfo = { scale: s, width: pw, height: ph, integer, dpr };
+    const changed = layoutInfo.width !== pw || layoutInfo.height !== ph || layoutInfo.dpr !== dpr || layoutInfo.fill !== fill;
+    layoutInfo = { scale: s, width: pw, height: ph, integer, dpr, fill };
     if (changed) MM.bus.emit('layout', { ...layoutInfo });
   }
 
@@ -219,7 +233,7 @@
     const watchDpr = () => { try { const mq = window.matchMedia('(resolution: ' + (window.devicePixelRatio || 1) + 'dppx)'); mq.addEventListener('change', () => { layout(); watchDpr(); }, { once: true }); } catch (e) { /* ignore */ } };
     watchDpr();
     if (MM.loop && !MM.loop.running) MM.loop.start(); // baseline normally starts it via MM.loop.attach
-    applyDocSettings(); MM.settings.onChange(applyDocSettings);
+    applyDocSettings(); MM.settings.onChange(() => { applyDocSettings(); layout(); });
     if (MM.audio && typeof MM.audio.applySettings === 'function') {
       const s = MM.settings.all(); try { MM.audio.applySettings({ master: s.volMaster, music: s.volMusic, sfx: s.volSfx, cine: s.volCine }); } catch (e) { console.error(e); }
     }
