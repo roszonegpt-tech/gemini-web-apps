@@ -32,7 +32,7 @@
   /* overflow:clip — focusing overflowing UI content must never scroll the stage (that would shift the canvas and break pointer mapping) */
   #mm-ui{position:absolute;inset:0;z-index:100;pointer-events:none;overflow:hidden;overflow:clip;font-size:calc(16px*var(--mm-text-scale))}
   /* #mm-ui itself never takes pointer events; UI elements opt in with pointer-events:auto (full-stage layer wrappers must not) */
-  #mm-ui :focus-visible{outline:2px solid var(--mm-focus);outline-offset:2px}
+  #mm-ui :focus-visible,#mm-ui-vp :focus-visible{outline:2px solid var(--mm-focus);outline-offset:2px}
   #mm-legacy-ui,[hidden]{display:none!important}
   /* Built-in fallbacks (boot.js) used only when the UI module (MM.ui) is missing. */
   .mm-fallback{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.6em;text-align:center;

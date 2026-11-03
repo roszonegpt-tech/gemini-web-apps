@@ -420,7 +420,7 @@ window.MM = window.MM || {};
       root.classList.add('mm-ui-fallback');
     }
     root.classList.add('mm-root');
-    if (!root.querySelector(':scope > .mm-layer-screens')) {
+    if (!ui.layers || !ui.layers.hud || !ui.layers.hud.isConnected) {
       ui.layers = {
         sky: h('div', { class: 'mm-layer mm-layer-sky', 'aria-hidden': 'true' }),
         hud: h('div', { class: 'mm-layer mm-layer-hud', role: 'region', 'aria-label': 'Game status' }),
@@ -429,7 +429,20 @@ window.MM = window.MM || {};
         loading: h('div', { class: 'mm-layer mm-layer-loading', 'aria-live': 'polite' }),
         toasts: h('div', { class: 'mm-layer mm-layer-toasts', role: 'status', 'aria-live': 'polite' }),
       };
-      Object.values(ui.layers).forEach((l) => root.appendChild(l));
+      // Full-screen layers live in a body-level host so no ancestor (stage overflow clip, box-shadow, compositing) can
+      // clip or re-anchor them: some mobile WebKit builds confined position:fixed layers to the 8:5 stage. The host mirrors
+      // the root's classes and CSS variables so every `.mm-root …` / `.mm-tall …` rule and var(--x) still applies.
+      const vp = h('div', { id: 'mm-ui-vp', class: 'mm-root' });
+      document.body.appendChild(vp);
+      ui.vpHost = vp;
+      for (const k of ['hud']) root.appendChild(ui.layers[k]);
+      for (const k of ['sky', 'touch', 'screens', 'loading', 'toasts']) vp.appendChild(ui.layers[k]);
+      const sync = () => {
+        vp.className = root.className;
+        vp.style.cssText = root.style.cssText + ';position:fixed;inset:0;z-index:100;pointer-events:none;overflow:visible;font-size:calc(16px*var(--mm-text-scale,1))';
+      };
+      sync();
+      try { new MutationObserver(sync).observe(root, { attributes: true, attributeFilter: ['class', 'style'] }); } catch (e) { /* no observer: static mirror */ }
     }
     return root;
   };
@@ -550,7 +563,7 @@ window.MM = window.MM || {};
       if (top) {
         if (rf && top.el.contains(rf) && rf.isConnected) rf.focus(); else ui.focusFirst(top.el);
         if (top.refresh) safe(() => top.refresh());
-      } else if (document.activeElement && root && root.contains(document.activeElement)) {
+      } else if (document.activeElement && ((root && root.contains(document.activeElement)) || (ui.vpHost && ui.vpHost.contains(document.activeElement)))) {
         document.activeElement.blur();
         const cv = document.getElementById('scene'); if (cv && cv.focus && ui.inGameplay()) cv.focus({ preventScroll: true });
       }

@@ -75,12 +75,13 @@ const fs = require('fs');
       await shot('03-enter');
       const door = await ev(() => { const b = MM.buildings.get('practice_hut'); return b.spawn; });
       await walkTo(door.x, door.y, 0.4);
+      for (let i = 0; i < 4 && (await ev(() => MM.state.current)) === 'dialogue'; i++) { await press('Escape'); await wait(250); } // a click can land on the sign sprite and open its dialogue
       await press('e'); await wait(500);
       if ((await ev(() => MM.state.current)) !== 'interior') { // walk into the trigger instead
         const tr = await ev(() => MM.buildings.get('practice_hut').approach || null);
-        if (tr) await walkTo(tr.x, tr.y, 0.3); await wait(600);
+        if (tr) await walkTo(tr.x, tr.y, 0.3); await wait(600); await press('e'); await wait(500); // arrived late: press interact at the approach
       }
-      check('enter-hut', (await ev(() => MM.state.current)) === 'interior' && (await step()) === 'exit', { state: await ev(() => MM.state.current), step: await step(), pos: await ev(() => [game.x, game.y]), door });
+      check('enter-hut', (await ev(() => MM.state.current)) === 'interior' && (await step()) === 'exit', { state: await ev(() => MM.state.current), step: await step(), pos: await ev(() => [game.x, game.y]), door, dbg: await ev(() => ({ blocked: MM.input.isBlocked && MM.input.isBlocked(), tgt: game.target, prompt: MM.world.currentPrompt && MM.world.currentPrompt(), ui: MM.ui && MM.ui.top && MM.ui.top() && MM.ui.top().id, focus: document.activeElement && document.activeElement.tagName })) });
       await wait(400); await shot('04-exit-inside');
       await wait(2000); check('inside-idle-no-advance', (await step()) === 'exit');
       // walk out of the doorway with the real controller (click-to-move target set to the doorway)
@@ -122,7 +123,7 @@ const fs = require('fs');
       await wait(1000); await press('Escape'); await wait(300);
       check('menu-without-bag-no-advance', (await step()) === 'menu' && (await ev(() => MM.state.current)) === 'tutorial');
       await press('Escape'); await wait(300);
-      const invBtn = p.locator('#mm-ui button', { hasText: 'Inventory' }).first();
+      const invBtn = p.locator('.mm-root button', { hasText: 'Inventory' }).first();
       await invBtn.click(); await wait(400);
       await shot('09-menu-inventory');
       check('inventory-open', await ev(() => MM.ui.isOpen('inventory')));
@@ -162,12 +163,12 @@ const fs = require('fs');
       await ev(() => { game.x = 7.6; game.y = 11.6; }); await p.keyboard.press('e'); await wait(150);
       await p.click('.mm-tut [data-act="skip"]'); await wait(400);
       await p.screenshot({ path: path.join(out, 'tutorial-12-skip-confirm.png') });
-      const cancel = p.locator('#mm-ui button', { hasText: 'Keep practising' }).first();
+      const cancel = p.locator('.mm-root button', { hasText: 'Keep practising' }).first();
       check('skip-confirm-shown', await cancel.count() > 0);
       await cancel.click(); await wait(500);
       check('skip-cancel-stays', (await ev(() => MM.state.current)) === 'tutorial' && (await ev(() => MM.tutorial.active)) && (await ev(() => MM.flow.flags().tutorialDone)) === false, await ev(() => MM.state.current));
       await p.click('.mm-tut [data-act="skip"]'); await wait(400);
-      await p.locator('#mm-ui button:not([data-act])', { hasText: 'Skip tutorial' }).last().click(); await wait(700);
+      await p.locator('.mm-root button:not([data-act])', { hasText: 'Skip tutorial' }).last().click(); await wait(700);
       const tl = await ev(() => window.__tl[window.__tl.length - 1]);
       check('skip-world-identical', tl && tl.world === before.world);
       check('skip-save-identical', tl && tl.save === before.save);
@@ -217,14 +218,14 @@ const fs = require('fs');
         if (d < 0.4) break; await wait(60);
       }
       await ev(() => MM.input.setAxis(0, 0, 'touch')); await wait(150);
-      const use = p.locator('#mm-ui .mm-tbtn-use').first();
+      const use = p.locator('.mm-root .mm-tbtn-use').first();
       check('touch-use-button-visible', await use.isVisible());
       await p.screenshot({ path: path.join(out, 'tutorial-13-touch.png') });
       await use.tap(); await wait(400);
       await ev(() => MM.ui && MM.ui.closeAll && MM.ui.closeAll()); await wait(300);
       check('touch-sign', (await ev(() => MM.tutorial.step)) === 'enter', await ev(() => [MM.tutorial.step, game.x, game.y]));
       await p.locator('.mm-tut [data-act="skip"]').tap(); await wait(400);
-      await p.locator('#mm-ui button:not([data-act])', { hasText: 'Skip tutorial' }).last().tap(); await wait(700);
+      await p.locator('.mm-root button:not([data-act])', { hasText: 'Skip tutorial' }).last().tap(); await wait(700);
       check('touch-skip', (await ev(() => MM.state.current)) === 'play' && (await ev(() => MM.flow.flags().tutorialDone)) === true);
       const hud = await ev(() => { const r = document.querySelector('.mm-tut'); return r ? r.getBoundingClientRect().width : 0; });
       check('touch-hud-gone', hud === 0);

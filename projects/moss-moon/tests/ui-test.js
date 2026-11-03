@@ -216,7 +216,7 @@ async function startNewGame(page, name) {
     await sleep(400);
     const vis = await p2.evaluate(() => { const L = document.querySelector('.mm-layer-touch'); return !!L && getComputedStyle(L).display !== 'none' && !L.classList.contains('mm-hidden'); });
     check(tag + ': joystick + action cluster visible on touch', vis);
-    check(tag + ': no d-pad buttons', await p2.evaluate(() => document.querySelectorAll('#mm-ui [data-dir]').length === 0));
+    check(tag + ': no d-pad buttons', await p2.evaluate(() => document.querySelectorAll('.mm-root [data-dir]').length === 0));
     const btnSizes = await p2.evaluate(() => Array.from(document.querySelectorAll('.mm-tbtn')).map((b) => Math.min(b.getBoundingClientRect().width, b.getBoundingClientRect().height)));
     check(tag + ': touch buttons ≥ 44px', btnSizes.length >= 6 && btnSizes.every((s) => s >= 44), btnSizes);
     await shot(p2, 'hud-' + tag);

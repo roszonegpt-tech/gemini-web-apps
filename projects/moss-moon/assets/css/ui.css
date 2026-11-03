@@ -1,7 +1,7 @@
 /* Moss & Moon — UI stylesheet (owner: UI agent). Moonlit botanical fantasy: teal-ink panels, cream text,
  * gold #cfaa71 filigree. Everything is scoped under #mm-ui / .mm-root. No external assets. */
 
-#mm-ui.mm-root {
+#mm-ui.mm-root, #mm-ui-vp.mm-root {
   --mm-ts: 1;
   --ink0: #081619; --ink1: #0e2427; --ink2: #153337; --ink3: #1e4448;
   --gold: #cfaa71; --gold-hi: #ecd29b; --gold-dim: rgba(207, 170, 113, .42); --gold-faint: rgba(207, 170, 113, .2);
@@ -40,7 +40,7 @@
 .mm-layer-screens { position: fixed; inset: 0; z-index: 5; }
 .mm-layer-loading { position: fixed; inset: 0; z-index: 8; display: grid; place-items: center; opacity: 0; transition: opacity .35s; background: radial-gradient(ellipse at 50% 40%, rgba(20, 44, 52, .92), rgba(4, 11, 13, .97)); visibility: hidden; }
 .mm-layer-loading.mm-on { opacity: 1; visibility: visible; pointer-events: auto; }
-.mm-layer-toasts { position: absolute; inset: auto; left: 50%; top: calc(max(12px, var(--st)) + 6.2em); transform: translateX(-50%); width: min(30em, 92%); z-index: 9; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.mm-layer-toasts { position: absolute; inset: auto; left: 50%; top: calc(var(--stage-top, 0px) + max(12px, var(--st)) + 6.2em); transform: translateX(-50%); width: min(30em, 92%); z-index: 9; display: flex; flex-direction: column; align-items: center; gap: 6px; }
 .mm-tall.mm-viewport .mm-layer-toasts { position: fixed; top: calc(max(10px, var(--st)) + 4px); }
 .mm-has-screen .mm-layer-toasts { position: fixed; top: auto; bottom: max(14px, calc(var(--sb) + 10px)); flex-direction: column-reverse; }
 .mm-state-cine .mm-layer-screens, .mm-state-cine .mm-layer-hud, .mm-state-cine .mm-layer-touch, .mm-state-cine .mm-layer-sky { visibility: hidden; }

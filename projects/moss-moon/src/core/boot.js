@@ -132,7 +132,7 @@
   MM.bus.on('state', ({ to }) => {
     if (to === 'play') {
       const a = document.activeElement, c = $('scene');
-      if (c && (!a || a === document.body || (a.closest && a.closest('#mm-ui') && !a.offsetParent))) { try { c.focus({ preventScroll: true }); } catch (e) { /* ignore */ } }
+      if (c && (!a || a === document.body || (a.closest && a.closest('#mm-ui, #mm-ui-vp') && !a.offsetParent))) { try { c.focus({ preventScroll: true }); } catch (e) { /* ignore */ } }
     }
   });
   function pauseForHide() {

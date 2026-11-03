@@ -50,7 +50,7 @@
 html.mm-scr-intro .mm-cine-skip{display:none!important}
 
 /* ------------------------------------------------------------------ title / main menu */
-html.mm-scr-title #mm-ui .mm-screen[data-screen="title"],html.mm-scr-title #mm-ui .mm-layer-sky{display:none!important} /* legacy UI title, if still registered */
+html.mm-scr-title #mm-ui .mm-screen[data-screen="title"],html.mm-scr-title #mm-ui .mm-layer-sky,html.mm-scr-title #mm-ui-vp .mm-screen[data-screen="title"],html.mm-scr-title #mm-ui-vp .mm-layer-sky{display:none!important} /* legacy UI title, if still registered */
 .mm-title{container-name:mmtitle;pointer-events:auto}
 .mm-title-ui{position:absolute;inset:0;font-size:calc(clamp(13px,2.05cqw,20px)*var(--ts));opacity:var(--mm-in,1)}
 .mm-title-brand{position:absolute;left:3.2%;top:4.5%;width:47%;margin:0;transform:translateY(calc((1 - var(--mm-in,1)) * -8px));pointer-events:none}

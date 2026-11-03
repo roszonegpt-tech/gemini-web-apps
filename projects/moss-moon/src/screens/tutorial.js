@@ -429,7 +429,7 @@ window.MM = window.MM || {};
     unglow();
     if (!s || !s.ui || method() !== 'touch') return;
     const a = s.id === 'menu' && SB.step && SB.step.inv ? null : s.ui; if (!a) return;
-    const el = document.querySelector('#mm-ui .mm-tbtn-' + UI_ALIAS[a] + ', #mm-ui [data-action="' + a + '"], #mm-ui [data-act="' + a + '"]');
+    const el = document.querySelector('#mm-ui .mm-tbtn-' + UI_ALIAS[a] + ', #mm-ui [data-action="' + a + '"], #mm-ui [data-act="' + a + '"], #mm-ui-vp .mm-tbtn-' + UI_ALIAS[a] + ', #mm-ui-vp [data-action="' + a + '"], #mm-ui-vp [data-act="' + a + '"]');
     if (el) el.classList.add('mm-tut-glow');
   }
   function syncVisibility(state) { if (SB && SB.hud) SB.hud.classList.toggle('mm-tut-off', !(state === 'tutorial' || state === 'interior') || !!SB.panel); }
