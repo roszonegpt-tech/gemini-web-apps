@@ -161,7 +161,7 @@
       if (stage && stage.parentNode === app) app.insertBefore(amb, stage); else app.insertBefore(amb, app.firstChild);
       S.track(amb);
       let acc = 1;
-      return { el: amb, update(dt) { if (!mini || !src) return; acc += dt; if (acc < 0.12) return; acc = 0; safe(() => mg.drawImage(src, 0, 0, 48, 30)); } };
+      return { el: amb, update(dt) { if (!mini || !src) return; acc += dt; if (acc < 0.4) return; acc = 0; safe(() => mg.drawImage(src, 0, 0, 48, 30)); } };
     };
     S.htmlClass = function (cls) { document.documentElement.classList.add(cls); S.offs.push(() => document.documentElement.classList.remove(cls)); };
     S.dispose = function () {

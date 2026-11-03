@@ -8,7 +8,7 @@
   const MM = window.MM = window.MM || {};
   MM.version = '0.3.0';
   MM.legacyUI = false;                                   // baseline per-frame sidebar DOM writes (off: menus replace them)
-  MM.baselineDraw = { damageNumbers: true, labels: true }; // FX/UI may set false to take over canvas text
+  MM.baselineDraw = { damageNumbers: true, labels: false }; // labels (canvas fillText) are slow every frame: the DOM HUD shows boss names // FX/UI may set false to take over canvas text
   const now = () => (window.performance && performance.now ? performance.now() : Date.now());
   const isObj = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
   // Baseline bindings live in the shared global lexical scope; before baseline runs they are missing/TDZ.

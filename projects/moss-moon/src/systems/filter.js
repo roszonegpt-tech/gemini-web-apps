@@ -94,7 +94,8 @@ window.MM = window.MM || {};
 
   // ------------------------------------------------------------------ the pass
   const BLOOM_Q = 'brightness(.54) contrast(9) blur(1px)', BLOOM_T = 'brightness(.52) contrast(11)', BLUR_H = 'blur(1.5px)', BLUR_Q = 'blur(2px)', BLUR_D = 'blur(1px)';
-  let frame = 0, last = 0, avg = 0, samples = 0, settingsTick = 0, sceneCtx = null;
+  let frame = 0, last = 0, avg = 0, samples = 0, settingsTick = 0, sceneCtx = null, glowTick = 0;
+  const GLOW_EVERY = 3; // rebuild the blurred bloom/diffusion textures at ~20 Hz, composite the cached ones every frame
   F.apply = function (ctx) {
     if (!F.enabled || !ctx) return;
     try { const sc = MM.screens; if (sc && sc.def) { const d = sc.def(sc.current); if (d && d.sim === 'none') return; } } catch (e) { /* */ }
@@ -107,34 +108,41 @@ window.MM = window.MM || {};
     ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1; ctx.filter = 'none'; ctx.imageSmoothingEnabled = false;
     const pal = palette();
     // ---- bloom: bright-pass at half res, blurred, added back with nearest 2x upscale (pixel-friendly)
+    const rebuild = (glowTick++ % GLOW_EVERY) === 0;
     if (M.bloom === 'low' && FILTER_OK) {
       // cheap path: plain half-res downsample -> threshold + blur at quarter res -> smooth up to half -> nearest 2x
-      hx.globalCompositeOperation = 'copy'; hx.drawImage(src, 0, 0, 256, 160);
-      qx.globalCompositeOperation = 'copy'; qx.filter = BLOOM_Q; qx.drawImage(half, 0, 0, 128, 80); qx.filter = 'none';
-      h2x.globalCompositeOperation = 'copy'; h2x.imageSmoothingEnabled = true; h2x.drawImage(quar, 0, 0, 256, 160);
+      if (rebuild) {
+        hx.globalCompositeOperation = 'copy'; hx.drawImage(src, 0, 0, 256, 160);
+        qx.globalCompositeOperation = 'copy'; qx.filter = BLOOM_Q; qx.drawImage(half, 0, 0, 128, 80); qx.filter = 'none';
+        h2x.globalCompositeOperation = 'copy'; h2x.imageSmoothingEnabled = true; h2x.drawImage(quar, 0, 0, 256, 160);
+      }
       ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.42;
       ctx.drawImage(half2, 0, 0, W, H);
     } else if (M.bloom !== 'off') {
+     if (rebuild) {
       hx.globalCompositeOperation = 'copy';
       if (FILTER_OK) { hx.filter = BLOOM_T; hx.drawImage(src, 0, 0, 256, 160); hx.filter = 'none'; }
       else { hx.drawImage(src, 0, 0, 256, 160); hx.globalCompositeOperation = 'multiply'; hx.drawImage(half, 0, 0); hx.drawImage(half, 0, 0); hx.drawImage(half, 0, 0); }
       h2x.globalCompositeOperation = 'copy';
       if (FILTER_OK) { h2x.filter = BLUR_H; h2x.drawImage(half, 0, 0); h2x.filter = 'none'; }
       else { qx.globalCompositeOperation = 'copy'; qx.drawImage(half, 0, 0, 128, 80); h2x.drawImage(quar, 0, 0, 256, 160); }
-      ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = M.bloom === 'high' ? 0.5 : 0.32;
-      ctx.drawImage(half2, 0, 0, W, H);
       if (M.bloom === 'high') {
         qx.globalCompositeOperation = 'copy';
         if (FILTER_OK) { qx.filter = BLUR_Q; qx.drawImage(half2, 0, 0, 128, 80); qx.filter = 'none'; } else qx.drawImage(half2, 0, 0, 128, 80);
-        ctx.globalAlpha = 0.3; ctx.drawImage(quar, 0, 0, W, H);
       }
+     }
+      ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = M.bloom === 'high' ? 0.5 : 0.32;
+      ctx.drawImage(half2, 0, 0, W, H);
+      if (M.bloom === 'high') { ctx.globalAlpha = 0.3; ctx.drawImage(quar, 0, 0, W, H); }
     }
     if (M.soft !== 'off') {
       const med = M.soft === 'medium';
       // ---- diffusion: a whisper of blurred scene screened on top
       if (M.diffusion) {
-        dx.globalCompositeOperation = 'copy';
-        if (FILTER_OK) { dx.filter = BLUR_D; dx.drawImage(src, 0, 0, 128, 80); dx.filter = 'none'; } else dx.drawImage(src, 0, 0, 128, 80);
+        if (rebuild) {
+          dx.globalCompositeOperation = 'copy';
+          if (FILTER_OK) { dx.filter = BLUR_D; dx.drawImage(src, 0, 0, 128, 80); dx.filter = 'none'; } else dx.drawImage(src, 0, 0, 128, 80);
+        }
         ctx.globalCompositeOperation = 'screen'; ctx.globalAlpha = 0.09;
         ctx.drawImage(dif, 0, 0, W, H);
       }

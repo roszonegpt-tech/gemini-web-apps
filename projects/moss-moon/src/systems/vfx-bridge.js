@@ -215,7 +215,8 @@ window.MM = window.MM || {};
   };
 
   // ------------------------------------------------------------------ draw passes
-  let ms = 0, msAvg = 0, msN = 0, lastRect = 0;
+  let ms = 0, msAvg = 0, msN = 0, lastRect = 0, ambTick = 0, cacheOk = false, cacheCam = '';
+  const cacheRect = { x: 0, y: 0, w: 0, h: 0 };
   const rect = { x0: 0, y0: 0, x1: 0, y1: 0 };
   function pass(ctx, layer) {
     if (!V.enabled || !active || !base() || !simOn()) return;
@@ -225,29 +226,41 @@ window.MM = window.MM || {};
     let any = false;
     for (let i = 0; i < MAX; i++) {
       const r = R[i]; if (!r.on || !r.fx) continue;
+      // ambient fields (rain, fireflies, leaves...) draw once per frame in the FRONT pass only (both of their layers), so a scene
+      // that has only ambient effects does a single clear + upload instead of two full-screen passes
+      if (r.cls === 'ambient' && layer !== 'front') continue;
       if (r.screen || r.cls === 'ambient') { rect.x0 = 0; rect.y0 = 0; rect.x1 = W; rect.y1 = H; any = true; continue; }
       const sx = r.ux / 2 - camOX, sy = r.uy / 2 - camOY, rx = r.rx / 2, up = r.up / 2, dn = r.dn / 2;
       if (sx + rx < 0 || sx - rx > W || sy + dn < 0 || sy - up > H) continue;
       if (sx - rx < rect.x0) rect.x0 = sx - rx; if (sy - up < rect.y0) rect.y0 = sy - up; if (sx + rx > rect.x1) rect.x1 = sx + rx; if (sy + dn > rect.y1) rect.y1 = sy + dn;
       any = true;
     }
-    if (!any) return;
+    if (!any) { cacheOk = false; return; }
     const x0 = Math.max(0, rect.x0 | 0), y0 = Math.max(0, rect.y0 | 0), x1 = Math.min(W, Math.ceil(rect.x1)), y1 = Math.min(H, Math.ceil(rect.y1));
     if (x1 - x0 < 1 || y1 - y0 < 1) return;
-    frame.color.fill(0); frame.light.fill(0);
-    for (let i = 0; i < MAX; i++) {
-      const r = R[i]; if (!r.on || !r.fx) continue;
-      if (r.screen) { frame.ox = 0; frame.oy = 0; } else { frame.ox = camOX; frame.oy = camOY; }
-      try { r.fx.draw(frame, layer); } catch (e) { console.error('[MM.vfx] draw ' + r.name, e); release(r); }
-    }
     const w = x1 - x0, h = y1 - y0;
+    // ambient-only scenes (the common case: fireflies / leaves / rain): re-rasterise the field every other frame and re-blit the cached
+    // canvases in between (the particles move a few px per frame, so 30 Hz is invisible and halves the clear + draw + upload cost)
+    let ambientOnly = layer === 'front';
+    for (let i = 0; i < MAX && ambientOnly; i++) { const r = R[i]; if (r.on && r.fx && r.cls !== 'ambient') ambientOnly = false; }
+    const reuse = ambientOnly && cacheOk && (++ambTick & 1) === 1 && cacheRect.w === w && cacheRect.h === h && cacheRect.x === x0 && cacheRect.y === y0 && cacheCam === camOX + ',' + camOY;
+    if (!reuse) {
+      frame.color.fill(0); frame.light.fill(0);
+      for (let i = 0; i < MAX; i++) {
+        const r = R[i]; if (!r.on || !r.fx) continue;
+        if (r.cls === 'ambient' && layer !== 'front') continue;
+        if (r.screen) { frame.ox = 0; frame.oy = 0; } else { frame.ox = camOX; frame.oy = camOY; }
+        try { r.fx.draw(frame, r.cls === 'ambient' ? undefined : layer); } catch (e) { console.error('[MM.vfx] draw ' + r.name, e); release(r); }
+      }
+      cacheOk = ambientOnly; cacheRect.x = x0; cacheRect.y = y0; cacheRect.w = w; cacheRect.h = h; cacheCam = camOX + ',' + camOY;
+    }
     lastRect = w * h;
     if (img) {
-      ox2.putImageData(img, 0, 0, x0, y0, w, h);
+      if (!reuse) ox2.putImageData(img, 0, 0, x0, y0, w, h);
       ctx.save(); ctx.imageSmoothingEnabled = false; ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
       ctx.drawImage(off, x0, y0, w, h, x0, y0, w, h);
       if (S.quality !== 'low') {
-        lx2.putImageData(limg, 0, 0, x0, y0, w, h);
+        if (!reuse) lx2.putImageData(limg, 0, 0, x0, y0, w, h);
         ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = (S.rFlash ? 0.22 : 0.4) * Math.min(1.2, 0.7 + 0.3 * S.fxI);
         ctx.drawImage(loff, x0, y0, w, h, x0, y0, w, h);
       }

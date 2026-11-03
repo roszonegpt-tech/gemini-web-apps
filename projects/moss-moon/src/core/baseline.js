@@ -465,7 +465,7 @@ function updateWorld(dt){
   if(enemy.boss){enemy.special-=dt;if(enemy.special<=0){enemy.special=4;addParticles(enemy,'#d49bce','#ffe3bf',18,1.2);if(distance<55&&hero===game){let pulse=9;if(world.ward>0){const used=Math.min(world.ward,pulse);world.ward-=used;pulse-=used;}world.lastDamage=pulse;world.hp-=pulse;mmEmit('hurt',{amount:pulse,from:enemy});message(enemy.name+' releases a pulse!');if(world.hp<=0){resetPlayer();break;}}}}
   if(distance>23){let sx=to.x-from.x,sy=to.y-from.y;const direction=normalize(sx,sy);
    for(const other of enemies){if(other===enemy||other.hp<=0)continue;const op=project(other.x,other.y),d=Math.hypot(from.x-op.x,from.y-op.y);if(d>0&&d<18){sx+=(from.x-op.x)/d*18;sy+=(from.y-op.y)/d*18;}}
-   const steer=normalize(sx,sy);let pace=(enemy.boss?13:14)+(world.mode==='rift'&&world.modifier==='Frenzy'?7:0);if(enemy.status.chill)pace*=.5;if(enemy.status.root)pace=0;
+   const steer=normalize(sx,sy);let pace=(enemy.boss?17:20)+(world.mode==='rift'&&world.modifier==='Frenzy'?7:0);if(enemy.status.chill)pace*=.5;if(enemy.status.root)pace=0;
    const m=unproject(steer.x*pace*dt,steer.y*pace*dt);const ox=enemy.x,oy=enemy.y;moveActor(enemy,m.x,m.y);if(enemy.x===ox&&enemy.y===oy){const side=unproject(-direction.y*pace*dt*.7,direction.x*pace*dt*.7);moveActor(enemy,side.x,side.y);}
   }else if(enemy.attack<=0){enemy.attack=enemy.boss?1.2:1.8;let damage=enemy.boss?14:4;
    if(hero.seed){hero.health=(hero.health??100)-damage*(world.cls==='sun'?1:2);if(hero.health<=0){hero.seed=null;hero.growth=0;hero.watered=false;message('A raider destroyed a crop');}}
@@ -478,7 +478,7 @@ function updateWorld(dt){
   ally.life-=dt;ally.cooldown-=dt;ally.artMoving=Math.max(0,(ally.artMoving||0)-dt);if(ally.type==='mirage')continue;
   ally.farmCooldown-=dt;if(ally.type==='skeleton'&&world.region==='grove'&&world.mode==='outside'&&ally.farmCooldown<=0){const plant=world.plots.find(p=>p.seed&&!p.watered&&screenDistance(ally,p)<100);if(plant){plant.watered=true;ally.farmCooldown=3;message('Skeleton watered a crop');}}
   const enemy=nearestEnemy(ally,140),goal=enemy||game,from=project(ally.x,ally.y),to=project(goal.x,goal.y),d=Math.hypot(to.x-from.x,to.y-from.y);
-  if(d>(enemy?22:25)){const v=normalize(to.x-from.x,to.y-from.y),m=unproject(v.x*25*dt,v.y*25*dt);ally.x+=m.x;ally.y+=m.y;noteCastMotion(ally,m.x,m.y);}
+  if(d>(enemy?22:25)){const v=normalize(to.x-from.x,to.y-from.y),m=unproject(v.x*38*dt,v.y*38*dt);ally.x+=m.x;ally.y+=m.y;noteCastMotion(ally,m.x,m.y);}
   if(enemy&&d<50&&ally.cooldown<=0){ally.cooldown=ally.type==='wisp'?.7:1.1;const summoner=ally.owner===game?world.cls==='summoner':ally.owner?.cls==='summoner';const power=(ally.type==='golem'?16:10)*(summoner?1.4:1);hitEntity(enemy,power,'#d2c3f5',ally.owner);addParticles(enemy,'#b99bdb','#fff0f6',5,.6);}
  }
  allies=allies.filter(a=>a.life>0);
@@ -489,9 +489,7 @@ function updateWorld(dt){
  lootDrops=lootDrops.filter(d=>d.life>0);
  for(const part of particles){part.life-=dt;part.ox+=part.vx*dt;part.oy+=part.vy*dt;part.vy+=18*dt;}particles=particles.filter(p=>p.life>0);
  for(const b of bursts)b.life-=dt;bursts=bursts.filter(b=>b.life>0);
- const fp=project(familiarSprite.x,familiarSprite.y),follow=project(game.x+.55,game.y-.55),fv=normalize(follow.x-fp.x,follow.y-fp.y);
- familiarSprite.artMoving=Math.max(0,(familiarSprite.artMoving||0)-dt);
- if(Math.hypot(follow.x-fp.x,follow.y-fp.y)>4){const m=unproject(fv.x*24*dt,fv.y*24*dt);moveActor(familiarSprite,m.x,m.y);}
+ updateFamiliar(dt); // MM seam: roaming familiar (was: glued to the witch's side at 24 px/s)
  updateParty(dt);worldAutosave+=dt;if(worldAutosave>8){worldAutosave=0;if(!window.MM?.save)saveWorld(true);} // MM seam S8: with MM, boot.js autosaves at safe moments
 }
 
@@ -580,6 +578,29 @@ function drawCompanion(p){
  if(window.MM?.baselineDraw?.labels!==false){ctx.fillStyle='#f4e6ad';ctx.font='bold 7px monospace';ctx.textAlign='center';ctx.fillText('P'+p.id,v.x,v.y-46-p.height);ctx.textAlign='start';} // MM seam: label gate
 }
 function drawLoot(item){if(window.MM?.art){const a=worldToCanvas(item.x,item.y);if(mmArt('loot_'+item.type,a.x,a.y,{t:game.elapsed}))return;} /* MM seam S5 */const p=worldToCanvas(item.x,item.y),color=item.type==='gold'?'#eac979':item.type==='rune'?'#9cdde4':'#e0aee5';ellipse(p.x,p.y,5,2,'rgba(52,69,48,.15)');diamond(ctx,p.x,p.y-4,7,7,color);sparkle(p.x,p.y-7,'#fff5c9',2);}
+// MM seam: the familiar wanders around the witch (short walks, idle pauses) instead of sitting on their leg, walks at a brisk pace
+// and runs to catch up when left behind. Speeds are iso px/s (the witch walks at 22, flies at ~60).
+function updateFamiliar(dt){
+ const f=familiarSprite;f.artMoving=Math.max(0,(f.artMoving||0)-dt);
+ if(world.familiar==='none')return;
+ const kind=world.familiar,walk=kind==='golem'?32:kind==='raven'?54:46,run=kind==='golem'?52:86;
+ const pf=project(f.x,f.y),pp=project(game.x,game.y),gap=Math.hypot(pp.x-pf.x,pp.y-pf.y);
+ if(gap>280){f.x=game.x+.55;f.y=game.y-.55;f.goal=null;f.mode='roam';return;} // teleported / changed region
+ f.wait=(f.wait===undefined?.6:f.wait)-dt;
+ if(gap>92||(f.mode==='catch'&&gap>40)){ // left behind: run back to the witch's side
+  f.mode='catch';f.goal=null;const v=normalize(pp.x-pf.x,pp.y-pf.y),sp=Math.min(run,Math.max(walk*1.4,speed()*1.15)),m=unproject(v.x*sp*dt,v.y*sp*dt);moveActor(f,m.x,m.y);return;
+ }
+ f.mode='roam';
+ if(!f.goal){
+  if(f.wait>0)return;
+  const a=Math.random()*Math.PI*2,r=34+Math.random()*38,t=unproject(Math.cos(a)*r,Math.sin(a)*r*.5); // a spot 34-72 px away, never at the witch's feet
+  f.goal={x:clamp(game.x+t.x,.8,19.2),y:clamp(game.y+t.y,.8,19.2)};f.stuck=0;
+ }
+ const pg=project(f.goal.x,f.goal.y),d=Math.hypot(pg.x-pf.x,pg.y-pf.y);
+ if(d<4||(f.stuck||0)>.5){f.goal=null;f.wait=.5+Math.random()*2.2;return;}
+ const v=normalize(pg.x-pf.x,pg.y-pf.y),m=unproject(v.x*walk*dt,v.y*walk*dt),ox=f.x,oy=f.y;
+ moveActor(f,m.x,m.y);f.stuck=(f.x===ox&&f.y===oy)?(f.stuck||0)+dt:0;
+}
 function drawFamiliar(){
  if(world.familiar==='none')return;
  const p=worldToCanvas(familiarSprite.x,familiarSprite.y);ellipse(p.x,p.y,6,2,'rgba(52,69,48,.2)');

@@ -150,3 +150,4 @@ html[data-reduced-motion] .mm-title-brand{transform:none}
 }
 html[data-reduced-motion] .mm-title-brand{transform:none}
 @container mmtitle (max-aspect-ratio: 4/5){ html[data-reduced-motion] .mm-title-brand{transform:translateX(-50%)} }
+html.mm-fill .mm-scr-ambient{display:none} /* fill-screen mode has no letterbox to fill: skip the blurred ambient copy (a 34px CSS blur repainting every few frames is costly) */

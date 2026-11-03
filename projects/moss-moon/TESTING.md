@@ -14,6 +14,8 @@ Playwright (Chromium) + Node. Run from this folder; each prints PASS/FAIL lines 
 | `node tests/cine-test.js` | every scene, skip, fallback, cleanup ×20, frame-rate independence | pass (83 checks, agent run) |
 | `node tests/audio-test.js [--quick]` | sfx/tracks, voice limits, peak levels | pass (no fails) |
 | `node tests/art-api.js` | every sprite resolves/draws | 15/15 |
+| `node tests/familiar-test.js` | familiar roams, walks (anim frames), is brisk, keeps up | 7/7 |
+| `node tests/perf-profile.js [html] [secs]` | Chromium CPU profile of live play (top self-time + native callers) | filter 2048→678 ms / 8 s, idle 26%→40% (headless software rendering) |
 | `node tests/webkit-phone.js [html]` | WebKit iPhone emulation: full-screen UI layers are viewport-anchored | pass |
 | `node tests/fill-shot.js [html] [prefix]` | phone portrait/landscape screenshots of logo/title/play (fill-screen layout) | screenshots reviewed |
 | `node tests/e2e-built.js builds/moss-moon-v0.3.0.html` | logo → … → play → save → reload → Continue on the single file | 18/18 |
