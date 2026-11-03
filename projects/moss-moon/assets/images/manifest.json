@@ -1,0 +1,6753 @@
+{
+ "version": "20261101213644",
+ "palette": {
+  "k": "#263a37",
+  "j": "#2f4b47",
+  "t": "#46695f",
+  "T": "#6a907f",
+  "G": "#4b7052",
+  "g": "#688d65",
+  "h": "#87ad7b",
+  "H": "#a6c593",
+  "y": "#d2e3ad",
+  "d": "#4a3a31",
+  "D": "#6e5642",
+  "w": "#8f7a5a",
+  "W": "#b89d72",
+  "s": "#c8aa86",
+  "S": "#4e5660",
+  "r": "#737d7e",
+  "R": "#9ea79f",
+  "q": "#d5d6bd",
+  "c": "#f7f4e9",
+  "C": "#e2dcc2",
+  "a": "#9a7444",
+  "o": "#cfaa71",
+  "O": "#eac979",
+  "Y": "#fff3c4",
+  "m": "#4f4566",
+  "v": "#8a78a8",
+  "l": "#c6aedb",
+  "L": "#ebe1f7",
+  "b": "#36636f",
+  "B": "#5f9ca3",
+  "i": "#a5d6d8",
+  "e": "#8a4a40",
+  "E": "#d27a55",
+  "p": "#e8b8a8",
+  "f": "#c95d6a",
+  "x": "#2e2638",
+  "X": "#7b4f7d",
+  "z": "#8ff0d0",
+  "u": "#59573a",
+  "U": "#8b8a58",
+  "n": "#c98f7e"
+ },
+ "sheets": {
+  "bosses": {
+   "file": "assets/images/bosses.png",
+   "w": 1023,
+   "h": 402,
+   "anchor": "bottom",
+   "note": "Bosses: <id>_<idle|windup>_<s|e>; west = draw east with flip.",
+   "frames": {
+    "bramble_warden_idle_e": {
+     "x": 0,
+     "y": 182,
+     "w": 66,
+     "h": 74,
+     "ax": 33,
+     "ay": 73,
+     "frames": 4,
+     "fps": 5,
+     "sh": [
+      14,
+      5
+     ]
+    },
+    "bramble_warden_idle_s": {
+     "x": 265,
+     "y": 182,
+     "w": 66,
+     "h": 74,
+     "ax": 33,
+     "ay": 73,
+     "frames": 4,
+     "fps": 5,
+     "sh": [
+      14,
+      5
+     ]
+    },
+    "bramble_warden_windup_e": {
+     "x": 0,
+     "y": 257,
+     "w": 66,
+     "h": 74,
+     "ax": 33,
+     "ay": 73,
+     "frames": 3,
+     "fps": 6,
+     "loop": false,
+     "sh": [
+      14,
+      5
+     ]
+    },
+    "bramble_warden_windup_s": {
+     "x": 199,
+     "y": 257,
+     "w": 66,
+     "h": 74,
+     "ax": 33,
+     "ay": 73,
+     "frames": 3,
+     "fps": 6,
+     "loop": false,
+     "sh": [
+      14,
+      5
+     ]
+    },
+    "frost_wyrm_idle_e": {
+     "x": 223,
+     "y": 91,
+     "w": 82,
+     "h": 74,
+     "ax": 41,
+     "ay": 73,
+     "frames": 4,
+     "fps": 5,
+     "sh": [
+      14,
+      5
+     ]
+    },
+    "frost_wyrm_idle_s": {
+     "x": 552,
+     "y": 91,
+     "w": 82,
+     "h": 74,
+     "ax": 41,
+     "ay": 73,
+     "frames": 4,
+     "fps": 5,
+     "sh": [
+      14,
+      5
+     ]
+    },
+    "frost_wyrm_windup_e": {
+     "x": 530,
+     "y": 182,
+     "w": 82,
+     "h": 74,
+     "ax": 41,
+     "ay": 73,
+     "frames": 3,
+     "fps": 6,
+     "loop": false,
+     "sh": [
+      14,
+      5
+     ]
+    },
+    "frost_wyrm_windup_s": {
+     "x": 777,
+     "y": 182,
+     "w": 82,
+     "h": 74,
+     "ax": 41,
+     "ay": 73,
+     "frames": 3,
+     "fps": 6,
+     "loop": false,
+     "sh": [
+      14,
+      5
+     ]
+    },
+    "mire_hag_idle_e": {
+     "x": 398,
+     "y": 257,
+     "w": 66,
+     "h": 70,
+     "ax": 33,
+     "ay": 69,
+     "frames": 4,
+     "fps": 5,
+     "sh": [
+      14,
+      5
+     ]
+    },
+    "mire_hag_idle_s": {
+     "x": 663,
+     "y": 257,
+     "w": 66,
+     "h": 70,
+     "ax": 33,
+     "ay": 69,
+     "frames": 4,
+     "fps": 5,
+     "sh": [
+      14,
+      5
+     ]
+    },
+    "mire_hag_windup_e": {
+     "x": 0,
+     "y": 332,
+     "w": 66,
+     "h": 70,
+     "ax": 33,
+     "ay": 69,
+     "frames": 3,
+     "fps": 6,
+     "loop": false,
+     "sh": [
+      14,
+      5
+     ]
+    },
+    "mire_hag_windup_s": {
+     "x": 199,
+     "y": 332,
+     "w": 66,
+     "h": 70,
+     "ax": 33,
+     "ay": 69,
+     "frames": 3,
+     "fps": 6,
+     "loop": false,
+     "sh": [
+      14,
+      5
+     ]
+    },
+    "well_spirit_idle_e": {
+     "x": 0,
+     "y": 0,
+     "w": 74,
+     "h": 90,
+     "ax": 37,
+     "ay": 89,
+     "frames": 4,
+     "fps": 5,
+     "sh": [
+      14,
+      5
+     ]
+    },
+    "well_spirit_idle_s": {
+     "x": 297,
+     "y": 0,
+     "w": 74,
+     "h": 90,
+     "ax": 37,
+     "ay": 89,
+     "frames": 4,
+     "fps": 5,
+     "sh": [
+      14,
+      5
+     ]
+    },
+    "well_spirit_windup_e": {
+     "x": 594,
+     "y": 0,
+     "w": 74,
+     "h": 90,
+     "ax": 37,
+     "ay": 89,
+     "frames": 3,
+     "fps": 6,
+     "loop": false,
+     "sh": [
+      14,
+      5
+     ]
+    },
+    "well_spirit_windup_s": {
+     "x": 0,
+     "y": 91,
+     "w": 74,
+     "h": 90,
+     "ax": 37,
+     "ay": 89,
+     "frames": 3,
+     "fps": 6,
+     "loop": false,
+     "sh": [
+      14,
+      5
+     ]
+    }
+   }
+  },
+  "buildings": {
+   "file": "assets/images/buildings.png",
+   "w": 802,
+   "h": 163,
+   "anchor": "bottom",
+   "note": "Buildings + Moonwell. Anchor = bottom vertex of the footprint diamond (front corner).",
+   "frames": {
+    "cottage_lush": {
+     "x": 269,
+     "y": 0,
+     "w": 86,
+     "h": 100,
+     "ax": 49,
+     "ay": 98,
+     "frames": 4,
+     "fps": 3
+    },
+    "cottage_mended": {
+     "x": 614,
+     "y": 0,
+     "w": 86,
+     "h": 100,
+     "ax": 49,
+     "ay": 98,
+     "frames": 1,
+     "fps": 0
+    },
+    "cottage_ruined": {
+     "x": 701,
+     "y": 0,
+     "w": 86,
+     "h": 100,
+     "ax": 49,
+     "ay": 98,
+     "frames": 1,
+     "fps": 0
+    },
+    "fountain_dry": {
+     "x": 760,
+     "y": 113,
+     "w": 42,
+     "h": 32,
+     "ax": 21,
+     "ay": 31,
+     "frames": 1,
+     "fps": 0
+    },
+    "house_village_0": {
+     "x": 0,
+     "y": 0,
+     "w": 96,
+     "h": 112,
+     "ax": 55,
+     "ay": 110,
+     "frames": 1,
+     "fps": 0
+    },
+    "house_village_1": {
+     "x": 174,
+     "y": 0,
+     "w": 94,
+     "h": 106,
+     "ax": 47,
+     "ay": 104,
+     "frames": 1,
+     "fps": 0
+    },
+    "house_village_2": {
+     "x": 97,
+     "y": 0,
+     "w": 76,
+     "h": 108,
+     "ax": 41,
+     "ay": 106,
+     "frames": 1,
+     "fps": 0
+    },
+    "moonwell_dark": {
+     "x": 650,
+     "y": 113,
+     "w": 54,
+     "h": 50,
+     "ax": 27,
+     "ay": 49,
+     "frames": 1,
+     "fps": 0
+    },
+    "moonwell_faint": {
+     "x": 705,
+     "y": 113,
+     "w": 54,
+     "h": 50,
+     "ax": 27,
+     "ay": 49,
+     "frames": 1,
+     "fps": 0
+    },
+    "moonwell_glow": {
+     "x": 433,
+     "y": 113,
+     "w": 54,
+     "h": 50,
+     "ax": 27,
+     "ay": 49,
+     "frames": 4,
+     "fps": 4
+    },
+    "moonwell_restored": {
+     "x": 0,
+     "y": 113,
+     "w": 54,
+     "h": 50,
+     "ax": 27,
+     "ay": 49,
+     "frames": 8,
+     "fps": 6
+    }
+   }
+  },
+  "crops": {
+   "file": "assets/images/crops.png",
+   "w": 503,
+   "h": 49,
+   "anchor": "bottom",
+   "note": "Crops stand on the plot centre; soil overlay is a 32x16 diamond (anchor 16,8).",
+   "frames": {
+    "crop_ember_pepper_growing": {
+     "x": 414,
+     "y": 0,
+     "w": 17,
+     "h": 24,
+     "ax": 8,
+     "ay": 23,
+     "frames": 1,
+     "fps": 0,
+     "sh": [
+      5,
+      2
+     ]
+    },
+    "crop_ember_pepper_ripe": {
+     "x": 432,
+     "y": 0,
+     "w": 17,
+     "h": 24,
+     "ax": 8,
+     "ay": 23,
+     "frames": 1,
+     "fps": 0,
+     "sh": [
+      5,
+      2
+     ]
+    },
+    "crop_ember_pepper_seed": {
+     "x": 231,
+     "y": 25,
+     "w": 13,
+     "h": 7,
+     "ax": 6,
+     "ay": 6,
+     "frames": 1,
+     "fps": 0
+    },
+    "crop_ember_pepper_sparkle": {
+     "x": 0,
+     "y": 0,
+     "w": 17,
+     "h": 24,
+     "ax": 8,
+     "ay": 23,
+     "frames": 4,
+     "fps": 6,
+     "sh": [
+      5,
+      2
+     ]
+    },
+    "crop_ember_pepper_sprout": {
+     "x": 159,
+     "y": 25,
+     "w": 11,
+     "h": 10,
+     "ax": 5,
+     "ay": 9,
+     "frames": 1,
+     "fps": 0,
+     "sh": [
+      5,
+      2
+     ]
+    },
+    "crop_frost_berry_growing": {
+     "x": 450,
+     "y": 0,
+     "w": 17,
+     "h": 24,
+     "ax": 8,
+     "ay": 23,
+     "frames": 1,
+     "fps": 0,
+     "sh": [
+      5,
+      2
+     ]
+    },
+    "crop_frost_berry_ripe": {
+     "x": 468,
+     "y": 0,
+     "w": 17,
+     "h": 24,
+     "ax": 8,
+     "ay": 23,
+     "frames": 1,
+     "fps": 0,
+     "sh": [
+      5,
+      2
+     ]
+    },
+    "crop_frost_berry_seed": {
+     "x": 245,
+     "y": 25,
+     "w": 13,
+     "h": 7,
+     "ax": 6,
+     "ay": 6,
+     "frames": 1,
+     "fps": 0
+    },
+    "crop_frost_berry_sparkle": {
+     "x": 69,
+     "y": 0,
+     "w": 17,
+     "h": 24,
+     "ax": 8,
+     "ay": 23,
+     "frames": 4,
+     "fps": 6,
+     "sh": [
+      5,
+      2
+     ]
+    },
+    "crop_frost_berry_sprout": {
+     "x": 171,
+     "y": 25,
+     "w": 11,
+     "h": 10,
+     "ax": 5,
+     "ay": 9,
+     "frames": 1,
+     "fps": 0,
+     "sh": [
+      5,
+      2
+     ]
+    },
+    "crop_glowcap_growing": {
+     "x": 486,
+     "y": 0,
+     "w": 17,
+     "h": 24,
+     "ax": 8,
+     "ay": 23,
+     "frames": 1,
+     "fps": 0,
+     "sh": [
+      5,
+      2
+     ]
+    },
+    "crop_glowcap_ripe": {
+     "x": 0,
+     "y": 25,
+     "w": 17,
+     "h": 24,
+     "ax": 8,
+     "ay": 23,
+     "frames": 1,
+     "fps": 0,
+     "sh": [
+      5,
+      2
+     ]
+    },
+    "crop_glowcap_seed": {
+     "x": 259,
+     "y": 25,
+     "w": 13,
+     "h": 7,
+     "ax": 6,
+     "ay": 6,
+     "frames": 1,
+     "fps": 0
+    },
+    "crop_glowcap_sparkle": {
+     "x": 138,
+     "y": 0,
+     "w": 17,
+     "h": 24,
+     "ax": 8,
+     "ay": 23,
+     "frames": 4,
+     "fps": 6,
+     "sh": [
+      5,
+      2
+     ]
+    },
+    "crop_glowcap_sprout": {
+     "x": 183,
+     "y": 25,
+     "w": 11,
+     "h": 10,
+     "ax": 5,
+     "ay": 9,
+     "frames": 1,
+     "fps": 0,
+     "sh": [
+      5,
+      2
+     ]
+    },
+    "crop_moonflower_growing": {
+     "x": 18,
+     "y": 25,
+     "w": 17,
+     "h": 24,
+     "ax": 8,
+     "ay": 23,
+     "frames": 1,
+     "fps": 0,
+     "sh": [
+      5,
+      2
+     ]
+    },
+    "crop_moonflower_ripe": {
+     "x": 36,
+     "y": 25,
+     "w": 17,
+     "h": 24,
+     "ax": 8,
+     "ay": 23,
+     "frames": 1,
+     "fps": 0,
+     "sh": [
+      5,
+      2
+     ]
+    },
+    "crop_moonflower_seed": {
+     "x": 273,
+     "y": 25,
+     "w": 13,
+     "h": 7,
+     "ax": 6,
+     "ay": 6,
+     "frames": 1,
+     "fps": 0
+    },
+    "crop_moonflower_sparkle": {
+     "x": 207,
+     "y": 0,
+     "w": 17,
+     "h": 24,
+     "ax": 8,
+     "ay": 23,
+     "frames": 4,
+     "fps": 6,
+     "sh": [
+      5,
+      2
+     ]
+    },
+    "crop_moonflower_sprout": {
+     "x": 195,
+     "y": 25,
+     "w": 11,
+     "h": 10,
+     "ax": 5,
+     "ay": 9,
+     "frames": 1,
+     "fps": 0,
+     "sh": [
+      5,
+      2
+     ]
+    },
+    "crop_starmint_growing": {
+     "x": 54,
+     "y": 25,
+     "w": 17,
+     "h": 24,
+     "ax": 8,
+     "ay": 23,
+     "frames": 1,
+     "fps": 0,
+     "sh": [
+      5,
+      2
+     ]
+    },
+    "crop_starmint_ripe": {
+     "x": 72,
+     "y": 25,
+     "w": 17,
+     "h": 24,
+     "ax": 8,
+     "ay": 23,
+     "frames": 1,
+     "fps": 0,
+     "sh": [
+      5,
+      2
+     ]
+    },
+    "crop_starmint_seed": {
+     "x": 287,
+     "y": 25,
+     "w": 13,
+     "h": 7,
+     "ax": 6,
+     "ay": 6,
+     "frames": 1,
+     "fps": 0
+    },
+    "crop_starmint_sparkle": {
+     "x": 276,
+     "y": 0,
+     "w": 17,
+     "h": 24,
+     "ax": 8,
+     "ay": 23,
+     "frames": 4,
+     "fps": 6,
+     "sh": [
+      5,
+      2
+     ]
+    },
+    "crop_starmint_sprout": {
+     "x": 207,
+     "y": 25,
+     "w": 11,
+     "h": 10,
+     "ax": 5,
+     "ay": 9,
+     "frames": 1,
+     "fps": 0,
+     "sh": [
+      5,
+      2
+     ]
+    },
+    "crop_wheat_growing": {
+     "x": 90,
+     "y": 25,
+     "w": 17,
+     "h": 24,
+     "ax": 8,
+     "ay": 23,
+     "frames": 1,
+     "fps": 0,
+     "sh": [
+      5,
+      2
+     ]
+    },
+    "crop_wheat_ripe": {
+     "x": 108,
+     "y": 25,
+     "w": 17,
+     "h": 24,
+     "ax": 8,
+     "ay": 23,
+     "frames": 1,
+     "fps": 0,
+     "sh": [
+      5,
+      2
+     ]
+    },
+    "crop_wheat_seed": {
+     "x": 301,
+     "y": 25,
+     "w": 13,
+     "h": 7,
+     "ax": 6,
+     "ay": 6,
+     "frames": 1,
+     "fps": 0
+    },
+    "crop_wheat_sparkle": {
+     "x": 345,
+     "y": 0,
+     "w": 17,
+     "h": 24,
+     "ax": 8,
+     "ay": 23,
+     "frames": 4,
+     "fps": 6,
+     "sh": [
+      5,
+      2
+     ]
+    },
+    "crop_wheat_sprout": {
+     "x": 219,
+     "y": 25,
+     "w": 11,
+     "h": 10,
+     "ax": 5,
+     "ay": 9,
+     "frames": 1,
+     "fps": 0,
+     "sh": [
+      5,
+      2
+     ]
+    },
+    "soil_watered": {
+     "x": 126,
+     "y": 25,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    }
+   }
+  },
+  "exterior": {
+   "file": "assets/images/exterior.png",
+   "w": 1021,
+   "h": 245,
+   "anchor": "bottom",
+   "note": "PHASE3-scale exteriors: bld_* (anchor front ground corner), ext_* face parts (_l SW face / _r SE face; anchor = centre of the bottom edge on the wall), roof edges, chimney, WORLD structures (bottom-centre).",
+   "frames": {
+    "bld_mill_locked": {
+     "x": 0,
+     "y": 0,
+     "w": 150,
+     "h": 208,
+     "ax": 79,
+     "ay": 205,
+     "frames": 1,
+     "fps": 0,
+     "foot": [
+      4.5,
+      4
+     ],
+     "anchorMode": "front"
+    },
+    "bld_shed_locked": {
+     "x": 270,
+     "y": 0,
+     "w": 110,
+     "h": 176,
+     "ax": 55,
+     "ay": 173,
+     "frames": 1,
+     "fps": 0,
+     "foot": [
+      3,
+      3
+     ],
+     "anchorMode": "front"
+    },
+    "bld_tutorial_hut": {
+     "x": 151,
+     "y": 0,
+     "w": 118,
+     "h": 180,
+     "ax": 63,
+     "ay": 177,
+     "frames": 1,
+     "fps": 0,
+     "foot": [
+      3.5,
+      3
+     ],
+     "anchorMode": "front"
+    },
+    "crypt_block": {
+     "x": 91,
+     "y": 209,
+     "w": 32,
+     "h": 34,
+     "ax": 16,
+     "ay": 33,
+     "frames": 1,
+     "fps": 0
+    },
+    "ext_awning_l": {
+     "x": 197,
+     "y": 209,
+     "w": 38,
+     "h": 31,
+     "ax": 19,
+     "ay": 21,
+     "frames": 1,
+     "fps": 0,
+     "face": "L"
+    },
+    "ext_awning_r": {
+     "x": 236,
+     "y": 209,
+     "w": 38,
+     "h": 31,
+     "ax": 19,
+     "ay": 20,
+     "frames": 1,
+     "fps": 0,
+     "face": "R"
+    },
+    "ext_chimney": {
+     "x": 485,
+     "y": 209,
+     "w": 14,
+     "h": 28,
+     "ax": 7,
+     "ay": 27,
+     "frames": 1,
+     "fps": 0
+    },
+    "ext_chimney_mossy": {
+     "x": 500,
+     "y": 209,
+     "w": 14,
+     "h": 28,
+     "ax": 7,
+     "ay": 27,
+     "frames": 1,
+     "fps": 0
+    },
+    "ext_door_boarded_l": {
+     "x": 381,
+     "y": 0,
+     "w": 38,
+     "h": 75,
+     "ax": 19,
+     "ay": 65,
+     "frames": 1,
+     "fps": 0,
+     "face": "L"
+    },
+    "ext_door_boarded_r": {
+     "x": 420,
+     "y": 0,
+     "w": 38,
+     "h": 75,
+     "ax": 19,
+     "ay": 64,
+     "frames": 1,
+     "fps": 0,
+     "face": "R"
+    },
+    "ext_door_frame_l": {
+     "x": 459,
+     "y": 0,
+     "w": 38,
+     "h": 75,
+     "ax": 19,
+     "ay": 65,
+     "frames": 1,
+     "fps": 0,
+     "face": "L"
+    },
+    "ext_door_frame_r": {
+     "x": 498,
+     "y": 0,
+     "w": 38,
+     "h": 75,
+     "ax": 19,
+     "ay": 64,
+     "frames": 1,
+     "fps": 0,
+     "face": "R"
+    },
+    "ext_door_l": {
+     "x": 537,
+     "y": 0,
+     "w": 38,
+     "h": 75,
+     "ax": 19,
+     "ay": 65,
+     "frames": 1,
+     "fps": 0,
+     "face": "L"
+    },
+    "ext_door_open_l": {
+     "x": 576,
+     "y": 0,
+     "w": 38,
+     "h": 75,
+     "ax": 19,
+     "ay": 65,
+     "frames": 1,
+     "fps": 0,
+     "face": "L"
+    },
+    "ext_door_open_r": {
+     "x": 615,
+     "y": 0,
+     "w": 38,
+     "h": 75,
+     "ax": 19,
+     "ay": 64,
+     "frames": 1,
+     "fps": 0,
+     "face": "R"
+    },
+    "ext_door_r": {
+     "x": 654,
+     "y": 0,
+     "w": 38,
+     "h": 75,
+     "ax": 19,
+     "ay": 64,
+     "frames": 1,
+     "fps": 0,
+     "face": "R"
+    },
+    "ext_eave_shingle": {
+     "x": 604,
+     "y": 209,
+     "w": 18,
+     "h": 18,
+     "ax": 9,
+     "ay": 17,
+     "frames": 1,
+     "fps": 0
+    },
+    "ext_eave_shingle_mossy": {
+     "x": 623,
+     "y": 209,
+     "w": 18,
+     "h": 18,
+     "ax": 9,
+     "ay": 17,
+     "frames": 1,
+     "fps": 0
+    },
+    "ext_eave_slate": {
+     "x": 642,
+     "y": 209,
+     "w": 18,
+     "h": 18,
+     "ax": 9,
+     "ay": 17,
+     "frames": 1,
+     "fps": 0
+    },
+    "ext_eave_slate_mossy": {
+     "x": 661,
+     "y": 209,
+     "w": 18,
+     "h": 18,
+     "ax": 9,
+     "ay": 17,
+     "frames": 1,
+     "fps": 0
+    },
+    "ext_eave_thatch": {
+     "x": 680,
+     "y": 209,
+     "w": 18,
+     "h": 18,
+     "ax": 9,
+     "ay": 17,
+     "frames": 1,
+     "fps": 0
+    },
+    "ext_eave_thatch_mossy": {
+     "x": 699,
+     "y": 209,
+     "w": 18,
+     "h": 18,
+     "ax": 9,
+     "ay": 17,
+     "frames": 1,
+     "fps": 0
+    },
+    "ext_flowerbox_l": {
+     "x": 558,
+     "y": 209,
+     "w": 22,
+     "h": 18,
+     "ax": 11,
+     "ay": 12,
+     "frames": 1,
+     "fps": 0,
+     "face": "L"
+    },
+    "ext_flowerbox_r": {
+     "x": 581,
+     "y": 209,
+     "w": 22,
+     "h": 18,
+     "ax": 11,
+     "ay": 11,
+     "frames": 1,
+     "fps": 0,
+     "face": "R"
+    },
+    "ext_foundation_l": {
+     "x": 870,
+     "y": 209,
+     "w": 18,
+     "h": 15,
+     "ax": 9,
+     "ay": 10,
+     "frames": 1,
+     "fps": 0,
+     "face": "L"
+    },
+    "ext_foundation_mossy_l": {
+     "x": 718,
+     "y": 209,
+     "w": 18,
+     "h": 17,
+     "ax": 9,
+     "ay": 12,
+     "frames": 1,
+     "fps": 0,
+     "face": "L"
+    },
+    "ext_foundation_mossy_r": {
+     "x": 737,
+     "y": 209,
+     "w": 18,
+     "h": 17,
+     "ax": 9,
+     "ay": 11,
+     "frames": 1,
+     "fps": 0,
+     "face": "R"
+    },
+    "ext_foundation_r": {
+     "x": 889,
+     "y": 209,
+     "w": 18,
+     "h": 15,
+     "ax": 9,
+     "ay": 9,
+     "frames": 1,
+     "fps": 0,
+     "face": "R"
+    },
+    "ext_ridge_shingle": {
+     "x": 908,
+     "y": 209,
+     "w": 18,
+     "h": 14,
+     "ax": 9,
+     "ay": 13,
+     "frames": 1,
+     "fps": 0
+    },
+    "ext_ridge_shingle_mossy": {
+     "x": 927,
+     "y": 209,
+     "w": 18,
+     "h": 14,
+     "ax": 9,
+     "ay": 13,
+     "frames": 1,
+     "fps": 0
+    },
+    "ext_ridge_slate": {
+     "x": 946,
+     "y": 209,
+     "w": 18,
+     "h": 14,
+     "ax": 9,
+     "ay": 13,
+     "frames": 1,
+     "fps": 0
+    },
+    "ext_ridge_slate_mossy": {
+     "x": 965,
+     "y": 209,
+     "w": 18,
+     "h": 14,
+     "ax": 9,
+     "ay": 13,
+     "frames": 1,
+     "fps": 0
+    },
+    "ext_ridge_thatch": {
+     "x": 984,
+     "y": 209,
+     "w": 18,
+     "h": 14,
+     "ax": 9,
+     "ay": 13,
+     "frames": 1,
+     "fps": 0
+    },
+    "ext_ridge_thatch_mossy": {
+     "x": 1003,
+     "y": 209,
+     "w": 18,
+     "h": 14,
+     "ax": 9,
+     "ay": 13,
+     "frames": 1,
+     "fps": 0
+    },
+    "ext_shutters_open_l": {
+     "x": 0,
+     "y": 209,
+     "w": 32,
+     "h": 36,
+     "ax": 16,
+     "ay": 27,
+     "frames": 1,
+     "fps": 0,
+     "face": "L"
+    },
+    "ext_shutters_open_r": {
+     "x": 33,
+     "y": 209,
+     "w": 32,
+     "h": 36,
+     "ax": 16,
+     "ay": 27,
+     "frames": 1,
+     "fps": 0,
+     "face": "R"
+    },
+    "ext_sign_bracket_l": {
+     "x": 401,
+     "y": 209,
+     "w": 22,
+     "h": 29,
+     "ax": 11,
+     "ay": 23,
+     "frames": 1,
+     "fps": 0,
+     "face": "L"
+    },
+    "ext_sign_bracket_r": {
+     "x": 424,
+     "y": 209,
+     "w": 22,
+     "h": 29,
+     "ax": 11,
+     "ay": 22,
+     "frames": 1,
+     "fps": 0,
+     "face": "R"
+    },
+    "ext_verge_shingle": {
+     "x": 756,
+     "y": 209,
+     "w": 18,
+     "h": 16,
+     "ax": 9,
+     "ay": 15,
+     "frames": 1,
+     "fps": 0
+    },
+    "ext_verge_shingle_mossy": {
+     "x": 775,
+     "y": 209,
+     "w": 18,
+     "h": 16,
+     "ax": 9,
+     "ay": 15,
+     "frames": 1,
+     "fps": 0
+    },
+    "ext_verge_slate": {
+     "x": 794,
+     "y": 209,
+     "w": 18,
+     "h": 16,
+     "ax": 9,
+     "ay": 15,
+     "frames": 1,
+     "fps": 0
+    },
+    "ext_verge_slate_mossy": {
+     "x": 813,
+     "y": 209,
+     "w": 18,
+     "h": 16,
+     "ax": 9,
+     "ay": 15,
+     "frames": 1,
+     "fps": 0
+    },
+    "ext_verge_thatch": {
+     "x": 832,
+     "y": 209,
+     "w": 18,
+     "h": 16,
+     "ax": 9,
+     "ay": 15,
+     "frames": 1,
+     "fps": 0
+    },
+    "ext_verge_thatch_mossy": {
+     "x": 851,
+     "y": 209,
+     "w": 18,
+     "h": 16,
+     "ax": 9,
+     "ay": 15,
+     "frames": 1,
+     "fps": 0
+    },
+    "ext_window_dark_l": {
+     "x": 275,
+     "y": 209,
+     "w": 20,
+     "h": 30,
+     "ax": 10,
+     "ay": 24,
+     "frames": 1,
+     "fps": 0,
+     "face": "L"
+    },
+    "ext_window_dark_r": {
+     "x": 296,
+     "y": 209,
+     "w": 20,
+     "h": 30,
+     "ax": 10,
+     "ay": 24,
+     "frames": 1,
+     "fps": 0,
+     "face": "R"
+    },
+    "ext_window_lit_l": {
+     "x": 317,
+     "y": 209,
+     "w": 20,
+     "h": 30,
+     "ax": 10,
+     "ay": 24,
+     "frames": 1,
+     "fps": 0,
+     "face": "L"
+    },
+    "ext_window_lit_r": {
+     "x": 338,
+     "y": 209,
+     "w": 20,
+     "h": 30,
+     "ax": 10,
+     "ay": 24,
+     "frames": 1,
+     "fps": 0,
+     "face": "R"
+    },
+    "ext_window_shuttered_l": {
+     "x": 359,
+     "y": 209,
+     "w": 20,
+     "h": 30,
+     "ax": 10,
+     "ay": 24,
+     "frames": 1,
+     "fps": 0,
+     "face": "L"
+    },
+    "ext_window_shuttered_r": {
+     "x": 380,
+     "y": 209,
+     "w": 20,
+     "h": 30,
+     "ax": 10,
+     "ay": 24,
+     "frames": 1,
+     "fps": 0,
+     "face": "R"
+    },
+    "hanging_sign": {
+     "x": 515,
+     "y": 209,
+     "w": 24,
+     "h": 22,
+     "ax": 12,
+     "ay": 21,
+     "frames": 1,
+     "fps": 0
+    },
+    "ice_cave": {
+     "x": 752,
+     "y": 0,
+     "w": 68,
+     "h": 50,
+     "ax": 34,
+     "ay": 49,
+     "frames": 1,
+     "fps": 0
+    },
+    "mailbox": {
+     "x": 447,
+     "y": 209,
+     "w": 18,
+     "h": 28,
+     "ax": 9,
+     "ay": 27,
+     "frames": 1,
+     "fps": 0
+    },
+    "mausoleum": {
+     "x": 693,
+     "y": 0,
+     "w": 58,
+     "h": 54,
+     "ax": 29,
+     "ay": 53,
+     "frames": 1,
+     "fps": 0
+    },
+    "notice_board": {
+     "x": 968,
+     "y": 0,
+     "w": 34,
+     "h": 38,
+     "ax": 17,
+     "ay": 37,
+     "frames": 1,
+     "fps": 0
+    },
+    "pillar": {
+     "x": 949,
+     "y": 0,
+     "w": 18,
+     "h": 40,
+     "ax": 9,
+     "ay": 39,
+     "frames": 1,
+     "fps": 0
+    },
+    "pillar_broken": {
+     "x": 466,
+     "y": 209,
+     "w": 18,
+     "h": 28,
+     "ax": 9,
+     "ay": 27,
+     "frames": 1,
+     "fps": 0
+    },
+    "rain_barrel": {
+     "x": 540,
+     "y": 209,
+     "w": 17,
+     "h": 20,
+     "ax": 8,
+     "ay": 19,
+     "frames": 1,
+     "fps": 0
+    },
+    "sunken_arch": {
+     "x": 821,
+     "y": 0,
+     "w": 62,
+     "h": 50,
+     "ax": 31,
+     "ay": 49,
+     "frames": 1,
+     "fps": 0
+    },
+    "thorn_gate": {
+     "x": 884,
+     "y": 0,
+     "w": 64,
+     "h": 48,
+     "ax": 32,
+     "ay": 47,
+     "frames": 1,
+     "fps": 0
+    },
+    "training_dummy": {
+     "x": 66,
+     "y": 209,
+     "w": 24,
+     "h": 36,
+     "ax": 12,
+     "ay": 35,
+     "frames": 1,
+     "fps": 0
+    },
+    "waystone": {
+     "x": 124,
+     "y": 209,
+     "w": 18,
+     "h": 32,
+     "ax": 9,
+     "ay": 31,
+     "frames": 4,
+     "fps": 4
+    }
+   }
+  },
+  "furniture": {
+   "file": "assets/images/furniture.png",
+   "w": 997,
+   "h": 237,
+   "anchor": "bottom",
+   "note": "Interior furniture. Anchor = footprint centre on the floor (foot = [tiles x, tiles y]); *_l against the left/NW back wall, *_r against the right/NE wall; hook:true = hangs from its anchor.",
+   "frames": {
+    "alchemy_bench_l": {
+     "x": 0,
+     "y": 106,
+     "w": 48,
+     "h": 57,
+     "ax": 24,
+     "ay": 44,
+     "frames": 1,
+     "fps": 0,
+     "foot": [
+      0.75,
+      2
+     ],
+     "flipOf": "alchemy_bench_r"
+    },
+    "alchemy_bench_r": {
+     "x": 49,
+     "y": 106,
+     "w": 48,
+     "h": 57,
+     "ax": 24,
+     "ay": 44,
+     "frames": 1,
+     "fps": 0,
+     "foot": [
+      2,
+      0.75
+     ]
+    },
+    "barrel_apples": {
+     "x": 619,
+     "y": 205,
+     "w": 28,
+     "h": 23,
+     "ax": 14,
+     "ay": 15,
+     "frames": 1,
+     "fps": 0,
+     "foot": [
+      0.75,
+      0.75
+     ]
+    },
+    "barrel_water": {
+     "x": 648,
+     "y": 205,
+     "w": 28,
+     "h": 23,
+     "ax": 14,
+     "ay": 15,
+     "frames": 1,
+     "fps": 0,
+     "foot": [
+      0.75,
+      0.75
+     ]
+    },
+    "bed_l": {
+     "x": 214,
+     "y": 106,
+     "w": 52,
+     "h": 53,
+     "ax": 26,
+     "ay": 39,
+     "frames": 1,
+     "fps": 0,
+     "foot": [
+      2,
+      1
+     ]
+    },
+    "bed_r": {
+     "x": 267,
+     "y": 106,
+     "w": 52,
+     "h": 53,
+     "ax": 26,
+     "ay": 39,
+     "frames": 1,
+     "fps": 0,
+     "foot": [
+      1,
+      2
+     ],
+     "flipOf": "bed_l"
+    },
+    "bench_in": {
+     "x": 94,
+     "y": 205,
+     "w": 44,
+     "h": 31,
+     "ax": 22,
+     "ay": 19,
+     "frames": 1,
+     "fps": 0,
+     "foot": [
+      2,
+      0.5
+     ]
+    },
+    "bookcase_l": {
+     "x": 940,
+     "y": 0,
+     "w": 28,
+     "h": 63,
+     "ax": 14,
+     "ay": 55,
+     "frames": 1,
+     "fps": 0,
+     "foot": [
+      0.5,
+      1
+     ],
+     "flipOf": "bookcase_r"
+    },
+    "bookcase_r": {
+     "x": 969,
+     "y": 0,
+     "w": 28,
+     "h": 63,
+     "ax": 14,
+     "ay": 55,
+     "frames": 1,
+     "fps": 0,
+     "foot": [
+      1,
+      0.5
+     ]
+    },
+    "candelabra": {
+     "x": 585,
+     "y": 164,
+     "w": 17,
+     "h": 36,
+     "ax": 8,
+     "ay": 35,
+     "frames": 4,
+     "fps": 6
+    },
+    "candle": {
+     "x": 940,
+     "y": 205,
+     "w": 7,
+     "h": 14,
+     "ax": 3,
+     "ay": 13,
+     "frames": 4,
+     "fps": 6
+    },
+    "candles_cluster": {
+     "x": 887,
+     "y": 205,
+     "w": 13,
+     "h": 15,
+     "ax": 6,
+     "ay": 14,
+     "frames": 4,
+     "fps": 6
+    },
+    "cauldron_big": {
+     "x": 81,
+     "y": 164,
+     "w": 36,
+     "h": 39,
+     "ax": 18,
+     "ay": 29,
+     "frames": 6,
+     "fps": 7,
+     "foot": [
+      1,
+      1
+     ]
+    },
+    "chair_ne": {
+     "x": 818,
+     "y": 164,
+     "w": 20,
+     "h": 33,
+     "ax": 10,
+     "ay": 27,
+     "frames": 1,
+     "fps": 0,
+     "foot": [
+      0.5,
+      0.5
+     ]
+    },
+    "chair_nw": {
+     "x": 839,
+     "y": 164,
+     "w": 20,
+     "h": 33,
+     "ax": 10,
+     "ay": 27,
+     "frames": 1,
+     "fps": 0,
+     "foot": [
+      0.5,
+      0.5
+     ],
+     "flipOf": "chair_ne"
+    },
+    "chair_se": {
+     "x": 860,
+     "y": 164,
+     "w": 20,
+     "h": 33,
+     "ax": 10,
+     "ay": 27,
+     "frames": 1,
+     "fps": 0,
+     "foot": [
+      0.5,
+      0.5
+     ],
+     "flipOf": "chair_sw"
+    },
+    "chair_sw": {
+     "x": 881,
+     "y": 164,
+     "w": 20,
+     "h": 33,
+     "ax": 10,
+     "ay": 27,
+     "frames": 1,
+     "fps": 0,
+     "foot": [
+      0.5,
+      0.5
+     ]
+    },
+    "chest": {
+     "x": 704,
+     "y": 205,
+     "w": 24,
+     "h": 23,
+     "ax": 12,
+     "ay": 16,
+     "frames": 1,
+     "fps": 0,
+     "foot": [
+      0.75,
+      0.5
+     ]
+    },
+    "chest_open": {
+     "x": 414,
+     "y": 205,
+     "w": 24,
+     "h": 27,
+     "ax": 12,
+     "ay": 20,
+     "frames": 1,
+     "fps": 0,
+     "foot": [
+      0.75,
+      0.5
+     ]
+    },
+    "chest_opening": {
+     "x": 314,
+     "y": 205,
+     "w": 24,
+     "h": 27,
+     "ax": 12,
+     "ay": 20,
+     "frames": 3,
+     "fps": 8,
+     "foot": [
+      0.75,
+      0.5
+     ]
+    },
+    "counter": {
+     "x": 593,
+     "y": 106,
+     "w": 48,
+     "h": 47,
+     "ax": 24,
+     "ay": 34,
+     "frames": 1,
+     "fps": 0,
+     "foot": [
+      2,
+      0.75
+     ]
+    },
+    "counter_stall": {
+     "x": 540,
+     "y": 106,
+     "w": 52,
+     "h": 47,
+     "ax": 26,
+     "ay": 33,
+     "frames": 1,
+     "fps": 0,
+     "foot": [
+      2,
+      1
+     ]
+    },
+    "crate_open": {
+     "x": 508,
+     "y": 205,
+     "w": 36,
+     "h": 25,
+     "ax": 18,
+     "ay": 15,
+     "frames": 1,
+     "fps": 0,
+     "foot": [
+      1,
+      1
+     ]
+    },
+    "desk_l": {
+     "x": 467,
+     "y": 164,
+     "w": 32,
+     "h": 39,
+     "ax": 16,
+     "ay": 30,
+     "frames": 1,
+     "fps": 0,
+     "foot": [
+      0.75,
+      1
+     ],
+     "flipOf": "desk_r"
+    },
+    "desk_r": {
+     "x": 500,
+     "y": 164,
+     "w": 32,
+     "h": 39,
+     "ax": 16,
+     "ay": 30,
+     "frames": 1,
+     "fps": 0,
+     "foot": [
+      1,
+      0.75
+     ]
+    },
+    "hearth_l": {
+     "x": 299,
+     "y": 0,
+     "w": 48,
+     "h": 89,
+     "ax": 24,
+     "ay": 76,
+     "frames": 1,
+     "fps": 0,
+     "foot": [
+      0.75,
+      2
+     ],
+     "flipOf": "hearth_r"
+    },
+    "hearth_r": {
+     "x": 106,
+     "y": 0,
+     "w": 48,
+     "h": 89,
+     "ax": 24,
+     "ay": 76,
+     "frames": 4,
+     "fps": 8,
+     "foot": [
+      2,
+      0.75
+     ]
+    },
+    "herb_rack": {
+     "x": 798,
+     "y": 106,
+     "w": 28,
+     "h": 45,
+     "ax": 14,
+     "ay": 37,
+     "frames": 1,
+     "fps": 0,
+     "foot": [
+      1,
+      0.5
+     ]
+    },
+    "herbs_hanging": {
+     "x": 750,
+     "y": 205,
+     "w": 17,
+     "h": 20,
+     "ax": 8,
+     "ay": 1,
+     "frames": 1,
+     "fps": 0,
+     "hook": true
+    },
+    "int_alchemy_table": {
+     "x": 320,
+     "y": 106,
+     "w": 36,
+     "h": 28,
+     "ax": 18,
+     "ay": 50,
+     "frames": 1,
+     "fps": 0,
+     "foot": [
+      1,
+      1
+     ],
+     "anchorMode": "front"
+    },
+    "int_armchair": {
+     "x": 642,
+     "y": 106,
+     "w": 32,
+     "h": 30,
+     "ax": 16,
+     "ay": 44,
+     "frames": 1,
+     "fps": 0,
+     "foot": [
+      0.875,
+      0.875
+     ],
+     "anchorMode": "front"
+    },
+    "int_bed": {
+     "x": 442,
+     "y": 106,
+     "w": 56,
+     "h": 24,
+     "ax": 22,
+     "ay": 48,
+     "frames": 1,
+     "fps": 0,
+     "foot": [
+      1.25,
+      2
+     ],
+     "anchorMode": "front"
+    },
+    "int_bookcase": {
+     "x": 698,
+     "y": 0,
+     "w": 36,
+     "h": 58,
+     "ax": 26,
+     "ay": 76,
+     "frames": 1,
+     "fps": 0,
+     "foot": [
+      1.5,
+      0.5
+     ],
+     "anchorMode": "front"
+    },
+    "int_cauldron": {
+     "x": 298,
+     "y": 164,
+     "w": 28,
+     "h": 22,
+     "ax": 14,
+     "ay": 36,
+     "frames": 6,
+     "fps": 7,
+     "foot": [
+      0.75,
+      0.75
+     ],
+     "anchorMode": "front"
+    },
+    "int_chair": {
+     "x": 925,
+     "y": 106,
+     "w": 24,
+     "h": 26,
+     "ax": 12,
+     "ay": 38,
+     "frames": 1,
+     "fps": 0,
+     "foot": [
+      0.625,
+      0.625
+     ],
+     "anchorMode": "front"
+    },
+    "int_chest": {
+     "x": 460,
+     "y": 205,
+     "w": 30,
+     "h": 16,
+     "ax": 18,
+     "ay": 23,
+     "frames": 1,
+     "fps": 0,
+     "foot": [
+      1,
+      0.6
+     ],
+     "anchorMode": "front"
+    },
+    "int_chest_open": {
+     "x": 554,
+     "y": 164,
+     "w": 30,
+     "h": 16,
+     "ax": 18,
+     "ay": 35,
+     "frames": 1,
+     "fps": 0,
+     "foot": [
+      1,
+      0.6
+     ],
+     "anchorMode": "front"
+    },
+    "int_counter": {
+     "x": 838,
+     "y": 0,
+     "w": 66,
+     "h": 24,
+     "ax": 50,
+     "ay": 61,
+     "frames": 1,
+     "fps": 0,
+     "foot": [
+      3,
+      0.875
+     ],
+     "anchorMode": "front"
+    },
+    "int_display_case": {
+     "x": 718,
+     "y": 106,
+     "w": 30,
+     "h": 32,
+     "ax": 18,
+     "ay": 43,
+     "frames": 1,
+     "fps": 0,
+     "foot": [
+      1,
+      0.625
+     ],
+     "anchorMode": "front"
+    },
+    "int_doormat": {
+     "x": 823,
+     "y": 205,
+     "w": 32,
+     "h": 0,
+     "ax": 24,
+     "ay": 15,
+     "frames": 1,
+     "fps": 0,
+     "foot": [
+      1.5,
+      0.5
+     ],
+     "anchorMode": "front"
+    },
+    "int_drying_rack": {
+     "x": 905,
+     "y": 0,
+     "w": 34,
+     "h": 44,
+     "ax": 26,
+     "ay": 61,
+     "frames": 1,
+     "fps": 0,
+     "foot": [
+      1.5,
+      0.4
+     ],
+     "anchorMode": "front"
+    },
+    "int_hearth": {
+     "x": 348,
+     "y": 0,
+     "w": 46,
+     "h": 62,
+     "ax": 31,
+     "ay": 84,
+     "frames": 4,
+     "fps": 8,
+     "foot": [
+      1.75,
+      0.75
+     ],
+     "anchorMode": "front"
+    },
+    "int_herbs_hanging": {
+     "x": 387,
+     "y": 205,
+     "w": 26,
+     "h": 27,
+     "ax": 13,
+     "ay": 26,
+     "frames": 1,
+     "fps": 0
+    },
+    "int_lesson_board": {
+     "x": 65,
+     "y": 205,
+     "w": 28,
+     "h": 32,
+     "ax": 14,
+     "ay": 31,
+     "frames": 1,
+     "fps": 0
+    },
+    "int_plant": {
+     "x": 760,
+     "y": 164,
+     "w": 20,
+     "h": 22,
+     "ax": 10,
+     "ay": 32,
+     "frames": 1,
+     "fps": 0,
+     "foot": [
+      0.5,
+      0.5
+     ],
+     "anchorMode": "front"
+    },
+    "int_portrait": {
+     "x": 270,
+     "y": 205,
+     "w": 18,
+     "h": 29,
+     "ax": 9,
+     "ay": 28,
+     "frames": 1,
+     "fps": 0
+    },
+    "int_rug": {
+     "x": 654,
+     "y": 164,
+     "w": 68,
+     "h": 0,
+     "ax": 40,
+     "ay": 33,
+     "frames": 1,
+     "fps": 0,
+     "foot": [
+      2.5,
+      1.75
+     ],
+     "anchorMode": "front"
+    },
+    "int_rug_round": {
+     "x": 213,
+     "y": 205,
+     "w": 56,
+     "h": 0,
+     "ax": 32,
+     "ay": 27,
+     "frames": 1,
+     "fps": 0,
+     "foot": [
+      2,
+      1.5
+     ],
+     "anchorMode": "front"
+    },
+    "int_shelves": {
+     "x": 735,
+     "y": 0,
+     "w": 36,
+     "h": 48,
+     "ax": 26,
+     "ay": 66,
+     "frames": 1,
+     "fps": 0,
+     "foot": [
+      1.5,
+      0.5
+     ],
+     "anchorMode": "front"
+    },
+    "int_star_chart": {
+     "x": 289,
+     "y": 205,
+     "w": 24,
+     "h": 28,
+     "ax": 12,
+     "ay": 27,
+     "frames": 1,
+     "fps": 0
+    },
+    "int_stool": {
+     "x": 729,
+     "y": 205,
+     "w": 20,
+     "h": 12,
+     "ax": 10,
+     "ay": 18,
+     "frames": 1,
+     "fps": 0,
+     "foot": [
+      0.5,
+      0.5
+     ],
+     "anchorMode": "front"
+    },
+    "int_stove": {
+     "x": 357,
+     "y": 106,
+     "w": 28,
+     "h": 34,
+     "ax": 14,
+     "ay": 48,
+     "frames": 3,
+     "fps": 6,
+     "foot": [
+      0.75,
+      0.75
+     ],
+     "anchorMode": "front"
+    },
+    "int_table": {
+     "x": 880,
+     "y": 106,
+     "w": 44,
+     "h": 20,
+     "ax": 26,
+     "ay": 38,
+     "frames": 1,
+     "fps": 0,
+     "foot": [
+      1.5,
+      1
+     ],
+     "anchorMode": "front"
+    },
+    "int_wall_lantern": {
+     "x": 856,
+     "y": 205,
+     "w": 10,
+     "h": 17,
+     "ax": 5,
+     "ay": 16,
+     "frames": 3,
+     "fps": 6
+    },
+    "int_wall_shelf": {
+     "x": 677,
+     "y": 205,
+     "w": 26,
+     "h": 23,
+     "ax": 13,
+     "ay": 22,
+     "frames": 1,
+     "fps": 0
+    },
+    "int_wardrobe": {
+     "x": 663,
+     "y": 0,
+     "w": 34,
+     "h": 60,
+     "ax": 22,
+     "ay": 77,
+     "frames": 1,
+     "fps": 0,
+     "foot": [
+      1.25,
+      0.625
+     ],
+     "anchorMode": "front"
+    },
+    "int_window": {
+     "x": 491,
+     "y": 205,
+     "w": 16,
+     "h": 26,
+     "ax": 8,
+     "ay": 25,
+     "frames": 1,
+     "fps": 0
+    },
+    "int_worktable": {
+     "x": 675,
+     "y": 106,
+     "w": 42,
+     "h": 22,
+     "ax": 26,
+     "ay": 43,
+     "frames": 1,
+     "fps": 0,
+     "foot": [
+      1.5,
+      0.875
+     ],
+     "anchorMode": "front"
+    },
+    "lamp_hanging": {
+     "x": 566,
+     "y": 205,
+     "w": 13,
+     "h": 24,
+     "ax": 6,
+     "ay": 1,
+     "frames": 4,
+     "fps": 5,
+     "hook": true
+    },
+    "lamp_oil": {
+     "x": 789,
+     "y": 205,
+     "w": 11,
+     "h": 17,
+     "ax": 5,
+     "ay": 16,
+     "frames": 3,
+     "fps": 5
+    },
+    "loom": {
+     "x": 499,
+     "y": 106,
+     "w": 40,
+     "h": 51,
+     "ax": 20,
+     "ay": 40,
+     "frames": 1,
+     "fps": 0,
+     "foot": [
+      1.5,
+      0.75
+     ]
+    },
+    "plant_flower": {
+     "x": 545,
+     "y": 205,
+     "w": 20,
+     "h": 25,
+     "ax": 10,
+     "ay": 19,
+     "frames": 1,
+     "fps": 0,
+     "foot": [
+      0.5,
+      0.5
+     ]
+    },
+    "plant_pot": {
+     "x": 439,
+     "y": 205,
+     "w": 20,
+     "h": 27,
+     "ax": 10,
+     "ay": 21,
+     "frames": 1,
+     "fps": 0,
+     "foot": [
+      0.5,
+      0.5
+     ]
+    },
+    "plant_tall": {
+     "x": 533,
+     "y": 164,
+     "w": 20,
+     "h": 39,
+     "ax": 10,
+     "ay": 33,
+     "frames": 1,
+     "fps": 0,
+     "foot": [
+      0.5,
+      0.5
+     ]
+    },
+    "potion_shelf_l": {
+     "x": 156,
+     "y": 106,
+     "w": 28,
+     "h": 55,
+     "ax": 14,
+     "ay": 47,
+     "frames": 1,
+     "fps": 0,
+     "foot": [
+      0.5,
+      1
+     ],
+     "flipOf": "potion_shelf_r"
+    },
+    "potion_shelf_r": {
+     "x": 185,
+     "y": 106,
+     "w": 28,
+     "h": 55,
+     "ax": 14,
+     "ay": 47,
+     "frames": 1,
+     "fps": 0,
+     "foot": [
+      1,
+      0.5
+     ]
+    },
+    "rug_doormat": {
+     "x": 969,
+     "y": 205,
+     "w": 24,
+     "h": 12,
+     "ax": 12,
+     "ay": 6,
+     "frames": 1,
+     "fps": 0,
+     "foot": [
+      1,
+      0.5
+     ]
+    },
+    "rug_rect": {
+     "x": 0,
+     "y": 164,
+     "w": 80,
+     "h": 40,
+     "ax": 40,
+     "ay": 20,
+     "frames": 1,
+     "fps": 0,
+     "foot": [
+      2,
+      3
+     ]
+    },
+    "rug_round": {
+     "x": 902,
+     "y": 164,
+     "w": 64,
+     "h": 32,
+     "ax": 32,
+     "ay": 16,
+     "frames": 1,
+     "fps": 0,
+     "foot": [
+      2,
+      2
+     ]
+    },
+    "rug_runner": {
+     "x": 0,
+     "y": 205,
+     "w": 64,
+     "h": 32,
+     "ax": 32,
+     "ay": 16,
+     "frames": 1,
+     "fps": 0,
+     "foot": [
+      3,
+      1
+     ]
+    },
+    "sack_pile": {
+     "x": 781,
+     "y": 164,
+     "w": 36,
+     "h": 33,
+     "ax": 18,
+     "ay": 23,
+     "frames": 1,
+     "fps": 0,
+     "foot": [
+      1,
+      1
+     ]
+    },
+    "shelves_l": {
+     "x": 98,
+     "y": 106,
+     "w": 28,
+     "h": 57,
+     "ax": 14,
+     "ay": 49,
+     "frames": 1,
+     "fps": 0,
+     "foot": [
+      0.5,
+      1
+     ],
+     "flipOf": "shelves_r"
+    },
+    "shelves_r": {
+     "x": 127,
+     "y": 106,
+     "w": 28,
+     "h": 57,
+     "ax": 14,
+     "ay": 49,
+     "frames": 1,
+     "fps": 0,
+     "foot": [
+      1,
+      0.5
+     ]
+    },
+    "stairs_l": {
+     "x": 0,
+     "y": 0,
+     "w": 52,
+     "h": 105,
+     "ax": 26,
+     "ay": 91,
+     "frames": 1,
+     "fps": 0,
+     "foot": [
+      2,
+      1
+     ],
+     "flipOf": "stairs_r"
+    },
+    "stairs_r": {
+     "x": 53,
+     "y": 0,
+     "w": 52,
+     "h": 105,
+     "ax": 26,
+     "ay": 91,
+     "frames": 1,
+     "fps": 0,
+     "foot": [
+      1,
+      2
+     ]
+    },
+    "stool": {
+     "x": 768,
+     "y": 205,
+     "w": 20,
+     "h": 19,
+     "ax": 10,
+     "ay": 13,
+     "frames": 1,
+     "fps": 0,
+     "foot": [
+      0.5,
+      0.5
+     ]
+    },
+    "stove_l": {
+     "x": 630,
+     "y": 0,
+     "w": 32,
+     "h": 81,
+     "ax": 16,
+     "ay": 72,
+     "frames": 1,
+     "fps": 0,
+     "foot": [
+      0.75,
+      1
+     ],
+     "flipOf": "stove_r"
+    },
+    "stove_r": {
+     "x": 533,
+     "y": 0,
+     "w": 32,
+     "h": 81,
+     "ax": 16,
+     "ay": 72,
+     "frames": 3,
+     "fps": 6,
+     "foot": [
+      1,
+      0.75
+     ]
+    },
+    "table": {
+     "x": 139,
+     "y": 205,
+     "w": 36,
+     "h": 31,
+     "ax": 18,
+     "ay": 21,
+     "frames": 1,
+     "fps": 0,
+     "foot": [
+      1,
+      1
+     ]
+    },
+    "table_long": {
+     "x": 827,
+     "y": 106,
+     "w": 52,
+     "h": 43,
+     "ax": 26,
+     "ay": 29,
+     "frames": 1,
+     "fps": 0,
+     "foot": [
+      2,
+      1
+     ]
+    },
+    "table_round": {
+     "x": 176,
+     "y": 205,
+     "w": 36,
+     "h": 31,
+     "ax": 18,
+     "ay": 21,
+     "frames": 1,
+     "fps": 0,
+     "foot": [
+      1,
+      1
+     ]
+    },
+    "table_set": {
+     "x": 723,
+     "y": 164,
+     "w": 36,
+     "h": 35,
+     "ax": 18,
+     "ay": 25,
+     "frames": 1,
+     "fps": 0,
+     "foot": [
+      1,
+      1
+     ]
+    },
+    "wardrobe_l": {
+     "x": 772,
+     "y": 0,
+     "w": 32,
+     "h": 69,
+     "ax": 16,
+     "ay": 60,
+     "frames": 1,
+     "fps": 0,
+     "foot": [
+      0.75,
+      1
+     ],
+     "flipOf": "wardrobe_r"
+    },
+    "wardrobe_r": {
+     "x": 805,
+     "y": 0,
+     "w": 32,
+     "h": 69,
+     "ax": 16,
+     "ay": 60,
+     "frames": 1,
+     "fps": 0,
+     "foot": [
+      1,
+      0.75
+     ]
+    },
+    "workbench": {
+     "x": 749,
+     "y": 106,
+     "w": 48,
+     "h": 45,
+     "ax": 24,
+     "ay": 32,
+     "frames": 1,
+     "fps": 0,
+     "foot": [
+      2,
+      0.75
+     ]
+    }
+   }
+  },
+  "fx": {
+   "file": "assets/images/fx.png",
+   "w": 506,
+   "h": 115,
+   "anchor": "center",
+   "note": "Spell impact / pickup effects, centred on the impact point.",
+   "frames": {
+    "fx_aura_moon": {
+     "x": 242,
+     "y": 72,
+     "w": 33,
+     "h": 17,
+     "ax": 16,
+     "ay": 8,
+     "frames": 8,
+     "fps": 8
+    },
+    "fx_blight_burst": {
+     "x": 350,
+     "y": 42,
+     "w": 25,
+     "h": 25,
+     "ax": 12,
+     "ay": 12,
+     "frames": 6,
+     "fps": 12,
+     "loop": false
+    },
+    "fx_ember_bloom": {
+     "x": 246,
+     "y": 0,
+     "w": 29,
+     "h": 29,
+     "ax": 14,
+     "ay": 14,
+     "frames": 7,
+     "fps": 12,
+     "loop": false
+    },
+    "fx_frostbell": {
+     "x": 0,
+     "y": 42,
+     "w": 25,
+     "h": 29,
+     "ax": 12,
+     "ay": 14,
+     "frames": 6,
+     "fps": 10,
+     "loop": false
+    },
+    "fx_harvest": {
+     "x": 0,
+     "y": 98,
+     "w": 17,
+     "h": 17,
+     "ax": 8,
+     "ay": 8,
+     "frames": 5,
+     "fps": 10,
+     "loop": false
+    },
+    "fx_heal": {
+     "x": 151,
+     "y": 72,
+     "w": 15,
+     "h": 21,
+     "ax": 7,
+     "ay": 20,
+     "frames": 6,
+     "fps": 10,
+     "loop": false
+    },
+    "fx_moonbolt_hit": {
+     "x": 0,
+     "y": 72,
+     "w": 25,
+     "h": 25,
+     "ax": 12,
+     "ay": 12,
+     "frames": 6,
+     "fps": 14.1,
+     "loop": false
+    },
+    "fx_poof": {
+     "x": 86,
+     "y": 98,
+     "w": 23,
+     "h": 13,
+     "ax": 11,
+     "ay": 6,
+     "frames": 5,
+     "fps": 12,
+     "loop": false
+    },
+    "fx_starfall": {
+     "x": 0,
+     "y": 0,
+     "w": 35,
+     "h": 41,
+     "ax": 17,
+     "ay": 36,
+     "frames": 7,
+     "fps": 14.1,
+     "loop": false
+    },
+    "fx_thornbind": {
+     "x": 151,
+     "y": 42,
+     "w": 33,
+     "h": 27,
+     "ax": 16,
+     "ay": 24,
+     "frames": 6,
+     "fps": 10,
+     "loop": false
+    }
+   }
+  },
+  "icons": {
+   "file": "assets/images/icons.png",
+   "w": 510,
+   "h": 34,
+   "anchor": "topleft",
+   "note": "16x16 UI icons (topleft anchor). UI ornaments + 3-frame motes too.",
+   "frames": {
+    "icon_bomb": {
+     "x": 18,
+     "y": 0,
+     "w": 16,
+     "h": 16,
+     "ax": 0,
+     "ay": 0,
+     "frames": 1,
+     "fps": 0
+    },
+    "icon_boots": {
+     "x": 35,
+     "y": 0,
+     "w": 16,
+     "h": 16,
+     "ax": 0,
+     "ay": 0,
+     "frames": 1,
+     "fps": 0
+    },
+    "icon_charm": {
+     "x": 52,
+     "y": 0,
+     "w": 16,
+     "h": 16,
+     "ax": 0,
+     "ay": 0,
+     "frames": 1,
+     "fps": 0
+    },
+    "icon_ember_pepper": {
+     "x": 69,
+     "y": 0,
+     "w": 16,
+     "h": 16,
+     "ax": 0,
+     "ay": 0,
+     "frames": 1,
+     "fps": 0
+    },
+    "icon_frost_berry": {
+     "x": 86,
+     "y": 0,
+     "w": 16,
+     "h": 16,
+     "ax": 0,
+     "ay": 0,
+     "frames": 1,
+     "fps": 0
+    },
+    "icon_glowcap": {
+     "x": 103,
+     "y": 0,
+     "w": 16,
+     "h": 16,
+     "ax": 0,
+     "ay": 0,
+     "frames": 1,
+     "fps": 0
+    },
+    "icon_gold": {
+     "x": 120,
+     "y": 0,
+     "w": 16,
+     "h": 16,
+     "ax": 0,
+     "ay": 0,
+     "frames": 1,
+     "fps": 0
+    },
+    "icon_hat": {
+     "x": 137,
+     "y": 0,
+     "w": 16,
+     "h": 16,
+     "ax": 0,
+     "ay": 0,
+     "frames": 1,
+     "fps": 0
+    },
+    "icon_lunar_fragment_1": {
+     "x": 154,
+     "y": 0,
+     "w": 16,
+     "h": 16,
+     "ax": 0,
+     "ay": 0,
+     "frames": 1,
+     "fps": 0
+    },
+    "icon_lunar_fragment_2": {
+     "x": 171,
+     "y": 0,
+     "w": 16,
+     "h": 16,
+     "ax": 0,
+     "ay": 0,
+     "frames": 1,
+     "fps": 0
+    },
+    "icon_lunar_fragment_3": {
+     "x": 188,
+     "y": 0,
+     "w": 16,
+     "h": 16,
+     "ax": 0,
+     "ay": 0,
+     "frames": 1,
+     "fps": 0
+    },
+    "icon_moonflower": {
+     "x": 205,
+     "y": 0,
+     "w": 16,
+     "h": 16,
+     "ax": 0,
+     "ay": 0,
+     "frames": 1,
+     "fps": 0
+    },
+    "icon_potion": {
+     "x": 222,
+     "y": 0,
+     "w": 16,
+     "h": 16,
+     "ax": 0,
+     "ay": 0,
+     "frames": 1,
+     "fps": 0
+    },
+    "icon_potion_ember": {
+     "x": 239,
+     "y": 0,
+     "w": 16,
+     "h": 16,
+     "ax": 0,
+     "ay": 0,
+     "frames": 1,
+     "fps": 0
+    },
+    "icon_potion_frost": {
+     "x": 256,
+     "y": 0,
+     "w": 16,
+     "h": 16,
+     "ax": 0,
+     "ay": 0,
+     "frames": 1,
+     "fps": 0
+    },
+    "icon_potion_growth": {
+     "x": 273,
+     "y": 0,
+     "w": 16,
+     "h": 16,
+     "ax": 0,
+     "ay": 0,
+     "frames": 1,
+     "fps": 0
+    },
+    "icon_potion_health": {
+     "x": 290,
+     "y": 0,
+     "w": 16,
+     "h": 16,
+     "ax": 0,
+     "ay": 0,
+     "frames": 1,
+     "fps": 0
+    },
+    "icon_potion_mana": {
+     "x": 307,
+     "y": 0,
+     "w": 16,
+     "h": 16,
+     "ax": 0,
+     "ay": 0,
+     "frames": 1,
+     "fps": 0
+    },
+    "icon_potion_moon": {
+     "x": 324,
+     "y": 0,
+     "w": 16,
+     "h": 16,
+     "ax": 0,
+     "ay": 0,
+     "frames": 1,
+     "fps": 0
+    },
+    "icon_robe": {
+     "x": 341,
+     "y": 0,
+     "w": 16,
+     "h": 16,
+     "ax": 0,
+     "ay": 0,
+     "frames": 1,
+     "fps": 0
+    },
+    "icon_rune_ember": {
+     "x": 358,
+     "y": 0,
+     "w": 16,
+     "h": 16,
+     "ax": 0,
+     "ay": 0,
+     "frames": 1,
+     "fps": 0
+    },
+    "icon_rune_frost": {
+     "x": 375,
+     "y": 0,
+     "w": 16,
+     "h": 16,
+     "ax": 0,
+     "ay": 0,
+     "frames": 1,
+     "fps": 0
+    },
+    "icon_rune_growth": {
+     "x": 392,
+     "y": 0,
+     "w": 16,
+     "h": 16,
+     "ax": 0,
+     "ay": 0,
+     "frames": 1,
+     "fps": 0
+    },
+    "icon_rune_moon": {
+     "x": 409,
+     "y": 0,
+     "w": 16,
+     "h": 16,
+     "ax": 0,
+     "ay": 0,
+     "frames": 1,
+     "fps": 0
+    },
+    "icon_rune_ward": {
+     "x": 426,
+     "y": 0,
+     "w": 16,
+     "h": 16,
+     "ax": 0,
+     "ay": 0,
+     "frames": 1,
+     "fps": 0
+    },
+    "icon_seeds": {
+     "x": 443,
+     "y": 0,
+     "w": 16,
+     "h": 16,
+     "ax": 0,
+     "ay": 0,
+     "frames": 1,
+     "fps": 0
+    },
+    "icon_seeds_ember_pepper": {
+     "x": 460,
+     "y": 0,
+     "w": 16,
+     "h": 16,
+     "ax": 0,
+     "ay": 0,
+     "frames": 1,
+     "fps": 0
+    },
+    "icon_seeds_frost_berry": {
+     "x": 477,
+     "y": 0,
+     "w": 16,
+     "h": 16,
+     "ax": 0,
+     "ay": 0,
+     "frames": 1,
+     "fps": 0
+    },
+    "icon_seeds_glowcap": {
+     "x": 494,
+     "y": 0,
+     "w": 16,
+     "h": 16,
+     "ax": 0,
+     "ay": 0,
+     "frames": 1,
+     "fps": 0
+    },
+    "icon_seeds_moonflower": {
+     "x": 0,
+     "y": 18,
+     "w": 16,
+     "h": 16,
+     "ax": 0,
+     "ay": 0,
+     "frames": 1,
+     "fps": 0
+    },
+    "icon_seeds_starmint": {
+     "x": 17,
+     "y": 18,
+     "w": 16,
+     "h": 16,
+     "ax": 0,
+     "ay": 0,
+     "frames": 1,
+     "fps": 0
+    },
+    "icon_seeds_wheat": {
+     "x": 34,
+     "y": 18,
+     "w": 16,
+     "h": 16,
+     "ax": 0,
+     "ay": 0,
+     "frames": 1,
+     "fps": 0
+    },
+    "icon_slot_boots": {
+     "x": 51,
+     "y": 18,
+     "w": 16,
+     "h": 16,
+     "ax": 0,
+     "ay": 0,
+     "frames": 1,
+     "fps": 0
+    },
+    "icon_slot_charm": {
+     "x": 68,
+     "y": 18,
+     "w": 16,
+     "h": 16,
+     "ax": 0,
+     "ay": 0,
+     "frames": 1,
+     "fps": 0
+    },
+    "icon_slot_hat": {
+     "x": 85,
+     "y": 18,
+     "w": 16,
+     "h": 16,
+     "ax": 0,
+     "ay": 0,
+     "frames": 1,
+     "fps": 0
+    },
+    "icon_slot_robe": {
+     "x": 102,
+     "y": 18,
+     "w": 16,
+     "h": 16,
+     "ax": 0,
+     "ay": 0,
+     "frames": 1,
+     "fps": 0
+    },
+    "icon_slot_wand": {
+     "x": 119,
+     "y": 18,
+     "w": 16,
+     "h": 16,
+     "ax": 0,
+     "ay": 0,
+     "frames": 1,
+     "fps": 0
+    },
+    "icon_starmint": {
+     "x": 136,
+     "y": 18,
+     "w": 16,
+     "h": 16,
+     "ax": 0,
+     "ay": 0,
+     "frames": 1,
+     "fps": 0
+    },
+    "icon_wand": {
+     "x": 153,
+     "y": 18,
+     "w": 16,
+     "h": 16,
+     "ax": 0,
+     "ay": 0,
+     "frames": 1,
+     "fps": 0
+    },
+    "icon_wheat": {
+     "x": 170,
+     "y": 18,
+     "w": 16,
+     "h": 16,
+     "ax": 0,
+     "ay": 0,
+     "frames": 1,
+     "fps": 0
+    },
+    "mote_firefly": {
+     "x": 395,
+     "y": 18,
+     "w": 5,
+     "h": 5,
+     "ax": 0,
+     "ay": 0,
+     "frames": 3,
+     "fps": 8
+    },
+    "mote_moon": {
+     "x": 365,
+     "y": 18,
+     "w": 7,
+     "h": 7,
+     "ax": 0,
+     "ay": 0,
+     "frames": 3,
+     "fps": 6
+    },
+    "mote_well": {
+     "x": 339,
+     "y": 18,
+     "w": 7,
+     "h": 9,
+     "ax": 0,
+     "ay": 0,
+     "frames": 3,
+     "fps": 5
+    },
+    "spell_ember_bloom": {
+     "x": 187,
+     "y": 18,
+     "w": 16,
+     "h": 16,
+     "ax": 0,
+     "ay": 0,
+     "frames": 1,
+     "fps": 0
+    },
+    "spell_frostbell": {
+     "x": 204,
+     "y": 18,
+     "w": 16,
+     "h": 16,
+     "ax": 0,
+     "ay": 0,
+     "frames": 1,
+     "fps": 0
+    },
+    "spell_moonbeam": {
+     "x": 221,
+     "y": 18,
+     "w": 16,
+     "h": 16,
+     "ax": 0,
+     "ay": 0,
+     "frames": 1,
+     "fps": 0
+    },
+    "spell_moonbolt": {
+     "x": 238,
+     "y": 18,
+     "w": 16,
+     "h": 16,
+     "ax": 0,
+     "ay": 0,
+     "frames": 1,
+     "fps": 0
+    },
+    "spell_starfall": {
+     "x": 255,
+     "y": 18,
+     "w": 16,
+     "h": 16,
+     "ax": 0,
+     "ay": 0,
+     "frames": 1,
+     "fps": 0
+    },
+    "spell_thornbind": {
+     "x": 272,
+     "y": 18,
+     "w": 16,
+     "h": 16,
+     "ax": 0,
+     "ay": 0,
+     "frames": 1,
+     "fps": 0
+    },
+    "ui_bullet": {
+     "x": 387,
+     "y": 18,
+     "w": 7,
+     "h": 7,
+     "ax": 0,
+     "ay": 0,
+     "frames": 1,
+     "fps": 0
+    },
+    "ui_corner": {
+     "x": 0,
+     "y": 0,
+     "w": 17,
+     "h": 17,
+     "ax": 0,
+     "ay": 0,
+     "frames": 1,
+     "fps": 0
+    },
+    "ui_divider": {
+     "x": 289,
+     "y": 18,
+     "w": 49,
+     "h": 9,
+     "ax": 0,
+     "ay": 0,
+     "frames": 1,
+     "fps": 0
+    },
+    "ui_edge_h": {
+     "x": 411,
+     "y": 18,
+     "w": 8,
+     "h": 3,
+     "ax": 0,
+     "ay": 0,
+     "frames": 1,
+     "fps": 0
+    },
+    "ui_edge_v": {
+     "x": 361,
+     "y": 18,
+     "w": 3,
+     "h": 8,
+     "ax": 0,
+     "ay": 0,
+     "frames": 1,
+     "fps": 0
+    }
+   }
+  },
+  "interior": {
+   "file": "assets/images/interior.png",
+   "w": 1020,
+   "h": 172,
+   "anchor": "center",
+   "note": "Interior floors (ifloor_<kind>_0..3) and walls (iwall_<kind>_<piece>_<l|r>, corner, end_l/r, low[door]_sw/se) per kind cottage|shop|herbal|elder|hut. Every piece anchors at the centre of the floor tile whose edge it stands on.",
+   "frames": {
+    "ifloor_cottage_0": {
+     "x": 747,
+     "y": 78,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "ifloor_cottage_1": {
+     "x": 780,
+     "y": 78,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "ifloor_cottage_2": {
+     "x": 813,
+     "y": 78,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "ifloor_cottage_3": {
+     "x": 846,
+     "y": 78,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "ifloor_elder_0": {
+     "x": 879,
+     "y": 78,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "ifloor_elder_1": {
+     "x": 912,
+     "y": 78,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "ifloor_elder_2": {
+     "x": 945,
+     "y": 78,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "ifloor_elder_3": {
+     "x": 978,
+     "y": 78,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "ifloor_herbal_0": {
+     "x": 0,
+     "y": 156,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "ifloor_herbal_1": {
+     "x": 33,
+     "y": 156,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "ifloor_herbal_2": {
+     "x": 66,
+     "y": 156,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "ifloor_herbal_3": {
+     "x": 99,
+     "y": 156,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "ifloor_hut_0": {
+     "x": 132,
+     "y": 156,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "ifloor_hut_1": {
+     "x": 165,
+     "y": 156,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "ifloor_hut_2": {
+     "x": 198,
+     "y": 156,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "ifloor_hut_3": {
+     "x": 231,
+     "y": 156,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "ifloor_shop_0": {
+     "x": 264,
+     "y": 156,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "ifloor_shop_1": {
+     "x": 297,
+     "y": 156,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "ifloor_shop_2": {
+     "x": 330,
+     "y": 156,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "ifloor_shop_3": {
+     "x": 363,
+     "y": 156,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "iwall_cottage_corner": {
+     "x": 342,
+     "y": 78,
+     "w": 8,
+     "h": 77,
+     "ax": 4,
+     "ay": 76,
+     "frames": 1,
+     "fps": 0,
+     "wall": "corner"
+    },
+    "iwall_cottage_door_l": {
+     "x": 319,
+     "y": 0,
+     "w": 17,
+     "h": 77,
+     "ax": 16,
+     "ay": 76,
+     "frames": 1,
+     "fps": 0,
+     "wall": "nw"
+    },
+    "iwall_cottage_door_r": {
+     "x": 337,
+     "y": 0,
+     "w": 17,
+     "h": 77,
+     "ax": 1,
+     "ay": 76,
+     "frames": 1,
+     "fps": 0,
+     "wall": "ne"
+    },
+    "iwall_cottage_doorway_l": {
+     "x": 355,
+     "y": 0,
+     "w": 17,
+     "h": 77,
+     "ax": 16,
+     "ay": 76,
+     "frames": 1,
+     "fps": 0,
+     "wall": "nw"
+    },
+    "iwall_cottage_doorway_r": {
+     "x": 373,
+     "y": 0,
+     "w": 17,
+     "h": 77,
+     "ax": 1,
+     "ay": 76,
+     "frames": 1,
+     "fps": 0,
+     "wall": "ne"
+    },
+    "iwall_cottage_end_l": {
+     "x": 104,
+     "y": 0,
+     "w": 21,
+     "h": 77,
+     "ax": 20,
+     "ay": 76,
+     "frames": 1,
+     "fps": 0,
+     "wall": "nw-end"
+    },
+    "iwall_cottage_end_r": {
+     "x": 214,
+     "y": 0,
+     "w": 20,
+     "h": 77,
+     "ax": 0,
+     "ay": 76,
+     "frames": 1,
+     "fps": 0,
+     "wall": "ne-end"
+    },
+    "iwall_cottage_low_se": {
+     "x": 387,
+     "y": 78,
+     "w": 17,
+     "h": 32,
+     "ax": 1,
+     "ay": 20,
+     "frames": 1,
+     "fps": 0,
+     "wall": "se"
+    },
+    "iwall_cottage_low_sw": {
+     "x": 405,
+     "y": 78,
+     "w": 17,
+     "h": 32,
+     "ax": 16,
+     "ay": 20,
+     "frames": 1,
+     "fps": 0,
+     "wall": "sw"
+    },
+    "iwall_cottage_lowdoor_se": {
+     "x": 423,
+     "y": 78,
+     "w": 17,
+     "h": 32,
+     "ax": 1,
+     "ay": 20,
+     "frames": 1,
+     "fps": 0,
+     "wall": "se"
+    },
+    "iwall_cottage_lowdoor_sw": {
+     "x": 441,
+     "y": 78,
+     "w": 17,
+     "h": 32,
+     "ax": 16,
+     "ay": 20,
+     "frames": 1,
+     "fps": 0,
+     "wall": "sw"
+    },
+    "iwall_cottage_plain2_l": {
+     "x": 391,
+     "y": 0,
+     "w": 17,
+     "h": 77,
+     "ax": 16,
+     "ay": 76,
+     "frames": 1,
+     "fps": 0,
+     "wall": "nw"
+    },
+    "iwall_cottage_plain2_r": {
+     "x": 409,
+     "y": 0,
+     "w": 17,
+     "h": 77,
+     "ax": 1,
+     "ay": 76,
+     "frames": 1,
+     "fps": 0,
+     "wall": "ne"
+    },
+    "iwall_cottage_plain_l": {
+     "x": 427,
+     "y": 0,
+     "w": 17,
+     "h": 77,
+     "ax": 16,
+     "ay": 76,
+     "frames": 1,
+     "fps": 0,
+     "wall": "nw"
+    },
+    "iwall_cottage_plain_r": {
+     "x": 445,
+     "y": 0,
+     "w": 17,
+     "h": 77,
+     "ax": 1,
+     "ay": 76,
+     "frames": 1,
+     "fps": 0,
+     "wall": "ne"
+    },
+    "iwall_cottage_window_l": {
+     "x": 463,
+     "y": 0,
+     "w": 17,
+     "h": 77,
+     "ax": 16,
+     "ay": 76,
+     "frames": 1,
+     "fps": 0,
+     "wall": "nw"
+    },
+    "iwall_cottage_window_r": {
+     "x": 481,
+     "y": 0,
+     "w": 17,
+     "h": 77,
+     "ax": 1,
+     "ay": 76,
+     "frames": 1,
+     "fps": 0,
+     "wall": "ne"
+    },
+    "iwall_curtain_l": {
+     "x": 499,
+     "y": 0,
+     "w": 17,
+     "h": 77,
+     "ax": 16,
+     "ay": 76,
+     "frames": 1,
+     "fps": 0,
+     "wall": "nw"
+    },
+    "iwall_curtain_r": {
+     "x": 517,
+     "y": 0,
+     "w": 17,
+     "h": 77,
+     "ax": 1,
+     "ay": 76,
+     "frames": 1,
+     "fps": 0,
+     "wall": "ne"
+    },
+    "iwall_elder_corner": {
+     "x": 351,
+     "y": 78,
+     "w": 8,
+     "h": 77,
+     "ax": 4,
+     "ay": 76,
+     "frames": 1,
+     "fps": 0,
+     "wall": "corner"
+    },
+    "iwall_elder_door_l": {
+     "x": 535,
+     "y": 0,
+     "w": 17,
+     "h": 77,
+     "ax": 16,
+     "ay": 76,
+     "frames": 1,
+     "fps": 0,
+     "wall": "nw"
+    },
+    "iwall_elder_door_r": {
+     "x": 553,
+     "y": 0,
+     "w": 17,
+     "h": 77,
+     "ax": 1,
+     "ay": 76,
+     "frames": 1,
+     "fps": 0,
+     "wall": "ne"
+    },
+    "iwall_elder_doorway_l": {
+     "x": 571,
+     "y": 0,
+     "w": 17,
+     "h": 77,
+     "ax": 16,
+     "ay": 76,
+     "frames": 1,
+     "fps": 0,
+     "wall": "nw"
+    },
+    "iwall_elder_doorway_r": {
+     "x": 589,
+     "y": 0,
+     "w": 17,
+     "h": 77,
+     "ax": 1,
+     "ay": 76,
+     "frames": 1,
+     "fps": 0,
+     "wall": "ne"
+    },
+    "iwall_elder_end_l": {
+     "x": 126,
+     "y": 0,
+     "w": 21,
+     "h": 77,
+     "ax": 20,
+     "ay": 76,
+     "frames": 1,
+     "fps": 0,
+     "wall": "nw-end"
+    },
+    "iwall_elder_end_r": {
+     "x": 235,
+     "y": 0,
+     "w": 20,
+     "h": 77,
+     "ax": 0,
+     "ay": 76,
+     "frames": 1,
+     "fps": 0,
+     "wall": "ne-end"
+    },
+    "iwall_elder_low_se": {
+     "x": 459,
+     "y": 78,
+     "w": 17,
+     "h": 32,
+     "ax": 1,
+     "ay": 20,
+     "frames": 1,
+     "fps": 0,
+     "wall": "se"
+    },
+    "iwall_elder_low_sw": {
+     "x": 477,
+     "y": 78,
+     "w": 17,
+     "h": 32,
+     "ax": 16,
+     "ay": 20,
+     "frames": 1,
+     "fps": 0,
+     "wall": "sw"
+    },
+    "iwall_elder_lowdoor_se": {
+     "x": 495,
+     "y": 78,
+     "w": 17,
+     "h": 32,
+     "ax": 1,
+     "ay": 20,
+     "frames": 1,
+     "fps": 0,
+     "wall": "se"
+    },
+    "iwall_elder_lowdoor_sw": {
+     "x": 513,
+     "y": 78,
+     "w": 17,
+     "h": 32,
+     "ax": 16,
+     "ay": 20,
+     "frames": 1,
+     "fps": 0,
+     "wall": "sw"
+    },
+    "iwall_elder_plain2_l": {
+     "x": 607,
+     "y": 0,
+     "w": 17,
+     "h": 77,
+     "ax": 16,
+     "ay": 76,
+     "frames": 1,
+     "fps": 0,
+     "wall": "nw"
+    },
+    "iwall_elder_plain2_r": {
+     "x": 625,
+     "y": 0,
+     "w": 17,
+     "h": 77,
+     "ax": 1,
+     "ay": 76,
+     "frames": 1,
+     "fps": 0,
+     "wall": "ne"
+    },
+    "iwall_elder_plain_l": {
+     "x": 643,
+     "y": 0,
+     "w": 17,
+     "h": 77,
+     "ax": 16,
+     "ay": 76,
+     "frames": 1,
+     "fps": 0,
+     "wall": "nw"
+    },
+    "iwall_elder_plain_r": {
+     "x": 661,
+     "y": 0,
+     "w": 17,
+     "h": 77,
+     "ax": 1,
+     "ay": 76,
+     "frames": 1,
+     "fps": 0,
+     "wall": "ne"
+    },
+    "iwall_elder_window_l": {
+     "x": 679,
+     "y": 0,
+     "w": 17,
+     "h": 77,
+     "ax": 16,
+     "ay": 76,
+     "frames": 1,
+     "fps": 0,
+     "wall": "nw"
+    },
+    "iwall_elder_window_r": {
+     "x": 697,
+     "y": 0,
+     "w": 17,
+     "h": 77,
+     "ax": 1,
+     "ay": 76,
+     "frames": 1,
+     "fps": 0,
+     "wall": "ne"
+    },
+    "iwall_herbal_corner": {
+     "x": 360,
+     "y": 78,
+     "w": 8,
+     "h": 77,
+     "ax": 4,
+     "ay": 76,
+     "frames": 1,
+     "fps": 0,
+     "wall": "corner"
+    },
+    "iwall_herbal_door_l": {
+     "x": 715,
+     "y": 0,
+     "w": 17,
+     "h": 77,
+     "ax": 16,
+     "ay": 76,
+     "frames": 1,
+     "fps": 0,
+     "wall": "nw"
+    },
+    "iwall_herbal_door_r": {
+     "x": 733,
+     "y": 0,
+     "w": 17,
+     "h": 77,
+     "ax": 1,
+     "ay": 76,
+     "frames": 1,
+     "fps": 0,
+     "wall": "ne"
+    },
+    "iwall_herbal_doorway_l": {
+     "x": 751,
+     "y": 0,
+     "w": 17,
+     "h": 77,
+     "ax": 16,
+     "ay": 76,
+     "frames": 1,
+     "fps": 0,
+     "wall": "nw"
+    },
+    "iwall_herbal_doorway_r": {
+     "x": 769,
+     "y": 0,
+     "w": 17,
+     "h": 77,
+     "ax": 1,
+     "ay": 76,
+     "frames": 1,
+     "fps": 0,
+     "wall": "ne"
+    },
+    "iwall_herbal_end_l": {
+     "x": 148,
+     "y": 0,
+     "w": 21,
+     "h": 77,
+     "ax": 20,
+     "ay": 76,
+     "frames": 1,
+     "fps": 0,
+     "wall": "nw-end"
+    },
+    "iwall_herbal_end_r": {
+     "x": 256,
+     "y": 0,
+     "w": 20,
+     "h": 77,
+     "ax": 0,
+     "ay": 76,
+     "frames": 1,
+     "fps": 0,
+     "wall": "ne-end"
+    },
+    "iwall_herbal_low_se": {
+     "x": 531,
+     "y": 78,
+     "w": 17,
+     "h": 32,
+     "ax": 1,
+     "ay": 20,
+     "frames": 1,
+     "fps": 0,
+     "wall": "se"
+    },
+    "iwall_herbal_low_sw": {
+     "x": 549,
+     "y": 78,
+     "w": 17,
+     "h": 32,
+     "ax": 16,
+     "ay": 20,
+     "frames": 1,
+     "fps": 0,
+     "wall": "sw"
+    },
+    "iwall_herbal_lowdoor_se": {
+     "x": 567,
+     "y": 78,
+     "w": 17,
+     "h": 32,
+     "ax": 1,
+     "ay": 20,
+     "frames": 1,
+     "fps": 0,
+     "wall": "se"
+    },
+    "iwall_herbal_lowdoor_sw": {
+     "x": 585,
+     "y": 78,
+     "w": 17,
+     "h": 32,
+     "ax": 16,
+     "ay": 20,
+     "frames": 1,
+     "fps": 0,
+     "wall": "sw"
+    },
+    "iwall_herbal_plain2_l": {
+     "x": 787,
+     "y": 0,
+     "w": 17,
+     "h": 77,
+     "ax": 16,
+     "ay": 76,
+     "frames": 1,
+     "fps": 0,
+     "wall": "nw"
+    },
+    "iwall_herbal_plain2_r": {
+     "x": 805,
+     "y": 0,
+     "w": 17,
+     "h": 77,
+     "ax": 1,
+     "ay": 76,
+     "frames": 1,
+     "fps": 0,
+     "wall": "ne"
+    },
+    "iwall_herbal_plain_l": {
+     "x": 823,
+     "y": 0,
+     "w": 17,
+     "h": 77,
+     "ax": 16,
+     "ay": 76,
+     "frames": 1,
+     "fps": 0,
+     "wall": "nw"
+    },
+    "iwall_herbal_plain_r": {
+     "x": 841,
+     "y": 0,
+     "w": 17,
+     "h": 77,
+     "ax": 1,
+     "ay": 76,
+     "frames": 1,
+     "fps": 0,
+     "wall": "ne"
+    },
+    "iwall_herbal_window_l": {
+     "x": 859,
+     "y": 0,
+     "w": 17,
+     "h": 77,
+     "ax": 16,
+     "ay": 76,
+     "frames": 1,
+     "fps": 0,
+     "wall": "nw"
+    },
+    "iwall_herbal_window_r": {
+     "x": 877,
+     "y": 0,
+     "w": 17,
+     "h": 77,
+     "ax": 1,
+     "ay": 76,
+     "frames": 1,
+     "fps": 0,
+     "wall": "ne"
+    },
+    "iwall_herbs_l": {
+     "x": 895,
+     "y": 0,
+     "w": 17,
+     "h": 77,
+     "ax": 16,
+     "ay": 76,
+     "frames": 1,
+     "fps": 0,
+     "wall": "nw"
+    },
+    "iwall_herbs_r": {
+     "x": 913,
+     "y": 0,
+     "w": 17,
+     "h": 77,
+     "ax": 1,
+     "ay": 76,
+     "frames": 1,
+     "fps": 0,
+     "wall": "ne"
+    },
+    "iwall_hut_corner": {
+     "x": 369,
+     "y": 78,
+     "w": 8,
+     "h": 77,
+     "ax": 4,
+     "ay": 76,
+     "frames": 1,
+     "fps": 0,
+     "wall": "corner"
+    },
+    "iwall_hut_door_l": {
+     "x": 931,
+     "y": 0,
+     "w": 17,
+     "h": 77,
+     "ax": 16,
+     "ay": 76,
+     "frames": 1,
+     "fps": 0,
+     "wall": "nw"
+    },
+    "iwall_hut_door_r": {
+     "x": 949,
+     "y": 0,
+     "w": 17,
+     "h": 77,
+     "ax": 1,
+     "ay": 76,
+     "frames": 1,
+     "fps": 0,
+     "wall": "ne"
+    },
+    "iwall_hut_doorway_l": {
+     "x": 967,
+     "y": 0,
+     "w": 17,
+     "h": 77,
+     "ax": 16,
+     "ay": 76,
+     "frames": 1,
+     "fps": 0,
+     "wall": "nw"
+    },
+    "iwall_hut_doorway_r": {
+     "x": 985,
+     "y": 0,
+     "w": 17,
+     "h": 77,
+     "ax": 1,
+     "ay": 76,
+     "frames": 1,
+     "fps": 0,
+     "wall": "ne"
+    },
+    "iwall_hut_end_l": {
+     "x": 170,
+     "y": 0,
+     "w": 21,
+     "h": 77,
+     "ax": 20,
+     "ay": 76,
+     "frames": 1,
+     "fps": 0,
+     "wall": "nw-end"
+    },
+    "iwall_hut_end_r": {
+     "x": 277,
+     "y": 0,
+     "w": 20,
+     "h": 77,
+     "ax": 0,
+     "ay": 76,
+     "frames": 1,
+     "fps": 0,
+     "wall": "ne-end"
+    },
+    "iwall_hut_low_se": {
+     "x": 603,
+     "y": 78,
+     "w": 17,
+     "h": 32,
+     "ax": 1,
+     "ay": 20,
+     "frames": 1,
+     "fps": 0,
+     "wall": "se"
+    },
+    "iwall_hut_low_sw": {
+     "x": 621,
+     "y": 78,
+     "w": 17,
+     "h": 32,
+     "ax": 16,
+     "ay": 20,
+     "frames": 1,
+     "fps": 0,
+     "wall": "sw"
+    },
+    "iwall_hut_lowdoor_se": {
+     "x": 639,
+     "y": 78,
+     "w": 17,
+     "h": 32,
+     "ax": 1,
+     "ay": 20,
+     "frames": 1,
+     "fps": 0,
+     "wall": "se"
+    },
+    "iwall_hut_lowdoor_sw": {
+     "x": 657,
+     "y": 78,
+     "w": 17,
+     "h": 32,
+     "ax": 16,
+     "ay": 20,
+     "frames": 1,
+     "fps": 0,
+     "wall": "sw"
+    },
+    "iwall_hut_plain2_l": {
+     "x": 1003,
+     "y": 0,
+     "w": 17,
+     "h": 77,
+     "ax": 16,
+     "ay": 76,
+     "frames": 1,
+     "fps": 0,
+     "wall": "nw"
+    },
+    "iwall_hut_plain2_r": {
+     "x": 0,
+     "y": 78,
+     "w": 17,
+     "h": 77,
+     "ax": 1,
+     "ay": 76,
+     "frames": 1,
+     "fps": 0,
+     "wall": "ne"
+    },
+    "iwall_hut_plain_l": {
+     "x": 18,
+     "y": 78,
+     "w": 17,
+     "h": 77,
+     "ax": 16,
+     "ay": 76,
+     "frames": 1,
+     "fps": 0,
+     "wall": "nw"
+    },
+    "iwall_hut_plain_r": {
+     "x": 36,
+     "y": 78,
+     "w": 17,
+     "h": 77,
+     "ax": 1,
+     "ay": 76,
+     "frames": 1,
+     "fps": 0,
+     "wall": "ne"
+    },
+    "iwall_hut_window_l": {
+     "x": 54,
+     "y": 78,
+     "w": 17,
+     "h": 77,
+     "ax": 16,
+     "ay": 76,
+     "frames": 1,
+     "fps": 0,
+     "wall": "nw"
+    },
+    "iwall_hut_window_r": {
+     "x": 72,
+     "y": 78,
+     "w": 17,
+     "h": 77,
+     "ax": 1,
+     "ay": 76,
+     "frames": 1,
+     "fps": 0,
+     "wall": "ne"
+    },
+    "iwall_portrait_l": {
+     "x": 90,
+     "y": 78,
+     "w": 17,
+     "h": 77,
+     "ax": 16,
+     "ay": 76,
+     "frames": 1,
+     "fps": 0,
+     "wall": "nw"
+    },
+    "iwall_portrait_r": {
+     "x": 108,
+     "y": 78,
+     "w": 17,
+     "h": 77,
+     "ax": 1,
+     "ay": 76,
+     "frames": 1,
+     "fps": 0,
+     "wall": "ne"
+    },
+    "iwall_sconce_l": {
+     "x": 0,
+     "y": 0,
+     "w": 17,
+     "h": 77,
+     "ax": 16,
+     "ay": 76,
+     "frames": 3,
+     "fps": 6,
+     "wall": "nw"
+    },
+    "iwall_sconce_r": {
+     "x": 52,
+     "y": 0,
+     "w": 17,
+     "h": 77,
+     "ax": 1,
+     "ay": 76,
+     "frames": 3,
+     "fps": 6,
+     "wall": "ne"
+    },
+    "iwall_shelf_l": {
+     "x": 126,
+     "y": 78,
+     "w": 17,
+     "h": 77,
+     "ax": 16,
+     "ay": 76,
+     "frames": 1,
+     "fps": 0,
+     "wall": "nw"
+    },
+    "iwall_shelf_r": {
+     "x": 144,
+     "y": 78,
+     "w": 17,
+     "h": 77,
+     "ax": 1,
+     "ay": 76,
+     "frames": 1,
+     "fps": 0,
+     "wall": "ne"
+    },
+    "iwall_shop_corner": {
+     "x": 378,
+     "y": 78,
+     "w": 8,
+     "h": 77,
+     "ax": 4,
+     "ay": 76,
+     "frames": 1,
+     "fps": 0,
+     "wall": "corner"
+    },
+    "iwall_shop_door_l": {
+     "x": 162,
+     "y": 78,
+     "w": 17,
+     "h": 77,
+     "ax": 16,
+     "ay": 76,
+     "frames": 1,
+     "fps": 0,
+     "wall": "nw"
+    },
+    "iwall_shop_door_r": {
+     "x": 180,
+     "y": 78,
+     "w": 17,
+     "h": 77,
+     "ax": 1,
+     "ay": 76,
+     "frames": 1,
+     "fps": 0,
+     "wall": "ne"
+    },
+    "iwall_shop_doorway_l": {
+     "x": 198,
+     "y": 78,
+     "w": 17,
+     "h": 77,
+     "ax": 16,
+     "ay": 76,
+     "frames": 1,
+     "fps": 0,
+     "wall": "nw"
+    },
+    "iwall_shop_doorway_r": {
+     "x": 216,
+     "y": 78,
+     "w": 17,
+     "h": 77,
+     "ax": 1,
+     "ay": 76,
+     "frames": 1,
+     "fps": 0,
+     "wall": "ne"
+    },
+    "iwall_shop_end_l": {
+     "x": 192,
+     "y": 0,
+     "w": 21,
+     "h": 77,
+     "ax": 20,
+     "ay": 76,
+     "frames": 1,
+     "fps": 0,
+     "wall": "nw-end"
+    },
+    "iwall_shop_end_r": {
+     "x": 298,
+     "y": 0,
+     "w": 20,
+     "h": 77,
+     "ax": 0,
+     "ay": 76,
+     "frames": 1,
+     "fps": 0,
+     "wall": "ne-end"
+    },
+    "iwall_shop_low_se": {
+     "x": 675,
+     "y": 78,
+     "w": 17,
+     "h": 32,
+     "ax": 1,
+     "ay": 20,
+     "frames": 1,
+     "fps": 0,
+     "wall": "se"
+    },
+    "iwall_shop_low_sw": {
+     "x": 693,
+     "y": 78,
+     "w": 17,
+     "h": 32,
+     "ax": 16,
+     "ay": 20,
+     "frames": 1,
+     "fps": 0,
+     "wall": "sw"
+    },
+    "iwall_shop_lowdoor_se": {
+     "x": 711,
+     "y": 78,
+     "w": 17,
+     "h": 32,
+     "ax": 1,
+     "ay": 20,
+     "frames": 1,
+     "fps": 0,
+     "wall": "se"
+    },
+    "iwall_shop_lowdoor_sw": {
+     "x": 729,
+     "y": 78,
+     "w": 17,
+     "h": 32,
+     "ax": 16,
+     "ay": 20,
+     "frames": 1,
+     "fps": 0,
+     "wall": "sw"
+    },
+    "iwall_shop_plain2_l": {
+     "x": 234,
+     "y": 78,
+     "w": 17,
+     "h": 77,
+     "ax": 16,
+     "ay": 76,
+     "frames": 1,
+     "fps": 0,
+     "wall": "nw"
+    },
+    "iwall_shop_plain2_r": {
+     "x": 252,
+     "y": 78,
+     "w": 17,
+     "h": 77,
+     "ax": 1,
+     "ay": 76,
+     "frames": 1,
+     "fps": 0,
+     "wall": "ne"
+    },
+    "iwall_shop_plain_l": {
+     "x": 270,
+     "y": 78,
+     "w": 17,
+     "h": 77,
+     "ax": 16,
+     "ay": 76,
+     "frames": 1,
+     "fps": 0,
+     "wall": "nw"
+    },
+    "iwall_shop_plain_r": {
+     "x": 288,
+     "y": 78,
+     "w": 17,
+     "h": 77,
+     "ax": 1,
+     "ay": 76,
+     "frames": 1,
+     "fps": 0,
+     "wall": "ne"
+    },
+    "iwall_shop_window_l": {
+     "x": 306,
+     "y": 78,
+     "w": 17,
+     "h": 77,
+     "ax": 16,
+     "ay": 76,
+     "frames": 1,
+     "fps": 0,
+     "wall": "nw"
+    },
+    "iwall_shop_window_r": {
+     "x": 324,
+     "y": 78,
+     "w": 17,
+     "h": 77,
+     "ax": 1,
+     "ay": 76,
+     "frames": 1,
+     "fps": 0,
+     "wall": "ne"
+    },
+    "int_floor_planks": {
+     "alias": "ifloor_cottage_0",
+     "x": 747,
+     "y": 78,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "int_floor_boards": {
+     "alias": "ifloor_shop_0",
+     "x": 264,
+     "y": 156,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "int_floor_herbs": {
+     "alias": "ifloor_herbal_0",
+     "x": 0,
+     "y": 156,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "int_floor_flagstone": {
+     "alias": "ifloor_elder_0",
+     "x": 879,
+     "y": 78,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    }
+   }
+  },
+  "nature": {
+   "file": "assets/images/nature.png",
+   "w": 507,
+   "h": 94,
+   "anchor": "bottom",
+   "note": "Trees, bushes, rocks, fungi, reeds, crystals. Anchor = trunk/base bottom-centre.",
+   "frames": {
+    "bush_0": {
+     "x": 36,
+     "y": 61,
+     "w": 24,
+     "h": 17,
+     "ax": 12,
+     "ay": 16,
+     "frames": 1,
+     "fps": 0,
+     "sh": [
+      9,
+      3
+     ]
+    },
+    "bush_1": {
+     "x": 61,
+     "y": 61,
+     "w": 24,
+     "h": 17,
+     "ax": 12,
+     "ay": 16,
+     "frames": 1,
+     "fps": 0,
+     "sh": [
+      9,
+      3
+     ]
+    },
+    "bush_berry": {
+     "x": 86,
+     "y": 61,
+     "w": 24,
+     "h": 17,
+     "ax": 12,
+     "ay": 16,
+     "frames": 1,
+     "fps": 0,
+     "sh": [
+      9,
+      3
+     ]
+    },
+    "bush_blight": {
+     "x": 111,
+     "y": 61,
+     "w": 24,
+     "h": 17,
+     "ax": 12,
+     "ay": 16,
+     "frames": 1,
+     "fps": 0,
+     "sh": [
+      9,
+      3
+     ]
+    },
+    "bush_snow": {
+     "x": 136,
+     "y": 61,
+     "w": 24,
+     "h": 17,
+     "ax": 12,
+     "ay": 16,
+     "frames": 1,
+     "fps": 0,
+     "sh": [
+      9,
+      3
+     ]
+    },
+    "bush_swamp": {
+     "x": 161,
+     "y": 61,
+     "w": 24,
+     "h": 17,
+     "ax": 12,
+     "ay": 16,
+     "frames": 1,
+     "fps": 0,
+     "sh": [
+      9,
+      3
+     ]
+    },
+    "flowers_moon": {
+     "x": 52,
+     "y": 82,
+     "w": 16,
+     "h": 11,
+     "ax": 8,
+     "ay": 10,
+     "frames": 1,
+     "fps": 0
+    },
+    "flowers_wild": {
+     "x": 153,
+     "y": 82,
+     "w": 14,
+     "h": 9,
+     "ax": 7,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "grass_tall": {
+     "x": 274,
+     "y": 61,
+     "w": 16,
+     "h": 14,
+     "ax": 8,
+     "ay": 13,
+     "frames": 4,
+     "fps": 3,
+     "sh": [
+      6,
+      2
+     ]
+    },
+    "ice_crystal_0": {
+     "x": 0,
+     "y": 61,
+     "w": 20,
+     "h": 20,
+     "ax": 10,
+     "ay": 19,
+     "frames": 1,
+     "fps": 0,
+     "sh": [
+      7,
+      2
+     ]
+    },
+    "ice_crystal_1": {
+     "x": 338,
+     "y": 0,
+     "w": 24,
+     "h": 28,
+     "ax": 12,
+     "ay": 27,
+     "frames": 4,
+     "fps": 4,
+     "sh": [
+      9,
+      3
+     ]
+    },
+    "lilypad": {
+     "x": 136,
+     "y": 82,
+     "w": 16,
+     "h": 9,
+     "ax": 8,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "log": {
+     "x": 0,
+     "y": 82,
+     "w": 28,
+     "h": 12,
+     "ax": 14,
+     "ay": 11,
+     "frames": 1,
+     "fps": 0,
+     "sh": [
+      10,
+      3
+     ]
+    },
+    "mushroom_brown": {
+     "x": 121,
+     "y": 82,
+     "w": 14,
+     "h": 10,
+     "ax": 7,
+     "ay": 9,
+     "frames": 1,
+     "fps": 0,
+     "sh": [
+      5,
+      2
+     ]
+    },
+    "mushroom_glow": {
+     "x": 339,
+     "y": 61,
+     "w": 16,
+     "h": 14,
+     "ax": 8,
+     "ay": 13,
+     "frames": 4,
+     "fps": 4,
+     "sh": [
+      6,
+      2
+     ]
+    },
+    "mushroom_moon": {
+     "x": 404,
+     "y": 61,
+     "w": 16,
+     "h": 14,
+     "ax": 8,
+     "ay": 13,
+     "frames": 4,
+     "fps": 4,
+     "sh": [
+      6,
+      2
+     ]
+    },
+    "mushroom_red": {
+     "x": 86,
+     "y": 82,
+     "w": 11,
+     "h": 11,
+     "ax": 5,
+     "ay": 10,
+     "frames": 1,
+     "fps": 0,
+     "sh": [
+      4,
+      2
+     ]
+    },
+    "reeds_0": {
+     "x": 435,
+     "y": 0,
+     "w": 18,
+     "h": 26,
+     "ax": 9,
+     "ay": 25,
+     "frames": 4,
+     "fps": 3,
+     "sh": [
+      6,
+      2
+     ]
+    },
+    "reeds_1": {
+     "x": 21,
+     "y": 61,
+     "w": 14,
+     "h": 20,
+     "ax": 7,
+     "ay": 19,
+     "frames": 1,
+     "fps": 0,
+     "sh": [
+      5,
+      2
+     ]
+    },
+    "rock_0": {
+     "x": 69,
+     "y": 82,
+     "w": 16,
+     "h": 11,
+     "ax": 8,
+     "ay": 10,
+     "frames": 1,
+     "fps": 0,
+     "sh": [
+      6,
+      2
+     ]
+    },
+    "rock_1": {
+     "x": 205,
+     "y": 61,
+     "w": 22,
+     "h": 15,
+     "ax": 11,
+     "ay": 14,
+     "frames": 1,
+     "fps": 0,
+     "sh": [
+      8,
+      3
+     ]
+    },
+    "rock_2": {
+     "x": 29,
+     "y": 82,
+     "w": 22,
+     "h": 12,
+     "ax": 11,
+     "ay": 11,
+     "frames": 1,
+     "fps": 0,
+     "sh": [
+      8,
+      3
+     ]
+    },
+    "rock_crypt": {
+     "x": 186,
+     "y": 61,
+     "w": 18,
+     "h": 16,
+     "ax": 9,
+     "ay": 15,
+     "frames": 1,
+     "fps": 0,
+     "sh": [
+      6,
+      2
+     ]
+    },
+    "rock_moss": {
+     "x": 228,
+     "y": 61,
+     "w": 22,
+     "h": 15,
+     "ax": 11,
+     "ay": 14,
+     "frames": 1,
+     "fps": 0,
+     "sh": [
+      8,
+      3
+     ]
+    },
+    "rock_snow": {
+     "x": 251,
+     "y": 61,
+     "w": 22,
+     "h": 15,
+     "ax": 11,
+     "ay": 14,
+     "frames": 1,
+     "fps": 0,
+     "sh": [
+      8,
+      3
+     ]
+    },
+    "snow_mound": {
+     "x": 98,
+     "y": 82,
+     "w": 22,
+     "h": 10,
+     "ax": 11,
+     "ay": 9,
+     "frames": 1,
+     "fps": 0
+    },
+    "stump": {
+     "x": 469,
+     "y": 61,
+     "w": 18,
+     "h": 13,
+     "ax": 9,
+     "ay": 12,
+     "frames": 1,
+     "fps": 0,
+     "sh": [
+      6,
+      2
+     ]
+    },
+    "tree_blighted": {
+     "x": 0,
+     "y": 0,
+     "w": 46,
+     "h": 60,
+     "ax": 23,
+     "ay": 59,
+     "frames": 1,
+     "fps": 0,
+     "sh": [
+      14,
+      5
+     ]
+    },
+    "tree_blighted_small": {
+     "x": 307,
+     "y": 0,
+     "w": 30,
+     "h": 42,
+     "ax": 15,
+     "ay": 41,
+     "frames": 1,
+     "fps": 0,
+     "sh": [
+      11,
+      4
+     ]
+    },
+    "tree_crypt": {
+     "x": 135,
+     "y": 0,
+     "w": 42,
+     "h": 56,
+     "ax": 21,
+     "ay": 55,
+     "frames": 1,
+     "fps": 0,
+     "sh": [
+      14,
+      5
+     ]
+    },
+    "tree_oak_0": {
+     "x": 178,
+     "y": 0,
+     "w": 42,
+     "h": 56,
+     "ax": 21,
+     "ay": 55,
+     "frames": 1,
+     "fps": 0,
+     "sh": [
+      14,
+      5
+     ]
+    },
+    "tree_oak_1": {
+     "x": 221,
+     "y": 0,
+     "w": 42,
+     "h": 56,
+     "ax": 21,
+     "ay": 55,
+     "frames": 1,
+     "fps": 0,
+     "sh": [
+      14,
+      5
+     ]
+    },
+    "tree_oak_2": {
+     "x": 264,
+     "y": 0,
+     "w": 42,
+     "h": 56,
+     "ax": 21,
+     "ay": 55,
+     "frames": 1,
+     "fps": 0,
+     "sh": [
+      14,
+      5
+     ]
+    },
+    "tree_pine_snow": {
+     "x": 98,
+     "y": 0,
+     "w": 36,
+     "h": 58,
+     "ax": 18,
+     "ay": 57,
+     "frames": 1,
+     "fps": 0,
+     "sh": [
+      13,
+      4
+     ]
+    },
+    "tree_willow": {
+     "x": 47,
+     "y": 0,
+     "w": 50,
+     "h": 58,
+     "ax": 25,
+     "ay": 57,
+     "frames": 1,
+     "fps": 0,
+     "sh": [
+      14,
+      5
+     ]
+    },
+    "prop_tree_0": {
+     "alias": "tree_oak_0",
+     "x": 178,
+     "y": 0,
+     "w": 42,
+     "h": 56,
+     "ax": 21,
+     "ay": 55,
+     "frames": 1,
+     "fps": 0,
+     "sh": [
+      14,
+      5
+     ],
+     "autoShadow": true
+    },
+    "prop_tree_1": {
+     "alias": "tree_oak_1",
+     "x": 221,
+     "y": 0,
+     "w": 42,
+     "h": 56,
+     "ax": 21,
+     "ay": 55,
+     "frames": 1,
+     "fps": 0,
+     "sh": [
+      14,
+      5
+     ],
+     "autoShadow": true
+    },
+    "prop_tree_2": {
+     "alias": "tree_oak_2",
+     "x": 264,
+     "y": 0,
+     "w": 42,
+     "h": 56,
+     "ax": 21,
+     "ay": 55,
+     "frames": 1,
+     "fps": 0,
+     "sh": [
+      14,
+      5
+     ],
+     "autoShadow": true
+    },
+    "prop_flowers": {
+     "alias": "flowers_wild",
+     "x": 153,
+     "y": 82,
+     "w": 14,
+     "h": 9,
+     "ax": 7,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "prop_rock": {
+     "alias": "rock_moss",
+     "x": 228,
+     "y": 61,
+     "w": 22,
+     "h": 15,
+     "ax": 11,
+     "ay": 14,
+     "frames": 1,
+     "fps": 0,
+     "sh": [
+      8,
+      3
+     ],
+     "autoShadow": true
+    }
+   }
+  },
+  "npcs": {
+   "file": "assets/images/npcs.png",
+   "w": 1014,
+   "h": 227,
+   "anchor": "bottom",
+   "note": "Villagers in the witch 48x56 cell, foot (24,49): npc_<marrow|pip|wren>_<idle|talk>_<s|e|n>; west = e flipped. cat_idle_<s|e>.",
+   "frames": {
+    "cat_idle_e": {
+     "x": 145,
+     "y": 171,
+     "w": 14,
+     "h": 13,
+     "ax": 6,
+     "ay": 12,
+     "frames": 4,
+     "fps": 3,
+     "sh": [
+      5,
+      2
+     ],
+     "facing": "e"
+    },
+    "cat_idle_s": {
+     "x": 202,
+     "y": 171,
+     "w": 14,
+     "h": 13,
+     "ax": 6,
+     "ay": 12,
+     "frames": 4,
+     "fps": 3,
+     "sh": [
+      5,
+      2
+     ],
+     "facing": "s"
+    },
+    "npc_marrow_idle_e": {
+     "x": 0,
+     "y": 0,
+     "w": 48,
+     "h": 56,
+     "ax": 24,
+     "ay": 49,
+     "frames": 4,
+     "fps": 4,
+     "sh": [
+      8,
+      3
+     ],
+     "facing": "e"
+    },
+    "npc_marrow_idle_n": {
+     "x": 193,
+     "y": 0,
+     "w": 48,
+     "h": 56,
+     "ax": 24,
+     "ay": 49,
+     "frames": 4,
+     "fps": 4,
+     "sh": [
+      8,
+      3
+     ],
+     "facing": "n"
+    },
+    "npc_marrow_idle_s": {
+     "x": 386,
+     "y": 0,
+     "w": 48,
+     "h": 56,
+     "ax": 24,
+     "ay": 49,
+     "frames": 4,
+     "fps": 4,
+     "sh": [
+      8,
+      3
+     ],
+     "facing": "s"
+    },
+    "npc_marrow_talk_e": {
+     "x": 772,
+     "y": 57,
+     "w": 48,
+     "h": 56,
+     "ax": 24,
+     "ay": 49,
+     "frames": 3,
+     "fps": 6,
+     "sh": [
+      8,
+      3
+     ],
+     "facing": "e"
+    },
+    "npc_marrow_talk_n": {
+     "x": 0,
+     "y": 114,
+     "w": 48,
+     "h": 56,
+     "ax": 24,
+     "ay": 49,
+     "frames": 3,
+     "fps": 6,
+     "sh": [
+      8,
+      3
+     ],
+     "facing": "n"
+    },
+    "npc_marrow_talk_s": {
+     "x": 145,
+     "y": 114,
+     "w": 48,
+     "h": 56,
+     "ax": 24,
+     "ay": 49,
+     "frames": 3,
+     "fps": 6,
+     "sh": [
+      8,
+      3
+     ],
+     "facing": "s"
+    },
+    "npc_pip_idle_e": {
+     "x": 579,
+     "y": 0,
+     "w": 48,
+     "h": 56,
+     "ax": 24,
+     "ay": 49,
+     "frames": 4,
+     "fps": 4,
+     "sh": [
+      8,
+      3
+     ],
+     "facing": "e"
+    },
+    "npc_pip_idle_n": {
+     "x": 772,
+     "y": 0,
+     "w": 48,
+     "h": 56,
+     "ax": 24,
+     "ay": 49,
+     "frames": 4,
+     "fps": 4,
+     "sh": [
+      8,
+      3
+     ],
+     "facing": "n"
+    },
+    "npc_pip_idle_s": {
+     "x": 0,
+     "y": 57,
+     "w": 48,
+     "h": 56,
+     "ax": 24,
+     "ay": 49,
+     "frames": 4,
+     "fps": 4,
+     "sh": [
+      8,
+      3
+     ],
+     "facing": "s"
+    },
+    "npc_pip_talk_e": {
+     "x": 290,
+     "y": 114,
+     "w": 48,
+     "h": 56,
+     "ax": 24,
+     "ay": 49,
+     "frames": 3,
+     "fps": 6,
+     "sh": [
+      8,
+      3
+     ],
+     "facing": "e"
+    },
+    "npc_pip_talk_n": {
+     "x": 435,
+     "y": 114,
+     "w": 48,
+     "h": 56,
+     "ax": 24,
+     "ay": 49,
+     "frames": 3,
+     "fps": 6,
+     "sh": [
+      8,
+      3
+     ],
+     "facing": "n"
+    },
+    "npc_pip_talk_s": {
+     "x": 580,
+     "y": 114,
+     "w": 48,
+     "h": 56,
+     "ax": 24,
+     "ay": 49,
+     "frames": 3,
+     "fps": 6,
+     "sh": [
+      8,
+      3
+     ],
+     "facing": "s"
+    },
+    "npc_wren_idle_e": {
+     "x": 193,
+     "y": 57,
+     "w": 48,
+     "h": 56,
+     "ax": 24,
+     "ay": 49,
+     "frames": 4,
+     "fps": 4,
+     "sh": [
+      8,
+      3
+     ],
+     "facing": "e"
+    },
+    "npc_wren_idle_n": {
+     "x": 386,
+     "y": 57,
+     "w": 48,
+     "h": 56,
+     "ax": 24,
+     "ay": 49,
+     "frames": 4,
+     "fps": 4,
+     "sh": [
+      8,
+      3
+     ],
+     "facing": "n"
+    },
+    "npc_wren_idle_s": {
+     "x": 579,
+     "y": 57,
+     "w": 48,
+     "h": 56,
+     "ax": 24,
+     "ay": 49,
+     "frames": 4,
+     "fps": 4,
+     "sh": [
+      8,
+      3
+     ],
+     "facing": "s"
+    },
+    "npc_wren_talk_e": {
+     "x": 725,
+     "y": 114,
+     "w": 48,
+     "h": 56,
+     "ax": 24,
+     "ay": 49,
+     "frames": 3,
+     "fps": 6,
+     "sh": [
+      8,
+      3
+     ],
+     "facing": "e"
+    },
+    "npc_wren_talk_n": {
+     "x": 870,
+     "y": 114,
+     "w": 48,
+     "h": 56,
+     "ax": 24,
+     "ay": 49,
+     "frames": 3,
+     "fps": 6,
+     "sh": [
+      8,
+      3
+     ],
+     "facing": "n"
+    },
+    "npc_wren_talk_s": {
+     "x": 0,
+     "y": 171,
+     "w": 48,
+     "h": 56,
+     "ax": 24,
+     "ay": 49,
+     "frames": 3,
+     "fps": 6,
+     "sh": [
+      8,
+      3
+     ],
+     "facing": "s"
+    },
+    "npc_marrow": {
+     "alias": "npc_marrow_idle_e",
+     "x": 0,
+     "y": 0,
+     "w": 48,
+     "h": 56,
+     "ax": 24,
+     "ay": 49,
+     "frames": 4,
+     "fps": 4,
+     "sh": [
+      8,
+      3
+     ],
+     "facing": "e"
+    },
+    "npc_pip": {
+     "alias": "npc_pip_idle_e",
+     "x": 579,
+     "y": 0,
+     "w": 48,
+     "h": 56,
+     "ax": 24,
+     "ay": 49,
+     "frames": 4,
+     "fps": 4,
+     "sh": [
+      8,
+      3
+     ],
+     "facing": "e"
+    },
+    "npc_wren": {
+     "alias": "npc_wren_idle_e",
+     "x": 193,
+     "y": 57,
+     "w": 48,
+     "h": 56,
+     "ax": 24,
+     "ay": 49,
+     "frames": 4,
+     "fps": 4,
+     "sh": [
+      8,
+      3
+     ],
+     "facing": "e"
+    }
+   }
+  },
+  "props": {
+   "file": "assets/images/props.png",
+   "w": 496,
+   "h": 73,
+   "anchor": "bottom",
+   "note": "Placeable props. Anchor = bottom-centre ground point. Fences anchor at the segment midpoint.",
+   "frames": {
+    "alchemy_table": {
+     "x": 164,
+     "y": 0,
+     "w": 34,
+     "h": 28,
+     "ax": 17,
+     "ay": 27,
+     "frames": 1,
+     "fps": 0,
+     "sh": [
+      12,
+      4
+     ]
+    },
+    "barrel": {
+     "x": 129,
+     "y": 49,
+     "w": 15,
+     "h": 18,
+     "ax": 7,
+     "ay": 17,
+     "frames": 1,
+     "fps": 0,
+     "sh": [
+      5,
+      2
+     ]
+    },
+    "bench": {
+     "x": 0,
+     "y": 49,
+     "w": 27,
+     "h": 24,
+     "ax": 13,
+     "ay": 23,
+     "frames": 1,
+     "fps": 0,
+     "sh": [
+      10,
+      3
+     ]
+    },
+    "brazier": {
+     "x": 432,
+     "y": 0,
+     "w": 16,
+     "h": 24,
+     "ax": 8,
+     "ay": 23,
+     "frames": 4,
+     "fps": 8,
+     "sh": [
+      6,
+      2
+     ]
+    },
+    "broom_stand": {
+     "x": 141,
+     "y": 0,
+     "w": 22,
+     "h": 34,
+     "ax": 11,
+     "ay": 33,
+     "frames": 1,
+     "fps": 0,
+     "sh": [
+      8,
+      3
+     ]
+    },
+    "bucket": {
+     "x": 264,
+     "y": 49,
+     "w": 11,
+     "h": 11,
+     "ax": 5,
+     "ay": 10,
+     "frames": 1,
+     "fps": 0,
+     "sh": [
+      4,
+      2
+     ]
+    },
+    "cauldron": {
+     "x": 335,
+     "y": 0,
+     "w": 24,
+     "h": 24,
+     "ax": 12,
+     "ay": 23,
+     "frames": 4,
+     "fps": 6,
+     "sh": [
+      9,
+      3
+     ]
+    },
+    "compost": {
+     "x": 28,
+     "y": 49,
+     "w": 26,
+     "h": 22,
+     "ax": 13,
+     "ay": 21,
+     "frames": 1,
+     "fps": 0,
+     "sh": [
+      9,
+      3
+     ]
+    },
+    "crate": {
+     "x": 109,
+     "y": 49,
+     "w": 19,
+     "h": 19,
+     "ax": 9,
+     "ay": 18,
+     "frames": 1,
+     "fps": 0,
+     "sh": [
+      7,
+      2
+     ]
+    },
+    "crate_stack": {
+     "x": 224,
+     "y": 0,
+     "w": 22,
+     "h": 28,
+     "ax": 11,
+     "ay": 27,
+     "frames": 1,
+     "fps": 0,
+     "sh": [
+      8,
+      3
+     ]
+    },
+    "fence_post": {
+     "x": 204,
+     "y": 49,
+     "w": 5,
+     "h": 16,
+     "ax": 2,
+     "ay": 15,
+     "frames": 1,
+     "fps": 0,
+     "sh": [
+      4,
+      2
+     ]
+    },
+    "fence_x": {
+     "x": 247,
+     "y": 0,
+     "w": 21,
+     "h": 25,
+     "ax": 10,
+     "ay": 19,
+     "frames": 1,
+     "fps": 0
+    },
+    "fence_x_broken": {
+     "x": 269,
+     "y": 0,
+     "w": 21,
+     "h": 25,
+     "ax": 10,
+     "ay": 19,
+     "frames": 1,
+     "fps": 0
+    },
+    "fence_y": {
+     "x": 291,
+     "y": 0,
+     "w": 21,
+     "h": 25,
+     "ax": 10,
+     "ay": 19,
+     "frames": 1,
+     "fps": 0
+    },
+    "fence_y_broken": {
+     "x": 313,
+     "y": 0,
+     "w": 21,
+     "h": 25,
+     "ax": 10,
+     "ay": 19,
+     "frames": 1,
+     "fps": 0
+    },
+    "grave_mound": {
+     "x": 239,
+     "y": 49,
+     "w": 24,
+     "h": 11,
+     "ax": 12,
+     "ay": 10,
+     "frames": 1,
+     "fps": 0,
+     "sh": [
+      9,
+      3
+     ]
+    },
+    "lamp_post": {
+     "x": 107,
+     "y": 0,
+     "w": 11,
+     "h": 34,
+     "ax": 5,
+     "ay": 33,
+     "frames": 3,
+     "fps": 5,
+     "sh": [
+      4,
+      2
+     ]
+    },
+    "lantern": {
+     "x": 145,
+     "y": 49,
+     "w": 11,
+     "h": 16,
+     "ax": 5,
+     "ay": 15,
+     "frames": 3,
+     "fps": 6,
+     "sh": [
+      4,
+      2
+     ]
+    },
+    "pumpkin": {
+     "x": 224,
+     "y": 49,
+     "w": 14,
+     "h": 12,
+     "ax": 7,
+     "ay": 11,
+     "frames": 1,
+     "fps": 0,
+     "sh": [
+      5,
+      2
+     ]
+    },
+    "sack": {
+     "x": 210,
+     "y": 49,
+     "w": 13,
+     "h": 14,
+     "ax": 6,
+     "ay": 13,
+     "frames": 1,
+     "fps": 0,
+     "sh": [
+      5,
+      2
+     ]
+    },
+    "scarecrow": {
+     "x": 80,
+     "y": 0,
+     "w": 26,
+     "h": 40,
+     "ax": 13,
+     "ay": 39,
+     "frames": 1,
+     "fps": 0,
+     "sh": [
+      9,
+      3
+     ]
+    },
+    "shop_stall": {
+     "x": 0,
+     "y": 0,
+     "w": 46,
+     "h": 48,
+     "ax": 23,
+     "ay": 47,
+     "frames": 1,
+     "fps": 0,
+     "sh": [
+      14,
+      5
+     ]
+    },
+    "signpost": {
+     "x": 199,
+     "y": 0,
+     "w": 24,
+     "h": 28,
+     "ax": 12,
+     "ay": 27,
+     "frames": 1,
+     "fps": 0,
+     "sh": [
+      9,
+      3
+     ]
+    },
+    "tombstone_0": {
+     "x": 55,
+     "y": 49,
+     "w": 17,
+     "h": 21,
+     "ax": 8,
+     "ay": 20,
+     "frames": 1,
+     "fps": 0,
+     "sh": [
+      6,
+      2
+     ]
+    },
+    "tombstone_1": {
+     "x": 73,
+     "y": 49,
+     "w": 17,
+     "h": 21,
+     "ax": 8,
+     "ay": 20,
+     "frames": 1,
+     "fps": 0,
+     "sh": [
+      6,
+      2
+     ]
+    },
+    "tombstone_2": {
+     "x": 91,
+     "y": 49,
+     "w": 17,
+     "h": 21,
+     "ax": 8,
+     "ay": 20,
+     "frames": 1,
+     "fps": 0,
+     "sh": [
+      6,
+      2
+     ]
+    },
+    "well": {
+     "x": 47,
+     "y": 0,
+     "w": 32,
+     "h": 44,
+     "ax": 16,
+     "ay": 43,
+     "frames": 1,
+     "fps": 0,
+     "sh": [
+      12,
+      4
+     ]
+    },
+    "woodpile": {
+     "x": 179,
+     "y": 49,
+     "w": 24,
+     "h": 16,
+     "ax": 12,
+     "ay": 15,
+     "frames": 1,
+     "fps": 0,
+     "sh": [
+      9,
+      3
+     ]
+    },
+    "prop_lamp": {
+     "alias": "lamp_post",
+     "x": 107,
+     "y": 0,
+     "w": 11,
+     "h": 34,
+     "ax": 5,
+     "ay": 33,
+     "frames": 3,
+     "fps": 5,
+     "sh": [
+      4,
+      2
+     ],
+     "autoShadow": true
+    },
+    "prop_bench": {
+     "alias": "bench",
+     "x": 0,
+     "y": 49,
+     "w": 27,
+     "h": 24,
+     "ax": 13,
+     "ay": 23,
+     "frames": 1,
+     "fps": 0,
+     "sh": [
+      10,
+      3
+     ],
+     "autoShadow": true
+    }
+   }
+  },
+  "tiles": {
+   "file": "assets/images/tiles.png",
+   "w": 494,
+   "h": 111,
+   "anchor": "center",
+   "note": "32x16 iso diamonds, anchor = diamond centre (16,8). Side skirts anchor at their top vertex.",
+   "frames": {
+    "cobble_0": {
+     "x": 261,
+     "y": 0,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "cobble_1": {
+     "x": 294,
+     "y": 0,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "cobble_2": {
+     "x": 327,
+     "y": 0,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "cobble_3": {
+     "x": 360,
+     "y": 0,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "crypt_flag_0": {
+     "x": 393,
+     "y": 0,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "crypt_flag_1": {
+     "x": 426,
+     "y": 0,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "crypt_flag_2": {
+     "x": 459,
+     "y": 0,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "crypt_flag_3": {
+     "x": 0,
+     "y": 27,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "edge_grass_ne": {
+     "x": 33,
+     "y": 27,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "edge_grass_nw": {
+     "x": 66,
+     "y": 27,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "edge_grass_se": {
+     "x": 99,
+     "y": 27,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "edge_grass_sw": {
+     "x": 132,
+     "y": 27,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "edge_moss_ne": {
+     "x": 165,
+     "y": 27,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "edge_moss_nw": {
+     "x": 198,
+     "y": 27,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "edge_moss_se": {
+     "x": 231,
+     "y": 27,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "edge_moss_sw": {
+     "x": 264,
+     "y": 27,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "edge_shore_ne": {
+     "x": 297,
+     "y": 27,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "edge_shore_nw": {
+     "x": 330,
+     "y": 27,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "edge_shore_se": {
+     "x": 363,
+     "y": 27,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "edge_shore_sw": {
+     "x": 396,
+     "y": 27,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "edge_snow_ne": {
+     "x": 429,
+     "y": 27,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "edge_snow_nw": {
+     "x": 462,
+     "y": 27,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "edge_snow_se": {
+     "x": 0,
+     "y": 44,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "edge_snow_sw": {
+     "x": 33,
+     "y": 44,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "edge_wild_ne": {
+     "x": 66,
+     "y": 44,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "edge_wild_nw": {
+     "x": 99,
+     "y": 44,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "edge_wild_se": {
+     "x": 132,
+     "y": 44,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "edge_wild_sw": {
+     "x": 165,
+     "y": 44,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "forest_moss_0": {
+     "x": 198,
+     "y": 44,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "forest_moss_1": {
+     "x": 231,
+     "y": 44,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "forest_moss_2": {
+     "x": 264,
+     "y": 44,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "forest_moss_3": {
+     "x": 297,
+     "y": 44,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "grass_grove_0": {
+     "x": 330,
+     "y": 44,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "grass_grove_1": {
+     "x": 363,
+     "y": 44,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "grass_grove_2": {
+     "x": 396,
+     "y": 44,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "grass_grove_3": {
+     "x": 429,
+     "y": 44,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "grass_wild_0": {
+     "x": 462,
+     "y": 44,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "grass_wild_1": {
+     "x": 0,
+     "y": 61,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "grass_wild_2": {
+     "x": 33,
+     "y": 61,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "grass_wild_3": {
+     "x": 66,
+     "y": 61,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "ice_0": {
+     "x": 99,
+     "y": 61,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "ice_1": {
+     "x": 132,
+     "y": 61,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "ice_2": {
+     "x": 165,
+     "y": 61,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "ice_3": {
+     "x": 198,
+     "y": 61,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "path_dirt_0": {
+     "x": 231,
+     "y": 61,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "path_dirt_1": {
+     "x": 264,
+     "y": 61,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "path_dirt_2": {
+     "x": 297,
+     "y": 61,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "path_dirt_3": {
+     "x": 330,
+     "y": 61,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "side_crypt": {
+     "x": 0,
+     "y": 0,
+     "w": 32,
+     "h": 26,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "side_earth": {
+     "x": 33,
+     "y": 0,
+     "w": 32,
+     "h": 26,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "side_snow": {
+     "x": 66,
+     "y": 0,
+     "w": 32,
+     "h": 26,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "side_stone": {
+     "x": 99,
+     "y": 0,
+     "w": 32,
+     "h": 26,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "snow_0": {
+     "x": 363,
+     "y": 61,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "snow_1": {
+     "x": 396,
+     "y": 61,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "snow_2": {
+     "x": 429,
+     "y": 61,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "snow_3": {
+     "x": 462,
+     "y": 61,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "soil_dry_0": {
+     "x": 0,
+     "y": 78,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "soil_dry_1": {
+     "x": 33,
+     "y": 78,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "soil_dry_2": {
+     "x": 66,
+     "y": 78,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "soil_dry_3": {
+     "x": 99,
+     "y": 78,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "soil_wet_0": {
+     "x": 132,
+     "y": 78,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "soil_wet_1": {
+     "x": 165,
+     "y": 78,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "soil_wet_2": {
+     "x": 198,
+     "y": 78,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "soil_wet_3": {
+     "x": 231,
+     "y": 78,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "swamp_bog_0": {
+     "x": 264,
+     "y": 78,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "swamp_bog_1": {
+     "x": 297,
+     "y": 78,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "swamp_bog_2": {
+     "x": 330,
+     "y": 78,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "swamp_bog_3": {
+     "x": 363,
+     "y": 78,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "swamp_mud_0": {
+     "x": 396,
+     "y": 78,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "swamp_mud_1": {
+     "x": 429,
+     "y": 78,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "swamp_mud_2": {
+     "x": 462,
+     "y": 78,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "swamp_mud_3": {
+     "x": 0,
+     "y": 95,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "water_0": {
+     "x": 33,
+     "y": 95,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "water_1": {
+     "x": 66,
+     "y": 95,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "water_2": {
+     "x": 99,
+     "y": 95,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "water_3": {
+     "x": 132,
+     "y": 95,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 1,
+     "fps": 0
+    },
+    "water_anim": {
+     "x": 132,
+     "y": 0,
+     "w": 32,
+     "h": 16,
+     "ax": 16,
+     "ay": 8,
+     "frames": 4,
+     "fps": 3
+    }
+   }
+  }
+ },
+ "generated": "tools/build-art.js from art/*.px.js (claude-pxl)"
+}

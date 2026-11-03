@@ -1,0 +1,106 @@
+{
+ "frames": {
+  "crop_moonflower_sparkle_0": {
+   "frame": {
+    "x": 0,
+    "y": 0,
+    "w": 17,
+    "h": 24
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 17,
+    "h": 24
+   },
+   "sourceSize": {
+    "w": 17,
+    "h": 24
+   },
+   "duration": 167
+  },
+  "crop_moonflower_sparkle_1": {
+   "frame": {
+    "x": 17,
+    "y": 0,
+    "w": 17,
+    "h": 24
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 17,
+    "h": 24
+   },
+   "sourceSize": {
+    "w": 17,
+    "h": 24
+   },
+   "duration": 167
+  },
+  "crop_moonflower_sparkle_2": {
+   "frame": {
+    "x": 34,
+    "y": 0,
+    "w": 17,
+    "h": 24
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 17,
+    "h": 24
+   },
+   "sourceSize": {
+    "w": 17,
+    "h": 24
+   },
+   "duration": 167
+  },
+  "crop_moonflower_sparkle_3": {
+   "frame": {
+    "x": 51,
+    "y": 0,
+    "w": 17,
+    "h": 24
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 17,
+    "h": 24
+   },
+   "sourceSize": {
+    "w": 17,
+    "h": 24
+   },
+   "duration": 167
+  }
+ },
+ "meta": {
+  "app": "pxl",
+  "image": "crop_moonflower_sparkle.png",
+  "format": "RGBA8888",
+  "size": {
+   "w": 68,
+   "h": 24
+  },
+  "scale": "1",
+  "frameTags": [
+   {
+    "name": "crop_moonflower_sparkle",
+    "from": 0,
+    "to": 3,
+    "direction": "forward"
+   }
+  ]
+ }
+}

@@ -1,0 +1,85 @@
+{
+ "frames": {
+  "mote_well_0": {
+   "frame": {
+    "x": 0,
+    "y": 0,
+    "w": 7,
+    "h": 9
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 7,
+    "h": 9
+   },
+   "sourceSize": {
+    "w": 7,
+    "h": 9
+   },
+   "duration": 200
+  },
+  "mote_well_1": {
+   "frame": {
+    "x": 7,
+    "y": 0,
+    "w": 7,
+    "h": 9
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 7,
+    "h": 9
+   },
+   "sourceSize": {
+    "w": 7,
+    "h": 9
+   },
+   "duration": 200
+  },
+  "mote_well_2": {
+   "frame": {
+    "x": 14,
+    "y": 0,
+    "w": 7,
+    "h": 9
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 7,
+    "h": 9
+   },
+   "sourceSize": {
+    "w": 7,
+    "h": 9
+   },
+   "duration": 200
+  }
+ },
+ "meta": {
+  "app": "pxl",
+  "image": "mote_well.png",
+  "format": "RGBA8888",
+  "size": {
+   "w": 21,
+   "h": 9
+  },
+  "scale": "1",
+  "frameTags": [
+   {
+    "name": "mote_well",
+    "from": 0,
+    "to": 2,
+    "direction": "forward"
+   }
+  ]
+ }
+}

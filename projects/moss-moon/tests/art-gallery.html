@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Moss Moon Art Gallery</title>
+<style>
+  :root { --bg: #2b3f3c; --ink: #f7f4e9; --muted: #c6aedb; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 13px/1.4 ui-monospace, Menlo, monospace; }
+  header { padding: 10px 14px; display: flex; gap: 14px; flex-wrap: wrap; align-items: baseline; }
+  header a { color: var(--muted); }
+  canvas { display: block; image-rendering: pixelated; }
+</style>
+</head>
+<body>
+<header id="nav"></header>
+<canvas id="g"></canvas>
+<script src="../assets/js/art-data.js"></script>
+<script src="../src/systems/art.js"></script>
+<script>
+// Contact sheet for MM.art. Query: ?view=<sheet>|patches|scene|all &scale=N &bg=light &t=seconds
+(function () {
+  const q = new URLSearchParams(location.search), view = q.get('view') || 'all';
+  const S = +(q.get('scale') || 3), T = +(q.get('t') || 0), light = q.get('bg') === 'light';
+  const cv = document.getElementById('g'), ctx = cv.getContext('2d');
+  const nav = document.getElementById('nav');
+  const sheets = window.MM_ART ? Object.keys(MM_ART.sheets) : [];
+  nav.innerHTML = '<b>MM.art</b> ' + ['all', ...sheets, 'patches', 'scene'].map((v) => `<a href="?view=${v}&scale=${S}">${v}</a>`).join(' ');
+
+  function label(x, y, s, col) { ctx.font = '10px monospace'; ctx.fillStyle = col || '#f7f4e9'; ctx.fillText(s, x, y); }
+
+  // Flow layout of every sprite in the given sheets; animated sprites show every frame.
+  function contact(list, W) {
+    const pad = 10, cells = [];
+    for (const n of list) {
+      const f = MM.art.get(n), sc = f.w * f.frames > 220 ? Math.max(1, S - 1) : S;
+      const w = Math.max(f.w * f.frames * sc + (f.frames - 1) * 2, n.length * 6 + 4), h = f.h * sc + 26;
+      cells.push({ n, f, sc, w, h });
+    }
+    let x = pad, y = 30, rowH = 0; const pos = [];
+    for (const c of cells) { if (x + c.w > W - pad && x > pad) { x = pad; y += rowH + pad; rowH = 0; } pos.push([c, x, y]); x += c.w + pad; rowH = Math.max(rowH, c.h); }
+    return { pos, H: y + rowH + pad };
+  }
+  function drawContact(title, list, W) {
+    const { pos, H } = contact(list, W);
+    return { H, paint(oy) {
+      label(10, oy + 18, title + ' (' + list.length + ')', '#eac979');
+      for (const [c, x, y] of pos) {
+        const f = c.f;
+        ctx.fillStyle = light ? '#d5d6bd' : '#3b5450'; ctx.fillRect(x - 1, oy + y - 1, f.w * f.frames * c.sc + (f.frames - 1) * 2 + 2, f.h * c.sc + 2);
+        for (let i = 0; i < f.frames; i++) {
+          const fx = x + i * (f.w * c.sc + 2);
+          MM.art.draw(ctx, c.n, fx + f.ax * c.sc, oy + y + f.ay * c.sc, { frame: i, scale: c.sc });
+        }
+        // anchor tick
+        ctx.fillStyle = '#c95d6a'; ctx.fillRect(x + f.ax * c.sc + Math.floor(c.sc / 2), oy + y + f.h * c.sc + 1, 1, 3);
+        label(x, oy + y + f.h * c.sc + 14, c.n);
+        label(x, oy + y + f.h * c.sc + 24, f.w + 'x' + f.h + (f.frames > 1 ? ' ' + f.frames + 'f@' + f.fps : ''), '#9ea79f');
+      }
+    } };
+  }
+
+  // Tessellated patches for every tile family (checks seams), plus fringes and skirts.
+  function patches(W) {
+    const fams = [...new Set(MM.art.names().filter((n) => /_\d+$/.test(n) && MM.art.get(n).sheet === 'tiles').map((n) => n.replace(/_\d+$/, '')))];
+    const N = 5, pw = (N * 2) * 16 * S + 20, ph = (N * 2) * 8 * S + 50;
+    const cols = Math.max(1, Math.floor((W - 20) / pw));
+    const H = 30 + Math.ceil((fams.length + 2) / cols) * ph;
+    return { H, paint(oy) {
+      label(10, oy + 18, 'tile patches (seams + variant mix)', '#eac979');
+      const all = [...fams, '_demo_edges', '_demo_skirt'];
+      all.forEach((fam, k) => {
+        const bx = 10 + (k % cols) * pw, by = oy + 30 + Math.floor(k / cols) * ph;
+        const cx = bx + pw / 2, cy = by + 20;
+        for (let i = 0; i < N; i++) for (let j = 0; j < N; j++) {
+          const x = cx + (i - j) * 16 * S, y = cy + (i + j) * 8 * S + 8 * S;
+          if (fam === '_demo_skirt') {
+            if (i === N - 1 || j === N - 1) MM.art.draw(ctx, 'side_earth', x, y, { scale: S });
+            MM.art.drawTile(ctx, 'grass_grove', i * 31 + j * 7, x, y, { scale: S });
+          } else if (fam === '_demo_edges') {
+            const path = i === 2, water = j >= 3 && !path;
+            MM.art.drawTile(ctx, path ? 'path_dirt' : water ? 'water' : 'grass_grove', i * 31 + j * 7, x, y, { scale: S });
+            if (path && j < 3) { MM.art.draw(ctx, 'edge_grass_ne', x, y, { scale: S }); MM.art.draw(ctx, 'edge_grass_sw', x, y, { scale: S }); }
+            if (water && j === 3) MM.art.draw(ctx, 'edge_shore_nw', x, y, { scale: S });
+          } else MM.art.drawTile(ctx, fam, i * 131 + j * 17 + 3, x, y, { scale: S });
+        }
+        label(bx, by + ph - 14, fam);
+      });
+    } };
+  }
+
+  // A small diorama: grass + path + farm plot + props, to judge cohesion at 1:1 game scale.
+  function scene(W) {
+    const H = 340 * S / 2 + 40;
+    return { H, paint(oy) {
+      const s = Math.max(1, Math.floor(S / 1.5)), ox = W / 2, top = oy + 40;
+      label(10, oy + 18, 'diorama @' + s + 'x', '#eac979');
+      const at = (i, j) => [ox + (i - j) * 16 * s, top + (i + j) * 8 * s + 8 * s];
+      const N = 12;
+      for (let i = 0; i < N; i++) for (let j = 0; j < N; j++) {
+        const [x, y] = at(i, j), seed = i * 57 + j * 13;
+        let fam = 'grass_grove';
+        if (i === 5 || j === 6) fam = 'path_dirt';
+        if (i >= 1 && i <= 3 && j >= 1 && j <= 3) fam = (i + j) % 2 ? 'soil_wet' : 'soil_dry';
+        if (i >= 9 && j >= 8) fam = 'water';
+        if (i <= 1 && j >= 9) fam = 'grass_wild';
+        if (i >= 7 && i <= 8 && j <= 2) fam = 'cobble';
+        if (i === N - 1 || j === N - 1) MM.art.draw(ctx, 'side_earth', x, y, { scale: s });
+        MM.art.drawTile(ctx, fam, seed, x, y, { scale: s });
+      }
+      const put = (n, i, j, o) => { const [x, y] = at(i, j); MM.art.draw(ctx, n, x, y, Object.assign({ scale: s, t: T }, o)); };
+      const crops = MM.art.names('crop_').filter((n) => /_ripe$/.test(n));
+      crops.slice(0, 6).forEach((n, k) => put(n, 1 + (k % 3), 1 + Math.floor(k / 3)));
+      put('crop_wheat_sprout', 3, 3); put('crop_moonflower_growing', 3, 2);
+      [['tree_oak_0', 0, 6], ['tree_oak_1', 8, 4], ['tree_willow', 10, 6], ['bush_0', 4, 0], ['rock_moss', 6, 9], ['reeds_0', 9, 7],
+       ['lamp_post', 4, 5], ['lamp_post', 6, 7], ['fence_x', 0, 0], ['scarecrow', 2, 0], ['well', 7, 3], ['barrel', 8, 0], ['crate', 9, 1], ['signpost', 4, 7],
+       ['cottage_lush', 2, 9], ['moonwell_restored', 6, 4], ['bench', 7, 8], ['cauldron', 4, 3], ['mushroom_glow', 1, 8], ['tree_pine_snow', 11, 2]]
+        .sort((a, b) => a[1] + a[2] - b[1] - b[2]).forEach(([n, i, j]) => put(n, i, j));
+    } };
+  }
+
+  MM.art.whenReady(() => {
+    const W = +(q.get('w') || 1500);
+    const views = [];
+    const sheetNames = (sn) => MM.art.names().filter((n) => MM.art.get(n).sheet === sn);
+    if (view === 'all' || sheets.includes(view)) for (const sn of view === 'all' ? sheets : [view]) views.push(drawContact('sheet: ' + sn, sheetNames(sn), W));
+    if (view === 'all' || view === 'patches') views.push(patches(W));
+    if (view === 'all' || view === 'scene') views.push(scene(W));
+    cv.width = W; cv.height = views.reduce((a, v) => a + v.H, 0) + 10;
+    ctx.imageSmoothingEnabled = false;
+    ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--bg'); ctx.fillRect(0, 0, cv.width, cv.height);
+    let oy = 0; for (const v of views) { v.paint(oy); oy += v.H; }
+    document.title = 'Moss Moon Art Gallery'; window.__galleryDone = { sprites: MM.art.count, error: MM.art.error };
+  });
+})();
+</script>
+</body>
+</html>

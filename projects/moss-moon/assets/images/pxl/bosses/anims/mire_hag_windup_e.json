@@ -1,0 +1,85 @@
+{
+ "frames": {
+  "mire_hag_windup_e_0": {
+   "frame": {
+    "x": 0,
+    "y": 0,
+    "w": 66,
+    "h": 70
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 66,
+    "h": 70
+   },
+   "sourceSize": {
+    "w": 66,
+    "h": 70
+   },
+   "duration": 167
+  },
+  "mire_hag_windup_e_1": {
+   "frame": {
+    "x": 66,
+    "y": 0,
+    "w": 66,
+    "h": 70
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 66,
+    "h": 70
+   },
+   "sourceSize": {
+    "w": 66,
+    "h": 70
+   },
+   "duration": 167
+  },
+  "mire_hag_windup_e_2": {
+   "frame": {
+    "x": 132,
+    "y": 0,
+    "w": 66,
+    "h": 70
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 66,
+    "h": 70
+   },
+   "sourceSize": {
+    "w": 66,
+    "h": 70
+   },
+   "duration": 167
+  }
+ },
+ "meta": {
+  "app": "pxl",
+  "image": "mire_hag_windup_e.png",
+  "format": "RGBA8888",
+  "size": {
+   "w": 198,
+   "h": 70
+  },
+  "scale": "1",
+  "frameTags": [
+   {
+    "name": "mire_hag_windup_e",
+    "from": 0,
+    "to": 2,
+    "direction": "forward"
+   }
+  ]
+ }
+}

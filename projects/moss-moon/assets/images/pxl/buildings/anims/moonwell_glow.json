@@ -1,0 +1,106 @@
+{
+ "frames": {
+  "moonwell_glow_0": {
+   "frame": {
+    "x": 0,
+    "y": 0,
+    "w": 54,
+    "h": 50
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 54,
+    "h": 50
+   },
+   "sourceSize": {
+    "w": 54,
+    "h": 50
+   },
+   "duration": 250
+  },
+  "moonwell_glow_1": {
+   "frame": {
+    "x": 54,
+    "y": 0,
+    "w": 54,
+    "h": 50
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 54,
+    "h": 50
+   },
+   "sourceSize": {
+    "w": 54,
+    "h": 50
+   },
+   "duration": 250
+  },
+  "moonwell_glow_2": {
+   "frame": {
+    "x": 108,
+    "y": 0,
+    "w": 54,
+    "h": 50
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 54,
+    "h": 50
+   },
+   "sourceSize": {
+    "w": 54,
+    "h": 50
+   },
+   "duration": 250
+  },
+  "moonwell_glow_3": {
+   "frame": {
+    "x": 162,
+    "y": 0,
+    "w": 54,
+    "h": 50
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 54,
+    "h": 50
+   },
+   "sourceSize": {
+    "w": 54,
+    "h": 50
+   },
+   "duration": 250
+  }
+ },
+ "meta": {
+  "app": "pxl",
+  "image": "moonwell_glow.png",
+  "format": "RGBA8888",
+  "size": {
+   "w": 216,
+   "h": 50
+  },
+  "scale": "1",
+  "frameTags": [
+   {
+    "name": "moonwell_glow",
+    "from": 0,
+    "to": 3,
+    "direction": "forward"
+   }
+  ]
+ }
+}

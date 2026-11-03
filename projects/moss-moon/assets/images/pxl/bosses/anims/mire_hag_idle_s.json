@@ -1,0 +1,106 @@
+{
+ "frames": {
+  "mire_hag_idle_s_0": {
+   "frame": {
+    "x": 0,
+    "y": 0,
+    "w": 66,
+    "h": 70
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 66,
+    "h": 70
+   },
+   "sourceSize": {
+    "w": 66,
+    "h": 70
+   },
+   "duration": 200
+  },
+  "mire_hag_idle_s_1": {
+   "frame": {
+    "x": 66,
+    "y": 0,
+    "w": 66,
+    "h": 70
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 66,
+    "h": 70
+   },
+   "sourceSize": {
+    "w": 66,
+    "h": 70
+   },
+   "duration": 200
+  },
+  "mire_hag_idle_s_2": {
+   "frame": {
+    "x": 132,
+    "y": 0,
+    "w": 66,
+    "h": 70
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 66,
+    "h": 70
+   },
+   "sourceSize": {
+    "w": 66,
+    "h": 70
+   },
+   "duration": 200
+  },
+  "mire_hag_idle_s_3": {
+   "frame": {
+    "x": 198,
+    "y": 0,
+    "w": 66,
+    "h": 70
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 66,
+    "h": 70
+   },
+   "sourceSize": {
+    "w": 66,
+    "h": 70
+   },
+   "duration": 200
+  }
+ },
+ "meta": {
+  "app": "pxl",
+  "image": "mire_hag_idle_s.png",
+  "format": "RGBA8888",
+  "size": {
+   "w": 264,
+   "h": 70
+  },
+  "scale": "1",
+  "frameTags": [
+   {
+    "name": "mire_hag_idle_s",
+    "from": 0,
+    "to": 3,
+    "direction": "forward"
+   }
+  ]
+ }
+}

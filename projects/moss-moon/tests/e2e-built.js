@@ -1,0 +1,38 @@
+// End-to-end on the single-file build: logo -> intro -> title -> new game -> creation -> tutorial(skip) -> play -> save -> reload -> Continue.
+const { chromium } = require('playwright'); const path = require('path'), fs = require('fs');
+const file = path.resolve(process.argv[2] || fs.readFileSync(path.join(__dirname, '../builds/LATEST.txt'), 'utf8').split(/\s/)[0]);
+const res = []; const ok = (n, v, i) => { res.push({ n, ok: !!v, i }); console.log((v ? 'PASS ' : 'FAIL ') + n + (i !== undefined ? '  ' + JSON.stringify(i) : '')); };
+(async () => {
+  const b = await chromium.launch(); const ctx = await b.newContext({ viewport: { width: 1280, height: 800 } }); const p = await ctx.newPage();
+  const errs = []; p.on('pageerror', e => errs.push(e.message)); p.on('console', m => m.type() === 'error' && errs.push(m.text()));
+  const st = () => p.evaluate(() => ({ s: MM.state.current, rafs: MM.loop.stats().rafs, el: game.elapsed, t: world.time, scene: getComputedStyle(document.getElementById('scene')).visibility }));
+  await p.goto('file://' + file); await p.waitForFunction(() => window.MM && MM.state && MM.state.current !== 'boot', null, { timeout: 15000 });
+  let s = await st(); ok('starts on logo (no world)', s.s === 'logo' && s.scene === 'hidden', s);
+  await p.keyboard.down('d'); await p.waitForTimeout(1500); await p.keyboard.up('d');
+  const s2 = await st(); ok('nothing simulated behind logo', s2.el === s.el && s2.t === s.t, [s.el, s2.el]);
+  await p.keyboard.press('Escape'); await p.waitForFunction(() => MM.state.current === 'intro', null, { timeout: 8000 }); ok('first run goes to intro', true);
+  await p.waitForTimeout(1500); s = await st(); ok('intro: single rAF, world frozen', s.rafs === 1 && s.scene === 'hidden', s);
+  await p.keyboard.press('Escape'); await p.waitForFunction(() => MM.state.current === 'title', null, { timeout: 8000 }); ok('skip intro -> main menu', true);
+  await p.screenshot({ path: path.join(__dirname, 'out/e2e-title.png') });
+  const cont = await p.getByRole('button', { name: /^Continue/ }).isDisabled().catch(() => null); ok('Continue disabled with no save', cont === true || cont === null, cont);
+  await p.getByRole('button', { name: /New Game/ }).click(); await p.waitForFunction(() => MM.state.current === 'creation', null, { timeout: 8000 }); ok('New Game -> creation', true);
+  await p.locator('input[type=text], input:not([type])').first().fill('Hazel');
+  await p.getByRole('button', { name: /Begin Journey/ }).click(); await p.waitForFunction(() => MM.state.current === 'tutorial', null, { timeout: 10000 }); ok('creation -> tutorial', true);
+  await p.waitForTimeout(800); await p.screenshot({ path: path.join(__dirname, 'out/e2e-tutorial.png') });
+  s = await st(); ok('tutorial: single rAF', s.rafs === 1, s);
+  await p.getByRole('button', { name: /Skip/ }).first().click(); await p.waitForTimeout(400);
+  await p.getByRole('button', { name: /Skip|Yes|Confirm/ }).last().click(); await p.waitForFunction(() => MM.state.current === 'play', null, { timeout: 10000 }); ok('skip tutorial (confirm) -> play', true);
+  await p.keyboard.down('d'); await p.waitForTimeout(900); await p.keyboard.up('d'); const m = await p.evaluate(() => ({ x: game.x, y: game.y })); ok('player moves in play', m.x > 9.8, m);
+  await p.screenshot({ path: path.join(__dirname, 'out/e2e-play.png') });
+  await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(500); await p.screenshot({ path: path.join(__dirname, 'out/e2e-play-phone.png') });
+  await p.setViewportSize({ width: 1280, height: 800 });
+  const saved = await p.evaluate(() => MM.save.save({ force: true, silent: true })); ok('manual save', saved);
+  const flow = await p.evaluate(() => JSON.parse(localStorage.getItem('moss-moon-flow-v1') || '{}')); ok('flow flags persisted (intro seen, tutorial skipped=done)', flow.introSeen && flow.tutorialDone, flow);
+  await p.reload(); await p.waitForFunction(() => window.MM && MM.state && ['logo', 'title'].includes(MM.state.current), null, { timeout: 15000 });
+  await p.keyboard.press('Escape').catch(() => {}); await p.waitForFunction(() => MM.state.current === 'title', null, { timeout: 8000 }); ok('returning player skips intro: reload -> title', true);
+  const cont2 = await p.getByRole('button', { name: /^Continue/ }).isEnabled(); ok('Continue enabled with save', cont2);
+  await p.getByRole('button', { name: /^Continue/ }).click(); await p.waitForFunction(() => MM.state.current === 'play', null, { timeout: 10000 }); ok('Continue -> play', true);
+  const nm = await p.evaluate(() => MM.game.name); ok('name restored', nm === 'Hazel', nm);
+  ok('no console/page errors', errs.length === 0, errs.slice(0, 3));
+  await b.close(); const bad = res.filter(r => !r.ok); console.log(JSON.stringify({ pass: !bad.length, total: res.length, failed: bad.map(r => r.n) })); process.exit(bad.length ? 1 : 0);
+})().catch(e => { console.error('E2E CRASH', e.message); process.exit(2); });

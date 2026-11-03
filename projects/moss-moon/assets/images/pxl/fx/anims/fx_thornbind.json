@@ -1,0 +1,148 @@
+{
+ "frames": {
+  "fx_thornbind_0": {
+   "frame": {
+    "x": 0,
+    "y": 0,
+    "w": 33,
+    "h": 27
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 33,
+    "h": 27
+   },
+   "sourceSize": {
+    "w": 33,
+    "h": 27
+   },
+   "duration": 100
+  },
+  "fx_thornbind_1": {
+   "frame": {
+    "x": 33,
+    "y": 0,
+    "w": 33,
+    "h": 27
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 33,
+    "h": 27
+   },
+   "sourceSize": {
+    "w": 33,
+    "h": 27
+   },
+   "duration": 100
+  },
+  "fx_thornbind_2": {
+   "frame": {
+    "x": 66,
+    "y": 0,
+    "w": 33,
+    "h": 27
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 33,
+    "h": 27
+   },
+   "sourceSize": {
+    "w": 33,
+    "h": 27
+   },
+   "duration": 100
+  },
+  "fx_thornbind_3": {
+   "frame": {
+    "x": 99,
+    "y": 0,
+    "w": 33,
+    "h": 27
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 33,
+    "h": 27
+   },
+   "sourceSize": {
+    "w": 33,
+    "h": 27
+   },
+   "duration": 100
+  },
+  "fx_thornbind_4": {
+   "frame": {
+    "x": 132,
+    "y": 0,
+    "w": 33,
+    "h": 27
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 33,
+    "h": 27
+   },
+   "sourceSize": {
+    "w": 33,
+    "h": 27
+   },
+   "duration": 100
+  },
+  "fx_thornbind_5": {
+   "frame": {
+    "x": 165,
+    "y": 0,
+    "w": 33,
+    "h": 27
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 33,
+    "h": 27
+   },
+   "sourceSize": {
+    "w": 33,
+    "h": 27
+   },
+   "duration": 100
+  }
+ },
+ "meta": {
+  "app": "pxl",
+  "image": "fx_thornbind.png",
+  "format": "RGBA8888",
+  "size": {
+   "w": 198,
+   "h": 27
+  },
+  "scale": "1",
+  "frameTags": [
+   {
+    "name": "fx_thornbind",
+    "from": 0,
+    "to": 5,
+    "direction": "forward"
+   }
+  ]
+ }
+}

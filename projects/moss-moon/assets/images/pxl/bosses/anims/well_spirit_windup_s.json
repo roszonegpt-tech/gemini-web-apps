@@ -1,0 +1,85 @@
+{
+ "frames": {
+  "well_spirit_windup_s_0": {
+   "frame": {
+    "x": 0,
+    "y": 0,
+    "w": 74,
+    "h": 90
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 74,
+    "h": 90
+   },
+   "sourceSize": {
+    "w": 74,
+    "h": 90
+   },
+   "duration": 167
+  },
+  "well_spirit_windup_s_1": {
+   "frame": {
+    "x": 74,
+    "y": 0,
+    "w": 74,
+    "h": 90
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 74,
+    "h": 90
+   },
+   "sourceSize": {
+    "w": 74,
+    "h": 90
+   },
+   "duration": 167
+  },
+  "well_spirit_windup_s_2": {
+   "frame": {
+    "x": 148,
+    "y": 0,
+    "w": 74,
+    "h": 90
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 74,
+    "h": 90
+   },
+   "sourceSize": {
+    "w": 74,
+    "h": 90
+   },
+   "duration": 167
+  }
+ },
+ "meta": {
+  "app": "pxl",
+  "image": "well_spirit_windup_s.png",
+  "format": "RGBA8888",
+  "size": {
+   "w": 222,
+   "h": 90
+  },
+  "scale": "1",
+  "frameTags": [
+   {
+    "name": "well_spirit_windup_s",
+    "from": 0,
+    "to": 2,
+    "direction": "forward"
+   }
+  ]
+ }
+}

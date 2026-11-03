@@ -1,0 +1,85 @@
+{
+ "frames": {
+  "mote_firefly_0": {
+   "frame": {
+    "x": 0,
+    "y": 0,
+    "w": 5,
+    "h": 5
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 5,
+    "h": 5
+   },
+   "sourceSize": {
+    "w": 5,
+    "h": 5
+   },
+   "duration": 125
+  },
+  "mote_firefly_1": {
+   "frame": {
+    "x": 5,
+    "y": 0,
+    "w": 5,
+    "h": 5
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 5,
+    "h": 5
+   },
+   "sourceSize": {
+    "w": 5,
+    "h": 5
+   },
+   "duration": 125
+  },
+  "mote_firefly_2": {
+   "frame": {
+    "x": 10,
+    "y": 0,
+    "w": 5,
+    "h": 5
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 5,
+    "h": 5
+   },
+   "sourceSize": {
+    "w": 5,
+    "h": 5
+   },
+   "duration": 125
+  }
+ },
+ "meta": {
+  "app": "pxl",
+  "image": "mote_firefly.png",
+  "format": "RGBA8888",
+  "size": {
+   "w": 15,
+   "h": 5
+  },
+  "scale": "1",
+  "frameTags": [
+   {
+    "name": "mote_firefly",
+    "from": 0,
+    "to": 2,
+    "direction": "forward"
+   }
+  ]
+ }
+}

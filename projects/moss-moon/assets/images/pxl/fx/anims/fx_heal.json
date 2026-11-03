@@ -1,0 +1,148 @@
+{
+ "frames": {
+  "fx_heal_0": {
+   "frame": {
+    "x": 0,
+    "y": 0,
+    "w": 15,
+    "h": 21
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 15,
+    "h": 21
+   },
+   "sourceSize": {
+    "w": 15,
+    "h": 21
+   },
+   "duration": 100
+  },
+  "fx_heal_1": {
+   "frame": {
+    "x": 15,
+    "y": 0,
+    "w": 15,
+    "h": 21
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 15,
+    "h": 21
+   },
+   "sourceSize": {
+    "w": 15,
+    "h": 21
+   },
+   "duration": 100
+  },
+  "fx_heal_2": {
+   "frame": {
+    "x": 30,
+    "y": 0,
+    "w": 15,
+    "h": 21
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 15,
+    "h": 21
+   },
+   "sourceSize": {
+    "w": 15,
+    "h": 21
+   },
+   "duration": 100
+  },
+  "fx_heal_3": {
+   "frame": {
+    "x": 45,
+    "y": 0,
+    "w": 15,
+    "h": 21
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 15,
+    "h": 21
+   },
+   "sourceSize": {
+    "w": 15,
+    "h": 21
+   },
+   "duration": 100
+  },
+  "fx_heal_4": {
+   "frame": {
+    "x": 60,
+    "y": 0,
+    "w": 15,
+    "h": 21
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 15,
+    "h": 21
+   },
+   "sourceSize": {
+    "w": 15,
+    "h": 21
+   },
+   "duration": 100
+  },
+  "fx_heal_5": {
+   "frame": {
+    "x": 75,
+    "y": 0,
+    "w": 15,
+    "h": 21
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 15,
+    "h": 21
+   },
+   "sourceSize": {
+    "w": 15,
+    "h": 21
+   },
+   "duration": 100
+  }
+ },
+ "meta": {
+  "app": "pxl",
+  "image": "fx_heal.png",
+  "format": "RGBA8888",
+  "size": {
+   "w": 90,
+   "h": 21
+  },
+  "scale": "1",
+  "frameTags": [
+   {
+    "name": "fx_heal",
+    "from": 0,
+    "to": 5,
+    "direction": "forward"
+   }
+  ]
+ }
+}
