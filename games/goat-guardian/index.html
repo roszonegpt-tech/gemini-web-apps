@@ -396,7 +396,7 @@ function text(str, x, y, key, opts) {
 // ---------------------------------------------------------------------
 // Settings (persisted per viewer)
 // ---------------------------------------------------------------------
-const settings = { sound: true, shake: true, fullscreen: true };
+const settings = { sound: true, shake: true, fullscreen: true, autoHelper: true };
 try {
   const s = JSON.parse(localStorage.getItem('goatGuardianSettings') || '{}');
   for (const k in settings) if (typeof s[k] === 'boolean') settings[k] = s[k];
@@ -917,6 +917,267 @@ function renderWorld(wd) {
   return wd;
 }
 
+// ---------------------------------------------------------------------
+// Map library: 10 escort routes and 10 defend arenas
+// ---------------------------------------------------------------------
+const ESCORT_MAPS = [
+  { name: 'MEADOW RUN', info: 'THE ORIGINAL ROUTE', legacy: true },
+  { name: 'BIRCH BEND', info: 'A LAZY WINDING TRAIL', w: 640, h: 1400, step: 150, swing: 120, rad: 42, radVar: 12, glades: 12, islands: 50, isMin: 7, isMax: 16, lakes: 0, gateEvery: 90, pillars: 6 },
+  { name: 'SWITCHBACKS', info: 'ZIG-ZAG UP THE HILL', w: 720, h: 1600, step: 110, swing: 230, zigzag: true, rad: 38, radVar: 8, glades: 8, islands: 40, isMin: 7, isMax: 14, lakes: 0, gateEvery: 110, pillars: 4 },
+  { name: 'TWIN TRAILS', info: 'THE PATH SPLITS AROUND GROVES', w: 700, h: 1700, step: 150, swing: 110, rad: 44, radVar: 10, glades: 10, islands: 50, isMin: 7, isMax: 15, lakes: 3, lakeR: 26, gateEvery: 120, pillars: 6 },
+  { name: 'STONE ROAD', info: 'ANCIENT PILLARS LINE THE WAY', w: 680, h: 1800, step: 140, swing: 130, rad: 42, radVar: 10, glades: 10, islands: 40, isMin: 7, isMax: 14, lakes: 1, lakeR: 22, gateEvery: 45, pillars: 26 },
+  { name: 'WOLF HOLLOW', info: 'NARROW AND CROWDED. MORE WOLVES', w: 700, h: 1900, step: 130, swing: 150, rad: 32, radVar: 6, glades: 6, islands: 90, isMin: 6, isMax: 12, lakes: 0, gateEvery: 120, pillars: 4, wolves: 1.35 },
+  { name: 'OPEN MOOR', info: 'WIDE OPEN SKY. MORE BATS', w: 800, h: 2000, step: 170, swing: 180, rad: 66, radVar: 16, glades: 22, islands: 20, isMin: 8, isMax: 16, lakes: 1, lakeR: 30, gateEvery: 0, pillars: 14, bats: 1.7 },
+  { name: 'LAKE OF PINES', info: 'ROUTE WEAVES ROUND PINE ISLES', w: 760, h: 2200, step: 160, swing: 140, rad: 44, radVar: 10, glades: 10, islands: 40, isMin: 7, isMax: 15, lakes: 5, lakeR: 30, gateEvery: 140, pillars: 8 },
+  { name: 'THE LONG MARCH', info: 'A VERY LONG WAY HOME', w: 760, h: 2600, step: 150, swing: 170, rad: 40, radVar: 12, glades: 16, islands: 80, isMin: 7, isMax: 16, lakes: 2, lakeR: 24, gateEvery: 100, pillars: 10 },
+  { name: 'SUNSET SUMMIT', info: 'EVERYTHING AT ONCE', w: 800, h: 2900, step: 120, swing: 240, zigzag: true, rad: 36, radVar: 10, glades: 14, islands: 90, isMin: 6, isMax: 14, lakes: 3, lakeR: 24, gateEvery: 70, pillars: 18, wolves: 1.2, bats: 1.2 }
+];
+const DEFEND_MAPS = [
+  { name: 'THE HENGE', info: 'STONE RING CLEARING', legacy: true },
+  { name: 'TWIN GLADES', info: 'TWO GLADES, ONE PASS', shape: 'twin' },
+  { name: 'RING ROAD', info: 'CIRCLE A WOODED ISLE', shape: 'ring', h: 500 },
+  { name: 'CROSSROADS', info: 'FOUR ROADS MEET', shape: 'cross', h: 500 },
+  { name: 'RUINED PLAZA', info: 'A FIELD OF PILLARS', shape: 'plaza' },
+  { name: 'CRESCENT', info: 'MOON-SHAPED MEADOW', shape: 'crescent', h: 500 },
+  { name: 'GROVE ISLES', info: 'TREES EVERYWHERE', shape: 'grove', h: 500 },
+  { name: 'LONG VALLEY', info: 'A WINDING VALLEY FLOOR', shape: 'valley' },
+  { name: 'CLOVER', info: 'THREE-LEAF CLEARING', shape: 'clover', h: 500 },
+  { name: 'GREAT CIRCLE', info: 'THE BIG ONE. MORE BATS', shape: 'great', h: 560, bats: 1.4 }
+];
+
+function makeEscortMap(def, seed) {
+  const w = def.w, h = def.h;
+  const wd = newWorld(w, h, seed, 'escort');
+  const r = wd.rng;
+  const pts = [];
+  let x = w / 2 + (r() - 0.5) * 160, y = h - 56;
+  let side = r() < 0.5 ? -1 : 1;
+  pts.push({ x: x, y: y });
+  while (y > 56 + def.step) {
+    y -= def.step * (0.85 + r() * 0.3);
+    if (def.zigzag) { x = w / 2 + side * def.swing * (0.6 + r() * 0.4); side = -side; }
+    else x = x + (r() - 0.5) * def.swing * 2;
+    x = clamp(x, 90, w - 90);
+    pts.push({ x: x, y: y });
+  }
+  pts.push({ x: clamp(x + (r() - 0.5) * 140, 100, w - 100), y: 56 });
+  for (let i = 0; i < pts.length - 1; i++) {
+    const a = pts[i], b = pts[i + 1];
+    const L = Math.hypot(b.x - a.x, b.y - a.y);
+    for (let t = 0; t < L; t += 3) wd.path.push({ x: lerp(a.x, b.x, t / L), y: lerp(a.y, b.y, t / L) });
+  }
+  wd.path.push(pts[pts.length - 1]);
+  const ph = r() * 10;
+  for (let i = 0; i < wd.path.length; i += 2) {
+    const p = wd.path[i];
+    const rad = def.rad + def.radVar * Math.sin(i * 0.05 + ph) + def.radVar * 0.6 * Math.sin(i * 0.13 + ph * 2);
+    stamp(wd, p.x, p.y, rad, 8, 0);
+  }
+  for (let k = 0; k < def.glades; k++) {
+    const p = wd.path[Math.floor(r() * wd.path.length)];
+    const a = r() * Math.PI * 2;
+    stamp(wd, p.x + Math.cos(a) * (def.rad + 18), p.y + Math.sin(a) * 34, 22 + r() * 22, 8, 0);
+  }
+  const s0 = pts[0], g0 = pts[pts.length - 1];
+  stamp(wd, s0.x, s0.y, 58, 6, 0);
+  stamp(wd, g0.x, g0.y, 56, 6, 0);
+  for (let k = 0; k < def.islands; k++) {
+    const p = wd.path[Math.floor(r() * wd.path.length)];
+    const rad = def.isMin + r() * (def.isMax - def.isMin);
+    const ix = p.x + (r() - 0.5) * (def.rad * 4), iy = p.y + (r() - 0.5) * 70;
+    if (minPathDist(wd, ix, iy) < rad + Math.max(18, def.rad * 0.55)) continue;
+    if (Math.hypot(ix - s0.x, iy - s0.y) < 70 || Math.hypot(ix - g0.x, iy - g0.y) < 70) continue;
+    stamp(wd, ix, iy, rad, 4, 1);
+  }
+  // pine isles sitting on the route: carve a ring round each so the trail splits
+  for (let k = 0; k < (def.lakes || 0); k++) {
+    const i = Math.floor(((k + 1) / (def.lakes + 1)) * wd.path.length);
+    const c = wd.path[i];
+    stamp(wd, c.x, c.y, def.lakeR + 32, 6, 0);
+    stamp(wd, c.x, c.y, def.lakeR, 4, 1);
+  }
+  borderForest(wd, 8);
+  if (def.gateEvery) {
+    for (let i = 40; i < wd.path.length - 40; i += def.gateEvery + Math.floor(r() * 30)) {
+      const p = wd.path[i], q = wd.path[Math.min(wd.path.length - 1, i + 3)];
+      const dx = q.x - p.x, dy = q.y - p.y;
+      const l = Math.hypot(dx, dy) || 1;
+      for (const sgn of [-1, 1]) {
+        const gx = p.x - dy / l * 24 * sgn, gy = p.y + dx / l * 24 * sgn;
+        if (clearAround(wd, gx, gy, 5)) addPillar(wd, gx, gy, r() < 0.3);
+      }
+    }
+  }
+  for (let k = 0; k < def.pillars; k++) {
+    const p = wd.path[Math.floor(r() * wd.path.length)];
+    const gx = p.x + (r() - 0.5) * def.rad * 2.4, gy = p.y + (r() - 0.5) * 50;
+    if (minPathDist(wd, gx, gy) > 14 && clearAround(wd, gx, gy, 6)) addPillar(wd, gx, gy, r() < 0.5);
+  }
+  wd.start = { x: s0.x, y: s0.y };
+  wd.goal = { x: g0.x, y: g0.y };
+  return wd;
+}
+
+function makeDefendMap(def, seed) {
+  const w = WORLD_W, h = def.h || 480;
+  const wd = newWorld(w, h, seed, 'defend');
+  const r = wd.rng;
+  const cx = w / 2, cy = Math.round(h / 2);
+  let start = { x: cx, y: cy };
+  const pillars = [];
+  const ring = (ox, oy, rx, ry, n, broken, a0) => {
+    for (let k = 0; k < n; k++) {
+      const a = (k / n) * Math.PI * 2 + (a0 || 0.3);
+      pillars.push([ox + Math.cos(a) * rx, oy + Math.sin(a) * ry, broken && k % 3 === 2]);
+    }
+  };
+  switch (def.shape) {
+    case 'twin':
+      stamp(wd, cx - 130, cy - 30, 80, 10, 0);
+      stamp(wd, cx + 130, cy + 30, 80, 10, 0);
+      for (let t = -130; t <= 130; t += 5) stamp(wd, cx + t, cy + t * 0.23 + Math.sin(t * 0.05) * 8, 26, 4, 0);
+      ring(cx - 130, cy - 30, 46, 36, 5, true);
+      ring(cx + 130, cy + 30, 46, 36, 5, true, 1);
+      break;
+    case 'ring':
+      stamp(wd, cx, cy, 150, 10, 0);
+      stamp(wd, cx - 70, cy, 125, 10, 0);
+      stamp(wd, cx + 70, cy, 125, 10, 0);
+      stamp(wd, cx, cy, 56, 6, 1);
+      start = { x: cx, y: cy + 100 };
+      ring(cx, cy, 165, 112, 8, false);
+      break;
+    case 'cross':
+      stamp(wd, cx, cy, 64, 8, 0);
+      for (let t = 0; t <= 240; t += 5) {
+        stamp(wd, cx + t, cy, 30, 4, 0); stamp(wd, cx - t, cy, 30, 4, 0);
+        if (t <= 190) { stamp(wd, cx, cy + t, 30, 4, 0); stamp(wd, cx, cy - t, 30, 4, 0); }
+      }
+      for (const [ex, ey] of [[cx + 230, cy], [cx - 230, cy], [cx, cy + 185], [cx, cy - 185]]) stamp(wd, ex, ey, 40, 6, 0);
+      for (const [ox, oy] of [[44, 34], [-44, 34], [44, -34], [-44, -34]]) pillars.push([cx + ox, cy + oy, false]);
+      break;
+    case 'plaza':
+      for (let gx = -160; gx <= 160; gx += 30) for (let gy = -110; gy <= 110; gy += 30) stamp(wd, cx + gx, cy + gy, 36, 6, 0);
+      for (let i = -3; i <= 3; i++) for (let j = -2; j <= 2; j++) {
+        if (Math.abs(i) <= 1 && Math.abs(j) <= 1) continue;
+        pillars.push([cx + i * 46, cy + j * 40, (i + j) % 3 === 0]);
+      }
+      break;
+    case 'crescent':
+      stamp(wd, cx, cy + 20, 150, 10, 0);
+      stamp(wd, cx - 85, cy + 20, 110, 10, 0);
+      stamp(wd, cx + 85, cy + 20, 110, 10, 0);
+      stamp(wd, cx, cy - 60, 112, 8, 1);
+      start = { x: cx, y: cy + 108 };
+      for (let k = 0; k < 7; k++) {
+        const a = 0.25 + (k / 6) * (Math.PI - 0.5);
+        pillars.push([cx + Math.cos(a) * 175, cy + 20 + Math.sin(a) * 100, k % 2 === 1]);
+      }
+      break;
+    case 'grove':
+      stamp(wd, cx, cy, 160, 12, 0);
+      stamp(wd, cx - 100, cy, 140, 12, 0);
+      stamp(wd, cx + 100, cy, 140, 12, 0);
+      for (let k = 0; k < 18; k++) {
+        const a = r() * Math.PI * 2, d = 60 + r() * 150;
+        stamp(wd, cx + Math.cos(a) * d * 1.3, cy + Math.sin(a) * d * 0.8, 7 + r() * 7, 4, 1);
+      }
+      ring(cx, cy, 34, 26, 4, true);
+      break;
+    case 'valley':
+      for (let t = -270; t <= 270; t += 5) stamp(wd, cx + t, cy + Math.sin(t * 0.018) * 40, 52 + 18 * Math.sin(t * 0.04 + 1), 8, 0);
+      for (let k = 0; k < 8; k++) {
+        const t = -240 + k * 68;
+        pillars.push([cx + t, cy + Math.sin(t * 0.018) * 40 + (k % 2 ? 30 : -30), k % 3 === 0]);
+      }
+      break;
+    case 'clover':
+      stamp(wd, cx, cy, 64, 8, 0);
+      for (let k = 0; k < 3; k++) {
+        const a = -Math.PI / 2 + k * (Math.PI * 2 / 3);
+        const lx = cx + Math.cos(a) * 110, ly = cy + Math.sin(a) * 95;
+        stamp(wd, lx, ly, 80, 10, 0);
+        ring(lx, ly, 34, 26, 4, k === 1);
+      }
+      break;
+    case 'great':
+      stamp(wd, cx, cy, 200, 14, 0);
+      stamp(wd, cx - 110, cy, 160, 12, 0);
+      stamp(wd, cx + 110, cy, 160, 12, 0);
+      ring(cx, cy, 52, 40, 7, true);
+      ring(cx, cy, 140, 104, 14, false, 0.1);
+      break;
+  }
+  borderForest(wd, 8);
+  for (const [px2, py2, br] of pillars) if (clearAround(wd, px2, py2, 4)) addPillar(wd, px2, py2, br);
+  if (blocked(start.x, start.y) || wd.mask[Math.round(start.y) * w + Math.round(start.x)] !== 0) {
+    for (let d = 4; d < 200; d += 4) {
+      let found = false;
+      for (let a = 0; a < 16 && !found; a++) {
+        const xx = Math.round(start.x + Math.cos(a / 16 * Math.PI * 2) * d), yy = Math.round(start.y + Math.sin(a / 16 * Math.PI * 2) * d);
+        if (clearAround(wd, xx, yy, 6)) { start = { x: xx, y: yy }; found = true; }
+      }
+      if (found) break;
+    }
+  }
+  wd.start = start;
+  return wd;
+}
+
+const mapCache = new Map();
+function getMapWorld(kind, idx) {
+  const key = kind + idx;
+  if (mapCache.has(key)) {
+    const wd = mapCache.get(key);
+    mapCache.delete(key); mapCache.set(key, wd);    // most recently used last
+    return wd;
+  }
+  let wd;
+  if (kind === 'escort') wd = idx === 0 ? makeEscortWorld(2, 7777) : makeEscortMap(ESCORT_MAPS[idx], 9100 + idx * 131);
+  else wd = idx === 0 ? makeDefendWorld(4242) : makeDefendMap(DEFEND_MAPS[idx], 5100 + idx * 97);
+  wd.mapIdx = idx;
+  mapCache.set(key, wd);
+  while (mapCache.size > 5) {
+    const oldKey = mapCache.keys().next().value;
+    const old = mapCache.get(oldKey);
+    if (old === world) { mapCache.delete(oldKey); mapCache.set(oldKey, old); if (mapCache.size <= 5) break; continue; }
+    mapCache.delete(oldKey);
+  }
+  return wd;
+}
+function mapPreview(wd, bw, bh) {
+  const key = bw + 'x' + bh;
+  if (wd.preview && wd.previewKey === key) return wd.preview;
+  const sc = Math.max(wd.w / bw, wd.h / bh);
+  const pw = Math.max(1, Math.floor(wd.w / sc)), ph = Math.max(1, Math.floor(wd.h / sc));
+  const c = makeCanvas(pw, ph);
+  const g = c.getContext('2d');
+  const img = g.createImageData(pw, ph);
+  const d32 = new Uint32Array(img.data.buffer);
+  const col = (k) => { const v = PAL_RGB[k][0]; return (0xff000000 | packLE(v[0], v[1], v[2])) >>> 0; };
+  const T = col('t'), Gc = col('g'), L = col('l'), I = col('i');
+  for (let y = 0; y < ph; y++) for (let x = 0; x < pw; x++) {
+    const m = wd.mask[Math.min(wd.h - 1, Math.floor((y + 0.5) * sc)) * wd.w + Math.min(wd.w - 1, Math.floor((x + 0.5) * sc))];
+    d32[y * pw + x] = m === 1 ? (((x + y) & 1) ? T : I) : (m === 2 ? L : Gc);
+  }
+  g.putImageData(img, 0, 0);
+  const dot = (p, k) => { if (!p) return; g.fillStyle = PAL_DAY[k]; g.fillRect(Math.round(p.x / sc) - 1, Math.round(p.y / sc) - 1, 3, 3); };
+  dot(wd.start, 'w');
+  dot(wd.goal, 'r');
+  wd.preview = c; wd.previewKey = key;
+  return c;
+}
+const progress = { escort: new Array(10).fill(0), defend: new Array(10).fill(0) };
+try {
+  const pr = JSON.parse(localStorage.getItem('goatGuardianMaps') || '{}');
+  for (const k of ['escort', 'defend']) if (Array.isArray(pr[k])) pr[k].forEach((v, i) => { if (i < 10) progress[k][i] = v | 0; });
+} catch (e) { /* storage unavailable */ }
+function saveProgress() {
+  try { localStorage.setItem('goatGuardianMaps', JSON.stringify(progress)); } catch (e) { /* ignore */ }
+}
+const selMap = { escort: 0, defend: 0 };
+let mapMods = { wolves: 1, bats: 1 };
+
 function meadowNear(x, y, r) {
   for (let a = 0; a < 8; a++) {
     const ang = (a / 8) * Math.PI * 2;
@@ -972,7 +1233,8 @@ function onScreen(x, y, m) {
   return x > cam.x - m && x < cam.x + W + m && y > cam.y - m && y < cam.y + H + m;
 }
 function updateCamera(dt) {
-  const actors = isMenu() ? demo : players;
+  const humans = players.filter(p => !p.dev.startsWith('ai'));
+  const actors = isMenu() ? demo : (humans.length ? humans : players);
   let tx = cam.cx, ty = cam.cy;
   if (actors.length) {
     let sx = 0, sy = 0, svx = 0, svy = 0;
@@ -1039,7 +1301,7 @@ const DOG_SPEED = 96;
 const PANIC_RADIUS = 40;
 const SHEEP_MAX = 14;
 const P_COL = ['y', 'r', 's', 'w'];
-const MENU_STATES = ['TITLE', 'MODE', 'PLAYERS', 'OPTIONS', 'HOWTO'];
+const MENU_STATES = ['TITLE', 'MODE', 'MAPS', 'PLAYERS', 'OPTIONS', 'HOWTO'];
 
 let state = 'TITLE';
 let mode = 'escort';
@@ -1480,6 +1742,7 @@ function updateSheep(dt) {
 function spawnEnemy(level, force) {
   const hc = herdCenter();
   let batChance = level < 2 ? 0 : Math.min(0.45, 0.15 + level * 0.05);
+  batChance = Math.min(0.8, batChance * (mapMods.bats || 1));
   if (force) batChance = force.type === 'bat' ? 1 : 0;
   const base = { vx: 0, vy: 0, fx: 1, fy: 0.3, t: 0, fear: 0, anim: rand() * 6, hits: {}, carry: null, flash: 0, phase: rand() * 6.28 };
   if (rand() < batChance) {
@@ -1661,16 +1924,42 @@ function placePlayers(cx, cy) {
     p.fy = -1;
   });
 }
+let pendingLoad = null;
+function requestLoad(fn, label) {
+  pendingLoad = fn;
+  loadLabel = label || '';
+  goScreen('LOADING');
+}
+let loadLabel = '';
 function startRun() {
   score = 0; rescued = 0; delivered = 0; lostCount = 0; newBest = false; gameOverDelay = 0;
   enemies = []; particles = []; texts = []; fireflies = [];
   paused = false;
-  goScreen('PLAYING');
-  if (mode === 'escort') startMission(1, 12);
-  else startDefend();
+  // solo player? bring a CPU partner if the option is on
+  players = players.filter(p => !p.auto);
+  const humans = players.filter(p => !p.cpu);
+  if (settings.autoHelper && humans.length === 1 && !players.some(p => p.cpu)) {
+    const cpu = joinCPU(true);
+    if (cpu) cpu.auto = true;
+  }
+  const idx = selMap[mode];
+  const name = (mode === 'escort' ? ESCORT_MAPS : DEFEND_MAPS)[idx].name;
+  requestLoad(() => {
+    goScreen('PLAYING');
+    if (mode === 'escort') startMission(idx + 1, 12, idx);
+    else startDefend(idx);
+  }, name);
 }
-function startDefend() {
-  world = renderWorld(makeDefendWorld(4242));
+function useMap(kind, idx) {
+  world = getMapWorld(kind, idx);
+  if (!world.canvas) renderWorld(world);
+  const def = (kind === 'escort' ? ESCORT_MAPS : DEFEND_MAPS)[idx];
+  mapMods = { wolves: def.wolves || 1, bats: def.bats || 1 };
+}
+function startDefend(idx) {
+  idx = idx || 0;
+  wave.map = idx;
+  useMap('defend', idx);
   spawnHerd(world.start.x, world.start.y, 12);
   placePlayers(world.start.x, world.start.y);
   snapCam(world.start.x, world.start.y);
@@ -1681,22 +1970,24 @@ function startWave(n) {
   wave.toSpawn = 2 + n * 2;
   wave.interval = Math.max(0.6, 2.4 - n * 0.15);
   wave.spawnT = 0.3;
-  banner = { t: 2.4, a: 'WAVE ' + n, b: n === 1 ? 'GUARD THE HENGE' : 'THEY COME AGAIN' };
+  banner = { t: 2.4, a: 'WAVE ' + n, b: n === 1 ? DEFEND_MAPS[wave.map || 0].name : 'THEY COME AGAIN' };
   dayTarget = clamp((n - 1) / 8, 0, 1);
   SFX.wave();
 }
-function startMission(n, herdN) {
+function startMission(n, herdN, idx) {
+  idx = idx || 0;
+  mission.map = idx;
+  useMap('escort', idx);
   mission.n = n; mission.herdStart = herdN; mission.penned = 0; mission.time = 0; mission.kills = 0;
-  mission.interval = Math.max(1.9, 5.5 - n * 0.5);
-  mission.cap = Math.min(8, 2 + n);
+  mission.interval = Math.max(1.6, 5.5 - n * 0.4) / mapMods.wolves;
+  mission.cap = Math.min(9, 2 + Math.ceil(n * 0.8));
   mission.spawnT = 5;
-  world = renderWorld(makeEscortWorld(n, 1000 + n * 77 + Math.floor(rand() * 1000)));
   enemies = [];
   spawnHerd(world.start.x, world.start.y - 6, herdN);
   placePlayers(world.start.x, world.start.y);
   snapCam(world.start.x, world.start.y - 40);
-  banner = { t: 3, a: 'MISSION ' + n, b: 'HERD THEM TO THE RED PIN' };
-  dayTarget = clamp((n - 1) / 5, 0, 1);
+  banner = { t: 3, a: 'MISSION ' + n, b: ESCORT_MAPS[idx].name };
+  dayTarget = clamp((n - 1) / 9, 0, 1);
   SFX.wave();
 }
 function updateDefend(dt) {
@@ -1724,7 +2015,7 @@ function updateDefend(dt) {
 }
 function updateEscort(dt) {
   mission.time += dt;
-  dayTarget = clamp((mission.n - 1) / 5 + Math.min(0.15, mission.time / 600), 0, 1);
+  dayTarget = clamp((mission.n - 1) / 9 + Math.min(0.1, mission.time / 900), 0, 1);
   const active = sheep.filter(s => !s.penned).length;
   if (active > 0) {
     mission.spawnT -= dt;
@@ -1737,14 +2028,20 @@ function updateEscort(dt) {
   const carrying = enemies.some(e => e.carry);
   if (active === 0 && !carrying && mission.penned > 0) {
     goScreen('RESULTS');
+    if (!showcase.on) {
+      const total = mission.herdStart;
+      const stars = mission.penned >= total ? 3 : (mission.penned >= total * 0.66 ? 2 : 1);
+      if (mission.map !== undefined && stars > progress.escort[mission.map]) { progress.escort[mission.map] = stars; saveProgress(); }
+    }
     for (const e of enemies) if (e.state !== 'launched') { e.state = 'flee'; e.exit = forestExit(e.x, e.y); }
     SFX.clear();
   }
 }
 function nextMission() {
   const herdN = Math.min(SHEEP_MAX, mission.penned + 2);
-  goScreen('PLAYING');
-  startMission(mission.n + 1, herdN);
+  const idx = ((mission.map || 0) + 1) % ESCORT_MAPS.length;
+  const n = mission.n + 1;
+  requestLoad(() => { goScreen('PLAYING'); startMission(n, herdN, idx); }, ESCORT_MAPS[idx].name);
 }
 function checkGameOver(dt) {
   const carrying = enemies.some(e => e.carry);
@@ -1753,6 +2050,8 @@ function checkGameOver(dt) {
     if (gameOverDelay > 1.2) {
       goScreen('GAMEOVER');
       newBest = saveBest();
+      if (mode === 'defend' && !showcase.on && wave.n > progress.defend[wave.map || 0]) { progress.defend[wave.map || 0] = wave.n; saveProgress(); }
+      if (mode === 'escort') selMap.escort = mission.map || 0;    // retry from the map you fell on
       SFX.gameover();
     }
   } else gameOverDelay = 0;
@@ -1794,6 +2093,7 @@ function resetRunState() {
   score = 0; rescued = 0; delivered = 0; lostCount = 0; gameOverDelay = 0; newBest = false;
   enemies = []; particles = []; texts = []; fireflies = [];
   paused = false; hitStop = 0;
+  mapMods = { wolves: 1, bats: 1 };
 }
 const SCENES = [
   {
@@ -2037,6 +2337,7 @@ function goScreen(s) {
   state = s;
   stateTime = 0;
   ui.cursor = 0;
+  ui.movedAt = 0;
   startCountdown = -1;
 }
 function useMenuWorld() {
@@ -2075,18 +2376,44 @@ function joinPlayer(dev) {
   SFX.join();
   return p;
 }
+function goMaps() {
+  goScreen('MAPS');
+  ui.cursor = selMap[mode];
+}
 function enterPlayers(dev) {
   useMenuWorld();
   goScreen('PLAYERS');
-  for (const p of players) p.ready = false;
-  if (!players.length && dev) joinPlayer(dev);
+  players = players.filter(p => !p.auto);
+  for (const p of players) p.ready = !!p.cpu;
+  if (!players.some(p => !p.cpu) && dev) joinPlayer(dev);
 }
+// CPU helpers: AI-driven goats/dogs that fill empty slots
+function joinCPU(silent) {
+  const slot = freeSlot();
+  if (slot < 0) return null;
+  const goats = players.filter(p => p.kind === 'goat').length, dogs = players.length - goats;
+  const p = { slot: slot, dev: 'ai' + slot, kind: goats > dogs ? 'dog' : 'goat', ready: true, cpu: true };
+  makePlayerBody(p, 0, 0);
+  aiVec[p.dev] = { x: 0, y: 0 };
+  players.push(p);
+  players.sort((a, b) => a.slot - b.slot);
+  if (!silent) SFX.join();
+  return p;
+}
+function removeCPU(p) {
+  p = p || players.slice().reverse().find(q => q.cpu);
+  if (!p) return;
+  players.splice(players.indexOf(p), 1);
+  SFX.back();
+}
+function hasCPU() { return players.some(p => p.dev.startsWith('ai')); }
 function onOff(v) { return v ? 'ON' : 'OFF'; }
 function optionItems() {
   return [
     { label: 'SOUND', value: onOff(settings.sound), select: () => { setSound(!settings.sound); SFX.click(); }, change: () => { setSound(!settings.sound); SFX.click(); } },
     { label: 'SCREEN SHAKE', value: onOff(settings.shake), select: () => { settings.shake = !settings.shake; saveSettings(); SFX.click(); }, change: () => { settings.shake = !settings.shake; saveSettings(); SFX.click(); } },
-    { label: 'FULLSCREEN', value: fsSupported() ? onOff(isFs()) : 'N/A', select: toggleFs, change: toggleFs }
+    { label: 'FULLSCREEN', value: fsSupported() ? onOff(isFs()) : 'N/A', select: toggleFs, change: toggleFs },
+    { label: 'SOLO AI HELPER', value: settings.autoHelper ? 'AUTO' : 'OFF', select: () => { settings.autoHelper = !settings.autoHelper; saveSettings(); SFX.click(); }, change: () => { settings.autoHelper = !settings.autoHelper; saveSettings(); SFX.click(); } }
   ];
 }
 function screenItems() {
@@ -2098,10 +2425,20 @@ function screenItems() {
       { label: 'OPTIONS', select: () => { optionsFrom = 'TITLE'; goScreen('OPTIONS'); } }
     ];
     case 'MODE': return [
-      { label: 'ESCORT', select: (dev) => { mode = 'escort'; enterPlayers(dev); } },
-      { label: 'DEFEND', select: (dev) => { mode = 'defend'; enterPlayers(dev); } },
+      { label: 'ESCORT', select: () => { mode = 'escort'; goMaps(); } },
+      { label: 'DEFEND', select: () => { mode = 'defend'; goMaps(); } },
       { label: 'BACK', select: () => goScreen('TITLE') }
     ];
+    case 'MAPS': {
+      const defs = mode === 'escort' ? ESCORT_MAPS : DEFEND_MAPS;
+      const items = defs.map((d, i) => {
+        const pv = progress[mode][i];
+        const value = mode === 'escort' ? (pv ? '*'.repeat(pv) : '') : (pv ? 'W' + pv : '');
+        return { label: (i + 1 < 10 ? ' ' : '') + (i + 1) + ' ' + d.name, value: value, select: (dev) => { selMap[mode] = i; enterPlayers(dev); } };
+      });
+      items.push({ label: 'BACK', select: () => goScreen('MODE') });
+      return items;
+    }
     case 'OPTIONS': return optionItems().concat([{ label: 'BACK', select: () => goScreen(optionsFrom) }]);
     case 'HOWTO': return [{ label: 'BACK', select: () => goScreen('TITLE') }];
     case 'PLAYING': return [
@@ -2115,6 +2452,7 @@ function screenItems() {
     ];
     case 'GAMEOVER': return [
       { label: 'RETRY', select: startRun },
+      { label: 'CHANGE MAP', select: () => { useMenuWorld(); goMaps(); } },
       { label: 'CHANGE PLAYERS', select: (dev) => enterPlayers(dev) },
       { label: 'TITLE', select: toTitle }
     ];
@@ -2123,6 +2461,7 @@ function screenItems() {
 }
 function screenBack() {
   if (state === 'MODE' || state === 'HOWTO') { goScreen('TITLE'); SFX.back(); }
+  else if (state === 'MAPS') { goScreen('MODE'); SFX.back(); }
   else if (state === 'OPTIONS') { goScreen(optionsFrom); SFX.back(); }
   else if (state === 'PLAYING' && paused) { paused = false; SFX.back(); }
 }
@@ -2132,8 +2471,8 @@ function listEvent(ev) {
   if (!n) return;
   ui.cursor = clamp(ui.cursor, 0, n - 1);
   const it = items[ui.cursor];
-  if (ev.type === 'up') { ui.cursor = (ui.cursor - 1 + n) % n; SFX.move(); }
-  else if (ev.type === 'down') { ui.cursor = (ui.cursor + 1) % n; SFX.move(); }
+  if (ev.type === 'up') { ui.cursor = (ui.cursor - 1 + n) % n; ui.movedAt = stateTime; SFX.move(); }
+  else if (ev.type === 'down') { ui.cursor = (ui.cursor + 1) % n; ui.movedAt = stateTime; SFX.move(); }
   else if (ev.type === 'left' || ev.type === 'right') { if (it.change) it.change(ev.type === 'left' ? -1 : 1); }
   else if (ev.type === 'action') { SFX.click(); it.select(ev.dev); }
   else if (ev.type === 'back' || ev.type === 'pause') screenBack();
@@ -2154,12 +2493,14 @@ function playersEvent(ev) {
     }
     return;
   }
+  if (ev.type === 'addcpu') { joinCPU(); return; }
+  if (ev.type === 'removecpu') { removeCPU(); return; }
   if (ev.type === 'back' || ev.type === 'pause') {
     let p;
     if (ev.dev === 'kb') p = players.slice().reverse().find(q => q.dev === 'kbL' || q.dev === 'kbR');
     else p = players.find(q => q.dev === ev.dev);
     if (p) { players.splice(players.indexOf(p), 1); SFX.back(); }
-    if (!players.length) goScreen('MODE');
+    if (!players.some(q => !q.cpu)) goMaps();
     return;
   }
   const p = players.find(q => q.dev === ev.dev);
@@ -2178,6 +2519,7 @@ function dispatch(ev) {
     if (['action', 'back', 'pause', 'tap', 'restart'].includes(ev.type)) endShowcase();
     return;
   }
+  if (state === 'LOADING') return;
   if (ev.type === 'fullscreen') { toggleFs(); return; }
   if (ev.type === 'mute') { setSound(!settings.sound); return; }
   if (state === 'PLAYERS') { playersEvent(ev); return; }
@@ -2198,6 +2540,7 @@ const keys = {};
 const touch = { stickId: null, sx: 0, sy: 0, cx: 0, cy: 0, active: false, used: false };
 const padPrev = {};
 const DEVICE_NAMES = {
+  ai0: 'CPU HELPER', ai1: 'CPU HELPER', ai2: 'CPU HELPER', ai3: 'CPU HELPER',
   kbL: 'WASD + SPACE', kbR: 'ARROWS + ENTER', touch: 'TOUCH',
   pad0: 'GAMEPAD 1', pad1: 'GAMEPAD 2', pad2: 'GAMEPAD 3', pad3: 'GAMEPAD 4'
 };
@@ -2224,6 +2567,8 @@ window.addEventListener('keydown', (e) => {
   else if (lk === 'r') ev('kb', 'restart');
   else if (lk === 'm') ev('kb', 'mute');
   else if (lk === 'f') ev('kb', 'fullscreen');
+  else if (lk === 'h') ev('kb', 'addcpu');
+  else if (lk === 'n') ev('kb', 'removecpu');
 });
 window.addEventListener('keyup', (e) => { keys[e.key.toLowerCase()] = false; });
 window.addEventListener('blur', () => {
@@ -2289,7 +2634,7 @@ function pollPads() {
     const b = (n) => !!(p.buttons[n] && p.buttons[n].pressed);
     const ax = p.axes[0] || 0, ay = p.axes[1] || 0;
     const now = {
-      action: b(0) || b(2), back: b(1), pause: b(9),
+      action: b(0) || b(2), back: b(1), pause: b(9), addcpu: b(3), removecpu: b(4),
       up: b(12) || ay < -0.6, down: b(13) || ay > 0.6, left: b(14) || ax < -0.6, right: b(15) || ax > 0.6
     };
     const prev = padPrev[dev];
@@ -2354,7 +2699,7 @@ function update(dt) {
   if (shake > 0) shake = Math.max(0, shake - dt * 14);
   if (isMenu()) {
     if (state === 'PLAYERS') {
-      if (players.length && players.every(p => p.ready)) {
+      if (players.some(p => !p.cpu) && players.every(p => p.ready)) {
         if (startCountdown < 0) startCountdown = 1.0;
         startCountdown -= dt;
         if (startCountdown <= 0) { startRun(); return; }
@@ -2366,10 +2711,14 @@ function update(dt) {
     updateCamera(dt);
     return;
   }
+  if (state === 'LOADING') {
+    if (stateTime > 0.03 && pendingLoad) { const f = pendingLoad; pendingLoad = null; f(); }
+    return;
+  }
   if (state === 'PLAYING') {
     if (paused) return;
     if (hitStop > 0) { hitStop -= dt; updateParticles(dt * 0.25); return; }
-    if (showcase.on) updateAI(dt);
+    if (showcase.on || hasCPU()) updateAI(dt);
     updatePlayers(dt);
     checkRamHits();
     updateSheep(dt);
@@ -2378,7 +2727,7 @@ function update(dt) {
     if (state === 'PLAYING') checkGameOver(dt);
     if (banner.t > 0) banner.t -= dt;
   } else {
-    if (showcase.on) updateAI(dt);
+    if (showcase.on || hasCPU()) updateAI(dt);
     updatePlayers(dt);
     updateSheep(dt);
     updateEnemies(dt);
@@ -2593,6 +2942,13 @@ function drawHUD() {
     else if (state === 'PLAYERS') drawPlayerSelect();
     else if (state === 'OPTIONS') drawOptions();
     else if (state === 'HOWTO') drawHowTo();
+    else if (state === 'MAPS') drawMapSelect();
+    return;
+  }
+  if (state === 'LOADING') {
+    rect(0, 0, W, H, 'k');
+    text('LOADING', W / 2, Math.round(H / 2) - 12, 'w', { s: 2, align: 'center' });
+    text(loadLabel, W / 2, Math.round(H / 2) + 6, 'y', { align: 'center' });
     return;
   }
   const active = sheep.filter(s => !s.penned).length;
@@ -2639,7 +2995,7 @@ function drawTitle() {
   rect(0, fy - 3, W, 13, 'k');
   if (best.escort || best.defend) text('BEST  ESCORT ' + best.escort + '  DEFEND ' + best.defend, W / 2, fy, 'y', { align: 'center' });
   else text('1-4 PLAYERS  GOATS AND DOGS', W / 2, fy, 's', { align: 'center' });
-  text('V0.4', W - 3, fy - 12, 'i', { align: 'right', outline: 'k' });
+  text('V0.5', W - 3, fy - 12, 'i', { align: 'right', outline: 'k' });
 }
 function drawModeSelect() {
   screenBg();
@@ -2682,9 +3038,9 @@ function drawPlayerSelect() {
   // back button
   rect(4, 5, 30, 11, 'i');
   text('<', 7, 8, 'l'); text('BACK', 14, 8, 'l');
-  hits.push({ x: 0, y: 0, w: 36, h: 20, fn: () => { goScreen('MODE'); SFX.back(); } });
+  hits.push({ x: 0, y: 0, w: 36, h: 20, fn: () => { goMaps(); SFX.back(); } });
   const w = colW(), x = Math.round(W / 2 - w / 2);
-  const bottom = 62;
+  const bottom = 70;
   const ch = clamp(Math.floor((H - 28 - bottom) / 4) - 4, 30, 42);
   const top = Math.max(28, Math.round((H - bottom + 24 - 4 * (ch + 4)) / 2));
   for (let s = 0; s < 4; s++) {
@@ -2696,7 +3052,11 @@ function drawPlayerSelect() {
     text('P' + (s + 1), x + 7, y + 4, P_COL[s]);
     if (!p) {
       text('OPEN SLOT', x + 7, y + 14, 'l');
-      text('PRESS ACTION OR TAP TO JOIN', x + 7, y + 22, 's');
+      text('ACTION OR TAP TO JOIN', x + 7, y + 22, 's');
+      const cbw = 34, cbx = x + w - cbw - 5, cby = y + ch - 14;
+      rect(cbx, cby, cbw, 10, 'i');
+      text('+ CPU', cbx + cbw / 2, cby + 3, 'l', { align: 'center' });
+      hits.push({ x: cbx - 2, y: cby - 2, w: cbw + 4, h: 14, fn: () => joinCPU() });
       hits.push({ x: x, y: y, w: w, h: ch, fn: (dev) => joinPlayer(dev === 'touch' ? 'touch' : normDev(dev)) });
       continue;
     }
@@ -2713,9 +3073,16 @@ function drawPlayerSelect() {
     text(p.kind === 'goat' ? 'RAMS PREDATORS' : 'BARKS + HERDS', tx, y + 14, 'l');
     text(DEVICE_NAMES[p.dev] || p.dev, tx, y + 22, 's');
     const rw = 34, rx = x + w - rw - 5, ry = y + ch - 14;
-    rect(rx, ry, rw, 10, p.ready ? 'y' : 'i');
-    text(p.ready ? 'READY' : 'READY?', rx + rw / 2, ry + 3, p.ready ? 'k' : 'l', { align: 'center' });
-    hits.push({ x: rx - 2, y: ry - 2, w: rw + 4, h: 14, fn: () => { p.ready = !p.ready; SFX.click(); } });
+    if (p.cpu) {
+      rect(rx, ry, rw, 10, 'i');
+      text('REMOVE', rx + rw / 2, ry + 3, 'l', { align: 'center' });
+      hits.push({ x: rx - 2, y: ry - 2, w: rw + 4, h: 14, fn: () => removeCPU(p) });
+      text('CPU', x + w - 6, y + 5, 's', { align: 'right' });
+    } else {
+      rect(rx, ry, rw, 10, p.ready ? 'y' : 'i');
+      text(p.ready ? 'READY' : 'READY?', rx + rw / 2, ry + 3, p.ready ? 'k' : 'l', { align: 'center' });
+      hits.push({ x: rx - 2, y: ry - 2, w: rw + 4, h: 14, fn: () => { p.ready = !p.ready; SFX.click(); } });
+    }
   }
   const fy = H - bottom + 4;
   if (startCountdown >= 0) {
@@ -2726,8 +3093,46 @@ function drawPlayerSelect() {
   } else {
     text('LEFT/RIGHT: GOAT OR DOG', W / 2, fy, 'l', { align: 'center' });
     text('ACTION: READY   BACK: LEAVE', W / 2, fy + 8, 'l', { align: 'center' });
+    text('H / PAD Y: ADD CPU   N / LB: REMOVE', W / 2, fy + 16, 's', { align: 'center' });
   }
-  text('GAME STARTS WHEN ALL ARE READY', W / 2, H - 32, 's', { align: 'center' });
+  text(settings.autoHelper && players.filter(q => !q.cpu).length === 1 && !players.some(q => q.cpu) ? 'SOLO: A CPU HELPER WILL JOIN' : 'GAME STARTS WHEN ALL ARE READY', W / 2, H - 32, 's', { align: 'center' });
+}
+function drawMapSelect() {
+  screenBg();
+  header(mode === 'escort' ? 'ESCORT - CHOOSE A ROUTE' : 'DEFEND - CHOOSE AN ARENA');
+  const defs = mode === 'escort' ? ESCORT_MAPS : DEFEND_MAPS;
+  const items = screenItems();
+  ui.cursor = clamp(ui.cursor, 0, items.length - 1);
+  const wide = W >= 300;
+  const rowH = H >= 260 ? 13 : 12;
+  const lw = wide ? Math.min(176, Math.floor(W * 0.5)) : colW();
+  const lx = wide ? Math.round(W / 2 - (lw + 8 + Math.min(150, W - lw - 40)) / 2) : Math.round(W / 2 - lw / 2);
+  const ly = 28;
+  drawList(items, lx + lw / 2, ly, lw, rowH);
+  const sel = defs[Math.min(ui.cursor, defs.length - 1)];
+  const idx = Math.min(ui.cursor, defs.length - 1);
+  let px0, py0, pw, ph;
+  if (wide) { px0 = lx + lw + 8; py0 = ly; pw = Math.min(150, W - px0 - 10); ph = H - ly - 40; }
+  else { px0 = Math.round(W / 2 - lw / 2); py0 = ly + items.length * rowH + 4; pw = lw; ph = H - py0 - 40; }
+  if (ph < 50 || ui.cursor >= defs.length) return;
+  rect(px0, py0, pw, ph, 'k');
+  frame(px0, py0, pw, ph, 'i');
+  text(sel.name, px0 + 5, py0 + 5, 'y');
+  text(sel.info, px0 + 5, py0 + 13, 'l');
+  const wdDef = sel.legacy ? null : sel;
+  const size = mode === 'escort' ? (wdDef ? wdDef.w + 'x' + wdDef.h : '600x1060') : '600x' + ((sel && sel.h) || (sel.legacy ? 460 : 480));
+  text('SIZE ' + size, px0 + 5, py0 + 21, 's');
+  const bw = pw - 10, bh = ph - 34;
+  if (bh < 20) return;
+  // build the preview after the cursor rests briefly (map generation takes a moment)
+  const key = mode + idx;
+  if (mapCache.has(key) || stateTime - (ui.movedAt || 0) > 0.18) {
+    const wd = getMapWorld(mode, idx);
+    const pv = mapPreview(wd, bw, bh);
+    G.drawImage(pv, Math.round(px0 + 5 + (bw - pv.width) / 2), Math.round(py0 + 29 + (bh - pv.height) / 2));
+  } else {
+    text('...', px0 + pw / 2, py0 + 29 + bh / 2, 'i', { align: 'center' });
+  }
 }
 function drawOptions() {
   screenBg();
@@ -2776,7 +3181,8 @@ function drawResults() {
   const cx = W / 2, w = Math.min(W - 24, 130), x = Math.round(cx - w / 2);
   let y = Math.round(H * 0.2);
   text('MISSION ' + mission.n, cx, y, 'w', { s: 2, align: 'center', outline: 'k' }); y += 16;
-  text('COMPLETE', cx, y, 'y', { s: 2, align: 'center', outline: 'k' }); y += 22;
+  text('COMPLETE', cx, y, 'y', { s: 2, align: 'center', outline: 'k' }); y += 18;
+  text(ESCORT_MAPS[mission.map || 0].name, cx, y, 'l', { align: 'center', outline: 'k' }); y += 12;
   const row = (a, b, c) => { text(a, x + 4, y, 'l'); text(String(b), x + w - 4, y, c, { align: 'right' }); y += 10; };
   row('DELIVERED', mission.penned + '/' + total, 'w');
   row('PREDATORS', mission.kills, 'w');

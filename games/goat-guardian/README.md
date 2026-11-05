@@ -8,6 +8,14 @@ All art is drawn from pixel matrices in code, and all sound is synthesized with 
 - Open `index.html` in any modern browser (desktop, iPad, or iPhone). No build step or server needed.
 - GitHub Pages: works as a static site and includes `.nojekyll`.
 
+## Maps
+- **Escort routes:** 1 Meadow Run (the original), 2 Birch Bend, 3 Switchbacks, 4 Twin Trails, 5 Stone Road, 6 Wolf Hollow, 7 Open Moor, 8 Lake of Pines, 9 The Long March, 10 Sunset Summit. Routes 2–10 get longer and wider.
+- **Defend arenas:** The Henge, Twin Glades, Ring Road, Crossroads, Ruined Plaza, Crescent, Grove Isles, Long Valley, Clover, Great Circle.
+- Choose a map on the Map Select screen, which shows a minimap preview. Escort continues through the routes in order.
+
+## AI helpers
+On Player Select, press H (keyboard), Y (gamepad) or tap "+ CPU" to add an AI goat or dog. Remove one with N, LB or "REMOVE". With **Solo AI helper** set to AUTO in Options (the default), playing alone brings in a CPU partner automatically.
+
 ## Modes
 - **Escort**: drive the herd from the start pin (bottom) through the woods to the pen at the red pin (top). Sheep that enter the pen are safe. A mission is complete when every remaining sheep is penned. The next mission is longer and harder, and its herd is the sheep you delivered plus 2 lambs.
 - **Defend**: endless waves around a stone henge. Clearing a wave returns 1 lamb.

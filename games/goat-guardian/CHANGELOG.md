@@ -2,6 +2,20 @@
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-11-05
+### Added
+- 10 escort routes: Meadow Run (the original map, kept as level 1), Birch Bend, Switchbacks, Twin Trails, Stone Road, Wolf Hollow, Open Moor, Lake of Pines, The Long March and Sunset Summit. Levels 2–10 are larger, from 640x1400 up to 800x2900, compared with 600x1060 for level 1.
+- 10 defend arenas: The Henge (original), Twin Glades, Ring Road, Crossroads, Ruined Plaza, Crescent, Grove Isles, Long Valley, Clover and Great Circle.
+- Map Select screen (Mode → Map → Players) with a minimap preview, map size and description. Escort routes remember your best stars; arenas remember your best wave.
+- Map traits: Wolf Hollow has more wolves, Open Moor and Great Circle have more bats, and Twin Trails and Lake of Pines split the path around pine islands.
+- CPU helpers: add AI goats or dogs on the Player Select screen (H / pad Y / tap "+ CPU", remove with N / pad LB / "REMOVE"). Options gains "Solo AI helper" (AUTO by default), which adds a partner when you play alone.
+- Loading screen while a map is generated.
+
+### Changed
+- Escort missions run through the 10 routes in order. After route 10 they loop back with harder waves. Daylight fades across the 10 routes.
+- RETRY in escort restarts on the route where the flock was lost. Game over also offers CHANGE MAP.
+- The camera follows human players only. CPU helpers are kept on screen by the leash.
+
 ## [0.4.0] - 2026-11-05
 ### Added
 - Attract-mode gameplay demo ("WATCH DEMO" on the title, and automatically after 30 s idle): AI goats and dogs play three scenes: Escort (goat leads, dog drives, the herd is penned), Defend with 4-player co-op at sunset, and Nightfall (wave 8, alphas and bat swarms).

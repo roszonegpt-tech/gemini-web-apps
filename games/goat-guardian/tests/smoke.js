@@ -1,4 +1,4 @@
-// Headless smoke test for Goat Guardian v0.4: node tests/smoke.js (needs Playwright + Chromium).
+// Headless smoke test for Goat Guardian v0.5: node tests/smoke.js (needs Playwright + Chromium).
 // Title -> Mode -> Players (2 keyboard players) -> escort, forces a ram and a bark, pens the herd,
 // advances a mission, runs 4-player defend, triggers game over, checks 6-direction facing and
 // adaptive resolution, starts and exits the attract-mode demo, and reports page errors.
@@ -17,12 +17,18 @@ const { chromium } = require('playwright');
   if (st.state !== 'TITLE') fail('not on title');
   await p.keyboard.press('Space');                 // PLAY
   st = await p.evaluate(() => state); if (st !== 'MODE') fail('mode screen ' + st);
-  await p.keyboard.press('Space');                 // ESCORT (joins P1 = kbL)
+  await p.keyboard.press('Space');                 // ESCORT -> map select
+  st = await p.evaluate(() => ({ state, n: screenItems().length })); if (st.state !== 'MAPS' || st.n !== 11) fail('maps ' + JSON.stringify(st));
+  await p.keyboard.press('Space');                 // map 1 (joins P1 = kbL)
   st = await p.evaluate(() => ({ state, n: players.length })); if (st.state !== 'PLAYERS' || st.n !== 1) fail('players ' + JSON.stringify(st));
+  await p.keyboard.press('h');                     // add a CPU helper
+  st = await p.evaluate(() => players.filter(q => q.cpu).length); if (st !== 1) fail('cpu add ' + st);
+  await p.keyboard.press('n');                     // remove it
+  st = await p.evaluate(() => players.filter(q => q.cpu).length); if (st !== 0) fail('cpu remove ' + st);
   await p.keyboard.press('Enter');                 // P2 joins
   await p.keyboard.press('ArrowRight');            // P2 swaps character
   await p.keyboard.press('Space'); await p.keyboard.press('Enter'); // both ready
-  await p.waitForTimeout(1500);
+  await p.waitForTimeout(2000);
   st = await p.evaluate(() => ({ state, mode, kinds: players.map(q => q.kind) }));
   if (st.state !== 'PLAYING' || st.mode !== 'escort' || st.kinds.join() !== 'goat,goat') fail('start ' + JSON.stringify(st));
   const dirs = await p.evaluate(() => [[0, -1], [0, 1], [1, -0.6], [1, 0.6], [-1, -0.6], [-1, 0.6]].map(v => faceDir(v[0], v[1]) + (v[0] < 0 ? 'L' : '')));
@@ -46,16 +52,20 @@ const { chromium } = require('playwright');
   await p.evaluate(() => { for (const s of sheep) { s.x = world.goal.x; s.y = world.goal.y; } enemies.length = 0; });
   await p.waitForTimeout(1200);
   st = await p.evaluate(() => state); if (st !== 'RESULTS') fail('results ' + st);
-  await p.keyboard.press('Space');                 // NEXT MISSION
-  st = await p.evaluate(() => ({ state, m: mission.n })); if (st.state !== 'PLAYING' || st.m !== 2) fail('next mission ' + JSON.stringify(st));
-  await p.evaluate(() => { enterPlayers('kbL'); mode = 'defend'; joinPlayer('pad0'); joinPlayer('pad1'); players.forEach(q => q.ready = true); });
-  await p.waitForTimeout(1600);
-  st = await p.evaluate(() => ({ state, mode, n: players.length }));
-  if (st.state !== 'PLAYING' || st.mode !== 'defend' || st.n !== 4) fail('defend 4p ' + JSON.stringify(st));
+  await p.keyboard.press('Space');                 // NEXT MISSION (loads map 2)
+  await p.waitForTimeout(1200);
+  st = await p.evaluate(() => ({ state, m: mission.n, map: mission.map, h: world.h })); if (st.state !== 'PLAYING' || st.m !== 2 || st.map !== 1 || st.h !== 1400) fail('next mission ' + JSON.stringify(st));
+  await p.evaluate(() => { mode = 'defend'; selMap.defend = 4; enterPlayers('kbL'); joinPlayer('pad0'); joinCPU(); players.forEach(q => q.ready = true); });
+  await p.waitForTimeout(1800);
+  st = await p.evaluate(() => ({ state, mode, n: players.length, cpu: players.filter(q => q.cpu).length, map: wave.map, pillars: world.pillars.length }));
+  if (st.state !== 'PLAYING' || st.mode !== 'defend' || st.n !== 4 || st.cpu !== 1 || st.map !== 4) fail('defend 4p + cpu ' + JSON.stringify(st));
+  await p.waitForTimeout(2000);
+  st = await p.evaluate(() => { const c = players.find(q => q.cpu); return len(c.vx, c.vy); });
+  if (!(st > 1)) fail('cpu helper not moving ' + st);
   await p.evaluate(() => { sheep.length = 0; enemies.forEach(e => e.carry = null); });
   await p.waitForTimeout(2300);
   st = await p.evaluate(() => state); if (st !== 'GAMEOVER') fail('game over ' + st);
-  await p.keyboard.press('s'); await p.keyboard.press('s'); await p.keyboard.press('Space'); // TITLE
+  await p.keyboard.press('s'); await p.keyboard.press('s'); await p.keyboard.press('s'); await p.keyboard.press('Space'); // TITLE
   st = await p.evaluate(() => state); if (st !== 'TITLE') fail('back to title ' + st);
   // attract-mode demo: plays itself with AI shepherds, any key returns to the title
   await p.evaluate(() => { ui.cursor = 1; });
@@ -64,7 +74,7 @@ const { chromium } = require('playwright');
   st = await p.evaluate(() => ({ on: showcase.on, state, n: players.length, ai: players.every(q => q.dev.startsWith('ai')) }));
   if (!st.on || st.state !== 'PLAYING' || !st.ai) fail('demo ' + JSON.stringify(st));
   await p.keyboard.press('Space');
-  st = await p.evaluate(() => ({ on: showcase.on, state, real: players.every(q => !q.dev.startsWith('ai')) }));
+  st = await p.evaluate(() => ({ on: showcase.on, state, real: players.every(q => q.cpu || !q.dev.startsWith('ai')) }));
   if (st.on || st.state !== 'TITLE' || !st.real) fail('demo exit ' + JSON.stringify(st));
   const wasFs = await p.evaluate(() => isFs());
   await p.evaluate(() => exitFs());
