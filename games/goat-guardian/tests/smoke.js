@@ -1,4 +1,4 @@
-// Headless smoke test for Goat Guardian v0.8: node tests/smoke.js (needs Playwright + Chromium).
+// Headless smoke test for Goat Guardian v0.9: node tests/smoke.js (needs Playwright + Chromium).
 // Title -> Mode -> Players (2 keyboard players) -> escort, forces a ram and a bark, pens the herd,
 // advances a mission, runs 4-player defend, triggers game over, checks 6-direction facing and
 // adaptive resolution, starts and exits the attract-mode demo, and reports page errors.
@@ -147,6 +147,34 @@ const { chromium } = require('playwright');
     return { n, mid, after: state, W2: W };
   });
   if (v8.n < 4 || !v8.mid.on || !v8.mid.trailer || v8.mid.i < 1 || v8.after !== 'TITLE') fail('birds/trailer ' + JSON.stringify(v8));
+  // v0.9: goat + farm dog breeds, 8-direction gallop sprites, dog skills
+  const v9 = await p.evaluate(async () => {
+    const out = { goats: GOAT_BREEDS.length, dogs: DOG_BREEDS.length };
+    const D = ['E', 'SE', 'NE', 'S', 'N'];
+    out.sets = DOG_BREEDS.every(b => { const s = canineSet(b.look); return D.every(d => s[d].length === 4 && s.run[d].length === 4) && s.pose.sit.E && s.pose.lie.E && s.pose.bite.E; })
+      && GOAT_BREEDS.every(b => { const s = goatSet(b); return D.every(d => s[d].length === 4 && s.run[d].length === 4); });
+    out.bob = SP.goat.run.E.map(f => f.bob).join();
+    const vis = (sp) => { const d = sp.r.getContext('2d').getImageData(0, 0, sp.w, sp.h).data; let t = sp.h, b = -1; for (let y = 0; y < sp.h; y++) for (let x = 0; x < sp.w; x++) if (d[(y * sp.w + x) * 4 + 3]) { t = Math.min(t, y); b = Math.max(b, y); } return b - t + 1; };
+    out.taller = Math.min(...GOAT_BREEDS.map(b => vis(goatSet(b).E[0]))) > Math.max(...DOG_BREEDS.map(b => vis(canineSet(b.look).E[0])));
+    out.locked = skinUnlocked('dog', 9);
+    progress.medals.escort = progress.medals.escort.map(() => 7); progress.medals.defend = progress.medals.defend.map(() => 7);
+    mode = 'defend'; enterPlayers('kbL'); players[0].kind = 'dog'; players.forEach(q => q.ready = true);
+    await new Promise(r => setTimeout(r, 2600));
+    wave.toSpawn = 0; enemies = [];
+    const d = players[0];
+    const mk = (x, y, o) => Object.assign({ type: 'wolf', x, y, vx: 0, vy: 0, fx: -1, fy: 0, state: 'hunt', t: 0, hp: 1, fear: 0, speed: 0, accel: 0, anim: 0, alt: 0, hits: {}, carry: null, flash: 0, phase: 0, alpha: false }, o || {});
+    const trial = async (skin, setup) => { enemies = []; d.skin = skin; d.cd2 = 0; d.fx = 1; d.fy = 0; d.dashT = 0; const r = setup(); playerAbility(d); await new Promise(z => setTimeout(z, 500)); return r(); };
+    out.corgi = await trial(1, () => { const w = mk(d.x + 20, d.y); enemies.push(w); return () => w.state; });
+    out.pyrenees = await trial(9, () => { const w = mk(d.x + 60, d.y); enemies.push(w); return () => w.state; });
+    out.carry = await trial(7, () => { const s0 = sheep[0]; s0.x = d.x + 5; s0.y = d.y; return () => !!d.carry && !sheep.includes(s0); });
+    d.cd2 = 0; playerAbility(d); out.drop = !d.carry;
+    out.ratter = (() => { d.skin = 6; d.cd = 0; enemies = [mk(d.x + 12, d.y, { type: 'fox' })]; tryBark(d); return enemies[0].state; })();
+    d.skin = 0; d.vx = 0; d.vy = 0; d.actT = 0; d.dashT = 0; d.idleT = 3; out.sit = actorSprite(d).spr === skinSet('dog', 0).pose.sit[faceDir8(d.fx, d.fy)];
+    toTitle();
+    return out;
+  });
+  if (v9.goats !== 9 || v9.dogs !== 10 || !v9.sets || v9.bob !== '0,-1,-2,-1' || !v9.taller || v9.locked) fail('breeds ' + JSON.stringify(v9));
+  if (v9.corgi !== 'stun' || v9.pyrenees !== 'flee' || !v9.carry || !v9.drop || v9.ratter !== 'launched' || !v9.sit) fail('dog skills ' + JSON.stringify(v9));
   const wasFs = await p.evaluate(() => isFs());
   await p.evaluate(() => exitFs());
   await p.waitForTimeout(300);

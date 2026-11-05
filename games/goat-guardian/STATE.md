@@ -1,18 +1,23 @@
 # State — Goat Guardian
 
-**Version:** 0.8.1 · **Status:** Playable. v0.8.1 redraws the goat: taller than the dog, horns outlined in black, and 8 facing directions.
+**Version:** 0.9.0 · **Status:** Playable. v0.9.0 adds 9 goat breeds, 10 farm dogs with their own skills, 4-frame walk and gallop cycles for every animal, and dog idle poses.
 
 ## Snapshot
 - The whole game is in `index.html`. Its sections are: canvases, palette and remap, sprites, font, audio, world generation and rendering, camera, input devices, state, particles, collision, players, herd boids, enemies, modes, lobby, update, render, and boot.
 - **Resolution:** `resize()` picks an integer pixel scale `PIX` and sizes the buffer `W×H` (W 120–560, H 180–420) to fill the screen. The world buffer has a 1px margin for sub-pixel camera presentation. The HUD is a separate canvas that is never palette-swapped. All layout must use `W`/`H`, never fixed numbers.
 - **Screens:** `TITLE → MODE → PLAYERS → PLAYING → RESULTS / GAMEOVER`, plus `OPTIONS` and `HOWTO`. List screens are built by `screenItems()` and handled by `listEvent()`. The player-select screen uses `playersEvent()`. Taps hit-test against `hits`, which is rebuilt every frame.
-- **Goat sprites:** the goat has `E`, `SE`, `NE`, `S` and `N` sets; `faceDir8()` picks one, and W, SW and NW are mirrors. `outlineHorns()` adds the black outline around the `b` horn pixels, and `lowerHead()` builds the ram poses.
-- **Sprites:** `SP[kind][dir][frame]`, where dir is N, S, SE or NE; NW and SW are mirrored. `SP[kind].act[dir]` holds the ram and bark poses. `faceDir(fx, fy)` picks the direction.
+- **Animal sprites (v0.9):**
+  - Goats come from the region templates `GT` and `GLEGS` (letters h horn, f head, K eye, e ear, m muzzle, z beard, c coat, d shade, L leg, k hoof). `goatColor()` maps the letters per entry of `GOAT_BREEDS`, applying spots, face stripes and a dorsal stripe, and `goatSet(breed)` builds the set.
+  - Dogs, wolves and foxes come from `canineSet(look)`, using `canineSide` for the E, SE and NE views and `canineFront` for S and N. A look has the body parameters L, B, Lg, Hd, muz, ears, tail and fluffy, plus colour keys and a pattern.
+  - Every set has `[dir][4 walk frames]`, `run[dir][4]` (each frame carries `.bob`) and `act[dir]`. Canines also have `pose.{sit, lie, alert, sniff[4], bite}`.
+  - `faceDir8()` is used for all players, wolves and foxes. Sheep still use the 6-direction `faceDir()`.
+  - `actorSprite()` picks the frame: gallop above `RUN_SPEED` (52 px/s), otherwise walk, sniff, sit or lie (from `p.idleT` and `p.slowT`).
 - **Modes:** `escort`, `defend`, `daily`, `endless`, `versus` and `custom` (an editor map). `isEscort()` covers every escort-like mode. `escortWorld(src)` builds the world for a map index, `'daily'`, `'endless'` or `'custom'`.
 - **Mask values:** 0 meadow, 1 forest, 2 pillar, 3 ford (slow), 4 deep water (blocked), 5 brambles (slow; tangles sheep). `blocked()` and `terrainSlow()` read these. Hazards come from `addHazards(def)`, using `def.rivers` and `def.brambles`.
 - **Weather:** `def.weather` is `rain`, `wind`, `fog` or `storm`. `applyRemap()` also does the fog and night dithering using a vision grid built by `buildVisGrid()`.
 - **Creatures:** enemy types are wolf (with alpha and boss variants), bat, fox and hawk. Sheep types are normal, ram, lamb and golden. Player kinds are goat, dog and wolf (Versus only).
-- **Progression:** `bells` and `upg` reset each run. `progress.medals` and `progress.daily` are saved in `goatGuardianMaps`. Looks are defined in `GOAT_SKINS`, `DOG_SKINS` and `WOOL_SKINS`, unlocked by `totalMedals()`.
+- **Progression:** `bells` and `upg` reset each run. `progress.medals` and `progress.daily` are saved in `goatGuardianMaps`. `GOAT_SKINS` and `DOG_SKINS` alias `GOAT_BREEDS` and `DOG_BREEDS`. `p.skin` is the breed index, unlocked by `totalMedals()` against `need`; during a showcase every breed is allowed (`skinOk`). `skinSet()` caches the generated sets. The last breed picked is saved as `settings.goatBreed` and `settings.dogBreed`.
+- **Dog skills:** `dogBreed(p)` gives the stats (`speed`, `push`, `ability`, `cd`, plus the passives `barkStun`, `ratter`, `bellwether`, `hide` and `aura`). `dogAbility()` dispatches the skill. Dashes use `p.dashT`, `p.dashKind` and `dashHits()`; the pounce ends in `ambushBlast()`. Sprint uses `p.sprintT` and the frenzy uses `p.frenzyN`, which calls `barkBlast()`. A Bernese carry sets `p.carry` (the sheep leaves the `sheep` array, and win and lose checks count it), and `dropSheep()` puts it back. `knockOut()` and `biteEnemy()` are the shared take-down helpers. CPU skill use is in `aiDogSkill()`.
 - **Editor:** the `ED` object holds a 75x175 grid of 8px cells. Share codes look like `GG1|rle|pillars|start|goal` and are saved under `goatGuardianCustom`.
 - **Birds:** the `birds` array is filled by `spawnFlock(big)` and updated by `updateBirds()`. `drawBirdShadows()` draws the shadows on the ground layer and `drawBirds()` draws the birds above everything.
 - **Trailer:** the `TRAILER` scene list is played through the showcase system with `showcase.trailer = true`. In trailer mode `resize()` uses `dh / 180`, which gives a closer camera, and `drawTrailerOverlay()` draws the cards, letterbox and captions. `window.__trailerMark(id)` is called at every cut so `tools/trailer/` can time the soundtrack.
@@ -31,6 +36,7 @@
 - **Assets:** no Universal Assets are used. Everything is procedural.
 
 ## Verified
+- v0.9.0: the smoke test checks that there are 9 goat and 10 dog breeds, that every set has 4 walk and 4 gallop frames in 5 views, the gallop bob, that every goat is taller than every dog (by visible pixels: 13 vs at most 11), the Corgi nip stun, Pyrenees roar, Bernese carry and drop, Jack Russell ratter and the idle sit. Runtime sweeps with every breed under CPU control in Escort and Defend had no page errors. The Farm Dogs demo scene and the breeds trailer clip run cleanly.
 - v0.8.0: the smoke test checks that birds spawn and that the trailer starts, advances and exits back to the title. `tools/trailer/make.sh` rebuilt the 1080p trailer (64.7 s, h264 + AAC) end to end.
 - v0.7.0: the smoke test also covers the story intro, Versus (both sides filled, timeout win), Daily and Endless starts, stomp, whistle, buying an upgrade, medals and unlocks, the editor route and share-code round trip, and the colour-safe remap.
 - A runtime sweep of every mode, the editor, the story, How to Play, the pause shop and key remap, night and fog had no page errors.

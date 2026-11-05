@@ -9,3 +9,5 @@ All 20 items from the feature list were added in v0.7.0. What remains is playtes
 - [ ] Check night lanterns and fog on long routes for readability.
 - [ ] Install the GitHub Pages build on a phone and test offline play.
 - [ ] Optional: more editor map sizes, several custom map slots.
+- [ ] Balance the farm dog skills (Komondor hiding and the Pyrenees roar may be strong; the Corgi push may be weak).
+- [ ] Optional: goat breed perks (breeds currently change the look only), and goat idle poses (graze, lie).

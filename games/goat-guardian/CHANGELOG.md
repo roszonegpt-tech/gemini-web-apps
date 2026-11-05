@@ -2,6 +2,21 @@
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-11-05
+### Added
+- **9 goat breeds** from the reference sheet: Saanen, Alpine, Boer, Nubian (spotted), Valais Blackneck, Toggenburg (face stripes), Golden Guernsey, Oberhasli (dorsal stripe) and Pygmy (roan). Medals unlock them.
+- **10 unlockable farm dogs**, each with its own speed, herding push and skill: Border Collie (whistle), Corgi (heel nip), Sheltie (sprint), Cattle Dog (bite dash), Old English (gather), German Shepherd (takedown; longer bark stun), Jack Russell (yap frenzy; ratter), Bernese (carry a sheep), Komondor (ambush; the flock follows it and hides beside it) and Great Pyrenees (roar; guardian aura).
+- Dog idle behaviour based on the reference video: sit, lie down, alert (head up when a predator is near), sniff, bark (mouth open) and bite poses.
+- CPU dogs use their breed's skill, and CPU helpers pick a different unlocked breed per slot.
+- How to Play now has 7 pages, including two pages of farm dogs (locked dogs show the medals needed) and a goat breed gallery.
+- A Farm Dogs demo scene that cycles through all 10 breeds, and a "9 goats + 10 farm dogs" trailer clip.
+- Player Select shows the breed name, its skill and how many breeds are unlocked. The game remembers the last breed picked.
+### Changed
+- **Running fixed:** every animal (goats, dogs, wolves and foxes) has a 4-frame walk and a 4-frame bounding gallop. The gallop bobs the body (0, -1, -2, -1), pitches the head on the reach and tucks the legs in flight. Walk is used below 52 px/s.
+- Dogs, wolves and foxes are now generated from body parameters (length, legs, ears, tail, coat pattern) and face 8 directions.
+- The old recolour looks for goats and dogs (Brown/Golden goat, Husky/Corgi dog) are replaced by real breeds. The unlock banner now reads "NEW BREED!".
+- App icons show the new goat with a sitting collie. The service worker cache was bumped to v0.9.0.
+
 ## [0.8.1] - 2026-11-05
 ### Changed
 - Goat redrawn to match the reference sheet: cream-white coat with grey shading, tan ears, beard and tail tuft, long legs with dark hooves, and curved brown horns with a black outline (generated around every horn pixel, so it holds in every pose).

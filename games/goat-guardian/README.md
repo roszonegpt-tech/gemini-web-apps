@@ -10,11 +10,12 @@ All art is drawn from pixel matrices in code, and all sound is synthesized with 
 
 ## What's in the game
 - **5 modes:** Escort (10 routes), Defend (10 arenas), Daily Challenge, Endless, and Versus (wolves against shepherds).
-- **Shepherds:** the goat (ram, plus stomp) and the dog (bark, plus whistle). In Versus, players can also be wolves (lunge, plus howl).
+- **Shepherds:** the goat (ram, plus stomp) and the dog (bark, plus a skill that depends on the breed). In Versus, players can also be wolves (lunge, plus howl).
+- **Breeds:** 9 goat breeds and 10 farm dogs, unlocked with medals. Each dog has its own speed, herding push and skill (see Farm dogs below).
 - **Sheep:** normal, stubborn ram, quick lamb, and golden.
 - **Predators:** shadow wolf, alpha wolf, fox, hawk, bat, and the Great Wolf boss.
 - **World:** fords, rivers with bridges, and brambles. Weather can be rain, wind, fog or storm, and nights are lit only by lanterns.
-- **Progression:** medals per map, unlockable goat, dog and wool looks, and bells to spend on upgrades during a run.
+- **Progression:** medals per map unlock goat breeds, farm dogs and wool colours. Bells are spent on upgrades during a run.
 - **Map editor** with share codes; saved maps can be played as "MY MAP".
 - **Story intro**, synthesized chiptune music, and an attract-mode demo.
 - **Accessibility:** remappable keys, a colour-safe palette, reduced flashing, and game speed.
@@ -37,7 +38,7 @@ On Player Select, press H (keyboard), Y (gamepad) or tap "+ CPU" to add an AI go
 - **Defend**: endless waves around a stone henge. Clearing a wave returns 1 lamb.
 
 ## Demo
-Choose **Watch Demo** on the title screen, or leave the title screen idle for 30 seconds. AI goats and dogs then play Escort, 4-player Defend and Nightfall, with on-screen labels for every unit. Press any button to exit.
+Choose **Watch Demo** on the title screen, or leave the title screen idle for 30 seconds. AI goats and dogs then play Escort, 4-player Defend, Nightfall and Farm Dogs, with on-screen labels for every unit. Farm Dogs cycles through all 10 breeds using their skills. Press any button to exit.
 
 ## Characters
 | | Goat | Dog |
@@ -47,6 +48,28 @@ Choose **Watch Demo** on the title screen, or leave the title screen idle for 30
 | Speed | Slower and heavier | Fast and agile |
 
 Ram or bark a predator that is carrying a sheep and the sheep is saved.
+
+## Goat breeds
+Saanen, Alpine (both available from the start), Boer (1 medal), Nubian (3), Valais Blackneck (5), Toggenburg (7), Golden Guernsey (9), Oberhasli (12) and Pygmy (16). Goat breeds change the look only. Every goat is taller than every dog.
+
+## Farm dogs
+Only working farm breeds are included: herders, livestock guardians and a farm terrier. On Player Select, Up/Down (or tapping the preview) changes the breed. The last breed you picked is remembered.
+
+| Dog | Medals | Skill (ability button) | Trait |
+|---|---|---|---|
+| Border Collie | 0 | Whistle: sends nearby sheep to the goal | All-round herder |
+| Corgi | 2 | Heel Nip: a short dash that stuns foes and drives sheep | Low and nimble |
+| Shetland Sheepdog | 4 | Sprint: 3 s at 1.55x speed with a wider push | Fastest herder |
+| Australian Cattle Dog | 6 | Bite Dash: a dash that takes down foes | Tough blue heeler |
+| Old English Sheepdog | 8 | Gather: calls every sheep within 140 px to the dog | Big, gentle push |
+| German Shepherd | 10 | Takedown: lunges at the nearest foe, 2 damage | Bark stuns 1.8x longer |
+| Jack Russell Terrier | 12 | Yap Frenzy: 3 quick barks | Ratter: bark defeats foxes and bats |
+| Bernese Mountain Dog | 15 | Carry: picks up a sheep (safe from predators) and drops it; dropping inside the pen pens it | Strong farm dog |
+| Komondor | 18 | Ambush: pounces and stuns everything within 32 px | Sheep drift to it, and predators can't see sheep beside it |
+| Great Pyrenees | 22 | Roar: every foe within 110 px flees | Guardian aura slows foes within 55 px |
+
+## Animation
+Every animal faces 8 directions and has a 4-frame walk and a 4-frame bounding gallop. During the gallop the body bobs and the head pitches down on the reach. Dogs also sit after 2.5 s idle and lie down after 7 s, lifting their head when a predator comes near. They sniff when moving slowly, and open their mouth to bark and bite.
 
 ## Controls
 | Device | Move | Action | Notes |
