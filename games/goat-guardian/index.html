@@ -1127,6 +1127,9 @@ const THEMES = {
   // Billy's theme: a stomping, heroic E-minor riff
   billy: { bpm: 140, wave: 'square', chords: [52, 48, 43, 50],
     lead: [76, 0, 76, 79, 0, 81, 0, 79, 76, 0, 74, 0, 72, 0, 74, 76, 0, 0, 76, 79, 0, 83, 0, 81, 79, 0, 76, 0, 74, 0, 71, 0] },
+  // the farm dogs' theme: a bouncy G-major romp
+  dogs: { bpm: 150, wave: 'square', chords: [55, 48, 50, 52],
+    lead: [79, 0, 81, 83, 0, 79, 0, 76, 79, 0, 0, 74, 76, 0, 79, 0, 81, 0, 83, 86, 0, 83, 0, 81, 79, 0, 76, 0, 74, 0, 76, 0] },
   day: { bpm: 112, wave: 'square', chords: [48, 43, 45, 41],
     lead: [72, 0, 76, 0, 79, 0, 76, 0, 74, 0, 79, 0, 83, 0, 79, 0, 76, 0, 72, 0, 69, 0, 72, 0, 77, 0, 76, 0, 74, 0, 72, 0] },
   dusk: { bpm: 92, wave: 'square', chords: [45, 41, 48, 43],
@@ -2366,6 +2369,7 @@ function barkBlast(p) {
   const stunK = breed.barkStun || 1;
   p.actT = 0.25;
   SFX.bark();
+  if (showcase.trailer && typeof window.__trailerMark === 'function') window.__trailerMark('bark');
   const br = BARK_RADIUS * upgradeMul('bark');
   addParticle({ x: p.x, y: p.y - 3, life: 0.35, max: 0.35, r0: 4, r1: br, col: 'w', kind: 'ring' });
   addText(p.x, p.y - 14, 'WOOF', 'w');
@@ -2443,6 +2447,7 @@ function playerAbility(p) {
 // every farm dog has its own skill (DOG_BREEDS[].ability)
 function dogAbility(p) {
   const b = dogBreed(p);
+  if (showcase.trailer && typeof window.__trailerMark === 'function') window.__trailerMark('skill');
   if (b.ability === 'carry' && !p.carry) {
     let best = null, bd = 15;
     for (const s of sheep) { if (s.penned) continue; const d = len(s.x - p.x - p.fx * 4, s.y - p.y); if (d < bd) { bd = d; best = s; } }
@@ -4021,6 +4026,7 @@ const TRAILER = [
 function billyArena(idx, day, look) {
   trailerDefend(idx, ['goat'], day);
   resetUpgrades();
+  comboN = 0;
   showcase.forceCrack = false;
   const b = players[0];
   b.skin = 0; b.look = normLabLook(look || {});
@@ -4084,13 +4090,97 @@ const BILLY_TRAILER = [
       return [{ at: 0.1, run: () => spawnFlock(false) }, { at: 1.2, run: () => spawnFlock(true) }];
     } }
 ];
+// ---- the farm dogs trailer: every breed showing off its skill, scored to the dogs' theme
+function dogArena(i, idx, day, look) {
+  trailerDefend(idx, ['dog:' + i], day);
+  resetUpgrades();
+  comboN = 0;
+  showcase.forceCrack = false;
+  const d = players[0];
+  d.look = normLabLook(look || {});
+  return d;
+}
+// use the dog's skill now, facing the nearest foe (or a given point)
+function dogSkill(at) {
+  const d = players[0];
+  let t = at || null, td = 1e9;
+  if (!t) for (const e of enemies) { if (e.state === 'launched' || e.state === 'emerge') continue; const dd = len(e.x - d.x, e.y - d.y); if (dd < td) { td = dd; t = e; } }
+  if (t) { const l = len(t.x - d.x, t.y - d.y) || 1; d.fx = (t.x - d.x) / l; d.fy = (t.y - d.y) / l; aiVec[d.dev] = { x: d.fx, y: d.fy }; }
+  d.cd2 = 0; d.down = 0; d.stun = 0;
+  playerAbility(d);
+}
+function ringFoes(n, r, types) {
+  const d = players[0];
+  for (let k = 0; k < n; k++) {
+    const e = rushBilly(types[k % types.length], null, r), a = k / n * Math.PI * 2;
+    e.x = d.x + Math.cos(a) * r; e.y = d.y + Math.sin(a) * r * 0.75;
+    if (blocked(e.x, e.y)) { e.x = d.x + (k % 2 ? r : -r); e.y = d.y; }
+  }
+}
+const dogScene = (i, dur, day, idx, events) => ({ id: 'd_' + DOG_BREEDS[i].unit, cap: DOG_BREEDS[i].name, sub: DOG_BREEDS[i].abil, dur: dur, day: day,
+  setup() { dogArena(i, idx, day); return events(); } });
+const DOGS_TRAILER = [
+  { id: 'd_cold', card: ['EVERY FLOCK', 'NEEDS A DOG.'], dur: 2.6, day: 0.2, setup() { dogArena(0, 0, 0.2); return []; } },
+  { id: 'd_ten', card: ['MEET THE TEN'], dur: 1.8, day: 0.2, setup() { return []; } },
+  { id: 'd_bcollie', cap: 'BORDER COLLIE', sub: DOG_BREEDS[0].abil, dur: 4.2, day: 0.1, setup() {
+      trailerEscort(1, 0.86, ['dog:0'], 0.1); resetUpgrades();
+      return [{ at: 1.0, run: () => dogSkill(world.goal) }];
+    } },
+  dogScene(1, 4.0, 0.15, 4, () => [{ at: 0.1, run: () => { rushBilly('wolf', null, 44); rushBilly('fox', null, 60); } },
+    { at: 0.8, run: () => dogSkill() }, { at: 2.2, run: () => dogSkill() }, { at: 2.0, run: () => rushBilly('wolf', null, 44) }]),
+  dogScene(2, 4.0, 0.25, 9, () => [{ at: 0.1, run: () => rushBilly('wolf', null, 110) }, { at: 0.4, run: () => dogSkill() }, { at: 2.2, run: () => rushBilly('wolf', null, 100) }]),
+  dogScene(3, 4.0, 0.3, 6, () => [{ at: 0.1, run: () => rushBilly('wolf', null, 46) }, { at: 0.8, run: () => dogSkill() },
+    { at: 1.5, run: () => rushBilly('wolf', null, 46) }, { at: 2.3, run: () => dogSkill() }]),
+  { id: 'd_oes', cap: 'OLD ENGLISH', sub: DOG_BREEDS[4].abil, dur: 4.2, day: 0.35, setup() {
+      const d = dogArena(4, 2, 0.35);
+      // the flock is scattered all over the field
+      for (const sh of sheep) { for (let k = 0; k < 8; k++) { const a = rand() * 6.283, r = 60 + rand() * 60, x = d.x + Math.cos(a) * r, y = d.y + Math.sin(a) * r * 0.7; if (!blocked(x, y)) { sh.x = x; sh.y = y; break; } } }
+      return [{ at: 0.9, run: () => dogSkill({ x: d.x, y: d.y - 1 }) }];
+    } },
+  dogScene(5, 4.0, 0.45, 5, () => [{ at: 0.1, run: () => rushBilly('wolf', null, 70) }, { at: 0.7, run: () => dogSkill() },
+    { at: 1.6, run: () => rushBilly('wolf', { alpha: true }, 70) }, { at: 2.3, run: () => dogSkill() }]),
+  dogScene(6, 4.0, 0.5, 4, () => [{ at: 0.1, run: () => { rushBilly('fox', null, 30); rushBilly('bat', null, 34); } }, { at: 0.8, run: () => dogSkill() },
+    { at: 2.0, run: () => { rushBilly('bat', null, 30); rushBilly('fox', null, 34); } }, { at: 2.6, run: () => dogSkill() }]),
+  { id: 'd_bernese', cap: 'BERNESE', sub: DOG_BREEDS[7].abil, dur: 4.4, day: 0.55, setup() {
+      const d = dogArena(7, 2, 0.55);
+      // a stray far from the flock, right in front of the dog
+      const hc = herdCenter(), sh = sheep[0];
+      d.x = hc.x + 70; d.y = hc.y + 10; if (blocked(d.x, d.y)) { d.x = hc.x - 70; }
+      d.fx = 1; d.fy = 0; sh.x = d.x + 5; sh.y = d.y; sh.vx = 0; sh.vy = 0;
+      snapCam(d.x, d.y);
+      return [{ at: 0.6, run: () => dogSkill(sh) }, { at: 2.0, run: () => rushBilly('wolf', null, 50) }];
+    } },
+  dogScene(8, 4.0, 0.62, 2, () => [{ at: 0.2, run: () => ringFoes(5, 26, ['wolf', 'fox']) }, { at: 1.0, run: () => dogSkill() },
+    { at: 2.2, run: () => ringFoes(4, 26, ['wolf', 'bat']) }, { at: 2.9, run: () => dogSkill() }]),
+  dogScene(9, 4.4, 0.7, 5, () => [{ at: 0.1, run: () => ringFoes(7, 80, ['wolf', 'wolf', 'fox', 'bat']) }, { at: 1.6, run: () => dogSkill() }]),
+  { id: 'd_team', cap: 'TEAM UP WITH BILLY', dur: 4.6, day: 0.4, setup() {
+      trailerDefend(9, ['goat', 'dog:3', 'dog:9', 'dog:7'], 0.4); resetUpgrades(); comboN = 0;
+      players[0].skin = 0;
+      return [0, 0.3, 0.7, 1.1, 1.6, 2.1, 2.7].map((t, i) => ({ at: t, run: () => spawnNear(['wolf', 'bat', 'fox'][i % 3], { open: true }, 60) }));
+    } },
+  { id: 'd_style', cap: 'STYLE EVERY DOG', dur: 4.0, day: 0.2, setup() {
+      const d = dogArena(0, 4, 0.2);
+      const looks = [{ hat: 1, col: { hat: 1 } }, { acc: [2], col: { acc: 1 } }, { hat: 3, col: { hat: 3 } }, { outfit: 1, col: { outfit: 4 } }, { hat: 5 }, { hat: 2, col: { hat: 5 } }, { hair: 2, col: { hair: 5 } }, { outfit: 4, hat: 4 }, { acc: [0, 2] }];
+      return looks.map((l, k) => ({ at: k * 0.42, run: () => { d.skin = [1, 5, 2, 7, 4, 6, 3, 9, 8][k]; d.look = normLabLook(Object.assign({ coat: k % 3 }, l)); } }));
+    } },
+  { id: 'd_title', finale: true, dur: 6.5, day: 0.15, setup() {
+      players = [];
+      world = menuWorld; enemies = []; particles = []; texts = []; splats = [];
+      spawnHerd(world.start.x, world.start.y, 10, true);
+      makeDemo();
+      snapCam(world.start.x, world.start.y);
+      dayProgress = 0.15; setWeather('');
+      goScreen('TITLE');
+      return [{ at: 0.1, run: () => spawnFlock(false) }, { at: 1.2, run: () => spawnFlock(true) }];
+    } }
+];
 function startTrailer(which) {
   if (!showcase.on) showcase.saved = players;
-  rngFn = mulberry32(which === 'billy' ? 4242 : 777);
+  rngFn = mulberry32(which === 'billy' ? 4242 : (which === 'dogs' ? 9090 : 777));
   showcase.on = true;
   showcase.trailer = true;
-  showcase.scenes = which === 'billy' ? BILLY_TRAILER : TRAILER;
-  showcase.close = which === 'billy';
+  showcase.scenes = which === 'billy' ? BILLY_TRAILER : (which === 'dogs' ? DOGS_TRAILER : TRAILER);
+  showcase.close = which === 'billy' || which === 'dogs';
   showcase.i = -1;
   resize();            // closer camera for the trailer
   nextScene();
@@ -4147,6 +4237,11 @@ function drawTrailerOverlay() {
     rect(8 - slide, H - bar - 24, w, 18, 'k');
     rect(8 - slide, H - bar - 24, 3, 18, 'y');
     text(sc.cap, 16 - slide, H - bar - 20, 'w', { s: 2 });
+    if (sc.sub) {
+      const sw = textWidth(sc.sub) + 10;
+      rect(8 - slide, H - bar - 35, sw, 11, 'k');
+      text(sc.sub, 13 - slide, H - bar - 33, 'y');
+    }
   }
 }
 function startShowcase() {
@@ -5345,7 +5440,7 @@ function update(dt) {
   realTime += dt;
   stateTime += dt;
   pollPads();
-  if (state === 'TITLE' && !showcase.on && realTime - lastInput > 30 && stateTime > 30) { attractN = (attractN || 0) + 1; if (attractN % 3 === 1) startShowcase(); else startTrailer(attractN % 3 === 0 ? 'billy' : ''); }
+  if (state === 'TITLE' && !showcase.on && realTime - lastInput > 30 && stateTime > 30) { attractN = (attractN || 0) + 1; if (attractN % 4 === 1) startShowcase(); else startTrailer(['dogs', '', 'billy'][attractN % 4 - (attractN % 4 > 1 ? 1 : 0)] || ''); }
   if (showcase.on) updateShowcase(dt);
   dayProgress += (dayTarget - dayProgress) * damp(0.5, dt);
   if (shake > 0) shake = Math.max(0, shake - dt * 14);
@@ -5814,7 +5909,7 @@ function drawTitle() {
   rect(0, fy - 3, W, 13, 'k');
   if (best.escort || best.defend) text('BEST  ESCORT ' + best.escort + '  DEFEND ' + best.defend, W / 2, fy, 'y', { align: 'center' });
   else text('1-4 PLAYERS  GOATS AND DOGS', W / 2, fy, 's', { align: 'center' });
-  text('V0.12', W - 3, fy - 12, 'i', { align: 'right', outline: 'k' });
+  text('V0.13', W - 3, fy - 12, 'i', { align: 'right', outline: 'k' });
 }
 const MODES = [
   { id: 'escort', title: 'ESCORT', l1: 'HERD THE FLOCK PIN TO PIN', icon: 'pinGoal' },

@@ -164,7 +164,7 @@ const { chromium } = require('playwright');
     out.taller = Math.min(...GOAT_BREEDS.map((b, i) => vis(goatSetCached(i).E[0]))) > Math.max(...DOG_BREEDS.map(b => vis(labSet(b.unit, {}).E[0])));
     // v0.12: Billy's ram frames, stomp as an upgrade, screen-crack smash, his theme
     out.ram = D.slice(0, 3).every(d => SP.goat.ram[d].length === 4) && SP.goat.ram.S.length === 4;
-    out.billyTheme = !!THEMES.billy && BILLY_TRAILER.length >= 10;
+    out.billyTheme = !!THEMES.billy && BILLY_TRAILER.length >= 10 && !!THEMES.dogs && DOGS_TRAILER.filter(sc => sc.sub).length === 10;
     out.locked = skinUnlocked('dog', 9);
     out.boss = SP.boss.E[0].h >= 18 && SP.boss.run.S.length === 4 && SP.boss.N.length === 4;
     progress.medals.escort = progress.medals.escort.map(() => 7); progress.medals.defend = progress.medals.defend.map(() => 7);

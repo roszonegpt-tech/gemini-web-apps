@@ -2,10 +2,13 @@
 # Builds a trailer with a synthesized soundtrack (1080p). Needs Node + Playwright (Chromium) and ffmpeg.
 #   tools/trailer/make.sh          -> build/trailer/get-em-billy-trailer.mp4   (~69 s, every mode)
 #   tools/trailer/make.sh billy    -> build/trailer-billy/billy-trailer.mp4    (~55 s, Billy + his theme)
+#   tools/trailer/make.sh dogs     -> build/trailer-dogs/dogs-trailer.mp4      (~60 s, the ten farm dogs + their theme)
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 WHICH="${1:-main}"
-if [ "$WHICH" = "billy" ]; then OUT=build/trailer-billy; NAME=billy-trailer.mp4; else OUT=build/trailer; NAME=get-em-billy-trailer.mp4; fi
+if [ "$WHICH" = "billy" ]; then OUT=build/trailer-billy; NAME=billy-trailer.mp4
+elif [ "$WHICH" = "dogs" ]; then OUT=build/trailer-dogs; NAME=dogs-trailer.mp4
+else OUT=build/trailer; NAME=get-em-billy-trailer.mp4; fi
 mkdir -p "$OUT"
 node tools/trailer/record.js "$OUT" "$WHICH"
 node tools/trailer/render_audio.js "$OUT" "$WHICH"

@@ -2,6 +2,25 @@
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-11-05
+### Added
+- **Farm Dogs trailer** (`tools/trailer/make.sh dogs` writes `build/trailer-dogs/dogs-trailer.mp4`, about 62 s), in the style of the Billy trailer:
+  - **Opening cards:** "Every flock needs a dog." and "Meet the ten".
+  - **Breed scenes:** each of the 10 farm dogs gets a close-up scene captioned with its name and skill, staged to show that skill:
+    - the collie whistling the flock into the pen
+    - the corgi heel-nipping
+    - the sheltie sprinting
+    - the heeler bite-dashing
+    - the Old English gathering a scattered flock
+    - the shepherd's takedown
+    - the Jack Russell's yap frenzy on foxes and bats
+    - the Bernese carrying a stray
+    - the komondor's ambush
+    - the Great Pyrenees roaring a pack away
+  - **Ending:** a "Team up with Billy" co-op scene, a "Style every dog" montage, and the logo.
+- **The dogs' theme**: a bouncy G-major romp with octave bass, off-beat stabs, claps and a whistled melody (`THEMES.dogs`). Woofs and skill chimes are timed to the barks and skills recorded during the trailer.
+- Trailer captions can carry a second line (`sub`). The idle title screen cycles the demo, the main trailer, the Billy trailer and the dogs trailer.
+
 ## [0.12.0] - 2026-11-05
 ### Added
 - **Screen smash**: when Billy rams a foe out, there is a 20% chance (always for the Great Wolf) that it flies at the camera, hits the glass with a white flash, shake and shatter sound, and leaves a spider-web crack. It sticks squashed for a moment, then slides down the screen leaving a smear. The crack dithers away after about 3 s. It is drawn on the HUD layer, so the crack is never tinted.

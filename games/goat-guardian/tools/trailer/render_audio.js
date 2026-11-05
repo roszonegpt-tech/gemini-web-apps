@@ -1,23 +1,25 @@
-// Usage: node tools/trailer/render_audio.js [outDir] [main|billy]
+// Usage: node tools/trailer/render_audio.js [outDir] [main|billy|dogs]
 // Renders the trailer soundtrack offline (OfflineAudioContext in Chromium), timed to recorded scene marks.
 const { chromium } = require('playwright');
 const fs = require('fs');
 const path = require('path');
 const OUT = path.resolve(process.argv[2] || 'build/trailer');
-const BILLY = process.argv[3] === 'billy';
+const BILLY = process.argv[3] === 'billy', DOGS = process.argv[3] === 'dogs';
 (async () => {
   const marksAbs = JSON.parse(fs.readFileSync(path.join(OUT, 'trailer_marks.json'), 'utf8'));
   const start = marksAbs[0].t;
   const all = marksAbs.map(m => ({ id: m.id, t: m.t - start }));
   // scene cuts, plus in-game events logged during recording (ram hits, screen cracks)
-  const marks = all.filter(m => m.id !== 'hit' && m.id !== 'crack');
-  const hits = all.filter(m => m.id === 'hit').map(m => m.t), cracks = all.filter(m => m.id === 'crack').map(m => m.t);
-  const total = marks[marks.length - 1].t + (BILLY ? 6.7 : 6.2);
+  const EVENTS = ['hit', 'crack', 'bark', 'skill'];
+  const marks = all.filter(m => EVENTS.indexOf(m.id) < 0);
+  const ev = (id) => all.filter(m => m.id === id).map(m => m.t);
+  const hits = ev('hit'), cracks = ev('crack'), barks = ev('bark'), skills = ev('skill');
+  const total = marks[marks.length - 1].t + (BILLY || DOGS ? 6.7 : 6.2);
   const b = await chromium.launch();
   const p = await b.newPage();
   await p.goto('file://' + path.resolve(__dirname, '../../index.html'));
   await p.waitForTimeout(300);
-  const b64 = await p.evaluate(async ({ marks, total, hits, cracks, BILLY }) => {
+  const b64 = await p.evaluate(async ({ marks, total, hits, cracks, barks, skills, BILLY, DOGS }) => {
     const sr = 44100;
     const ctx = new OfflineAudioContext(2, Math.ceil(sr * total), sr);
     const comp = ctx.createDynamicsCompressor();
@@ -148,7 +150,63 @@ const BILLY = process.argv[3] === 'billy';
       osc('sine', 120, 40, t, 0.3, 0.8); nz(t, 0.7, 'highpass', 3500, 0.5, 1800); nz(t, 0.12, 'bandpass', 2400, 0.45, null, 3);
       for (let k = 0; k < 7; k++) { const f = 2400 + Math.random() * 2800; osc('sine', f, f * 0.8, t + 0.05 + k * 0.05, 0.14, 0.045, null, (Math.random() - 0.5)); }
     };
-    if (BILLY) {
+    // ---- the dogs' theme: bouncy octave bass, off-beat chord stabs, claps and a whistled melody ----
+    function dogRiff(t0, t1, o) {
+      o = o || {};
+      const th = THEMES.dogs, st = 60 / (o.bpm || 160) / 4, tr = o.tr || 0;
+      const minor = [false, false, false, true];
+      for (let i = 0; ; i++) {
+        const t = t0 + i * st;
+        if (t >= t1 - 0.01) break;
+        const s = i % 32, ci = Math.floor(s / 8), root = th.chords[ci] + tr, third = minor[ci] ? 3 : 4;
+        // bouncing bass: root, octave, fifth, octave
+        if (s % 2 === 0) { const bn = root - 24 + [0, 12, 7, 12][(s / 2) % 4]; osc('triangle', hz(bn), hz(bn), t, st * 1.6, 0.3); }
+        // off-beat stabs
+        if (s % 4 === 2 && !o.noStab) for (const n of [root, root + third, root + 7]) osc('square', hz(n), hz(n), t, st * 0.9, 0.028, 2200, (n - root) / 10 - 0.3);
+        const ln = th.lead[s];
+        if (ln && o.lead) {
+          osc('square', hz(ln + tr), hz(ln + tr), t, st * 1.8, 0.065, 3400, 0.15);
+          if (o.whistle) osc('sine', hz(ln + tr + 12), hz(ln + tr + 12), t, st * 1.6, 0.05, null, -0.2);
+        }
+        if (o.arp) osc('square', hz(root + 12 + [0, third, 7, 12][s % 4]), hz(root + 12 + [0, third, 7, 12][s % 4]), t, st * 0.6, 0.02, 3200, 0.35);
+        if (!o.noDrums) {
+          if (o.half ? s % 8 === 0 : (s % 8 === 0 || s % 8 === 3)) kick(t, 0.8);
+          if (o.half ? s % 16 === 8 : s % 8 === 4) { snare(t, 0.35); nz(t, 0.08, 'bandpass', 1500, 0.3, null, 1.2, 0.2); }
+          hat(t, s % 2 === 0 ? 0.08 : 0.045);
+          if (o.crash && s === 0) crash(t);
+        }
+      }
+    }
+    const woof = (t, v) => {
+      for (const [dt, f] of [[0, 420], [0.11, 330]]) {
+        osc('square', f * 1.4, f * 0.7, t + dt, 0.1, (v || 0.25), 1300, 0.1);
+        nz(t + dt, 0.07, 'bandpass', 1400, (v || 0.25) * 0.9, null, 2, 0.1);
+      }
+    };
+    const chime = (t) => { for (let k = 0; k < 3; k++) osc('square', hz(86 + k * 5), hz(86 + k * 5), t + k * 0.05, 0.12, 0.04, 4000, 0.3); nz(t, 0.25, 'bandpass', 900, 0.15, 3000, 2); };
+    const whistleTune = (t) => { osc('sine', hz(88), hz(95), t, 0.25, 0.12); osc('sine', hz(95), hz(84), t + 0.27, 0.4, 0.12); };
+    if (DOGS) {
+      let s = seg('d_cold'); dogRiff(s.t, s.end, { half: true, noStab: true }); woof(s.t + 1.2, 0.35);
+      s = seg('d_ten'); riser(s.t, s.end - s.t, 0.4); for (let k = 0; k < 8; k++) snare(s.end - 0.8 + k * 0.1, 0.12 + k * 0.04);
+      const scenes = ['d_bcollie', 'd_corgi', 'd_sheltie', 'd_acd', 'd_oes', 'd_gsd', 'd_jrt', 'd_bernese', 'd_komondor', 'd_pyrenees'];
+      scenes.forEach((id, k) => {
+        const g = seg(id); if (!g) return;
+        crash(g.t);
+        dogRiff(g.t, g.end, { lead: true, arp: k % 2 === 1, whistle: k >= 5, tr: k >= 5 ? 2 : 0 });
+      });
+      whistleTune(seg('d_bcollie').t + 1.0);
+      roar(seg('d_pyrenees').t + 1.6); boom(seg('d_pyrenees').t + 1.6);
+      s = seg('d_team'); crash(s.t); dogRiff(s.t, s.end, { lead: true, whistle: true, arp: true, tr: 2, crash: true });
+      s = seg('d_style'); dogRiff(s.t, s.end, { lead: true, arp: true });
+      s = seg('d_title'); crash(s.t); boom(s.t); dogRiff(s.t, s.end - 1.6, { lead: true, whistle: true, arp: true, crash: true });
+      const fc = s.end - 1.6;
+      for (const n of [55, 59, 62, 67, 43]) osc('square', hz(n), hz(n), fc, 1.5, 0.05, 2400, (n % 3 - 1) * 0.3);
+      crash(fc); kick(fc); woof(fc + 0.25, 0.4);
+      for (const t of barks) woof(t, 0.22);
+      for (const t of skills) chime(t);
+      for (const t of hits) ramHit(t);
+      for (const t of cracks) { glass(t); crash(t); }
+    } else if (BILLY) {
       let s = seg('b_cold'); drone(s.t, s.end - s.t + 0.3, 40, 0.05); for (let t = s.t + 0.3; t < s.end; t += 0.9) heart(t, 0.7); howl(s.t + 0.8);
       s = seg('b_but'); riser(s.t, s.end - s.t, 0.4); for (let k = 0; k < 8; k++) snare(s.end - 0.8 + k * 0.1, 0.15 + k * 0.04);
       s = seg('b_name'); crash(s.t); boom(s.t); for (const n of [40, 47, 52, 59]) osc('sawtooth', hz(n), hz(n), s.t, 1.6, 0.07, 1600, (n % 2) - 0.5); bleat(s.t + 0.35, 0.45);
@@ -202,7 +260,7 @@ const BILLY = process.argv[3] === 'billy';
     for (let i = 0; i < n; i++) { dv.setInt16(o, Math.max(-1, Math.min(1, L[i])) * 32767, true); dv.setInt16(o + 2, Math.max(-1, Math.min(1, R[i])) * 32767, true); o += 4; }
     const blob = new Blob([ab], { type: 'audio/wav' });
     return await new Promise((res) => { const fr = new FileReader(); fr.onload = () => res(fr.result.split(',')[1]); fr.readAsDataURL(blob); });
-  }, { marks, total, hits, cracks, BILLY });
+  }, { marks, total, hits, cracks, barks, skills, BILLY, DOGS });
   fs.writeFileSync(path.join(OUT, 'trailer_audio.wav'), Buffer.from(b64, 'base64'));
   fs.writeFileSync(path.join(OUT, 'trailer_cut.json'), JSON.stringify({ start, total }));
   console.log('audio ok', total.toFixed(2), 's');

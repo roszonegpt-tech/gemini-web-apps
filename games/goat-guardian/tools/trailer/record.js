@@ -1,5 +1,5 @@
 // Records the in-game trailer (startTrailer) at 1920x1080 and logs real scene-cut times.
-// Usage: node tools/trailer/record.js [outDir] [main|billy]
+// Usage: node tools/trailer/record.js [outDir] [main|billy|dogs]
 const { chromium } = require('playwright');
 const fs = require('fs');
 const path = require('path');
@@ -18,7 +18,7 @@ fs.mkdirSync(OUT, { recursive: true });
   await p.goto('file://' + path.resolve(__dirname, '../../index.html'));
   await p.evaluate(() => { settings.fullscreen = false; settings.music = false; settings.storySeen = true; });
   await p.waitForTimeout(2500);
-  await p.evaluate((w) => startTrailer(w === 'billy' ? 'billy' : ''), WHICH);
+  await p.evaluate((w) => startTrailer(w === 'billy' || w === 'dogs' ? w : ''), WHICH);
   const fpsSamples = [];
   for (let i = 0; i < 90; i++) {
     await p.waitForTimeout(1000);

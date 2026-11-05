@@ -1,6 +1,6 @@
 # State — Get em Billy (formerly Goat Guardian)
 
-**Version:** 0.12.0 · **Status:** Playable.
+**Version:** 0.13.0 · **Status:** Playable. v0.13.0 adds `DOGS_TRAILER` (`startTrailer('dogs')`, with `dogArena()`, `dogSkill()` and `ringFoes()`) and `THEMES.dogs`. The trailer tools take `main`, `billy` or `dogs`, and `__trailerMark('bark')` and `('skill')` time the woofs and chimes.
 
 v0.12.0 adds:
 - the screen smash: `trySplat()`, `drawSplats()` and `makeCracks()`; the `splats` array is drawn on the HUD canvas

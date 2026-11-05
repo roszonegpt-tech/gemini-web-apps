@@ -24,6 +24,7 @@ All art is drawn from pixel matrices in code, and all sound is synthesized with 
 - **Installable app:** when served from GitHub Pages it installs to a home screen and works offline.
 
 ## Trailer
+- **Farm Dogs trailer:** `tools/trailer/make.sh dogs` writes `build/trailer-dogs/dogs-trailer.mp4`, about 62 s, scored with the dogs' theme.
 - **Billy trailer:** `tools/trailer/make.sh billy` writes `build/trailer-billy/billy-trailer.mp4`, about 55 s, scored with Billy's own theme.
 - In the game, the title screen alternates between the gameplay demo and the trailer when left idle.
 - To build the video file, run `tools/trailer/make.sh` (needs Node, Playwright and ffmpeg). It writes `build/trailer/get-em-billy-trailer.mp4`: 1080p, about 65 s, with a soundtrack synthesized from the game's music.
