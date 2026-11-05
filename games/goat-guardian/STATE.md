@@ -1,6 +1,6 @@
-# State — Goat Guardian
+# State — Get em Billy (formerly Goat Guardian)
 
-**Version:** 0.10.0 · **Status:** Playable. v0.10.0 replaces the animal art with the Rusty Lab sprites (8 drawn directions, five actions, colourways and items) and adds the STYLE customization screen. v0.9.1 smoothed the walk and run animation (shared stride phase and hysteresis) and redraws the Great Wolf boss. v0.9.0 added 9 goat breeds, 10 farm dogs with their own skills, 4-frame walk and gallop cycles for every animal, and dog idle poses.
+**Version:** 0.11.0 · **Status:** Playable. v0.11.0 renames the game to **Get em Billy**; the folder, localStorage keys (`goatGuardian*`) and `GG1` share codes are deliberately unchanged. v0.10.1 bakes goats at a larger scale (0.92, `LAB.units.goat.scale`) so they stand taller than every dog. v0.10.0 replaced the animal art with the Rusty Lab sprites (8 drawn directions, five actions, colourways and items) and adds the STYLE customization screen. v0.9.1 smoothed the walk and run animation (shared stride phase and hysteresis) and redraws the Great Wolf boss. v0.9.0 added 9 goat breeds, 10 farm dogs with their own skills, 4-frame walk and gallop cycles for every animal, and dog idle poses.
 
 ## Snapshot
 - The whole game is in `index.html`. Its sections are: canvases, palette and remap, sprites, font, audio, world generation and rendering, camera, input devices, state, particles, collision, players, herd boids, enemies, modes, lobby, update, render, and boot.

@@ -1,4 +1,6 @@
-# Goat Guardian
+# Get em Billy
+
+*(Formerly Goat Guardian. The folder is still `games/goat-guardian/`, so links and saved progress keep working.)*
 
 A lo-fi portrait herding game for 1–4 local players. Each player is a **goat** or a **dog**, in any combination. Guide the flock across a scrolling forest world while shadow wolves and bats hunt it, and day fades into sunset.
 
@@ -23,7 +25,7 @@ All art is drawn from pixel matrices in code, and all sound is synthesized with 
 
 ## Trailer
 - In the game, the title screen alternates between the gameplay demo and the trailer when left idle.
-- To build the video file, run `tools/trailer/make.sh` (needs Node, Playwright and ffmpeg). It writes `build/trailer/goat-guardian-trailer.mp4`: 1080p, about 65 s, with a soundtrack synthesized from the game's music.
+- To build the video file, run `tools/trailer/make.sh` (needs Node, Playwright and ffmpeg). It writes `build/trailer/get-em-billy-trailer.mp4`: 1080p, about 65 s, with a soundtrack synthesized from the game's music.
 
 ## Maps
 - **Escort routes:** 1 Meadow Run (the original), 2 Birch Bend, 3 Switchbacks, 4 Twin Trails, 5 Stone Road, 6 Wolf Hollow, 7 Open Moor, 8 Lake of Pines, 9 The Long March, 10 Sunset Summit. Routes 2–10 get longer and wider.

@@ -1,5 +1,5 @@
-// Goat Guardian service worker: cache the game so it installs and plays offline.
-const CACHE = 'goat-guardian-v0.10.0';
+// Get em Billy service worker: cache the game so it installs and plays offline.
+const CACHE = 'get-em-billy-v0.11.0';
 const FILES = [
   './',
   './index.html',

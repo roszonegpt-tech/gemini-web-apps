@@ -4,11 +4,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="Goat Guardian">
+<meta name="apple-mobile-web-app-title" content="Get em Billy">
 <meta name="theme-color" content="#160c26">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="assets/icons/icon-192.png">
-<title>Goat Guardian</title>
+<title>Get em Billy</title>
 <style>
   :root { --bg: #0c0816; color-scheme: dark; }
   html, body { height: 100%; }
@@ -40,12 +40,12 @@
 </style>
 </head>
 <body>
-<div id="stage"><canvas id="game" tabindex="0" aria-label="Goat Guardian game. Use arrows or WASD and Space or Enter to choose menu options."></canvas></div>
+<div id="stage"><canvas id="game" tabindex="0" aria-label="Get em Billy game. Use arrows or WASD and Space or Enter to choose menu options."></canvas></div>
 <script>
 'use strict';
 
 /* =====================================================================
-   GOAT GUARDIAN  v0.3.0
+   GET EM BILLY  (formerly Goat Guardian)
    Lo-fi herding game for 1-4 local players (any mix of goat and dog).
    - Adaptive low-res buffer: integer pixel scale, width/height follow the
      screen so the game fills it (portrait or landscape).
@@ -713,6 +713,8 @@ function labFixedUnit(name, pal, eyes, views, acts, W) {
     [['Gold', '#f4d35e'], ['Red', '#e04848']], { E: HAWK },
     { idle: [0, 1, 2, 1], walk: [0, 1, 2, 1], run: [0, 1, 2, 1], jump: [0, 1, 2], attack: [3, 3, 3, 3] }, 17);
 }
+// goats are drawn a little larger than the farm dogs (the lab goat is shorter than the tallest dogs)
+LAB.units.goat.scale = 0.92;
 SP.goat = labSet('goat', {});
 SP.dog = labSet('bcollie', {});
 SP.wolf = labSet('wolf', { eyes: 1 });
@@ -3821,7 +3823,7 @@ const TRAILER = [
       trailerDefend(0, ['goat', 'dog'], 0.66);
       return [0, 0.4, 0.8, 1.3, 1.8].map((t, i) => ({ at: t, run: () => spawnNear('wolf', { alpha: i === 3 }, 80) }));
     } },
-  { id: 'need', card: ['THE FLOCK NEEDS', 'A GUARDIAN'], dur: 2.0, day: 0.66, setup() { return []; } },
+  { id: 'need', card: ['THE FLOCK NEEDS', 'A BILLY GOAT'], dur: 2.0, day: 0.66, setup() { return []; } },
   { id: 'ram', cap: 'GOATS RAM', dur: 5.0, day: 0.12, setup() {
       trailerDefend(4, ['goat', 'goat'], 0.12);
       return [0.1, 0.5, 0.9, 1.4, 2.0, 2.6, 3.2].map((t) => ({ at: t, run: () => spawnNear(rand() < 0.3 ? 'bat' : 'wolf', { open: true }, 48) }));
@@ -5250,7 +5252,7 @@ function drawWorldScene() {
   }
   drawBirdShadows();
   for (const s of sheep) drawShadow(wx(s.x), wy(s.y), s.type === 'lamb' ? 5 : 7);
-  for (const p of actors) drawShadow(wx(p.x), wy(p.y), p.kind === 'goat' ? 11 : 8);
+  for (const p of actors) drawShadow(wx(p.x), wy(p.y), p.kind === 'goat' ? 13 : 8);
   for (const e of enemies) {
     if (e.state === 'emerge' || (canopy(e.x, e.y) && e.type !== 'hawk' && e.type !== 'bat')) continue;
     if (e.type === 'hawk') drawShadow(wx(e.x), wy(e.y), Math.max(4, 11 - Math.round(e.alt / 6)));
@@ -5578,11 +5580,11 @@ function colW() { return Math.min(W - 16, 168); }
 function drawTitle() {
   const cy0 = Math.round(H * 0.1);
   const big = W >= 200 ? 5 : 4;
-  text('GOAT', W / 2, cy0, 'w', { s: big, align: 'center', outline: 'k' });
-  text('GUARDIAN', W / 2, cy0 + big * 5 + 6, 'y', { s: 2, align: 'center', outline: 'k' });
-  text('A HERDING TALE', W / 2, cy0 + big * 5 + 22, 'l', { align: 'center', outline: 'k' });
+  text('GET EM', W / 2, cy0, 'y', { s: 2, align: 'center', outline: 'k' });
+  text('BILLY', W / 2, cy0 + 16, 'w', { s: big, align: 'center', outline: 'k' });
+  text('A HERDING TALE', W / 2, cy0 + big * 5 + 26, 'l', { align: 'center', outline: 'k' });
   const w = Math.min(W - 24, 120);
-  const y = Math.max(cy0 + big * 5 + 28, Math.min(Math.round(H * 0.48), H - 104));
+  const y = Math.max(cy0 + big * 5 + 38, Math.min(Math.round(H * 0.48), H - 104));
   if (showcase.on && showcase.trailer) return;
   rect(Math.round(W / 2 - w / 2) - 2, y - 2, w + 4, 6 * 14 + 2, 'k');
   drawList(screenItems(), W / 2, y, w, 14);
@@ -5590,7 +5592,7 @@ function drawTitle() {
   rect(0, fy - 3, W, 13, 'k');
   if (best.escort || best.defend) text('BEST  ESCORT ' + best.escort + '  DEFEND ' + best.defend, W / 2, fy, 'y', { align: 'center' });
   else text('1-4 PLAYERS  GOATS AND DOGS', W / 2, fy, 's', { align: 'center' });
-  text('V0.10', W - 3, fy - 12, 'i', { align: 'right', outline: 'k' });
+  text('V0.11', W - 3, fy - 12, 'i', { align: 'right', outline: 'k' });
 }
 const MODES = [
   { id: 'escort', title: 'ESCORT', l1: 'HERD THE FLOCK PIN TO PIN', icon: 'pinGoal' },

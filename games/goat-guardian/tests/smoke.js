@@ -1,4 +1,4 @@
-// Headless smoke test for Goat Guardian v0.10: node tests/smoke.js (needs Playwright + Chromium).
+// Headless smoke test for Get em Billy v0.11: node tests/smoke.js (needs Playwright + Chromium).
 // Title -> Mode -> Players (2 keyboard players) -> escort, forces a ram and a bark, pens the herd,
 // advances a mission, runs 4-player defend, triggers game over, checks 6-direction facing and
 // adaptive resolution, starts and exits the attract-mode demo, and reports page errors.
@@ -160,6 +160,8 @@ const { chromium } = require('playwright');
       && px(labSet('bcollie', { coat: 1 }).E[0]) !== px(SP.dog.E[0]);
     out.sanitize = JSON.stringify(normLabLook({ hat: 99, acc: [7, 'x', 1, 1], col: { hat: -2 }, coat: 'z' })) === JSON.stringify(normLabLook({ acc: [1] }));
     remapQ = -1; buildRemap(0.8); out.remap = LAB_EXTRA.size > 20 && [...LAB_EXTRA.keys()].every(k => remapTable.has(k)); remapQ = -1; buildRemap(dayProgress);
+    const vis = (sp) => sprBox(sp).h;
+    out.taller = Math.min(...GOAT_BREEDS.map((b, i) => vis(goatSetCached(i).E[0]))) > Math.max(...DOG_BREEDS.map(b => vis(labSet(b.unit, {}).E[0])));
     out.locked = skinUnlocked('dog', 9);
     out.boss = SP.boss.E[0].h >= 18 && SP.boss.run.S.length === 4 && SP.boss.N.length === 4;
     progress.medals.escort = progress.medals.escort.map(() => 7); progress.medals.defend = progress.medals.defend.map(() => 7);
@@ -188,7 +190,7 @@ const { chromium } = require('playwright');
     return out;
   });
   if (v9.styleState !== 'STYLE' || !v9.styleSaved || v9.styleRows < 12 || v9.styleBack !== 'PLAYERS') fail('style ' + JSON.stringify(v9));
-  if (v9.goats !== 12 || v9.dogs !== 10 || !v9.sets || !v9.leftArt || !v9.items || !v9.sanitize || !v9.remap || v9.locked || !v9.boss || v9.gaitFlips) fail('breeds ' + JSON.stringify(v9));
+  if (v9.goats !== 12 || v9.dogs !== 10 || !v9.sets || !v9.leftArt || !v9.items || !v9.sanitize || !v9.remap || v9.locked || !v9.taller || !v9.boss || v9.gaitFlips) fail('breeds ' + JSON.stringify(v9));
   if (v9.corgi !== 'stun' || v9.pyrenees !== 'flee' || !v9.carry || !v9.drop || v9.ratter !== 'launched' || !v9.sit) fail('dog skills ' + JSON.stringify(v9));
   const wasFs = await p.evaluate(() => isFs());
   await p.evaluate(() => exitFs());

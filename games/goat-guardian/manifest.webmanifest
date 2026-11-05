@@ -1,6 +1,6 @@
 {
-  "name": "Goat Guardian",
-  "short_name": "Goat Guardian",
+  "name": "Get em Billy",
+  "short_name": "Get em Billy",
   "description": "Lo-fi herding game for 1-4 players: goats ram, dogs herd, escort the flock home before nightfall.",
   "start_url": "./index.html",
   "scope": "./",

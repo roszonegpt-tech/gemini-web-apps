@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Builds build/trailer/goat-guardian-trailer.mp4 (1080p, ~65 s, with a synthesized soundtrack).
+# Builds build/trailer/get-em-billy-trailer.mp4 (1080p, ~65 s, with a synthesized soundtrack).
 # Needs Node + Playwright (Chromium) and ffmpeg.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
@@ -13,5 +13,5 @@ ffmpeg -v error -y -ss "$START" -i "$OUT/trailer_raw.webm" -i "$OUT/trailer_audi
   -vf "fps=30,fade=t=in:st=0:d=0.4,fade=t=out:st=$FO:d=1.0" \
   -af "afade=t=in:st=0:d=0.3,afade=t=out:st=$FO:d=1.0,loudnorm=I=-14:TP=-1.5:LRA=11" \
   -c:v libx264 -preset slow -crf 20 -pix_fmt yuv420p -c:a aac -b:a 192k -ar 44100 -movflags +faststart \
-  "$OUT/goat-guardian-trailer.mp4"
-echo "Trailer: $OUT/goat-guardian-trailer.mp4"
+  "$OUT/get-em-billy-trailer.mp4"
+echo "Trailer: $OUT/get-em-billy-trailer.mp4"

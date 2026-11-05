@@ -1,6 +1,16 @@
-# Changelog
+# Changelog — Get em Billy (formerly Goat Guardian)
 
 ## [Unreleased]
+
+## [0.11.0] - 2026-11-05
+### Changed
+- **Renamed to Get em Billy.** Updated the title screen logo ("GET EM" over a big "BILLY"), the page title, the home-screen app name (manifest and iOS), the trailer's title card ("The flock needs a billy goat") and finale, the docs, and the trailer file (`build/trailer/get-em-billy-trailer.mp4`).
+- Unchanged so nothing breaks: the folder `games/goat-guardian/`, the saved-data keys (settings, looks, medals and bests carry over) and the `GG1` map share codes. The service worker cache is renamed, so installed copies refresh.
+
+## [0.10.1] - 2026-11-05
+### Changed
+- Goats are drawn larger than the farm dogs: the goat is baked at 0.92 of the lab size (12 px tall) and the dogs at 2/3 (at most 10 px tall). The goat shadow is wider to match. The smoke test checks that every goat breed is taller than every dog.
+- The trailer was rebuilt with the Rusty Lab animals.
 
 ## [0.10.0] - 2026-11-05
 ### Changed
