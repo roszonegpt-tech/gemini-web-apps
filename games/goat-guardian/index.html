@@ -506,15 +506,17 @@ function labBody(g) {
   g[bot].forEach((c, x) => { if (c !== '.') { x0 = Math.min(x0, x); x1 = Math.max(x1, x); } });
   return { bot, last, leg: last - bot, x0, x1 };
 }
-function labShiftCols(g, cols, n, keepBelow) {
+// move the pixels of some columns down by n. Pixels below keepBelow are dropped
+// (legs folded away) unless keepLegs, which leaves them standing where they were.
+function labShiftCols(g, cols, n, keepBelow, keepLegs) {
   const H = g.length, out = g.map(r => r.slice());
   for (const x of cols) {
     const colPx = [];
-    for (let y = 0; y < H; y++) { colPx.push(g[y][x]); out[y][x] = '.'; }
+    for (let y = 0; y < H; y++) { colPx.push(g[y][x]); if (!(keepLegs && keepBelow !== undefined && y > keepBelow)) out[y][x] = '.'; }
     for (let y = 0; y < H; y++) {
       if (keepBelow !== undefined && y > keepBelow) continue;
       const ny = y + n;
-      if (colPx[y] !== '.' && ny >= 0 && ny < H) out[ny][x] = colPx[y];
+      if (colPx[y] !== '.' && ny >= 0 && ny < H && (out[ny][x] === '.' || ny <= keepBelow)) out[ny][x] = colPx[y];
     }
   }
   return out;
@@ -552,9 +554,21 @@ function labPose(g, d, pose) {
   if (pose === 'sniff') {
     if (!f) return g;
     const hc = labHeadCols(b, f, W);
-    return labShiftCols(g, hc, Math.min(2, b.leg), b.bot);
+    return labShiftCols(g, hc, Math.min(2, b.leg), b.bot, true);
   }
   return g;
+}
+// the ram charge: the lab's head-down butt (attack frame) on top of the gallop legs of a run frame,
+// lined up on the body's underside, then dropped so the feet stay on the ground row (keeps the bob)
+function labRam(atk, run) {
+  const H = atk.length, W = atk[0].length, ba = labBody(atk), br = labBody(run);
+  const rows = [];
+  for (let y = 0; y <= ba.bot; y++) rows.push(atk[y].slice());
+  for (let y = br.bot + 1; y <= br.last; y++) rows.push(run[y].slice());
+  const shift = H - rows.length;
+  const out = labGrid(W, H);
+  rows.forEach((r, i) => { const y = i + shift; if (y >= 0 && y < H) out[y] = r; });
+  return out;
 }
 // shrink a composed grid to the game's sprite scale (2/3). Every source pixel lands in
 // exactly one output pixel, so a 1px eye stays 1px; an output pixel is filled when any of
@@ -609,6 +623,11 @@ function labSet(id, look) {
     const i0R = grid(dR, 'idle', 0), i0L = grid(dL, 'idle', 0);
     for (const ps of ['sit', 'lie', 'alert']) set.pose[ps][k] = pair(dR, dL, labPose(i0R, dR, ps), labPose(i0L, dL, ps));
     set.pose.sniff[k] = u.art[dR].walk.map((_, i) => pair(dR, dL, labPose(grid(dR, 'walk', i), dR, 'sniff'), labPose(grid(dL, 'walk', i), dL, 'sniff')));
+    if (id === 'goat') {
+      // the ram charge: gallop frames with the head down (front and back views use the head-dip frames)
+      if (!set.ram) set.ram = {};
+      set.ram[k] = LAB_FRONT[dR] ? u.art[dR].run.map((_, i) => pair(dR, dL, labRam(grid(dR, 'attack', 2), grid(dR, 'run', i)), labRam(grid(dL, 'attack', 2), grid(dL, 'run', i)))) : acts.attack;
+    }
   }
   if (labCache.size > 160) labCache.clear();
   labCache.set(key, set);
@@ -942,6 +961,15 @@ function noise(dur, type, freq, vol, q, t0, freq1) {
   src.stop(t + dur + 0.05);
 }
 const SFX = {
+  glass() {
+    // the screen cracks: a thud, a bright shatter and a few tinkling shards
+    if (!audioReady()) return;
+    const t = AC.currentTime;
+    tone('sine', 120, 40, 0.3, 0.9, t);
+    noise(0.5, 'highpass', 3500, 0.55, 0.7, t, 1800);
+    noise(0.12, 'bandpass', 2400, 0.5, 3, t);
+    for (let k = 0; k < 6; k++) tone('sine', 2400 + Math.random() * 2600, 1800 + Math.random() * 1500, 0.12, 0.07, t + 0.05 + k * 0.05 + Math.random() * 0.03);
+  },
   dash() {
     if (!audioReady()) return;
     const t = AC.currentTime;
@@ -1096,6 +1124,9 @@ const SFX = {
 // Music: tiny chiptune sequencer, one loop per time of day
 // ---------------------------------------------------------------------
 const THEMES = {
+  // Billy's theme: a stomping, heroic E-minor riff
+  billy: { bpm: 140, wave: 'square', chords: [52, 48, 43, 50],
+    lead: [76, 0, 76, 79, 0, 81, 0, 79, 76, 0, 74, 0, 72, 0, 74, 76, 0, 0, 76, 79, 0, 83, 0, 81, 79, 0, 76, 0, 74, 0, 71, 0] },
   day: { bpm: 112, wave: 'square', chords: [48, 43, 45, 41],
     lead: [72, 0, 76, 0, 79, 0, 76, 0, 74, 0, 79, 0, 83, 0, 79, 0, 76, 0, 72, 0, 69, 0, 72, 0, 77, 0, 76, 0, 74, 0, 72, 0] },
   dusk: { bpm: 92, wave: 'square', chords: [45, 41, 48, 43],
@@ -1127,7 +1158,7 @@ function updateMusic() {
   musicBus.gain.setTargetAtTime(want, AC.currentTime, 0.3);
   if (!settings.music) { music.nextT = 0; return; }
   const night = !isMenu() && dayProgress > 0.8, dusk = !isMenu() && dayProgress > 0.42;
-  const theme = night ? 'night' : (dusk ? 'dusk' : 'day');
+  const theme = isMenu() && !showcase.on ? 'billy' : (night ? 'night' : (dusk ? 'dusk' : 'day'));
   if (theme !== music.theme && music.step % 16 === 0) music.theme = theme;
   const th = THEMES[music.theme];
   const stepDur = 60 / th.bpm / 4;
@@ -2072,11 +2103,12 @@ function resize() {
   const dpr = window.devicePixelRatio || 1;
   const dw = Math.max(1, Math.floor((stage.clientWidth || window.innerWidth) * dpr));
   const dh = Math.max(1, Math.floor((stage.clientHeight || window.innerHeight) * dpr));
-  let k = Math.max(1, Math.round(dh / (typeof showcase !== 'undefined' && showcase.trailer ? 180 : 288)));
+  const tr = typeof showcase !== 'undefined' && showcase.trailer, close = tr && showcase.close;   // the Billy trailer films close up
+  let k = Math.max(1, Math.round(dh / (close ? 135 : (tr ? 180 : 288))));
   if (Math.floor(dw / k) < 144) k = Math.max(1, Math.floor(dw / 144));
-  if (Math.floor(dh / k) < 210) k = Math.max(1, Math.floor(dh / 210));
+  if (!close && Math.floor(dh / k) < 210) k = Math.max(1, Math.floor(dh / 210));
   W = clamp(Math.floor(dw / k), 120, 560);
-  H = clamp(Math.floor(dh / k), 180, 420);
+  H = clamp(Math.floor(dh / k), close ? 120 : 180, 420);
   PIX = k;
   BW = W + 2; BH = H + 2;
   buf.width = BW; buf.height = BH;
@@ -2402,8 +2434,10 @@ const STOMP_CD = 6, STOMP_R = 34, WHISTLE_CD = 7, WHISTLE_R = 90;
 function playerAbility(p) {
   if (p.down > 0 || p.stun > 0) return;
   if (p.cd2 > 0) { if (p.cd2 < 0.25) p.queue2 = 0.3; return; }
-  if (p.kind === 'goat') stomp(p);
-  else if (p.kind === 'dog') dogAbility(p);
+  if (p.kind === 'goat') {
+    if (upg.stomp) stomp(p);
+    else if (realTime - (p.lockMsg || -9) > 1.5) { p.lockMsg = realTime; addText(p.x, p.y - 16, 'STOMP: BUY IN UPGRADES', 'l'); SFX.back(); }
+  } else if (p.kind === 'dog') dogAbility(p);
   else if (p.kind === 'wolf') howl(p);
 }
 // every farm dog has its own skill (DOG_BREEDS[].ability)
@@ -3102,6 +3136,7 @@ function checkRamHits() {
       const ey = e.y - (flier ? Math.min(e.alt, 8) : 3);
       if (len(e.x - hx, ey - hy) > (flier ? 10 : (e.boss ? 14 : 9))) continue;
       e.hits[p.slot] = p.ramId;
+      if (showcase.trailer && typeof window.__trailerMark === 'function') window.__trailerMark('hit');
       let dx = e.x - p.x, dy = e.y - p.y;
       const l = len(dx, dy) || 1;
       dx = dx / l * 0.5 + p.fx * 0.8; dy = dy / l * 0.5 + p.fy * 0.8;
@@ -3120,6 +3155,7 @@ function checkRamHits() {
         if (e.boss) { addText(e.x, e.y - 24, 'GREAT WOLF DOWN!', 'y'); bells += 10; SFX.roar(); addShake(6); }
         else addText(e.x, e.y - 14, '+1', 'y');
         addCombo(e.x, e.y);
+        if (trySplat(e)) { enemies.splice(i, 1); p.vx *= 0.75; p.vy *= 0.75; continue; }
       } else if (e.boss) {
         e.state = 'stun'; e.t = 0.45; e.vx = dx * 70; e.vy = dy * 70;
         addText(e.x, e.y - 24, e.hp + ' HP', 'y');
@@ -3130,6 +3166,100 @@ function checkRamHits() {
       }
       p.vx *= 0.75; p.vy *= 0.75;
     }
+  }
+}
+
+// ---------------------------------------------------------------------
+// Billy's screen smash: a rammed foe sometimes flies at the camera, cracks
+// the screen and slides down the glass (HUD layer, never palette-swapped)
+// ---------------------------------------------------------------------
+let splats = [], splatLast = 0;
+const SPLAT_CHANCE = 0.2;
+function trySplat(e) {
+  if (splats.length) return false;
+  if (!(e.boss || (showcase.on && showcase.forceCrack) || rand() < SPLAT_CHANCE)) return false;
+  const set = e.boss ? SP.boss : (e.type === 'bat' ? SP.bat : (e.type === 'hawk' ? SP.hawk : (e.type === 'fox' ? SP.fox : (e.alpha ? SP.alpha : SP.wolf))));
+  const sx = e.x - cam.x, sy = e.y - cam.y - 6 - (e.alt || 0);
+  splats.push({ spr: set.S[0], sx: sx, sy: sy, tx: clamp(sx + rr(-W * 0.15, W * 0.15), W * 0.22, W * 0.78), ty: rr(H * 0.25, H * 0.4),
+    t: 0, hit: false, seed: Math.floor(rand() * 1e9), boss: !!e.boss });
+  addText(e.x, e.y - 18, e.boss ? 'TO THE MOON!' : 'YEET!', 'y');
+  return true;
+}
+function makeCracks(cx, cy, seed) {
+  const r = mulberry32(seed), lines = [], R = Math.min(W, H) * (0.22 + r() * 0.08), rays = 9 + Math.floor(r() * 4);
+  const pts = [];
+  for (let i = 0; i < rays; i++) {
+    const a = (i / rays) * Math.PI * 2 + (r() - 0.5) * 0.5, L = R * (0.55 + r() * 0.6);
+    let x = cx, y = cy;
+    const ray = [[x, y]];
+    for (let d = 5; d < L; d += 5 + r() * 6) {
+      x = cx + Math.cos(a) * d + (r() - 0.5) * 4; y = cy + Math.sin(a) * d + (r() - 0.5) * 4;
+      ray.push([x, y]);
+    }
+    pts.push(ray);
+    for (let k = 1; k < ray.length; k++) lines.push([ray[k - 1], ray[k]]);
+    if (r() < 0.5 && ray.length > 3) {   // a forked splinter
+      const m = ray[Math.floor(ray.length / 2)], b = a + (r() < 0.5 ? -0.6 : 0.6);
+      lines.push([m, [m[0] + Math.cos(b) * R * 0.3, m[1] + Math.sin(b) * R * 0.3]]);
+    }
+  }
+  // spider-web rings joining neighbouring rays
+  for (const ringI of [1, 3]) for (let i = 0; i < rays; i++) {
+    const a = pts[i][ringI], b = pts[(i + 1) % rays][ringI];
+    if (a && b && r() < 0.85) lines.push([a, b]);
+  }
+  return lines;
+}
+function crackLine(x0, y0, x1, y1, col, skip) {
+  x0 = Math.round(x0); y0 = Math.round(y0); x1 = Math.round(x1); y1 = Math.round(y1);
+  const dx = Math.abs(x1 - x0), dy = -Math.abs(y1 - y0), sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1;
+  let err = dx + dy, n = 0;
+  for (;;) {
+    if (!skip || !skip(x0, y0)) px(x0, y0, col);
+    if (x0 === x1 && y0 === y1 || n++ > 400) break;
+    const e2 = 2 * err;
+    if (e2 >= dy) { err += dy; x0 += sx; }
+    if (e2 <= dx) { err += dx; y0 += sy; }
+  }
+}
+function drawSplats() {
+  const dt = clamp(realTime - splatLast, 0, 0.05);
+  splatLast = realTime;
+  const FLY = 0.34, STICK = 0.8, K = W >= 300 ? 6 : 4;
+  for (let i = splats.length - 1; i >= 0; i--) {
+    const s = splats[i];
+    s.t += dt;
+    let x, y, k, sqx = 1, sqy = 1;
+    if (s.t < FLY) {
+      const u = s.t / FLY, e2 = u * u;
+      x = lerp(s.sx, s.tx, e2); y = lerp(s.sy, s.ty, e2) - Math.sin(u * Math.PI) * H * 0.12; k = lerp(1, K, e2);
+    } else {
+      if (!s.hit) {
+        s.hit = true; s.lines = makeCracks(s.tx, s.ty, s.seed);
+        SFX.glass(); addShake(7); hitStop = Math.max(hitStop, 0.08); s.flash = 0.07;
+        if (showcase.trailer && typeof window.__trailerMark === 'function') window.__trailerMark('crack');
+      }
+      k = K;
+      const st = s.t - STICK;
+      x = s.tx;
+      if (st < 0) { y = s.ty; sqx = 1.2; sqy = 0.82; }
+      else { y = s.ty + 5 * st + 30 * st * st; sqx = 1.1; sqy = 0.9 + Math.min(0.2, st * 0.12); }
+      s.y = y;
+    }
+    const w = Math.round(s.spr.w * k * sqx), h = Math.round(s.spr.h * k * sqy);
+    // smear left on the glass as it slides
+    if (s.hit && s.t > STICK) for (let yy = Math.round(s.ty); yy < Math.min(H, y - h * 0.3); yy++) for (let xx = Math.round(x - w * 0.18); xx < x + w * 0.18; xx++) if ((xx + yy) % 3 === 0) px(xx, yy, 'l');
+    if (y - h / 2 < H + 4) G.drawImage(s.spr.r, 0, 0, s.spr.w, s.spr.h, Math.round(x - w / 2), Math.round(y - h / 2), w, h);
+    if (s.lines) {
+      // cracks sit on the glass in front; they dither away at the end
+      const fade = clamp((s.t - 3.0) / 0.8, 0, 1);
+      const skip = fade > 0 ? (xx, yy) => ((xx * 7 + yy * 13) % 10) / 10 < fade : null;
+      for (const [a, b] of s.lines) crackLine(a[0] + 1, a[1] + 1, b[0] + 1, b[1] + 1, 'k', skip);
+      for (const [a, b] of s.lines) crackLine(a[0], a[1], b[0], b[1], 'w', skip);
+      if (fade < 1) for (let a = 0; a < 12; a++) px(s.tx + Math.cos(a) * 2.5, s.ty + Math.sin(a) * 2, 'w');
+    }
+    if (s.flash > 0) { s.flash -= dt; if (!settings.reduceFlash) { G.fillStyle = PAL_DAY.w; G.globalAlpha = 0.35; G.fillRect(0, 0, W, H); G.globalAlpha = 1; } }
+    if (s.t > 3.9) splats.splice(i, 1);
   }
 }
 
@@ -3162,11 +3292,12 @@ const UPGRADES = [
   { id: 'bark', name: 'BIG BARK', desc: 'WIDER BARK' },
   { id: 'speed', name: 'SWIFT HOOVES', desc: 'FASTER SHEPHERDS' },
   { id: 'cool', name: 'QUICK SKILLS', desc: 'SHORTER STOMP/WHISTLE' },
-  { id: 'pen', name: 'WIDE PEN', desc: 'BIGGER PEN (ESCORT)' }
+  { id: 'pen', name: 'WIDE PEN', desc: 'BIGGER PEN (ESCORT)' },
+  { id: 'stomp', name: 'STOMP', desc: 'GOAT SKILL: STUN ALL NEARBY', max: 1, cost: [8] }
 ];
 const UPG_COST = [6, 12, 20];
-let upg = { ram: 0, bark: 0, speed: 0, cool: 0, pen: 0 };
-function resetUpgrades() { upg = { ram: 0, bark: 0, speed: 0, cool: 0, pen: 0 }; }
+let upg = { ram: 0, bark: 0, speed: 0, cool: 0, pen: 0, stomp: 0 };
+function resetUpgrades() { upg = { ram: 0, bark: 0, speed: 0, cool: 0, pen: 0, stomp: 0 }; }
 function upgradeMul(id) {
   const l = (upg && upg[id]) || 0;
   if (id === 'cool') return 1 - 0.15 * l;
@@ -3175,10 +3306,10 @@ function upgradeMul(id) {
 }
 function shopItems(backFn) {
   const items = UPGRADES.map(u => {
-    const lvl = upg[u.id], cost = UPG_COST[lvl];
-    return { label: u.name + ' ' + lvl + '/3', value: lvl >= 3 ? 'MAX' : cost + ' BELLS', desc: u.desc,
+    const lvl = upg[u.id] || 0, max = u.max || 3, cost = (u.cost || UPG_COST)[lvl];
+    return { label: u.name + ' ' + lvl + '/' + max, value: lvl >= max ? (max === 1 ? 'OWNED' : 'MAX') : cost + ' BELLS', desc: u.desc,
       select: () => {
-        if (lvl >= 3) return;
+        if (lvl >= max) return;
         if (bells < cost) { SFX.back(); return; }
         bells -= cost; upg[u.id]++; SFX.coin();
         if (u.id === 'pen' && world && world.goal) world.goalR = 26 + 4 * upg.pen;
@@ -3886,12 +4017,80 @@ const TRAILER = [
       return [{ at: 0.1, run: () => spawnFlock(false) }, { at: 0.8, run: () => spawnFlock(true) }, { at: 2.0, run: () => spawnFlock(false) }];
     } }
 ];
-function startTrailer() {
+// ---- the Billy trailer: one goat against everything, scored to his theme
+function billyArena(idx, day, look) {
+  trailerDefend(idx, ['goat'], day);
+  resetUpgrades();
+  showcase.forceCrack = false;
+  const b = players[0];
+  b.skin = 0; b.look = normLabLook(look || {});
+  return b;
+}
+// a foe that rushes straight at Billy across open ground
+function rushBilly(type, opts, dist) {
+  const b = players[0], e = spawnNear(type, Object.assign({ open: true }, opts || {}), dist || 46);
+  const a = Math.atan2(e.y - b.y, e.x - b.x);
+  e.x = b.x + Math.cos(a) * (dist || 46); e.y = b.y + Math.sin(a) * (dist || 46) * 0.8;
+  if (blocked(e.x, e.y)) { e.x = b.x + (dist || 46); e.y = b.y; }
+  e.state = 'hunt'; e.t = 0;
+  e.downCd = 999;          // nothing knocks Billy over in his own trailer
+  return e;
+}
+const BILLY_TRAILER = [
+  { id: 'b_cold', card: ['THE WOLVES THOUGHT', 'THE FLOCK WAS EASY.'], eyes: 'r', dur: 3.0, day: 0.85, setup() { billyArena(0, 0.85); return []; } },
+  { id: 'b_but', card: ['THEN THEY MET...'], dur: 1.5, day: 0.85, setup() { return []; } },
+  { id: 'b_name', card: ['BILLY'], big: true, dur: 1.8, day: 0.85, setup() { return []; } },
+  { id: 'b_walk', cap: 'ONE GOAT', dur: 3.4, day: 0.12, setup() { billyArena(4, 0.12); return []; } },
+  { id: 'b_ram', cap: 'ONE RAM', dur: 4.6, day: 0.12, setup() {
+      billyArena(4, 0.12);
+      return [0.2, 1.0, 1.9, 2.8, 3.6].map(t => ({ at: t, run: () => rushBilly(t > 2.5 ? 'fox' : 'wolf') }));
+    } },
+  { id: 'b_crack', cap: 'RIGHT INTO YOUR SCREEN', dur: 6.6, day: 0.3, setup() {
+      billyArena(6, 0.3); showcase.forceCrack = true;
+      return [{ at: 0.1, run: () => rushBilly('wolf', null, 40) }, { at: 4.0, run: () => rushBilly('wolf', null, 40) }];
+    } },
+  { id: 'b_combo', cap: 'COMBO AFTER COMBO', dur: 5.2, day: 0.45, setup() {
+      billyArena(9, 0.45); upg.ram = 3;
+      return [0, 0.3, 0.6, 0.9, 1.3, 1.7, 2.1, 2.6, 3.1, 3.6].map((t, i) => ({ at: t, run: () => rushBilly(['wolf', 'bat', 'wolf', 'fox'][i % 4], null, 36 + (i % 3) * 14) }));
+    } },
+  { id: 'b_stomp', cap: 'EARN THE STOMP', dur: 4.4, day: 0.55, setup() {
+      billyArena(2, 0.55); upg.stomp = 1;
+      const ring = () => { for (let k = 0; k < 5; k++) { const e = rushBilly(k % 2 ? 'bat' : 'wolf', null, 26); const a = k / 5 * Math.PI * 2, b = players[0]; e.x = b.x + Math.cos(a) * 24; e.y = b.y + Math.sin(a) * 18; } };
+      return [{ at: 0.2, run: ring }, { at: 1.1, run: () => { players[0].cd2 = 0; stomp(players[0]); } },
+        { at: 2.4, run: ring }, { at: 3.2, run: () => { players[0].cd2 = 0; stomp(players[0]); } }];
+    } },
+  { id: 'b_alpha', cap: 'ALPHAS GO DOWN TOO', dur: 4.6, day: 0.72, setup() {
+      billyArena(5, 0.72); showcase.forceCrack = false;
+      return [0.1, 1.3, 2.6].map(t => ({ at: t, run: () => rushBilly('wolf', { alpha: true }, 44) }));
+    } },
+  { id: 'b_boss_card', card: ['EVEN THE', 'GREAT WOLF...'], eyes: 'y', dur: 2.0, day: 0.6, setup() { return []; } },
+  { id: 'b_boss', cap: '...GETS THE HORNS', dur: 7.2, day: 0.6, setup() {
+      billyArena(5, 0.6); upg.ram = 2;
+      return [{ at: 0.1, run: () => { const e = rushBilly('wolf', { boss: true }, 60); e.hp = 3; e.maxHp = 3; e.t = 0.1; } }];
+    } },
+  { id: 'b_style', cap: 'DRESS HIM UP', dur: 3.8, day: 0.2, setup() {
+      const b = billyArena(4, 0.2);
+      const looks = [{ hat: 3, col: { hat: 5 } }, { hat: 1, col: { hat: 1 } }, { outfit: 5 }, { hat: 2, col: { hat: 3 } }, { acc: [2], hat: 4 }, { hair: 3, col: { hair: 2 } }, { hat: 5 }, { outfit: 1, col: { outfit: 5 }, hat: 3 }];
+      return looks.map((l, i) => ({ at: i * 0.45, run: () => { b.look = normLabLook(l); b.skin = [0, 3, 4, 1, 5, 6, 2, 7][i]; } }));
+    } },
+  { id: 'b_title', finale: true, dur: 6.5, day: 0.15, setup() {
+      players = [];
+      world = menuWorld; enemies = []; particles = []; texts = []; splats = [];
+      spawnHerd(world.start.x, world.start.y, 10, true);
+      makeDemo();
+      snapCam(world.start.x, world.start.y);
+      dayProgress = 0.15; setWeather('');
+      goScreen('TITLE');
+      return [{ at: 0.1, run: () => spawnFlock(false) }, { at: 1.2, run: () => spawnFlock(true) }];
+    } }
+];
+function startTrailer(which) {
   if (!showcase.on) showcase.saved = players;
-  rngFn = mulberry32(777);
+  rngFn = mulberry32(which === 'billy' ? 4242 : 777);
   showcase.on = true;
   showcase.trailer = true;
-  showcase.scenes = TRAILER;
+  showcase.scenes = which === 'billy' ? BILLY_TRAILER : TRAILER;
+  showcase.close = which === 'billy';
   showcase.i = -1;
   resize();            // closer camera for the trailer
   nextScene();
@@ -3914,7 +4113,7 @@ function drawTrailerOverlay() {
   if (sc.card) {
     rect(0, 0, W, H, 'k');
     const lines = sc.card;
-    const s = W >= 400 ? 4 : (W >= 260 ? 3 : 2);
+    const s = (W >= 400 ? 4 : (W >= 260 ? 3 : 2)) * (sc.big ? 2 : 1);
     const reveal = clamp(t / 0.35, 0, 1);
     let y = Math.round(H / 2 - (lines.length * (s * 5 + 8)) / 2);
     lines.forEach((ln, i) => {
@@ -3980,6 +4179,9 @@ function endShowcase() {
   const wasTrailer = showcase.trailer;
   showcase.on = false;
   showcase.trailer = false;
+  showcase.forceCrack = false;
+  showcase.close = false;
+  splats = [];
   showcase.scenes = SCENES;
   if (wasTrailer) resize();
   rngFn = Math.random;
@@ -5143,7 +5345,7 @@ function update(dt) {
   realTime += dt;
   stateTime += dt;
   pollPads();
-  if (state === 'TITLE' && !showcase.on && realTime - lastInput > 30 && stateTime > 30) { attractN = (attractN || 0) + 1; if (attractN % 2) startShowcase(); else startTrailer(); }
+  if (state === 'TITLE' && !showcase.on && realTime - lastInput > 30 && stateTime > 30) { attractN = (attractN || 0) + 1; if (attractN % 3 === 1) startShowcase(); else startTrailer(attractN % 3 === 0 ? 'billy' : ''); }
   if (showcase.on) updateShowcase(dt);
   dayProgress += (dayTarget - dayProgress) * damp(0.5, dt);
   if (shake > 0) shake = Math.max(0, shake - dt * 14);
@@ -5217,7 +5419,7 @@ function actorSprite(p) {
   const set = skinSet(p.kind, p.skin, p.look);
   const sp = len(p.vx, p.vy);
   const atk = set.attack[dir], prog = (t, T, n) => clamp(Math.floor((1 - t / T) * n), 0, n - 1);
-  if (p.kind === 'goat' && p.ramT > 0) return { spr: atk[prog(p.ramT, RAM_DURATION, atk.length)] };
+  if (p.kind === 'goat' && p.ramT > 0) return { spr: set.ram[dir][Math.floor(p.stepPh || 0) % set.ram[dir].length] };
   if (p.kind === 'goat' && p.actT2 > 0) return { spr: set.jump[dir][prog(p.actT2, 0.3, set.jump[dir].length)] };
   if (p.kind !== 'goat') {
     if (p.dashT > 0 || p.lungeT > 0) return { spr: set.pose.bite[side] };
@@ -5373,17 +5575,20 @@ function drawActor(p) {
     const my = y - s.h - 2 + bob;
     rect(x - 1, my, 3, 1, c); px(x, my + 1, c);
   }
-  if (p.cd > 0 && state === 'PLAYING') {
+  if (state === 'PLAYING' && (!p.dev.startsWith('ai') || p.cd > 0) && !showcase.trailer) {
+    // attack bar: fills while the ram / bark / lunge recharges, bright and full when ready
     const total = p.cdMax || (p.kind === 'goat' ? RAM_COOLDOWN : BARK_COOLDOWN);
-    const w = 7, fl = Math.round(w * (1 - p.cd / total));
-    rect(x - 3, y + 2, w, 1, 'k');
-    if (fl > 0) rect(x - 3, y + 2, fl, 1, 'y');
+    const w = 9, ready = p.cd <= 0 && p.ramT <= 0, fl = ready ? w : Math.round(w * clamp(1 - p.cd / total, 0, 1));
+    rect(x - 5, y + 2, w + 2, 3, 'k');
+    if (fl > 0) rect(x - 4, y + 3, fl, 1, ready ? 'y' : 'n');
+    if (ready && realTime - (p.readyAt || 0) < 0.35 && !settings.reduceFlash) rect(x - 5, y + 2, w + 2, 3, 'w');
   }
+  if (p.cd > 0) p.wasCooling = true; else if (p.wasCooling) { p.wasCooling = false; p.readyAt = realTime; }
   if (p.cd2 > 0 && state === 'PLAYING') {
     const total = p.kind === 'goat' ? STOMP_CD * upgradeMul('cool') : (p.kind === 'dog' ? (p.cd2Max || 1) : HOWL_CD);
     const w = 7, fl = Math.round(w * clamp(1 - p.cd2 / total, 0, 1));
-    rect(x - 3, y + 4, w, 1, 'k');
-    if (fl > 0) rect(x - 3, y + 4, fl, 1, 's');
+    rect(x - 3, y + 5, w, 1, 'k');
+    if (fl > 0) rect(x - 3, y + 5, fl, 1, 's');
   }
 }
 function drawSprScaled(s, x, y, left, k, opts) {
@@ -5509,6 +5714,7 @@ function drawHUD() {
     text(loadLabel, W / 2, Math.round(H / 2) + 6, 'y', { align: 'center' });
     return;
   }
+  if (splats.length) drawSplats();
   if (showcase.on && showcase.trailer) { drawShowcaseCaption(); return; }
   const active = sheep.filter(s => !s.penned).length;
   G.drawImage(SP.sheep.SE[0].r, 3, 3);
@@ -5543,6 +5749,22 @@ function drawHUD() {
     rect(W - 13, 2, 11, 10, 'k');
     frame(W - 13, 2, 11, 10, paused ? 'y' : 'i');
     rect(W - 10, 4, 2, 6, paused ? 'y' : 'w'); rect(W - 6, 4, 2, 6, paused ? 'y' : 'w');
+  }
+  // attack meters for the human players (bottom right): is the ram / bark ready?
+  if (state === 'PLAYING') {
+    const hum = players.filter(q => !q.dev.startsWith('ai'));
+    hum.forEach((q, i) => {
+      const total = q.cdMax || (q.kind === 'goat' ? RAM_COOLDOWN : BARK_COOLDOWN);
+      const ready = q.cd <= 0 && q.ramT <= 0 && q.down <= 0, k = ready ? 1 : clamp(1 - q.cd / total, 0, 1);
+      const name = q.kind === 'goat' ? 'RAM' : (q.kind === 'dog' ? 'BARK' : 'LUNGE');
+      const bw = 26, by = H - 12 - i * 10 - (touch.used ? 32 : 0), bx = W - bw - 4;
+      const lbl = (hum.length > 1 ? 'P' + (q.slot + 1) + ' ' : '') + name;
+      rect(bx - textWidth(lbl) - 6, by - 1, textWidth(lbl) + bw + 8, 9, 'k');
+      text(lbl, bx - 3, by + 1, hum.length > 1 ? P_COL[q.slot] : 'w', { align: 'right' });
+      rect(bx, by + 1, bw, 5, 'i');
+      rect(bx, by + 1, Math.round(bw * k), 5, ready ? 'y' : 'n');
+      if (ready && Math.floor(realTime * 3) % 2 && !settings.reduceFlash) rect(bx + bw - 2, by + 1, 2, 5, 'w');
+    });
   }
   const boss = enemies.find(e => e.boss && e.state !== 'launched');
   if (boss) {
@@ -5592,7 +5814,7 @@ function drawTitle() {
   rect(0, fy - 3, W, 13, 'k');
   if (best.escort || best.defend) text('BEST  ESCORT ' + best.escort + '  DEFEND ' + best.defend, W / 2, fy, 'y', { align: 'center' });
   else text('1-4 PLAYERS  GOATS AND DOGS', W / 2, fy, 's', { align: 'center' });
-  text('V0.11', W - 3, fy - 12, 'i', { align: 'right', outline: 'k' });
+  text('V0.12', W - 3, fy - 12, 'i', { align: 'right', outline: 'k' });
 }
 const MODES = [
   { id: 'escort', title: 'ESCORT', l1: 'HERD THE FLOCK PIN TO PIN', icon: 'pinGoal' },
@@ -5680,7 +5902,7 @@ function drawPlayerSelect() {
     text(kname, tx + 8, y + 5, p.kind === 'wolf' ? 'r' : 'w');
     text('>', tx + 8 + textWidth(kname) + 4, y + 5, 'l');
     hits.push({ x: tx - 2, y: y + 2, w: textWidth(kname) + 20, h: 10, fn: () => cycleKind(p, 1) });
-    text(p.kind === 'goat' ? 'RAM + STOMP' : (p.kind === 'dog' ? 'BARK + ' + dogBreed(p).short : 'LUNGE + HOWL'), tx, y + 14, 'l');
+    text(p.kind === 'goat' ? 'RAM (STOMP: UPGRADE)' : (p.kind === 'dog' ? 'BARK + ' + dogBreed(p).short : 'LUNGE + HOWL'), tx, y + 14, 'l');
     text(DEVICE_NAMES[p.dev] || p.dev, tx, y + 22, 's');
     if (p.kind !== 'wolf') {
       const list = skinList(p.kind), got = list.filter((_, i) => skinUnlocked(p.kind, i)).length;
@@ -5787,7 +6009,7 @@ function drawHowTo() {
   const entry = (sp, name, l1, l2) => { icon(sp); text(name, x + 25, y + 1, 'y'); text(l1, x + 25, y + 8, 'l'); if (l2) text(l2, x + 25, y + 15, 's'); y += l2 ? 23 : 18; };
   const line = (str, col) => { text(str, x + 2, y, col || 'l'); y += 8; };
   if (howPage === 0) {
-    entry(SP.goat.SE[0], 'GOAT', 'RAM: SMASH PREDATORS', 'STOMP: STUN ALL NEARBY');
+    entry(SP.goat.SE[0], 'GOAT (BILLY)', 'RAM: SMASH PREDATORS', 'STOMP (UPGRADE): STUN ALL NEARBY');
     entry(SP.dog.SE[0], 'DOG', 'BARK: SHOVE SHEEP, SCARE FOES', 'ABILITY: EACH FARM DOG DIFFERS');
     entry(SP.sheep.SE[0], 'SHEEP', 'FOLLOW GOATS, FLEE DOGS');
     entry(SP.ramSheep.SE[0], 'RAM SHEEP', 'STUBBORN: IGNORES DOGS');
@@ -5875,7 +6097,7 @@ function drawPause() {
   let y = y0 + 34;
   if (pauseView === 'controls') {
     const lines = [['MOVE', 'WASD / ARROWS / STICK'], ['ACTION', 'SPACE / ENTER / A / TAP'], ['ABILITY', 'E / . / X / R-CLICK'],
-      ['GOAT', 'RAM + STOMP'], ['DOG', 'BARK + WHISTLE'], ['CPU ORDER', 'C / PAD Y'], ['PAUSE', 'P / ESC / START']];
+      ['GOAT', 'RAM (+STOMP UPGRADE)'], ['DOG', 'BARK + WHISTLE'], ['CPU ORDER', 'C / PAD Y'], ['PAUSE', 'P / ESC / START']];
     for (const [a, b] of lines) { text(a, x + 2, y, 'y'); text(b, x + w - 2, y, 'l', { align: 'right' }); y += 10; }
   } else if (pauseView === 'restart') {
     text('PROGRESS ON THIS MAP IS LOST', W / 2, y + 2, 'l', { align: 'center' }); y += bodyH;

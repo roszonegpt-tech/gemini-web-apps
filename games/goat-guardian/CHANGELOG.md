@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-11-05
+### Added
+- **Screen smash**: when Billy rams a foe out, there is a 20% chance (always for the Great Wolf) that it flies at the camera, hits the glass with a white flash, shake and shatter sound, and leaves a spider-web crack. It sticks squashed for a moment, then slides down the screen leaving a smear. The crack dithers away after about 3 s. It is drawn on the HUD layer, so the crack is never tinted.
+- **Attack bars**: a bar under every human player fills while the ram, bark or lunge recharges and flashes when it is ready. A HUD meter at the bottom right shows RAM, BARK or LUNGE for each human player (P1–P4 in co-op).
+- **Billy's theme**: a heroic E-minor riff, now the menu music and the soundtrack of the new trailer.
+- **Billy trailer** (`tools/trailer/make.sh billy` writes `build/trailer-billy/billy-trailer.mp4`, about 55 s). It has a close-up camera on a solo Billy, title cards ("The wolves thought the flock was easy... then they met BILLY"), ram, screen-crack, combo, stomp, alpha and Great Wolf scenes, a dress-up montage and the logo. The score is Billy's theme: power-chord chug, octave bass, double kicks, the melody and goat bleats, with thuds on every recorded ram hit and glass shatters on every crack. The idle title screen now cycles demo, trailer and Billy trailer.
+### Changed
+- **The ram is back**: during the charge Billy gallops with his head and horns lowered and forward. The frames are made from the lab's head-down butt frame on top of the gallop legs; the front and back views use the head-dip frames.
+- **Stomp is now an upgrade**: STOMP (8 bells, one level) in the Upgrades shop. Until it is bought, the goat's ability button says "STOMP: BUY IN UPGRADES". Player Select, How to Play and the controls help say so.
+### Fixed
+- The sniff pose no longer drops the front legs.
+
 ## [0.11.0] - 2026-11-05
 ### Changed
 - **Renamed to Get em Billy.** Updated the title screen logo ("GET EM" over a big "BILLY"), the page title, the home-screen app name (manifest and iOS), the trailer's title card ("The flock needs a billy goat") and finale, the docs, and the trailer file (`build/trailer/get-em-billy-trailer.mp4`).

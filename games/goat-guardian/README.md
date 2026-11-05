@@ -12,7 +12,7 @@ All art is drawn from pixel matrices in code, and all sound is synthesized with 
 
 ## What's in the game
 - **5 modes:** Escort (10 routes), Defend (10 arenas), Daily Challenge, Endless, and Versus (wolves against shepherds).
-- **Shepherds:** the goat (ram, plus stomp) and the dog (bark, plus a skill that depends on the breed). In Versus, players can also be wolves (lunge, plus howl).
+- **Shepherds:** Billy the goat (ram charge; the stomp is an upgrade bought with bells; rammed foes can smash into the screen) and the dog (bark, plus a skill that depends on the breed). In Versus, players can also be wolves (lunge, plus howl).
 - **Breeds:** 9 goat breeds and 10 farm dogs, unlocked with medals. Each dog has its own speed, herding push and skill (see Farm dogs below).
 - **Sheep:** normal, stubborn ram, quick lamb, and golden.
 - **Predators:** shadow wolf, alpha wolf, fox, hawk, bat, and the Great Wolf boss.
@@ -24,6 +24,7 @@ All art is drawn from pixel matrices in code, and all sound is synthesized with 
 - **Installable app:** when served from GitHub Pages it installs to a home screen and works offline.
 
 ## Trailer
+- **Billy trailer:** `tools/trailer/make.sh billy` writes `build/trailer-billy/billy-trailer.mp4`, about 55 s, scored with Billy's own theme.
 - In the game, the title screen alternates between the gameplay demo and the trailer when left idle.
 - To build the video file, run `tools/trailer/make.sh` (needs Node, Playwright and ffmpeg). It writes `build/trailer/get-em-billy-trailer.mp4`: 1080p, about 65 s, with a soundtrack synthesized from the game's music.
 

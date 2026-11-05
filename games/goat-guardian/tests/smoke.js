@@ -1,4 +1,4 @@
-// Headless smoke test for Get em Billy v0.11: node tests/smoke.js (needs Playwright + Chromium).
+// Headless smoke test for Get em Billy v0.12: node tests/smoke.js (needs Playwright + Chromium).
 // Title -> Mode -> Players (2 keyboard players) -> escort, forces a ram and a bark, pens the herd,
 // advances a mission, runs 4-player defend, triggers game over, checks 6-direction facing and
 // adaptive resolution, starts and exits the attract-mode demo, and reports page errors.
@@ -162,6 +162,9 @@ const { chromium } = require('playwright');
     remapQ = -1; buildRemap(0.8); out.remap = LAB_EXTRA.size > 20 && [...LAB_EXTRA.keys()].every(k => remapTable.has(k)); remapQ = -1; buildRemap(dayProgress);
     const vis = (sp) => sprBox(sp).h;
     out.taller = Math.min(...GOAT_BREEDS.map((b, i) => vis(goatSetCached(i).E[0]))) > Math.max(...DOG_BREEDS.map(b => vis(labSet(b.unit, {}).E[0])));
+    // v0.12: Billy's ram frames, stomp as an upgrade, screen-crack smash, his theme
+    out.ram = D.slice(0, 3).every(d => SP.goat.ram[d].length === 4) && SP.goat.ram.S.length === 4;
+    out.billyTheme = !!THEMES.billy && BILLY_TRAILER.length >= 10;
     out.locked = skinUnlocked('dog', 9);
     out.boss = SP.boss.E[0].h >= 18 && SP.boss.run.S.length === 4 && SP.boss.N.length === 4;
     progress.medals.escort = progress.medals.escort.map(() => 7); progress.medals.defend = progress.medals.defend.map(() => 7);
@@ -177,6 +180,15 @@ const { chromium } = require('playwright');
     d.cd2 = 0; playerAbility(d); out.drop = !d.carry;
     out.ratter = (() => { d.skin = 6; d.cd = 0; enemies = [mk(d.x + 12, d.y, { type: 'fox' })]; tryBark(d); return enemies[0].state; })();
     d.skin = 0; d.vx = 0; d.vy = 0; d.actT = 0; d.dashT = 0; d.idleT = 3; out.sit = actorSprite(d).spr === skinSet('dog', 0).pose.sit[faceDir8(d.fx, d.fy)];
+    // stomp is locked until bought; buying it in the shop unlocks it
+    { const g = players[0]; g.kind = 'goat'; enemies = [mk(g.x + 10, g.y)]; g.cd2 = 0; resetUpgrades(); playerAbility(g); out.stompLocked = enemies[0].state === 'hunt';
+      bells = 20; shopItems(() => {}).find(i => i.label.startsWith('STOMP')).select(); g.cd2 = 0; playerAbility(g); out.stompBought = upg.stomp === 1 && enemies[0].state === 'stun';
+      // forced smash: the rammed wolf leaves the field and sticks to the screen
+      enemies = []; splats = []; showcase.on = true; showcase.forceCrack = true;
+      const w = mk(g.x + 14, g.y); enemies.push(w); g.fx = 1; g.fy = 0; g.cd = 0; g.ramT = 0; tryRam(g);
+      await new Promise(z => setTimeout(z, 200)); showcase.on = false; showcase.forceCrack = false;
+      out.splat = splats.length === 1 && !enemies.includes(w);
+      await new Promise(z => setTimeout(z, 600)); out.cracked = splats.length === 1 && splats[0].hit && splats[0].lines.length > 10; }
     toTitle();
     // v0.10 style screen: open from player select, change the hat, saved per animal kind
     mode = 'defend'; enterPlayers('kbL'); players[0].kind = 'dog'; players[0].look = rememberedLook('dog');
@@ -189,6 +201,7 @@ const { chromium } = require('playwright');
     toTitle();
     return out;
   });
+  if (!v9.ram || !v9.billyTheme || !v9.stompLocked || !v9.stompBought || !v9.splat || !v9.cracked) fail('billy ' + JSON.stringify(v9));
   if (v9.styleState !== 'STYLE' || !v9.styleSaved || v9.styleRows < 12 || v9.styleBack !== 'PLAYERS') fail('style ' + JSON.stringify(v9));
   if (v9.goats !== 12 || v9.dogs !== 10 || !v9.sets || !v9.leftArt || !v9.items || !v9.sanitize || !v9.remap || v9.locked || !v9.taller || !v9.boss || v9.gaitFlips) fail('breeds ' + JSON.stringify(v9));
   if (v9.corgi !== 'stun' || v9.pyrenees !== 'flee' || !v9.carry || !v9.drop || v9.ratter !== 'launched' || !v9.sit) fail('dog skills ' + JSON.stringify(v9));
