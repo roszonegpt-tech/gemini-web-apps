@@ -286,21 +286,48 @@ const SP = {};
       spr(['..ww...', '.wwww..', 'wwwww..', 'wwwwwkk', '.llllk.', '.k..k..'])],
     panic: spr(['..ww.kk', '.wwwwkk', 'wwwwww.', 'wwwwww.', '.llll..', 'k.k..k.'])
   };
-  // Goat
-  const gSide = ['....ll...', '...l..nn.', '......nkn', 'nnnnnnnn.', 'nnnnnnbw.', '.bbbbb...'];
-  const gSideBack = ['....ll...', '...l.lnn.', '......nnn', 'nnnnnnnn.', 'nnnnnnb..', '.bbbbb...'];
-  const gFront = ['l.....l', '.l...l.', '..nnn..', '.nknkn.', '..nwn..', '.nbbbn.'];
-  const gBack = ['l.....l', '.l...l.', '..nnn..', '.nnnnn.', '.nnwnn.', '.nbbbn.'];
+  // Goat: cream coat, curved brown horns with a black outline, 8 facing directions
+  // (E, SE, NE, S, N drawn; W, SW, NW are mirrors). Taller than the dog.
+  const gE = ['.............', '.....bb......', '....b..b.....', '....b...bb...', '.......nwww..', '........wwkw.',
+    '.w.....wwwwwl', '.wwwwwwwwwll.', '.wwwwwwwwwl..', '.lwwwwwwwl.l.'];
+  const gSE = ['.............', '.....bb..bb..', '....b..bb..b.', '....b..www.b.', '......nwwwn..', '......wkwkw..',
+    '.w....wwwww..', '.wwwwwwwlww..', '.wwwwwwwwl...', '.lwwwwwwwl...'];
+  const gNE = ['.............', '.....bb..bb..', '....b..bb..b.', '....b..www.b.', '......nwwwn..', '......wwwww..',
+    '.w....wwwww..', '.wwwwwwwwww..', '.wwwwwwwww...', '.lwwwwwwwl...'];
+  const gS = ['...........', '..bb...bb..', '.b..b.b..b.', '.b..www..b.', '..nwwwwwn..', '...wkwkw...',
+    '...wwwww...', '....wlw....', '...wwlww...', '..wwwwwww..', '..lwwwwwl..'];
+  const gN = ['...........', '..bb...bb..', '.b..b.b..b.', '.b..www..b.', '..nwwwwwn..', '...wwwww...',
+    '...wwwww...', '..wwwwwww..', '..wwwlwww..', '..wwwnwww..', '..lwwwwwl..'];
+  const sideLegs = [['..w.w...w.w..', '..w.w...w.w..', '..k.k...k.k..'], ['..w.w...w.w..', '.w...w.w...w.', '.k...k.k...k.']];
+  const qLegs = [['..w.w..w.w...', '..w.w..w.w...', '..k.k..k.k...'], ['..w.w..w.w...', '.w...w..w..w.', '.k...k..k..k.']];
+  const fLegs = [['..w.w.w.w..', '..w.w.w.w..', '..k.k.k.k..'], ['..w.w.w.w..', '.w..w.w..w.', '.k..k.k..k.']];
+  // black outline around the horns (any empty pixel touching a horn pixel)
+  const outlineHorns = (rows) => {
+    const w = Math.max(...rows.map(r => r.length));
+    const g = rows.map(r => r.padEnd(w, '.').split(''));
+    const out = g.map(r => r.slice());
+    for (let y = 0; y < g.length; y++) for (let x = 0; x < w; x++) {
+      if (g[y][x] !== '.') continue;
+      if ((g[y - 1] && g[y - 1][x] === 'b') || (g[y + 1] && g[y + 1][x] === 'b') || g[y][x - 1] === 'b' || g[y][x + 1] === 'b') out[y][x] = 'k';
+    }
+    return out.map(r => r.join(''));
+  };
+  // ram pose: drop the head (and horns) down and forward
+  const lowerHead = (rows, maxRow, xMin, dy, dx) => {
+    const w = Math.max(...rows.map(r => r.length)) + dx;
+    const g = rows.map(r => r.padEnd(w, '.').split(''));
+    const head = [];
+    for (let y = 0; y <= maxRow; y++) for (let x = xMin; x < w; x++) if (g[y][x] !== '.') { head.push([x, y, g[y][x]]); g[y][x] = '.'; }
+    for (const [x, y, c] of head) if (y + dy < g.length && x + dx < w) g[y + dy][x + dx] = c;
+    return g.map(r => r.join(''));
+  };
+  const gp = (top, legs) => [spr(outlineHorns(top.concat(legs[0]))), spr(outlineHorns(top.concat(legs[1])))];
+  const ram = (top, legs, maxRow, xMin, dy, dx) => spr(outlineHorns(lowerHead(top.concat(legs[1]), maxRow, xMin, dy, dx)));
   SP.goat = {
-    SE: walkPair(gSide, '.k.k.k.k.', 'k..k..k.k'),
-    NE: walkPair(gSideBack, '.k.k.k.k.', 'k..k..k.k'),
-    S: walkPair(gFront, '.k...k.', '..k.k..'),
-    N: walkPair(gBack, '.k...k.', '..k.k..'),
+    E: gp(gE, sideLegs), SE: gp(gSE, qLegs), NE: gp(gNE, qLegs), S: gp(gS, fLegs), N: gp(gN, fLegs),
     act: {
-      SE: spr(['.........', '...ll....', 'nnnnl.ll.', 'nnnnnnnn.', 'nnnnnnnkn', '.bbbbb.w.', 'k..k.k..k']),
-      NE: spr(['.........', '...ll....', 'nnnnl.ll.', 'nnnnnnnn.', 'nnnnnnnnn', '.bbbbb...', 'k..k.k..k']),
-      S: spr(['.......', 'l.....l', '.lnnnl.', '.nknkn.', '.nnnnn.', '.nbwbn.', 'k.....k']),
-      N: spr(['.......', 'l.....l', '.lnnnl.', '.nnnnn.', '.nnwnn.', '.nbbbn.', 'k.....k'])
+      E: ram(gE, sideLegs, 6, 4, 2, 1), SE: ram(gSE, qLegs, 6, 4, 2, 1), NE: ram(gNE, qLegs, 6, 4, 2, 1),
+      S: ram(gS, fLegs, 8, 0, 2, 0), N: ram(gN, fLegs, 4, 0, 2, 0)
     }
   };
   // Dog (border collie)
@@ -399,6 +426,14 @@ function recolorSet(set, map) {
 SP.goldSheep = recolorSet(SP.sheep, { w: 'y', l: 'n' });
 SP.ramSheep = recolorSet(SP.sheep, { w: 'l', l: 'h', k: 'b' });
 // facing: 6 directions from a facing vector
+// 8 directions for the goat: E, SE, S, N, NE (W, SW, NW mirror E, SE, NE)
+function faceDir8(fx, fy) {
+  const a = Math.atan2(fy, fx) * 57.2958, ab = Math.abs(a);
+  if (a < -67.5 && a > -112.5) return 'N';
+  if (a > 67.5 && a < 112.5) return 'S';
+  if (ab < 22.5 || ab > 157.5) return 'E';
+  return a > 0 ? 'SE' : 'NE';
+}
 function faceDir(fx, fy) {
   const a = Math.atan2(fy, fx) * 57.2958;
   if (a < -58 && a > -122) return 'N';
@@ -2665,7 +2700,7 @@ function awardMedals(kind, idx, bits) {
   if (unlocked) { banner = { t: 3, a: 'NEW LOOK!', b: 'UNLOCKED IN PLAYER SELECT' }; SFX.coin(); }
   return nw & ~old;
 }
-const GOAT_SKINS = [{ name: 'BROWN', need: 0 }, { name: 'SNOW', need: 3, map: { n: 'w', b: 'l' } }, { name: 'GOLDEN', need: 8, map: { n: 'y', b: 'n' } }];
+const GOAT_SKINS = [{ name: 'CREAM', need: 0 }, { name: 'BROWN', need: 3, map: { w: 'n', l: 'b', n: 'b' } }, { name: 'GOLDEN', need: 8, map: { w: 'y', l: 'n' } }];
 const DOG_SKINS = [{ name: 'COLLIE', need: 0 }, { name: 'HUSKY', need: 5, map: { k: 'l' } }, { name: 'CORGI', need: 12, map: { k: 'n' } }];
 const WOOL_SKINS = [{ name: 'WHITE', need: 0 }, { name: 'CREAM', need: 2, map: { w: 'n', l: 'b' } }, { name: 'GREY', need: 6, map: { w: 'l', l: 'h' } }, { name: 'ROSE', need: 15, map: { w: 'r', l: 'n' } }];
 const WOOL_NAMES = WOOL_SKINS.map(x => x.name);
@@ -4455,7 +4490,7 @@ function sheepSprite(s) {
   return { spr: set[dir][f], left: s.fx < 0 };
 }
 function actorSprite(p) {
-  const dir = faceDir(p.fx, p.fy);
+  const dir = p.kind === 'goat' ? faceDir8(p.fx, p.fy) : faceDir(p.fx, p.fy);
   const set = skinSet(p.kind, p.skin);
   const moving = len(p.vx, p.vy) > 8;
   const f = moving ? Math.floor(p.walk / 5) % 2 : 0;
@@ -4475,7 +4510,7 @@ function drawWorldScene() {
   }
   drawBirdShadows();
   for (const s of sheep) drawShadow(wx(s.x), wy(s.y), s.type === 'lamb' ? 5 : 7);
-  for (const p of actors) drawShadow(wx(p.x), wy(p.y), 8);
+  for (const p of actors) drawShadow(wx(p.x), wy(p.y), p.kind === 'goat' ? 11 : 8);
   for (const e of enemies) {
     if (e.state === 'emerge' || (canopy(e.x, e.y) && e.type !== 'hawk' && e.type !== 'bat')) continue;
     if (e.type === 'hawk') drawShadow(wx(e.x), wy(e.y), Math.max(4, 11 - Math.round(e.alt / 6)));

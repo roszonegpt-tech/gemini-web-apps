@@ -1,5 +1,5 @@
 // Goat Guardian service worker: cache the game so it installs and plays offline.
-const CACHE = 'goat-guardian-v0.7.0';
+const CACHE = 'goat-guardian-v0.8.1';
 const FILES = [
   './',
   './index.html',

@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+## [0.8.1] - 2026-11-05
+### Changed
+- Goat redrawn to match the reference sheet: cream-white coat with grey shading, tan ears, beard and tail tuft, long legs with dark hooves, and curved brown horns with a black outline (generated around every horn pixel, so it holds in every pose).
+- The goat is now about 13 px tall, clearly taller than the 6 px dog, and casts a wider shadow.
+- The goat faces 8 directions (S, N, E, W, SE, SW, NE, NW) with matching lowered-head ram poses. Other animals keep 6.
+- Goat looks: Cream (default), Brown (3 medals), Golden (8 medals).
+- App icons regenerated with the new goat. The service worker cache was bumped to v0.8.1. The trailer was rebuilt.
+
 ## [0.8.0] - 2026-11-05
 ### Added
 - Ambient birds: V-formation flocks of 3–7 birds and an occasional gliding heron cross the sky, with shadows sweeping over the meadow and forest. They appear in play, on the title screen and in the trailer, but not at night or in rain. Wind drifts them, and flocks chirp as they pass.

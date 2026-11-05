@@ -1,11 +1,12 @@
 # State — Goat Guardian
 
-**Version:** 0.8.0 · **Status:** Playable. v0.8.0 adds ambient birds and a cinematic trailer.
+**Version:** 0.8.1 · **Status:** Playable. v0.8.1 redraws the goat: taller than the dog, horns outlined in black, and 8 facing directions.
 
 ## Snapshot
 - The whole game is in `index.html`. Its sections are: canvases, palette and remap, sprites, font, audio, world generation and rendering, camera, input devices, state, particles, collision, players, herd boids, enemies, modes, lobby, update, render, and boot.
 - **Resolution:** `resize()` picks an integer pixel scale `PIX` and sizes the buffer `W×H` (W 120–560, H 180–420) to fill the screen. The world buffer has a 1px margin for sub-pixel camera presentation. The HUD is a separate canvas that is never palette-swapped. All layout must use `W`/`H`, never fixed numbers.
 - **Screens:** `TITLE → MODE → PLAYERS → PLAYING → RESULTS / GAMEOVER`, plus `OPTIONS` and `HOWTO`. List screens are built by `screenItems()` and handled by `listEvent()`. The player-select screen uses `playersEvent()`. Taps hit-test against `hits`, which is rebuilt every frame.
+- **Goat sprites:** the goat has `E`, `SE`, `NE`, `S` and `N` sets; `faceDir8()` picks one, and W, SW and NW are mirrors. `outlineHorns()` adds the black outline around the `b` horn pixels, and `lowerHead()` builds the ram poses.
 - **Sprites:** `SP[kind][dir][frame]`, where dir is N, S, SE or NE; NW and SW are mirrored. `SP[kind].act[dir]` holds the ram and bark poses. `faceDir(fx, fy)` picks the direction.
 - **Modes:** `escort`, `defend`, `daily`, `endless`, `versus` and `custom` (an editor map). `isEscort()` covers every escort-like mode. `escortWorld(src)` builds the world for a map index, `'daily'`, `'endless'` or `'custom'`.
 - **Mask values:** 0 meadow, 1 forest, 2 pillar, 3 ford (slow), 4 deep water (blocked), 5 brambles (slow; tangles sheep). `blocked()` and `terrainSlow()` read these. Hazards come from `addHazards(def)`, using `def.rivers` and `def.brambles`.
