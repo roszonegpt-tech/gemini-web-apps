@@ -10,4 +10,6 @@ All 20 items from the feature list were added in v0.7.0. What remains is playtes
 - [ ] Install the GitHub Pages build on a phone and test offline play.
 - [ ] Optional: more editor map sizes, several custom map slots.
 - [ ] Balance the farm dog skills (Komondor hiding and the Pyrenees roar may be strong; the Corgi push may be weak).
+- [ ] Lab art: the lab goat is 13 px tall in the source and the German Shepherd and Old English are 15, so goats are no longer taller than every dog (v0.8.1 asked for that). Decide whether to adjust the lab art.
+- [ ] STYLE: per-breed coat memory (one dog look is shared across breeds; the coat index wraps per breed).
 - [ ] Optional: goat breed perks (breeds currently change the look only), and goat idle poses (graze, lie).

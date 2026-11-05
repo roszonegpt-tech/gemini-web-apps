@@ -1,12 +1,19 @@
 # State — Goat Guardian
 
-**Version:** 0.9.1 · **Status:** Playable. v0.9.1 smooths the walk and run animation (shared stride phase and hysteresis) and redraws the Great Wolf boss. v0.9.0 added 9 goat breeds, 10 farm dogs with their own skills, 4-frame walk and gallop cycles for every animal, and dog idle poses.
+**Version:** 0.10.0 · **Status:** Playable. v0.10.0 replaces the animal art with the Rusty Lab sprites (8 drawn directions, five actions, colourways and items) and adds the STYLE customization screen. v0.9.1 smoothed the walk and run animation (shared stride phase and hysteresis) and redraws the Great Wolf boss. v0.9.0 added 9 goat breeds, 10 farm dogs with their own skills, 4-frame walk and gallop cycles for every animal, and dog idle poses.
 
 ## Snapshot
 - The whole game is in `index.html`. Its sections are: canvases, palette and remap, sprites, font, audio, world generation and rendering, camera, input devices, state, particles, collision, players, herd boids, enemies, modes, lobby, update, render, and boot.
 - **Resolution:** `resize()` picks an integer pixel scale `PIX` and sizes the buffer `W×H` (W 120–560, H 180–420) to fill the screen. The world buffer has a 1px margin for sub-pixel camera presentation. The HUD is a separate canvas that is never palette-swapped. All layout must use `W`/`H`, never fixed numbers.
 - **Screens:** `TITLE → MODE → PLAYERS → PLAYING → RESULTS / GAMEOVER`, plus `OPTIONS` and `HOWTO`. List screens are built by `screenItems()` and handled by `listEvent()`. The player-select screen uses `playersEvent()`. Taps hit-test against `hits`, which is rebuilt every frame.
-- **Animal sprites (v0.9):**
+- **Rusty Lab animals (v0.10):**
+  - `LAB` holds the lab data: `units` (goat, wolf, fox, the ten farm dogs; compact `R` row table plus `F` frame indices and `O` offsets), `items` (hair, hat, outfit, acc), `sets` (item colour options) and `fixed` colours. Boss, bat and hawk are added at boot with `labFixedUnit()`.
+  - Frames are built by `labSet(unitId, look)` (cached): `labCompose()` is a port of the lab's compose (under-accessories, base, outfit, hair, hat, accessories), then `labPose()` for the derived poses, then `labScale()` (2/3, detail-preserving), then `labColors()` and `labCanvas()`.
+  - The resulting set looks like the old one: `set[dir]` holds the walk frames, plus `run`, `idle`, `jump`, `attack`, `act` and `pose.{sit, lie, alert, sniff, bite}`. dir is E, SE, NE, S or N, and each `LabSpr` carries the drawn west-facing art in `.l`.
+  - A look is `{coat, eyes, hair, hat, outfit, acc[], col{hair, hat, outfit, acc}}`, sanitized by `normLabLook()`. `skinSet(kind, breed, look)` resolves breed and look into a set. For goats the breed sets the coat, and `DOG_BREEDS[].unit` names the lab unit.
+  - Off-palette lab colours are registered in `LAB_EXTRA` and remapped in `buildRemap()` via `labRemapInto()`.
+  - STYLE screen: `openStyle(p)`, `styleItems()` and `drawStyle()`. Looks are saved in `settings.looks[kind]`; `cpuLook()` styles the CPU helpers.
+- **Animal sprites (v0.9, replaced in v0.10; facing and gait logic still apply):**
   - Goats come from the region templates `GT` and `GLEGS` (letters h horn, f head, K eye, e ear, m muzzle, z beard, c coat, d shade, L leg, k hoof). `goatColor()` maps the letters per entry of `GOAT_BREEDS`, applying spots, face stripes and a dorsal stripe, and `goatSet(breed)` builds the set.
   - Dogs, wolves and foxes come from `canineSet(look)`, using `canineSide` for the E, SE and NE views and `canineFront` for S and N. A look has the body parameters L, B, Lg, Hd, muz, ears, tail and fluffy, plus colour keys and a pattern.
   - Every set has `[dir][4 walk frames]`, `run[dir][4]` (each frame carries `.bob`) and `act[dir]`. Canines also have `pose.{sit, lie, alert, sniff[4], bite}`.
@@ -37,6 +44,15 @@
 - **Assets:** no Universal Assets are used. Everything is procedural.
 
 ## Verified
+- v0.10.0: the smoke test checks:
+  - every lab set (12 goat breeds, 10 dogs, wolf, fox, boss, bat, hawk) has full idle, walk, run, jump and attack frames in 5 views
+  - the drawn west-facing art
+  - that hats, hair, outfits, collar and coats change pixels
+  - look sanitizing
+  - that every lab colour is in the sunset remap
+  - the STYLE screen (open, change the hat, saved, back)
+
+  In-game screenshots show the scale against the sheep, and the game runs at 60 fps.
 - v0.9.1: a frame log of a CPU dog shows walk and run frames advancing 0→1→2→3 through gait and direction changes (direction flips down from 11 to 7 in 4 s). The smoke test checks that gait does not flip under a speed wobble, and checks the boss sprite set. The boss was checked in play.
 - v0.9.0: the smoke test checks that there are 9 goat and 10 dog breeds, that every set has 4 walk and 4 gallop frames in 5 views, the gallop bob, that every goat is taller than every dog (by visible pixels: 13 vs at most 11), the Corgi nip stun, Pyrenees roar, Bernese carry and drop, Jack Russell ratter and the idle sit. Runtime sweeps with every breed under CPU control in Escort and Defend had no page errors. The Farm Dogs demo scene and the breeds trailer clip run cleanly.
 - v0.8.0: the smoke test checks that birds spawn and that the trailer starts, advances and exits back to the title. `tools/trailer/make.sh` rebuilt the 1080p trailer (64.7 s, h264 + AAC) end to end.

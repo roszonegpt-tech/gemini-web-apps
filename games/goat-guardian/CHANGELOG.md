@@ -2,6 +2,19 @@
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-11-05
+### Changed
+- **Animals now use the Rusty Lab art** (from `rusty_lab_v0_13_1.html`): the goat, wolf, fox and the lab versions of the ten farm dogs. Each is drawn in all 8 directions (west-facing views are drawn, not mirrored), with idle, walk, run, jump and attack frames. The ram uses the attack frames, the stomp uses the jump frames, and the bark and bites use the attack frames.
+- The lab art is shrunk to the original sprite scale (2/3) at bake time by a detail-preserving reduction: every source pixel maps to exactly one pixel, eyes, nose and fangs take priority, and thin legs and ears are kept. Shadows are back to their original sizes.
+- **Goat breeds are lab goat colourways**: Saanen, Alpine, Boer, Nubian, Valais, Toggenburg*, Golden, Oberhasli*, Pygmy, Kid Brown, Chocolate and Panda (12; *new colourways added to the lab set).
+- The lab colours follow the sunset and night palette swap: each off-palette colour moves the way its nearest palette colour does.
+- Sheep are unchanged.
+### Added
+- **Animal customization (STYLE)**: press the ability button, or tap STYLE on a Player Select card, to open it. It sets breed, coat colourway, eyes, hat (Hood, Bandana, Witch hat, Horned helm, Mushroom), hair (Shaggy, Spikes, Mohawk, Top knot), outfit (Vest, Tunic, Robe, Poncho, Fur wrap), earring, warpaint and a bell collar, each with the lab's colour options. It has a rotating, animated preview, plus Random and Reset. Looks are saved per animal (goat, dog, wolf). CPU helpers get varied looks, and the wolf player can be styled in Versus.
+- Made to the lab standard (letter colour regions, colourways, all 8 directions, five actions): the **Great Wolf** boss (full size), a **bat** (3 colourways, 4-frame flap) and a **hawk** (2 colourways, flap and dive).
+- Dog idle poses (sit, lie, alert, sniff) are now generated from the lab frames.
+- The demo's Farm Dogs scene shows hats and collars.
+
 ## [0.9.1] - 2026-11-05
 ### Fixed
 - **Choppy walk and run.** CPU dogs' speed swings between about 20 and 90 px/s while herding. Each time it crossed 52 px/s the sprite switched between walk and run, and the two counted frames differently, so it jumped to an unrelated frame. Now:

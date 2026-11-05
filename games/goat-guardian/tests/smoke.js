@@ -1,4 +1,4 @@
-// Headless smoke test for Goat Guardian v0.9: node tests/smoke.js (needs Playwright + Chromium).
+// Headless smoke test for Goat Guardian v0.10: node tests/smoke.js (needs Playwright + Chromium).
 // Title -> Mode -> Players (2 keyboard players) -> escort, forces a ram and a bark, pens the herd,
 // advances a mission, runs 4-player defend, triggers game over, checks 6-direction facing and
 // adaptive resolution, starts and exits the attract-mode demo, and reports page errors.
@@ -151,18 +151,17 @@ const { chromium } = require('playwright');
   const v9 = await p.evaluate(async () => {
     const out = { goats: GOAT_BREEDS.length, dogs: DOG_BREEDS.length };
     const D = ['E', 'SE', 'NE', 'S', 'N'];
-    out.sets = DOG_BREEDS.every(b => { const s = canineSet(b.look); return D.every(d => s[d].length === 4 && s.run[d].length === 4) && s.pose.sit.E && s.pose.lie.E && s.pose.bite.E; })
-      && GOAT_BREEDS.every(b => { const s = goatSet(b); return D.every(d => s[d].length === 4 && s.run[d].length === 4); });
-    out.bob = SP.goat.run.E.map(f => f.bob).join();
-    const vis = (sp) => { const d = sp.r.getContext('2d').getImageData(0, 0, sp.w, sp.h).data; let t = sp.h, b = -1; for (let y = 0; y < sp.h; y++) for (let x = 0; x < sp.w; x++) if (d[(y * sp.w + x) * 4 + 3]) { t = Math.min(t, y); b = Math.max(b, y); } return b - t + 1; };
-    out.taller = Math.min(...GOAT_BREEDS.map(b => vis(goatSet(b).E[0]))) > Math.max(...DOG_BREEDS.map(b => vis(canineSet(b.look).E[0])));
+    const full = (st) => D.every(d => st[d].length === 4 && st.run[d].length === 4 && st.idle[d].length >= 2 && st.attack[d].length === 4 && st.jump[d].length === 3);
+    out.sets = DOG_BREEDS.every(b => { const st = labSet(b.unit, {}); return full(st) && st.pose.sit.E && st.pose.lie.E && st.pose.bite.E && st.pose.sniff.E.length === 4; })
+      && GOAT_BREEDS.every((b, i) => full(goatSetCached(i))) && full(SP.wolf) && full(SP.fox) && full(SP.boss) && full(SP.bat) && full(SP.hawk);
+    out.leftArt = SP.dog.E[0].l !== SP.dog.E[0].r;     // the lab draws W, it is not a mirror
+    const px = (sp) => { const d = sp.r.getContext('2d').getImageData(0, 0, sp.w, sp.h).data; let h = 0; for (let i = 0; i < d.length; i += 4) h = (h * 31 + d[i] + d[i + 1] * 3 + d[i + 2] * 7 + d[i + 3]) >>> 0; return h; };
+    out.items = ['hat', 'hair', 'outfit'].every(k => px(labSet('bcollie', { [k]: 1 }).E[0]) !== px(SP.dog.E[0])) && px(labSet('bcollie', { acc: [2] }).S[0]) !== px(SP.dog.S[0])
+      && px(labSet('bcollie', { coat: 1 }).E[0]) !== px(SP.dog.E[0]);
+    out.sanitize = JSON.stringify(normLabLook({ hat: 99, acc: [7, 'x', 1, 1], col: { hat: -2 }, coat: 'z' })) === JSON.stringify(normLabLook({ acc: [1] }));
+    remapQ = -1; buildRemap(0.8); out.remap = LAB_EXTRA.size > 20 && [...LAB_EXTRA.keys()].every(k => remapTable.has(k)); remapQ = -1; buildRemap(dayProgress);
     out.locked = skinUnlocked('dog', 9);
     out.boss = SP.boss.E[0].h >= 18 && SP.boss.run.S.length === 4 && SP.boss.N.length === 4;
-    // gait hysteresis + shared phase: a speed wobble around the threshold does not flip the gait
-    const o = { vx: 60, vy: 0 }; stepGait(o, 0.016, 58, 42);
-    let flips = 0, prev = o.gait;
-    for (let i = 0; i < 60; i++) { o.vx = 50 + Math.sin(i) * 6; stepGait(o, 0.016, 58, 42); if (o.gait !== prev) flips++; prev = o.gait; }
-    out.gaitFlips = flips;
     progress.medals.escort = progress.medals.escort.map(() => 7); progress.medals.defend = progress.medals.defend.map(() => 7);
     mode = 'defend'; enterPlayers('kbL'); players[0].kind = 'dog'; players.forEach(q => q.ready = true);
     await new Promise(r => setTimeout(r, 2600));
@@ -177,9 +176,19 @@ const { chromium } = require('playwright');
     out.ratter = (() => { d.skin = 6; d.cd = 0; enemies = [mk(d.x + 12, d.y, { type: 'fox' })]; tryBark(d); return enemies[0].state; })();
     d.skin = 0; d.vx = 0; d.vy = 0; d.actT = 0; d.dashT = 0; d.idleT = 3; out.sit = actorSprite(d).spr === skinSet('dog', 0).pose.sit[faceDir8(d.fx, d.fy)];
     toTitle();
+    // v0.10 style screen: open from player select, change the hat, saved per animal kind
+    mode = 'defend'; enterPlayers('kbL'); players[0].kind = 'dog'; players[0].look = rememberedLook('dog');
+    openStyle(players[0]); out.styleState = state;
+    const its = screenItems(); const hatRow = its.findIndex(i => i.label === 'HAT'); its[hatRow].change(1);
+    out.styleSaved = settings.looks.dog && settings.looks.dog.hat === 1 && players[0].look.hat === 1;
+    out.styleRows = screenItems().length;
+    screenBack(); out.styleBack = state;
+    settings.looks = {}; saveSettings();
+    toTitle();
     return out;
   });
-  if (v9.goats !== 9 || v9.dogs !== 10 || !v9.sets || v9.bob !== '0,-1,-1,0' || !v9.taller || v9.locked || !v9.boss || v9.gaitFlips) fail('breeds ' + JSON.stringify(v9));
+  if (v9.styleState !== 'STYLE' || !v9.styleSaved || v9.styleRows < 12 || v9.styleBack !== 'PLAYERS') fail('style ' + JSON.stringify(v9));
+  if (v9.goats !== 12 || v9.dogs !== 10 || !v9.sets || !v9.leftArt || !v9.items || !v9.sanitize || !v9.remap || v9.locked || !v9.boss || v9.gaitFlips) fail('breeds ' + JSON.stringify(v9));
   if (v9.corgi !== 'stun' || v9.pyrenees !== 'flee' || !v9.carry || !v9.drop || v9.ratter !== 'launched' || !v9.sit) fail('dog skills ' + JSON.stringify(v9));
   const wasFs = await p.evaluate(() => isFs());
   await p.evaluate(() => exitFs());

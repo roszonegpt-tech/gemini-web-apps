@@ -50,7 +50,18 @@ Choose **Watch Demo** on the title screen, or leave the title screen idle for 30
 Ram or bark a predator that is carrying a sheep and the sheep is saved.
 
 ## Goat breeds
-Saanen, Alpine (both available from the start), Boer (1 medal), Nubian (3), Valais Blackneck (5), Toggenburg (7), Golden Guernsey (9), Oberhasli (12) and Pygmy (16). Goat breeds change the look only. Every goat is taller than every dog.
+Saanen, Alpine (both available from the start), Boer (1 medal), Kid Brown (2), Nubian (3), Valais Blackneck (5), Toggenburg (7), Golden Guernsey (9), Oberhasli (12), Pygmy (16), Chocolate (20) and Panda (26). Goat breeds are colourways of the Rusty Lab goat and change the look only.
+
+## Customization (STYLE)
+On Player Select, press the ability button (E, `.`, gamepad X) or tap **STYLE** on your card. You can pick:
+- breed and coat colourway
+- eyes
+- hat: Hood, Bandana, Witch hat, Horned helm or Mushroom
+- hair: Shaggy, Spikes, Mohawk or Top knot
+- outfit: Vest, Tunic, Robe, Poncho or Fur wrap
+- earring, warpaint and bell collar
+
+Each item has its own colour options. The preview turns through all 8 directions and plays idle, walk, run and attack. Looks are saved per animal.
 
 ## Farm dogs
 Only working farm breeds are included: herders, livestock guardians and a farm terrier. On Player Select, Up/Down (or tapping the preview) changes the breed. The last breed you picked is remembered.
@@ -67,6 +78,9 @@ Only working farm breeds are included: herders, livestock guardians and a farm t
 | Bernese Mountain Dog | 15 | Carry: picks up a sheep (safe from predators) and drops it; dropping inside the pen pens it | Strong farm dog |
 | Komondor | 18 | Ambush: pounces and stuns everything within 32 px | Sheep drift to it, and predators can't see sheep beside it |
 | Great Pyrenees | 22 | Roar: every foe within 110 px flees | Guardian aura slows foes within 55 px |
+
+## Art
+The goat, wolf, fox and farm dogs come from **Rusty Lab v0.13.1**, the user's sprite lab. The data is embedded in `index.html` as `LAB`, and each frame is shrunk to the game's sprite scale when it is baked. The Great Wolf, bat and hawk were made to the same standard. Sheep keep the original game art.
 
 ## Animation
 Every animal faces 8 directions and has a 4-frame walk and a 4-frame bounding gallop. During the gallop the body bobs and the head pitches down on the reach. Dogs also sit after 2.5 s idle and lie down after 7 s, lifting their head when a predator comes near. They sniff when moving slowly, and open their mouth to bark and bite.
