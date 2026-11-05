@@ -6,94 +6,102 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <title>Goat Guardian</title>
 <style>
-  html, body {
+  :root { --bg: #0c0816; color-scheme: dark; }
+  html, body { height: 100%; }
+  body {
     margin: 0;
-    padding: 0;
-    width: 100%;
-    height: 100%;
-    background: #0b1714;
+    background: var(--bg);
     overflow: hidden;
     touch-action: none;
     -webkit-user-select: none;
     user-select: none;
     -webkit-tap-highlight-color: transparent;
   }
-  body {
+  #stage {
+    width: 100%;
+    height: 100%;
     display: flex;
     align-items: center;
     justify-content: center;
   }
   #game {
     display: block;
+    max-width: 100%;
     image-rendering: pixelated;
     image-rendering: crisp-edges;
-    -ms-interpolation-mode: nearest-neighbor;
-    background: #0b1714;
+    background: var(--bg);
     cursor: crosshair;
     outline: none;
   }
 </style>
 </head>
 <body>
-<canvas id="game" tabindex="0" aria-label="Goat Guardian game canvas"></canvas>
+<div id="stage"><canvas id="game" tabindex="0" aria-label="Goat Guardian game. Press Space, Enter or a gamepad button to join."></canvas></div>
 <script>
 'use strict';
 
 /* =====================================================================
-   GOAT GUARDIAN
-   Single-file procedural pixel-art herding defense game.
-   - Internal resolution 480x270, scaled to viewport with nearest-neighbour.
-   - All art drawn from pixel matrices / per-pixel generators.
-   - All sound synthesized with the Web Audio API.
+   GOAT GUARDIAN  v0.2.0
+   Lo-fi portrait herding game. Up to 4 local players (goat or dog).
+   - 160x288 internal portrait buffer, smooth follow camera with
+     sub-pixel presentation, scrolling procedural worlds.
+   - Restricted 12-colour palette; day -> sunset -> dusk is a true
+     per-pixel palette swap of the rendered frame.
+   - Modes: ESCORT (drive the herd from the start pin to the pen at
+     the red pin) and DEFEND (endless waves around a stone henge).
+   - All art from pixel matrices, all audio synthesized (Web Audio).
    ===================================================================== */
 
 // ---------------------------------------------------------------------
-// Canvas setup
+// Canvases
 // ---------------------------------------------------------------------
-const W = 480;
-const H = 270;
+const W = 160;
+const H = 288;
+const BW = W + 2;
+const BH = H + 2;
+
 const view = document.getElementById('game');
 const vctx = view.getContext('2d');
 const buf = document.createElement('canvas');
-buf.width = W;
-buf.height = H;
-const ctx = buf.getContext('2d');
-ctx.imageSmoothingEnabled = false;
-
-let viewScale = 1;
-let viewCssW = W;
-let viewCssH = H;
-
-function resize() {
-  const ww = window.innerWidth;
-  const wh = window.innerHeight;
-  let s = Math.min(ww / W, wh / H);
-  // Prefer integer scaling when it still fills most of the screen.
-  if (s >= 2 && Math.floor(s) / s > 0.9) s = Math.floor(s);
-  viewScale = s;
-  viewCssW = Math.floor(W * s);
-  viewCssH = Math.floor(H * s);
-  const dpr = window.devicePixelRatio || 1;
-  view.style.width = viewCssW + 'px';
-  view.style.height = viewCssH + 'px';
-  view.width = Math.max(1, Math.round(viewCssW * dpr));
-  view.height = Math.max(1, Math.round(viewCssH * dpr));
-  vctx.imageSmoothingEnabled = false;
-}
-window.addEventListener('resize', resize);
-resize();
+buf.width = BW;
+buf.height = BH;
+const bctx = buf.getContext('2d', { willReadFrequently: true });
+bctx.imageSmoothingEnabled = false;
+const hud = document.createElement('canvas');
+hud.width = W;
+hud.height = H;
+const hctx = hud.getContext('2d');
+hctx.imageSmoothingEnabled = false;
+let G = bctx; // current draw target for sprite/text helpers
 
 function makeCanvas(w, h) {
   const c = document.createElement('canvas');
   c.width = w;
   c.height = h;
-  const g = c.getContext('2d');
-  g.imageSmoothingEnabled = false;
+  c.getContext('2d').imageSmoothingEnabled = false;
   return c;
 }
 
+function resize() {
+  const stage = document.getElementById('stage');
+  const ww = stage.clientWidth || window.innerWidth;
+  const wh = stage.clientHeight || window.innerHeight;
+  let s = Math.min(ww / W, wh / H);
+  if (s >= 2 && Math.floor(s) / s > 0.88) s = Math.floor(s);
+  const cssW = Math.max(1, Math.floor(W * s));
+  const cssH = Math.max(1, Math.floor(H * s));
+  const dpr = window.devicePixelRatio || 1;
+  view.style.width = cssW + 'px';
+  view.style.height = cssH + 'px';
+  view.width = Math.max(1, Math.round(cssW * dpr));
+  view.height = Math.max(1, Math.round(cssH * dpr));
+  vctx.imageSmoothingEnabled = false;
+}
+window.addEventListener('resize', resize);
+resize();
+
 // ---------------------------------------------------------------------
-// Math helpers / RNG
+// Math / RNG
 // ---------------------------------------------------------------------
 function mulberry32(seed) {
   let a = seed >>> 0;
@@ -107,26 +115,103 @@ function mulberry32(seed) {
 }
 const rand = Math.random;
 function rr(a, b) { return a + rand() * (b - a); }
-function ri(a, b) { return Math.floor(rr(a, b + 1)); }
 function pick(arr) { return arr[Math.floor(rand() * arr.length)]; }
 function clamp(v, a, b) { return v < a ? a : (v > b ? b : v); }
 function lerp(a, b, t) { return a + (b - a) * t; }
 function len(x, y) { return Math.sqrt(x * x + y * y); }
+function damp(rate, dt) { return 1 - Math.exp(-rate * dt); }
+function hash2(x, y) {
+  let h = Math.imul(x | 0, 374761393) + Math.imul(y | 0, 668265263);
+  h = Math.imul(h ^ (h >>> 13), 1274126177);
+  return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+}
 function hexToRgb(hex) {
   const h = hex.replace('#', '');
   return [parseInt(h.substr(0, 2), 16), parseInt(h.substr(2, 2), 16), parseInt(h.substr(4, 2), 16)];
 }
-const BAYER = [
-  [0, 8, 2, 10],
-  [12, 4, 14, 6],
-  [3, 11, 1, 9],
-  [15, 7, 13, 5]
-];
+function makeNoise(seed) {
+  const r = mulberry32(seed);
+  const P = new Float32Array(65536);
+  for (let i = 0; i < P.length; i++) P[i] = r();
+  return function (x, y) {
+    const xi = Math.floor(x), yi = Math.floor(y);
+    const xf = x - xi, yf = y - yi;
+    const a = P[((yi & 255) << 8) | (xi & 255)];
+    const b = P[((yi & 255) << 8) | ((xi + 1) & 255)];
+    const c = P[(((yi + 1) & 255) << 8) | (xi & 255)];
+    const d = P[(((yi + 1) & 255) << 8) | ((xi + 1) & 255)];
+    const u = xf * xf * (3 - 2 * xf), v = yf * yf * (3 - 2 * yf);
+    return lerp(lerp(a, b, u), lerp(c, d, u), v);
+  };
+}
 
 // ---------------------------------------------------------------------
-// Sprite construction from pixel matrices
+// Restricted palette + time-of-day palette swap
 // ---------------------------------------------------------------------
-function makeSprite(rows, pal) {
+// k ink, i indigo, t teal canopy, s seafoam, g olive ground, h olive shade,
+// w wool white, l pale stone, b brown, n tan, r red accent, y yellow accent
+const PAL_KEYS = ['k', 'i', 't', 's', 'g', 'h', 'w', 'l', 'b', 'n', 'r', 'y'];
+const PAL_DAY = {
+  k: '#160c26', i: '#34204e', t: '#2a5f6e', s: '#4e8f80', g: '#9aac5c', h: '#7f9450',
+  w: '#ece6d2', l: '#b9b2a2', b: '#8c6a4c', n: '#c8a878', r: '#e04848', y: '#f4d860'
+};
+const PAL_SUNSET = {
+  k: '#1c0a1e', i: '#3a1838', t: '#5e2c58', s: '#84466a', g: '#b87850', h: '#9a5c44',
+  w: '#f4d4b0', l: '#c89a80', b: '#7c4030', n: '#d89a68', r: '#ff5a4a', y: '#ffd27a'
+};
+const PAL_DUSK = {
+  k: '#0a0614', i: '#1a1030', t: '#2c2048', s: '#3e3060', g: '#4e4466', h: '#3e3656',
+  w: '#a898b8', l: '#786a90', b: '#4a3450', n: '#7a6488', r: '#ff4a6a', y: '#f0d080'
+};
+const C = PAL_DAY;
+const PAL_RGB = {};
+for (const k of PAL_KEYS) PAL_RGB[k] = [hexToRgb(PAL_DAY[k]), hexToRgb(PAL_SUNSET[k]), hexToRgb(PAL_DUSK[k])];
+function packLE(r, g, b) { return ((b << 16) | (g << 8) | r) >>> 0; }
+
+let remapTable = null;
+let remapQ = -1;
+function paletteColorAt(k, p) {
+  const [d, s, n] = PAL_RGB[k];
+  if (p <= 0.6) {
+    const t = p / 0.6;
+    return [0, 1, 2].map(j => Math.round(lerp(d[j], s[j], t)));
+  }
+  const t = (p - 0.6) / 0.4;
+  return [0, 1, 2].map(j => Math.round(lerp(s[j], n[j], t)));
+}
+function buildRemap(p) {
+  const q = Math.round(clamp(p, 0, 1) * 96);
+  if (q === remapQ) return;
+  remapQ = q;
+  if (q === 0) { remapTable = null; return; }
+  const m = new Map();
+  for (const k of PAL_KEYS) {
+    const from = PAL_RGB[k][0];
+    const to = paletteColorAt(k, q / 96);
+    m.set(packLE(from[0], from[1], from[2]), (0xff000000 | packLE(to[0], to[1], to[2])) >>> 0);
+  }
+  remapTable = m;
+}
+function applyRemap() {
+  if (!remapTable) return;
+  const img = bctx.getImageData(0, 0, BW, BH);
+  const d = new Uint32Array(img.data.buffer);
+  let lastK = -1, lastV = 0;
+  for (let i = 0; i < d.length; i++) {
+    const k = d[i] & 0xffffff;
+    if (k !== lastK) {
+      lastK = k;
+      lastV = remapTable.get(k) || 0;
+    }
+    if (lastV) d[i] = lastV;
+  }
+  bctx.putImageData(img, 0, 0);
+}
+
+// ---------------------------------------------------------------------
+// Sprites (chunky pixel matrices, palette letters)
+// ---------------------------------------------------------------------
+function makeSprite(rows) {
   let w = 0;
   for (const r of rows) w = Math.max(w, r.length);
   const h = rows.length;
@@ -136,224 +221,92 @@ function makeSprite(rows, pal) {
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
       const ch = rows[y][x] || '.';
-      if (ch === '.' || !pal[ch]) continue;
-      const rgb = hexToRgb(pal[ch]);
+      if (!PAL_DAY[ch]) continue;
+      const rgb = PAL_RGB[ch][0];
       const i = (y * w + x) * 4;
-      img.data[i] = rgb[0];
-      img.data[i + 1] = rgb[1];
-      img.data[i + 2] = rgb[2];
-      img.data[i + 3] = 255;
+      img.data[i] = rgb[0]; img.data[i + 1] = rgb[1]; img.data[i + 2] = rgb[2]; img.data[i + 3] = 255;
     }
   }
   g.putImageData(img, 0, 0);
   return c;
 }
-function flipCanvas(src) {
+function transformCanvas(src, flipX, flipY) {
   const c = makeCanvas(src.width, src.height);
   const g = c.getContext('2d');
-  g.translate(src.width, 0);
-  g.scale(-1, 1);
+  g.translate(flipX ? src.width : 0, flipY ? src.height : 0);
+  g.scale(flipX ? -1 : 1, flipY ? -1 : 1);
   g.drawImage(src, 0, 0);
   return c;
 }
-function whiteCanvas(src) {
+function recolor(src, key) {
   const c = makeCanvas(src.width, src.height);
   const g = c.getContext('2d');
   g.drawImage(src, 0, 0);
   g.globalCompositeOperation = 'source-in';
-  g.fillStyle = '#ffffff';
+  g.fillStyle = PAL_DAY[key];
   g.fillRect(0, 0, src.width, src.height);
   return c;
 }
-// A sprite "pair" holds right- and left-facing canvases plus white flash versions.
-function spritePair(rows, pal) {
-  const r = makeSprite(rows, pal);
-  const l = flipCanvas(r);
-  return { r: r, l: l, wr: whiteCanvas(r), wl: whiteCanvas(l), w: r.width, h: r.height };
+function spr(rows) {
+  const r = makeSprite(rows);
+  const l = transformCanvas(r, true, false);
+  return {
+    r: r, l: l, ru: transformCanvas(r, false, true), lu: transformCanvas(r, true, true),
+    wr: recolor(r, 'w'), wl: recolor(l, 'w'), w: r.width, h: r.height
+  };
 }
+const S = {};
+// Sheep (7x6)
+S.sheepIdle = spr(['..ww...', '.wwwwkk', 'wwwwwkk', 'wwwwww.', '.llll..', '.k..k..']);
+S.sheepWalk = spr(['..ww...', '.wwwwkk', 'wwwwwkk', 'wwwwww.', '.llll..', 'k...k..']);
+S.sheepGrazeA = spr(['..ww...', '.wwww..', 'wwwwwk.', 'wwwwwkk', '.llll..', '.k..k..']);
+S.sheepGrazeB = spr(['..ww...', '.wwww..', 'wwwww..', 'wwwwwkk', '.llllk.', '.k..k..']);
+S.sheepPanic = spr(['..ww.kk', '.wwwwkk', 'wwwwww.', 'wwwwww.', '.llll..', 'k.k..k.']);
+// Goat (9x7)
+S.goatA = spr(['....ll...', '...l..nn.', '......nkn', 'nnnnnnnn.', 'nnnnnnbw.', '.bbbbb...', '.k.k.k.k.']);
+S.goatB = spr(['....ll...', '...l..nn.', '......nkn', 'nnnnnnnn.', 'nnnnnnbw.', '.bbbbb...', 'k..k..k.k']);
+S.goatRam = spr(['.........', '...ll....', 'nnnnl.ll.', 'nnnnnnnn.', 'nnnnnnnkn', '.bbbbb.w.', 'k..k.k..k']);
+// Dog, border collie (9x6)
+S.dogA = spr(['......k.k', 'w.....kkk', '.k....kwk', '.kkkkkkww', '.kkwwwk..', '.k.k..k.k']);
+S.dogB = spr(['......k.k', '.w....kkk', '.k....kwk', '.kkkkkkww', '.kkwwwk..', 'k..k.k..k']);
+S.dogBark = spr(['.....k.k.', 'w....kkk.', '.k...kwkw', '.kkkkkkw.', '.kkwwwk.w', '.k.k..k.k']);
+// Wolf (11x5)
+S.wolfA = spr(['.........i.', 'i.......iri', '.iiiiiiiiik', '.kiiiiiiik.', '.k.k..k.k..']);
+S.wolfB = spr(['.........i.', 'i.......iri', '.iiiiiiiiik', '.kiiiiiiik.', 'k...kk...k.']);
+S.alphaA = spr(['.........k.', 'k.......kyk', '.kkkkkkkkki', '.ikkkkkkki.', '.i.i..i.i..']);
+S.alphaB = spr(['.........k.', 'k.......kyk', '.kkkkkkkkki', '.ikkkkkkki.', 'i...ii...i.']);
+// Bat (7x4)
+S.batUp = spr(['i.....i', 'ii...ii', '.iikii.', '..krk..']);
+S.batDown = spr(['..kkk..', '.iirii.', 'ii...ii', 'i.....i']);
+// Structures
+S.pillar = spr([
+  'llllll', 'wwwwwl', '.wwwl.', '.wwwl.', '.wlwl.', '.wwll.', '.wwwl.', '.wwwl.',
+  '.wwwl.', '.lwwl.', '.wwwl.', 'lwwwwl', 'llllll'
+]);
+S.pillarBroken = spr(['..w...', '.wwl..', '.wwwl.', '.wlwl.', '.wwwl.', '.wwll.', 'lwwwwl', 'llllll']);
+S.pinGoal = spr(['.rrr.', 'rrwrr', 'rrrrr', '.rrr.', '..r..', '..k..']);
+S.pinStart = spr(['.lll.', 'llwll', 'lllll', '.lll.', '..l..', '..k..']);
 
-// ---------------------------- GOAT ----------------------------------
-const GOAT_PAL = {
-  k: '#1c1612', d: '#5e4c3e', b: '#806a54', g: '#9c938a', G: '#c8c0b4',
-  W: '#ece6dc', h: '#efe3c4', H: '#a89068', y: '#f0c840', n: '#d8908c'
-};
-const GOAT_TOP = [
-  '..........hhhh....',
-  '.........hHHHHh...',
-  '........hH...Hh...',
-  '........hH..kGGGk.',
-  '........h..kgGGGGk',
-  '...........kgGykGk',
-  '.kkkkkkkkkkggGGGGk',
-  'kWGGGGGGGGGgggGGnk',
-  'kGGGGGGGGGgggkkkk.',
-  'kgGGGGGGGgggggk.d.',
-  'kggggggggggbbbk.d.',
-  '.kbbbbbbbbbbbk....'
-];
-const GOAT_LEGS_A = [
-  '..kd.kd...kd.kd...',
-  '..kd.kd...kd.kd...',
-  '..kk.kk...kk.kk...'
-];
-const GOAT_LEGS_B = [
-  '..kd..kd.kd..kd...',
-  '.kd....kdkd....kd.',
-  '.kk....kk.kk...kk.'
-];
-const GOAT_RAM = [
-  '..................',
-  '..................',
-  '..................',
-  '..................',
-  '..........hhh......',
-  '.........hHHHhh....',
-  '.kkkkkkkkhH...HHhh.',
-  'kWGGGGGGGgg.kkGGkhh',
-  'kGGGGGGGGgggkgGGGGk',
-  'kgGGGGGGggggkgykGGk',
-  'kggggggggggbkGGGGnk',
-  '.kbbbbbbbbbbbkkkkk.',
-  '..kd.kd...kd.kd.d..',
-  '.kd...kd.kd...kd...',
-  'kk.....kkk.....kk..'
-];
-const SPR = {};
-SPR.goatA = spritePair(GOAT_TOP.concat(GOAT_LEGS_A), GOAT_PAL);
-SPR.goatB = spritePair(GOAT_TOP.concat(GOAT_LEGS_B), GOAT_PAL);
-SPR.goatRam = spritePair(GOAT_RAM, GOAT_PAL);
-
-// ---------------------------- SHEEP ---------------------------------
-const SHEEP_PAL = {
-  W: '#fbf8ee', w: '#e8e0cc', c: '#c8bea6', d: '#2e2a2e', D: '#4c4548',
-  e: '#f4f0e8', k: '#151216', p: '#d89a9a'
-};
-SPR.sheepIdle = spritePair([
-  '...cWW.WWc.....',
-  '..cWWWWWWWWc...',
-  '.cWWWWWWWWWWpd.',
-  'cwWWWWWWWWWdDDd',
-  'cwWWWWWWWWwdekd',
-  'cwwWWWWWWwwdddk',
-  '.cwwwwwwwwc.dd.',
-  '..ccccccccc....',
-  '..k.k...k.k....',
-  '..k.k...k.k....'
-], SHEEP_PAL);
-SPR.sheepWalk = spritePair([
-  '...cWW.WWc.....',
-  '..cWWWWWWWWc...',
-  '.cWWWWWWWWWWpd.',
-  'cwWWWWWWWWWdDDd',
-  'cwWWWWWWWWwdekd',
-  'cwwWWWWWWwwdddk',
-  '.cwwwwwwwwc.dd.',
-  '..ccccccccc....',
-  '..k..k..k..k...',
-  '.k....k.k...k..'
-], SHEEP_PAL);
-SPR.sheepGrazeA = spritePair([
-  '...cWW.WWc.....',
-  '..cWWWWWWWWc...',
-  '.cWWWWWWWWWWc..',
-  'cwWWWWWWWWWWwp.',
-  'cwWWWWWWWWwwDDd',
-  'cwwWWWWWWwwdekd',
-  '.cwwwwwwwwcdddd',
-  '..ccccccccc.ddk',
-  '..k.k...k.k....',
-  '..k.k...k.k....'
-], SHEEP_PAL);
-SPR.sheepGrazeB = spritePair([
-  '...cWW.WWc.....',
-  '..cWWWWWWWWc...',
-  '.cWWWWWWWWWWc..',
-  'cwWWWWWWWWWWwp.',
-  'cwWWWWWWWWwwdDd',
-  'cwwWWWWWWwwDekd',
-  '.cwwwwwwwwcdddd',
-  '..ccccccccc.dkd',
-  '..k.k...k.k....',
-  '..k.k...k.k....'
-], SHEEP_PAL);
-SPR.sheepPanic = spritePair([
-  '...cWW.WWc.pd..',
-  '..cWWWWWWWWdDDd',
-  '.cWWWWWWWWWdeed',
-  'cwWWWWWWWWWwdkd',
-  'cwWWWWWWWWwwddk',
-  'cwwWWWWWWwwc...',
-  '.cwwwwwwwwc....',
-  '..ccccccccc....',
-  '.k..k....k..k..',
-  'k....k..k....k.'
-], SHEEP_PAL);
-
-// ---------------------------- BAT -----------------------------------
-const BAT_PAL = {
-  P: '#3a1440', p: '#6e2468', m: '#a03a6a', k: '#1c0a20', r: '#ff3a3a', f: '#f0e0e0'
-};
-SPR.batUp = spritePair([
-  'P.............P',
-  'pP...........Pp',
-  'mpP..k...k..Ppm',
-  '.mpPPkkkkkPPpm.',
-  '..mppkrkrkppm..',
-  '.....kkkkk.....',
-  '......f.f......'
-], BAT_PAL);
-SPR.batDown = spritePair([
-  '.....k...k.....',
-  '.....kkkkk.....',
-  '....pkrkrkp....',
-  '...pPkkkkkPp...',
-  '..pPPPkkkPPPp..',
-  '.pPmm.f.f.mmPp.',
-  'pPm.........mPp'
-], BAT_PAL);
-
-// ---------------------------- WOLF ----------------------------------
-const WOLF_PAL = {
-  k: '#111218', d: '#2c2f3a', D: '#474c5c', L: '#6c7288', r: '#ff3434', t: '#eeeeee'
-};
-const ALPHA_PAL = {
-  k: '#140f1c', d: '#3a2c50', D: '#5c4880', L: '#8a74b8', r: '#ffd040', t: '#eeeeee'
-};
-const WOLF_TOP = [
-  '...............k.k...',
-  '..............kDkD...',
-  'k.............kDDDk..',
-  '.kk..........kDDrDkkk',
-  '..kkLLLLLLLLkDDDDDDDk',
-  '...kdDDDDDDDDdDdktkk.',
-  '...kddddddddddddk....'
-];
-const WOLF_LEGS_A = [
-  '...kdk.kdk...kdkdk...',
-  '..kdk...kdk.kdk..kdk.',
-  '.kk......kk.kk....kk.'
-];
-const WOLF_LEGS_B = [
-  '....kdkdk....kdkdk...',
-  '....kdkdk....kdkdk...',
-  '....kk.kk....kk.kk...'
-];
-SPR.wolfA = spritePair(WOLF_TOP.concat(WOLF_LEGS_A), WOLF_PAL);
-SPR.wolfB = spritePair(WOLF_TOP.concat(WOLF_LEGS_B), WOLF_PAL);
-SPR.alphaA = spritePair(WOLF_TOP.concat(WOLF_LEGS_A), ALPHA_PAL);
-SPR.alphaB = spritePair(WOLF_TOP.concat(WOLF_LEGS_B), ALPHA_PAL);
-
-// Draw sprite anchored at bottom-centre (feet).
-function drawSpr(pair, x, y, faceLeft, flash) {
-  const img = flash ? (faceLeft ? pair.wl : pair.wr) : (faceLeft ? pair.l : pair.r);
-  ctx.drawImage(img, Math.round(x - pair.w / 2), Math.round(y - pair.h));
+function drawSpr(s, x, y, left, opts) {
+  const o = opts || {};
+  let img;
+  if (o.white) img = left ? s.wl : s.wr;
+  else if (o.upside) img = left ? s.lu : s.ru;
+  else img = left ? s.l : s.r;
+  G.drawImage(img, Math.round(x - s.w / 2), Math.round(y - s.h + 1));
+}
+function px(x, y, key) {
+  G.fillStyle = PAL_DAY[key];
+  G.fillRect(Math.round(x), Math.round(y), 1, 1);
+}
+function rect(x, y, w, h, key) {
+  G.fillStyle = PAL_DAY[key];
+  G.fillRect(Math.round(x), Math.round(y), w, h);
 }
 function drawShadow(x, y, w) {
-  ctx.fillStyle = 'rgba(10,24,12,0.35)';
-  const x0 = Math.round(x - w / 2);
-  const yy = Math.round(y);
-  ctx.fillRect(x0 + 1, yy - 1, w - 2, 3);
-  ctx.fillRect(x0, yy, w, 1);
+  const x0 = Math.round(x - w / 2), yy = Math.round(y);
+  rect(x0 + 1, yy, w - 2, 1, 'h');
+  rect(x0 + 2, yy + 1, Math.max(1, w - 4), 1, 'h');
 }
 
 // ---------------------------------------------------------------------
@@ -372,78 +325,57 @@ const FONT = {
   '8': '111101111101111', '9': '111101111001110',
   ':': '000010000010000', '.': '000000000000010', '!': '010010010000010', '-': '000000111000000',
   '/': '001001010100100', '+': '000010111010000', "'": '010010000000000', ',': '000000000010100',
-  '?': '110001010000010', '(': '001010010010001', ')': '100010010010100', '>': '100010001010100',
-  '<': '001010100010001', '=': '000111000111000', 'x': '000101010101000', ' ': '000000000000000'
+  '?': '110001010000010', '(': '001010010010001', ')': '100010010010100', '>': '100110111110100',
+  '<': '001011111011001', '=': '000111000111000', 'x': '000101010101000', ' ': '000000000000000',
+  '^': '010111000000000', '*': '000010111010101'
 };
-function textWidth(str, s) {
-  return str.length ? (str.length * 4 - 1) * s : 0;
-}
+function textWidth(str, s) { return str.length ? (str.length * 4 - 1) * s : 0; }
 function drawTextRaw(str, x, y, col, s) {
-  ctx.fillStyle = col;
+  G.fillStyle = col;
   let cx = x;
   for (let i = 0; i < str.length; i++) {
     const g = FONT[str[i]];
-    if (g) {
-      for (let j = 0; j < 15; j++) {
-        if (g[j] === '1') ctx.fillRect(cx + (j % 3) * s, y + ((j / 3) | 0) * s, s, s);
-      }
-    }
+    if (g) for (let j = 0; j < 15; j++) if (g[j] === '1') G.fillRect(cx + (j % 3) * s, y + ((j / 3) | 0) * s, s, s);
     cx += 4 * s;
   }
 }
-// opts: { s, align, shadow, outline }
-function drawText(str, x, y, col, opts) {
+// key = palette letter. opts: s, align, outline (palette letter), shadow (palette letter)
+function text(str, x, y, key, opts) {
   const o = opts || {};
   const s = o.s || 1;
   str = String(str).toUpperCase().replace(/X(?=\d)/g, 'x');
   const w = textWidth(str, s);
   if (o.align === 'center') x -= Math.floor(w / 2);
   else if (o.align === 'right') x -= w;
-  x = Math.round(x);
-  y = Math.round(y);
+  x = Math.round(x); y = Math.round(y);
   if (o.outline) {
-    drawTextRaw(str, x - s, y, o.outline, s);
-    drawTextRaw(str, x + s, y, o.outline, s);
-    drawTextRaw(str, x, y - s, o.outline, s);
-    drawTextRaw(str, x, y + s, o.outline, s);
-    drawTextRaw(str, x + s, y + s, o.outline, s);
+    const oc = PAL_DAY[o.outline];
+    drawTextRaw(str, x - s, y, oc, s); drawTextRaw(str, x + s, y, oc, s);
+    drawTextRaw(str, x, y - s, oc, s); drawTextRaw(str, x, y + s, oc, s);
+    drawTextRaw(str, x + s, y + s, oc, s);
   } else if (o.shadow) {
-    drawTextRaw(str, x + Math.max(1, s >> 1), y + Math.max(1, s >> 1), o.shadow, s);
+    drawTextRaw(str, x + 1, y + 1, PAL_DAY[o.shadow], s);
   }
-  drawTextRaw(str, x, y, col, s);
+  drawTextRaw(str, x, y, PAL_DAY[key], s);
 }
 
 // ---------------------------------------------------------------------
-// Audio (Web Audio API synthesis)
+// Audio (Web Audio synthesis)
 // ---------------------------------------------------------------------
-let AC = null;
-let master = null;
-let noiseBuf = null;
-let muted = false;
-
+let AC = null, master = null, noiseBuf = null, muted = false;
 function initAudio() {
-  if (AC) {
-    if (AC.state === 'suspended') AC.resume();
-    return;
-  }
+  if (AC) { if (AC.state === 'suspended') AC.resume(); return; }
   const Ctor = window.AudioContext || window.webkitAudioContext;
   if (!Ctor) return;
-  try {
-    AC = new Ctor();
-  } catch (e) {
-    AC = null;
-    return;
-  }
+  try { AC = new Ctor(); } catch (e) { AC = null; return; }
   master = AC.createGain();
   master.gain.value = muted ? 0 : 0.45;
   master.connect(AC.destination);
-  noiseBuf = AC.createBuffer(1, Math.floor(AC.sampleRate * 1.0), AC.sampleRate);
+  noiseBuf = AC.createBuffer(1, Math.floor(AC.sampleRate), AC.sampleRate);
   const d = noiseBuf.getChannelData(0);
   for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
 }
-function audioReady() {
-  return AC && master && AC.state !== 'closed';
-}
+function audioReady() { return AC && master && AC.state !== 'closed'; }
 function setMuted(m) {
   muted = m;
   if (master) master.gain.setTargetAtTime(m ? 0 : 0.45, AC.currentTime, 0.02);
@@ -469,11 +401,8 @@ function tone(type, f0, f1, dur, vol, t0, filter) {
     f.frequency.setValueAtTime(filter.freq, t);
     if (filter.freq1) f.frequency.exponentialRampToValueAtTime(filter.freq1, t + dur);
     f.Q.value = filter.q || 1;
-    o.connect(f);
-    f.connect(g);
-  } else {
-    o.connect(g);
-  }
+    o.connect(f); f.connect(g);
+  } else o.connect(g);
   g.connect(master);
   o.start(t);
   o.stop(t + dur + 0.05);
@@ -489,9 +418,7 @@ function noise(dur, type, freq, vol, q, t0, freq1) {
   if (freq1) f.frequency.exponentialRampToValueAtTime(freq1, t + dur);
   f.Q.value = q || 1;
   const g = envGain(t, 0.004, vol, dur);
-  src.connect(f);
-  f.connect(g);
-  g.connect(master);
+  src.connect(f); f.connect(g); g.connect(master);
   src.start(t, Math.random() * 0.5);
   src.stop(t + dur + 0.05);
 }
@@ -499,9 +426,9 @@ const SFX = {
   dash() {
     if (!audioReady()) return;
     const t = AC.currentTime;
-    tone('square', 90, 620, 0.2, 0.22, t, { type: 'lowpass', freq: 900, freq1: 3200, q: 4 });
-    tone('sawtooth', 60, 300, 0.18, 0.12, t);
-    noise(0.22, 'bandpass', 600, 0.25, 1.5, t, 3000);
+    tone('square', 90, 620, 0.2, 0.2, t, { type: 'lowpass', freq: 900, freq1: 3200, q: 4 });
+    tone('sawtooth', 60, 300, 0.18, 0.1, t);
+    noise(0.22, 'bandpass', 600, 0.22, 1.5, t, 3000);
   },
   impact() {
     if (!audioReady()) return;
@@ -516,7 +443,15 @@ const SFX = {
     tone('triangle', 700, 1700, 0.07, 0.35, t);
     tone('square', 1500, 2600, 0.06, 0.12, t + 0.05, { type: 'highpass', freq: 900 });
     noise(0.14, 'highpass', 4200, 0.35, 0.8, t + 0.03);
-    tone('sine', 2400, 3600, 0.05, 0.12, t + 0.09);
+  },
+  bark() {
+    if (!audioReady()) return;
+    const t = AC.currentTime;
+    [0, 0.11].forEach((dt, i) => {
+      const f = i ? 330 : 420;
+      tone('square', f * 1.4, f * 0.7, 0.09, 0.22, t + dt, { type: 'bandpass', freq: 1100, q: 1.5 });
+      noise(0.07, 'bandpass', 1400, 0.3, 2, t + dt);
+    });
   },
   baa(panic) {
     if (!audioReady()) return;
@@ -533,24 +468,15 @@ const SFX = {
     lfo.frequency.value = panic ? 34 : 24;
     const lfoG = AC.createGain();
     lfoG.gain.value = base * (panic ? 0.09 : 0.06);
-    lfo.connect(lfoG);
-    lfoG.connect(o.frequency);
+    lfo.connect(lfoG); lfoG.connect(o.frequency);
     const f1 = AC.createBiquadFilter();
-    f1.type = 'bandpass';
-    f1.frequency.value = panic ? 1500 : 1100;
-    f1.Q.value = 2.2;
+    f1.type = 'bandpass'; f1.frequency.value = panic ? 1500 : 1100; f1.Q.value = 2.2;
     const f2 = AC.createBiquadFilter();
-    f2.type = 'lowpass';
-    f2.frequency.value = 3200;
-    const g = envGain(t, 0.03, panic ? 0.5 : 0.38, dur);
-    o.connect(f1);
-    f1.connect(f2);
-    f2.connect(g);
-    g.connect(master);
-    o.start(t);
-    lfo.start(t);
-    o.stop(t + dur + 0.08);
-    lfo.stop(t + dur + 0.08);
+    f2.type = 'lowpass'; f2.frequency.value = 3200;
+    const g = envGain(t, 0.03, panic ? 0.45 : 0.32, dur);
+    o.connect(f1); f1.connect(f2); f2.connect(g); g.connect(master);
+    o.start(t); lfo.start(t);
+    o.stop(t + dur + 0.08); lfo.stop(t + dur + 0.08);
   },
   capture() {
     if (!audioReady()) return;
@@ -575,16 +501,21 @@ const SFX = {
     const t = AC.currentTime;
     [523, 659, 784].forEach((f, i) => tone('triangle', f, f, 0.1, 0.22, t + i * 0.07));
   },
+  pen() {
+    if (!audioReady()) return;
+    const t = AC.currentTime;
+    tone('triangle', 988, 988, 0.08, 0.18, t);
+    tone('triangle', 1318, 1318, 0.12, 0.16, t + 0.06);
+  },
   wave() {
     if (!audioReady()) return;
     const t = AC.currentTime;
-    [392, 523, 659, 784].forEach((f, i) => tone('triangle', f, f * 1.01, 0.12, 0.22, t + i * 0.09));
-    tone('square', 196, 196, 0.4, 0.05, t, { type: 'lowpass', freq: 800 });
+    [392, 523, 659, 784].forEach((f, i) => tone('triangle', f, f * 1.01, 0.12, 0.2, t + i * 0.09));
   },
   clear() {
     if (!audioReady()) return;
     const t = AC.currentTime;
-    [523, 659, 784, 1047, 784, 1047].forEach((f, i) => tone('square', f, f, 0.09, 0.09, t + i * 0.08, { type: 'lowpass', freq: 2400 }));
+    [523, 659, 784, 1047, 784, 1047].forEach((f, i) => tone('square', f, f, 0.09, 0.08, t + i * 0.08, { type: 'lowpass', freq: 2400 }));
   },
   gameover() {
     if (!audioReady()) return;
@@ -592,564 +523,448 @@ const SFX = {
     [392, 349, 311, 262].forEach((f, i) => tone('triangle', f, f * 0.98, 0.3, 0.25, t + i * 0.22));
     tone('sine', 130, 65, 1.0, 0.3, t + 0.66);
   },
-  bump() {
+  bump() { if (audioReady()) tone('sine', 120, 60, 0.08, 0.25); },
+  click() { if (audioReady()) tone('square', 660, 990, 0.05, 0.08, undefined, { type: 'lowpass', freq: 2000 }); },
+  join() {
     if (!audioReady()) return;
-    tone('sine', 120, 60, 0.08, 0.25);
-  },
-  click() {
-    if (!audioReady()) return;
-    tone('square', 660, 990, 0.05, 0.08, undefined, { type: 'lowpass', freq: 2000 });
+    const t = AC.currentTime;
+    tone('square', 440, 440, 0.06, 0.1, t, { type: 'lowpass', freq: 2200 });
+    tone('square', 880, 880, 0.08, 0.1, t + 0.06, { type: 'lowpass', freq: 2200 });
   }
 };
 
 // ---------------------------------------------------------------------
-// World / field definition
+// Worlds (procedural maps with a forest mask)
+// mask: 0 meadow, 1 forest canopy, 2 solid structure
 // ---------------------------------------------------------------------
-const FIELD = { x0: 30, y0: 42, x1: 450, y1: 246 };
-const FIELD_CX = (FIELD.x0 + FIELD.x1) / 2;
-const FIELD_CY = (FIELD.y0 + FIELD.y1) / 2;
+let world = null;
 
-// ---------------------------------------------------------------------
-// Procedural environment (pre-rendered)
-// ---------------------------------------------------------------------
-const bgCanvas = makeCanvas(W, H);
-const fgCanvas = makeCanvas(W, H);
-const vignetteCanvas = makeCanvas(W, H);
-
-function makeGrassTile(rng) {
-  const S = 32;
-  const c = makeCanvas(S, S);
-  const g = c.getContext('2d');
-  const img = g.createImageData(S, S);
-  const base = ['#4c8a3e', '#56963f', '#5f9f48'].map(hexToRgb);
-  const dark = hexToRgb('#3f7634');
-  const light = hexToRgb('#7cbc5a');
-  const tip = hexToRgb('#94cc68');
-  const px = new Array(S * S);
-  for (let y = 0; y < S; y++) {
-    for (let x = 0; x < S; x++) {
-      const v = 0.5 + 0.25 * Math.sin((x / S) * Math.PI * 2 * 2 + 1.3) * Math.cos((y / S) * Math.PI * 2 + 0.4) + (rng() - 0.5) * 0.5;
-      const t = v * 3 + (BAYER[y & 3][x & 3] / 16 - 0.5) * 0.9;
-      px[y * S + x] = base[clamp(Math.floor(t), 0, 2)];
-    }
-  }
-  // grass blades
-  for (let i = 0; i < 70; i++) {
-    const bx = Math.floor(rng() * S);
-    const by = Math.floor(rng() * S);
-    const L = 2 + Math.floor(rng() * 3);
-    const isLight = rng() < 0.55;
-    const lean = rng() < 0.3 ? (rng() < 0.5 ? -1 : 1) : 0;
-    for (let k = 0; k < L; k++) {
-      const xx = (bx + (k === L - 1 ? lean : 0) + S) % S;
-      const yy = (by - k + S) % S;
-      let col = isLight ? light : dark;
-      if (isLight && k === L - 1) col = tip;
-      px[yy * S + xx] = col;
-    }
-  }
-  for (let i = 0; i < S * S; i++) {
-    const c3 = px[i];
-    img.data[i * 4] = c3[0];
-    img.data[i * 4 + 1] = c3[1];
-    img.data[i * 4 + 2] = c3[2];
-    img.data[i * 4 + 3] = 255;
-  }
-  g.putImageData(img, 0, 0);
-  return c;
-}
-
-function makeTreeCanvas(rng, r, palette) {
-  const w = Math.ceil(r * 2 + 8);
-  const trunkH = 6;
-  const hgt = Math.ceil(r * 2 + trunkH + 6);
-  const c = makeCanvas(w, hgt);
-  const g = c.getContext('2d');
-  const img = g.createImageData(w, hgt);
-  const cols = palette.map(hexToRgb);
-  const cx = w / 2;
-  const baseY = hgt - 2;
-  const ccy = baseY - trunkH - r * 0.85;
-  function put(x, y, rgb, a) {
-    if (x < 0 || y < 0 || x >= w || y >= hgt) return;
-    const i = (y * w + x) * 4;
-    img.data[i] = rgb[0];
-    img.data[i + 1] = rgb[1];
-    img.data[i + 2] = rgb[2];
-    img.data[i + 3] = a === undefined ? 255 : a;
-  }
-  // ground shadow under tree
-  const shadowRgb = hexToRgb('#0a1d18');
-  for (let y = -2; y <= 1; y++) {
-    const hw = Math.floor(r * 0.9 * Math.sqrt(1 - (y / 3) * (y / 3)));
-    for (let x = -hw; x <= hw; x++) put(Math.floor(cx + x), baseY + y, shadowRgb, 150);
-  }
-  // trunk
-  const trunkDark = hexToRgb('#2e2018');
-  const trunkMid = hexToRgb('#4f3826');
-  const trunkLight = hexToRgb('#6e5036');
-  for (let y = 0; y < trunkH + 4; y++) {
-    const yy = baseY - y;
-    put(Math.floor(cx) - 2, yy, trunkDark);
-    put(Math.floor(cx) - 1, yy, trunkLight);
-    put(Math.floor(cx), yy, trunkMid);
-    put(Math.floor(cx) + 1, yy, trunkDark);
-  }
-  put(Math.floor(cx) - 3, baseY, trunkDark);
-  put(Math.floor(cx) + 2, baseY, trunkDark);
-  // trunk shadow from canopy
-  const s1 = rng() * 6.28;
-  const s2 = rng() * 6.28;
-  const s3 = rng() * 6.28;
-  const s4 = rng() * 6.28;
-  const lobes = 5 + Math.floor(rng() * 3);
-  for (let y = -r - 3; y <= r + 3; y++) {
-    for (let x = -r - 3; x <= r + 3; x++) {
-      const ang = Math.atan2(y, x);
-      const rEff = r * (1 + 0.12 * Math.sin(ang * lobes + s1) + 0.06 * Math.sin(ang * 11 + s2));
-      const d = Math.sqrt(x * x + (y * 1.08) * (y * 1.08));
-      if (d > rEff) continue;
-      const px = Math.floor(cx + x);
-      const py = Math.floor(ccy + y);
-      if (d > rEff - 1.1) {
-        put(px, py, cols[0]);
-        continue;
-      }
-      const light = (-x * 0.55 - y * 0.85) / r;
-      const e = d / rEff;
-      const clump = Math.sin(x * 0.9 + s3) * Math.sin(y * 0.85 + s4);
-      let v = 0.52 + light * 0.42 - e * e * 0.3 + clump * 0.13;
-      const t = v * 4 + (BAYER[py & 3][px & 3] / 16 - 0.5) * 0.95;
-      const idx = clamp(Math.floor(t), 0, cols.length - 1);
-      put(px, py, cols[idx]);
-    }
-  }
-  // dark band where canopy meets trunk (canopy shadow on trunk)
-  const shade = hexToRgb('#0b201b');
-  const by = Math.floor(ccy + r * 0.95);
-  for (let x = -2; x <= 1; x++) put(Math.floor(cx) + x, by + 1, shade);
-  g.putImageData(img, 0, 0);
-  return c;
-}
-
-const TREE_PALETTES = [
-  ['#0b2622', '#123a33', '#1d5241', '#2d6b4a', '#4a8a52'],
-  ['#0a2328', '#11363c', '#1a4d4c', '#26665a', '#3f8566'],
-  ['#0c2620', '#163f30', '#22573a', '#357244', '#5a9452']
-];
-
-function buildEnvironment() {
-  const rng = mulberry32(1337);
-  const g = bgCanvas.getContext('2d');
-  g.imageSmoothingEnabled = false;
-  // base grass pattern
-  const tile = makeGrassTile(rng);
-  g.fillStyle = g.createPattern(tile, 'repeat');
-  g.fillRect(0, 0, W, H);
-
-  // large-scale lighter/darker grass patches (dithered)
-  const img = g.getImageData(0, 0, W, H);
-  const a1 = rng() * 6, a2 = rng() * 6, a3 = rng() * 6;
-  for (let y = 0; y < H; y++) {
-    for (let x = 0; x < W; x++) {
-      const v = Math.sin(x * 0.045 + a1) * Math.sin(y * 0.06 + a2) + 0.6 * Math.sin((x + y) * 0.021 + a3);
-      const th = BAYER[y & 3][x & 3] / 16;
-      const i = (y * W + x) * 4;
-      if (v > 0.55 + th * 0.5) {
-        img.data[i] *= 0.88; img.data[i + 1] *= 0.9; img.data[i + 2] *= 0.88;
-      } else if (v < -0.75 - th * 0.4) {
-        img.data[i] = Math.min(255, img.data[i] * 1.08 + 4);
-        img.data[i + 1] = Math.min(255, img.data[i + 1] * 1.06 + 4);
-      }
-    }
-  }
-  g.putImageData(img, 0, 0);
-
-  function px(x, y, col) {
-    g.fillStyle = col;
-    g.fillRect(Math.round(x), Math.round(y), 1, 1);
-  }
-  // dirt patches
-  for (let i = 0; i < 6; i++) {
-    const cx = lerp(FIELD.x0 + 30, FIELD.x1 - 30, rng());
-    const cy = lerp(FIELD.y0 + 20, FIELD.y1 - 20, rng());
-    const rx = 8 + rng() * 10, ry = 4 + rng() * 5;
-    for (let y = -ry; y <= ry; y++) {
-      for (let x = -rx; x <= rx; x++) {
-        const d = (x * x) / (rx * rx) + (y * y) / (ry * ry);
-        const xx = Math.round(cx + x), yy = Math.round(cy + y);
-        if (d < 1 && (d < 0.55 || BAYER[yy & 3][xx & 3] / 16 > d - 0.4)) {
-          px(xx, yy, d < 0.3 && rng() < 0.2 ? '#9a7c52' : (rng() < 0.15 ? '#6e5434' : '#86683f'));
-        }
-      }
-    }
-  }
-  // flowers
-  const flowerCols = [
-    ['#ffffff', '#f6d23a'], ['#f6d23a', '#c07a20'], ['#ff8fb8', '#ffe070'],
-    ['#b48cff', '#ffffff'], ['#ff6a5a', '#ffd040']
-  ];
-  for (let i = 0; i < 170; i++) {
-    const x = Math.round(lerp(FIELD.x0 - 4, FIELD.x1 + 4, rng()));
-    const y = Math.round(lerp(FIELD.y0 - 2, FIELD.y1 + 6, rng()));
-    const fc = flowerCols[Math.floor(rng() * flowerCols.length)];
-    const type = rng();
-    if (type < 0.45) {
-      px(x, y + 1, '#3a7030');
-      px(x, y, fc[0]);
-    } else if (type < 0.85) {
-      px(x, y + 2, '#3a7030');
-      px(x - 1, y, fc[0]); px(x + 1, y, fc[0]); px(x, y - 1, fc[0]); px(x, y + 1, fc[0]);
-      px(x, y, fc[1]);
-    } else {
-      // clover clump
-      px(x, y, '#3c7a34'); px(x + 1, y, '#468a3a'); px(x, y - 1, '#4e9440'); px(x - 1, y, '#3c7a34');
-      px(x + 1, y - 1, '#68aa50');
-    }
-  }
-  // rocks and pebbles
-  for (let i = 0; i < 26; i++) {
-    const x = Math.round(lerp(FIELD.x0, FIELD.x1, rng()));
-    const y = Math.round(lerp(FIELD.y0, FIELD.y1 + 6, rng()));
-    const big = rng() < 0.4;
-    const w = big ? 4 + Math.floor(rng() * 2) : 3;
-    const h = big ? 3 : 2;
-    g.fillStyle = 'rgba(20,40,16,0.45)';
-    g.fillRect(x, y + h, w + 1, 1);
-    g.fillStyle = '#4c4c48';
-    g.fillRect(x, y, w, h);
-    g.fillStyle = '#8a8a82';
-    g.fillRect(x, y, w - 1, h - 1);
-    g.fillStyle = '#b4b2a8';
-    g.fillRect(x, y, Math.max(1, w - 2), 1);
-    g.fillStyle = '#4c4c48';
-    g.fillRect(x - 1, y + 1, 1, h - 1);
-  }
-  for (let i = 0; i < 90; i++) {
-    px(lerp(FIELD.x0, FIELD.x1, rng()), lerp(FIELD.y0, FIELD.y1 + 6, rng()), rng() < 0.5 ? '#8c8a80' : '#6c6a62');
-  }
-
-  // dark forest floor outside the field with a ragged edge
-  g.fillStyle = '#10261f';
-  for (let y = 0; y < H; y++) {
-    for (let x = 0; x < W; x++) {
-      const inset = 4 + 3 * Math.sin(x * 0.3 + y * 0.17) + 2 * Math.sin(x * 0.11 - y * 0.23);
-      const out = x < FIELD.x0 - inset || x > FIELD.x1 + inset || y < FIELD.y0 - inset - 4 || y > FIELD.y1 + inset + 4;
-      if (out) g.fillRect(x, y, 1, 1);
-    }
-  }
-
-  // Trees
-  const trees = [];
-  function addTree(x, y, r) {
-    trees.push({ x: x, y: y, r: r, pal: TREE_PALETTES[Math.floor(rng() * TREE_PALETTES.length)] });
-  }
-  // top band (3 rows)
-  for (let row = 0; row < 3; row++) {
-    let x = -10 + row * 7;
-    while (x < W + 12) {
-      addTree(x + rng() * 4, 8 + row * 12 + rng() * 6, 10 + Math.floor(rng() * 4));
-      x += 13 + rng() * 6;
-    }
-  }
-  // bottom band (2 rows)
-  for (let row = 0; row < 2; row++) {
-    let x = -8 + row * 8;
-    while (x < W + 12) {
-      addTree(x + rng() * 4, H + 2 + row * 10 + rng() * 4, 10 + Math.floor(rng() * 4));
-      x += 13 + rng() * 6;
-    }
-  }
-  // side bands
-  for (let side = 0; side < 2; side++) {
-    for (let col = 0; col < 2; col++) {
-      let y = 30 + col * 6;
-      while (y < H + 8) {
-        const bx = side === 0 ? (2 + col * 12 + rng() * 4) : (W - 2 - col * 12 - rng() * 4);
-        addTree(bx, y + rng() * 4, 9 + Math.floor(rng() * 4));
-        y += 12 + rng() * 6;
-      }
-    }
-  }
-  trees.sort((a, b) => a.y - b.y);
-  const fg = fgCanvas.getContext('2d');
-  fg.imageSmoothingEnabled = false;
-  for (const t of trees) {
-    const tc = makeTreeCanvas(rng, t.r, t.pal);
-    const dx = Math.round(t.x - tc.width / 2);
-    const dy = Math.round(t.y - tc.height + 2);
-    // Trees whose canopy can overlap the bottom of the field go to the foreground layer.
-    if (t.y > FIELD.y1 + 6) fg.drawImage(tc, dx, dy);
-    else g.drawImage(tc, dx, dy);
-  }
-
-  // vignette
-  const vg = vignetteCanvas.getContext('2d');
-  const grad = vg.createRadialGradient(W / 2, H / 2, H * 0.35, W / 2, H / 2, W * 0.62);
-  grad.addColorStop(0, 'rgba(30,8,40,0)');
-  grad.addColorStop(1, 'rgba(30,8,40,0.85)');
-  vg.fillStyle = grad;
-  vg.fillRect(0, 0, W, H);
-}
-buildEnvironment();
-
-// ---------------------------------------------------------------------
-// Day -> sunset palette shift
-// ---------------------------------------------------------------------
-const TINT_STOPS = [
-  { t: 0.0, c: [255, 255, 255], glow: [255, 240, 200], ga: 0.0 },
-  { t: 0.3, c: [255, 236, 196], glow: [255, 210, 140], ga: 0.06 },
-  { t: 0.6, c: [255, 200, 156], glow: [255, 140, 80], ga: 0.13 },
-  { t: 0.82, c: [242, 172, 160], glow: [255, 120, 110], ga: 0.14 },
-  { t: 1.0, c: [192, 150, 192], glow: [255, 120, 160], ga: 0.12 }
-];
-function tintAt(p) {
-  p = clamp(p, 0, 1);
-  for (let i = 0; i < TINT_STOPS.length - 1; i++) {
-    const a = TINT_STOPS[i], b = TINT_STOPS[i + 1];
-    if (p >= a.t && p <= b.t) {
-      const k = (p - a.t) / (b.t - a.t);
-      return {
-        c: a.c.map((v, j) => Math.round(lerp(v, b.c[j], k))),
-        glow: a.glow.map((v, j) => Math.round(lerp(v, b.glow[j], k))),
-        ga: lerp(a.ga, b.ga, k)
-      };
-    }
-  }
-  const l = TINT_STOPS[TINT_STOPS.length - 1];
-  return { c: l.c, glow: l.glow, ga: l.ga };
-}
-
-// ---------------------------------------------------------------------
-// Game state
-// ---------------------------------------------------------------------
-const RAM_DURATION = 0.3;
-const RAM_COOLDOWN = 1.5;
-const RAM_SPEED = 300;
-const GOAT_SPEED = 92;
-const SHEEP_COUNT = 14;
-const SHEEP_MAX = 15;
-const PANIC_RADIUS = 58;
-
-let state = 'MENU';       // MENU | PLAYING | GAMEOVER
-let paused = false;
-let gameTime = 0;
-let realTime = 0;
-let score = 0;
-let rescued = 0;
-let lostCount = 0;
-let best = 0;
-try { best = parseInt(localStorage.getItem('goatGuardianBest') || '0', 10) || 0; } catch (e) { best = 0; }
-let shake = 0;
-let hitStop = 0;
-let dayProgress = 0;
-let dayTarget = 0;
-let gameOverDelay = 0;
-let gameOverTime = 0;
-let lastBaa = 0;
-let newBest = false;
-
-const goat = {
-  x: FIELD_CX, y: FIELD_CY + 20, vx: 0, vy: 0, fx: 1, fy: 0, side: 1,
-  ramT: 0, cd: 0, ramId: 0, walk: 0, ramQueue: 0, bonk: 0
-};
-let sheep = [];
-let enemies = [];
-let particles = [];
-let texts = [];
-let fireflies = [];
-const wave = { n: 0, phase: 'intro', t: 0, toSpawn: 0, spawnT: 0, interval: 2, banner: 0, bannerText: '', subText: '' };
-
-function makeSheep(x, y) {
+function newWorld(w, h, seed, kind) {
   return {
-    x: x, y: y, vx: 0, vy: 0, side: rand() < 0.5 ? -1 : 1,
-    panic: 0, grazeT: rr(0.5, 3), grazing: rand() < 0.5, chew: rand() * 10,
-    wander: rand() * Math.PI * 2, walk: 0, baaCd: rr(0, 2), bob: rand() * 6, flash: 0
+    w: w, h: h, kind: kind, seed: seed,
+    mask: new Uint8Array(w * h).fill(1),
+    rng: mulberry32(seed), noise: makeNoise(seed),
+    pillars: [], start: null, goal: null, goalR: 26, path: [], canvas: null
   };
 }
-function spawnHerd() {
-  sheep = [];
-  for (let i = 0; i < SHEEP_COUNT; i++) {
-    const a = (i / SHEEP_COUNT) * Math.PI * 2 + rr(-0.3, 0.3);
-    const r = rr(8, 34);
-    sheep.push(makeSheep(FIELD_CX + Math.cos(a) * r * 1.4, FIELD_CY + Math.sin(a) * r * 0.8));
-  }
+function maskAt(x, y) {
+  x = x | 0; y = y | 0;
+  if (x < 0 || y < 0 || x >= world.w || y >= world.h) return 1;
+  return world.mask[y * world.w + x];
 }
+function blocked(x, y) { return maskAt(x, y) !== 0; }
+function canopy(x, y) { return maskAt(x, y) === 1; }
 
-function resetGame() {
-  score = 0;
-  rescued = 0;
-  lostCount = 0;
-  shake = 0;
-  hitStop = 0;
-  gameTime = 0;
-  paused = false;
-  newBest = false;
-  gameOverDelay = 0;
-  dayTarget = 0;
-  goat.x = FIELD_CX; goat.y = FIELD_CY + 26; goat.vx = 0; goat.vy = 0;
-  goat.fx = 1; goat.fy = 0; goat.side = 1; goat.ramT = 0; goat.cd = 0; goat.ramQueue = 0; goat.walk = 0;
-  spawnHerd();
-  enemies = [];
-  particles = [];
-  texts = [];
-  fireflies = [];
-  startWave(1);
-}
-
-function startWave(n) {
-  wave.n = n;
-  wave.phase = 'intro';
-  wave.t = 2.2;
-  wave.toSpawn = 3 + n * 2;
-  wave.interval = Math.max(0.55, 2.3 - n * 0.16);
-  wave.spawnT = 0.2;
-  wave.banner = 2.2;
-  wave.bannerText = 'WAVE ' + n;
-  wave.subText = n === 1 ? 'PROTECT THE FLOCK!' : (n % 4 === 0 ? 'THE SUN IS SINKING...' : 'HERE THEY COME!');
-  dayTarget = clamp((n - 1) / 8, 0, 1);
-  SFX.wave();
-}
-
-// ---------------------------------------------------------------------
-// Particles & floating text
-// ---------------------------------------------------------------------
-function addParticle(p) {
-  if (particles.length > 600) particles.shift();
-  particles.push(p);
-}
-function dust(x, y, n, spread, speed) {
-  const cols = ['#d6c49a', '#bca77c', '#e4d6b0', '#a8946c'];
-  for (let i = 0; i < n; i++) {
-    const a = rand() * Math.PI * 2;
-    const s = rr(0.2, 1) * (speed || 30);
-    addParticle({
-      x: x + rr(-spread, spread), y: y + rr(-2, 1),
-      vx: Math.cos(a) * s, vy: Math.sin(a) * s * 0.5 - rr(4, 14),
-      life: rr(0.35, 0.8), max: 0.8, size: rand() < 0.35 ? 2 : 1,
-      col: pick(cols), g: -6, drag: 3, kind: 'px'
-    });
-  }
-}
-function impactBurst(x, y, col) {
-  const cols = ['#ffffff', '#fff3a8', '#ffc84a', '#ff8a3a', col];
-  for (let i = 0; i < 26; i++) {
-    const a = rand() * Math.PI * 2;
-    const s = rr(40, 170);
-    addParticle({
-      x: x, y: y, vx: Math.cos(a) * s, vy: Math.sin(a) * s * 0.75,
-      life: rr(0.2, 0.5), max: 0.5, size: rand() < 0.3 ? 2 : 1,
-      col: pick(cols), g: 60, drag: 4, kind: 'spark'
-    });
-  }
-  addParticle({ x: x, y: y, vx: 0, vy: 0, life: 0.28, max: 0.28, r0: 3, r1: 22, col: '#fff6c8', kind: 'ring' });
-  addParticle({ x: x, y: y, vx: 0, vy: 0, life: 0.12, max: 0.12, r0: 2, r1: 9, col: '#ffffff', kind: 'flash' });
-}
-function popBurst(x, y, col) {
-  for (let i = 0; i < 16; i++) {
-    const a = (i / 16) * Math.PI * 2 + rr(-0.2, 0.2);
-    const s = rr(50, 110);
-    addParticle({
-      x: x, y: y, vx: Math.cos(a) * s, vy: Math.sin(a) * s * 0.8,
-      life: rr(0.25, 0.45), max: 0.45, size: 1,
-      col: rand() < 0.5 ? col : '#ffffff', g: 0, drag: 5, kind: 'spark'
-    });
-  }
-  // shards
-  for (let i = 0; i < 8; i++) {
-    addParticle({
-      x: x + rr(-3, 3), y: y + rr(-3, 3), vx: rr(-60, 60), vy: rr(-90, -20),
-      life: rr(0.4, 0.7), max: 0.7, size: 2, col: col, g: 260, drag: 1, kind: 'px'
-    });
-  }
-  addParticle({ x: x, y: y, vx: 0, vy: 0, life: 0.22, max: 0.22, r0: 2, r1: 14, col: '#ffffff', kind: 'ring' });
-}
-function woolPuff(x, y, n) {
-  for (let i = 0; i < n; i++) {
-    addParticle({
-      x: x + rr(-4, 4), y: y + rr(-6, 0), vx: rr(-40, 40), vy: rr(-50, -5),
-      life: rr(0.4, 0.9), max: 0.9, size: rand() < 0.5 ? 2 : 1,
-      col: pick(['#ffffff', '#f2ecdc', '#ddd4bc']), g: 40, drag: 2.5, kind: 'px'
-    });
-  }
-}
-function leafBurst(x, y) {
-  for (let i = 0; i < 10; i++) {
-    addParticle({
-      x: x + rr(-6, 6), y: y + rr(-10, 0), vx: rr(-30, 30), vy: rr(-40, 0),
-      life: rr(0.5, 1.0), max: 1.0, size: 1,
-      col: pick(['#2d6b4a', '#4a8a52', '#1d5241', '#5a9452']), g: 50, drag: 2, kind: 'px'
-    });
-  }
-}
-function addText(x, y, str, col, big) {
-  texts.push({ x: x, y: y, str: str, col: col, life: 1.1, max: 1.1, s: big ? 2 : 1 });
-}
-
-function updateParticles(dt) {
-  for (let i = particles.length - 1; i >= 0; i--) {
-    const p = particles[i];
-    p.life -= dt;
-    if (p.life <= 0) { particles.splice(i, 1); continue; }
-    if (p.kind === 'px' || p.kind === 'spark') {
-      const k = Math.max(0, 1 - p.drag * dt);
-      p.vx *= k;
-      p.vy *= k;
-      p.vy += p.g * dt;
-      p.px = p.x; p.py = p.y;
-      p.x += p.vx * dt;
-      p.y += p.vy * dt;
+function stamp(wd, cx, cy, r, rough, val, onlyIf) {
+  const pad = Math.ceil(rough) + 2;
+  const x0 = Math.max(0, Math.floor(cx - r - pad)), x1 = Math.min(wd.w - 1, Math.ceil(cx + r + pad));
+  const y0 = Math.max(0, Math.floor(cy - r - pad)), y1 = Math.min(wd.h - 1, Math.ceil(cy + r + pad));
+  for (let y = y0; y <= y1; y++) {
+    for (let x = x0; x <= x1; x++) {
+      const d = Math.hypot(x - cx, y - cy);
+      const n = wd.noise(x * 0.09, y * 0.09) - 0.5;
+      if (d < r + n * rough * 2) {
+        const i = y * wd.w + x;
+        if (onlyIf === undefined || wd.mask[i] === onlyIf) wd.mask[i] = val;
+      }
     }
   }
-  for (let i = texts.length - 1; i >= 0; i--) {
-    const t = texts[i];
-    t.life -= dt;
-    t.y -= 18 * dt;
-    if (t.life <= 0) texts.splice(i, 1);
+}
+function borderForest(wd, b) {
+  for (let y = 0; y < wd.h; y++) for (let x = 0; x < wd.w; x++) {
+    if (x < b || y < b || x >= wd.w - b || y >= wd.h - b) wd.mask[y * wd.w + x] = 1;
+  }
+}
+function minPathDist(wd, x, y) {
+  let m = 1e9;
+  for (let i = 0; i < wd.path.length; i += 2) {
+    const p = wd.path[i];
+    const d = (p.x - x) * (p.x - x) + (p.y - y) * (p.y - y);
+    if (d < m) m = d;
+  }
+  return Math.sqrt(m);
+}
+function clearAround(wd, x, y, r) {
+  for (let yy = Math.floor(y - r); yy <= y + r; yy++) for (let xx = Math.floor(x - r); xx <= x + r; xx++) {
+    if (xx < 0 || yy < 0 || xx >= wd.w || yy >= wd.h) return false;
+    if (wd.mask[yy * wd.w + xx] !== 0) return false;
+  }
+  return true;
+}
+function addPillar(wd, x, y, broken) {
+  x = Math.round(x); y = Math.round(y);
+  wd.pillars.push({ x: x, y: y, broken: !!broken });
+  for (let yy = y - 2; yy <= y; yy++) for (let xx = x - 3; xx <= x + 2; xx++) {
+    if (xx >= 0 && yy >= 0 && xx < wd.w && yy < wd.h) wd.mask[yy * wd.w + xx] = 2;
   }
 }
 
+function makeDefendWorld(seed) {
+  const wd = newWorld(320, 420, seed, 'defend');
+  const r = wd.rng;
+  const cx = 160, cy = 214;
+  for (let a = 0; a < Math.PI * 2; a += 0.12) {
+    const rad = 90 + r() * 30;
+    stamp(wd, cx + Math.cos(a) * 60, cy + Math.sin(a) * 90, rad * 0.62, 10, 0);
+  }
+  stamp(wd, cx, cy, 110, 12, 0);
+  // inner tree clumps
+  for (let k = 0; k < 5; k++) {
+    for (let tries = 0; tries < 30; tries++) {
+      const a = r() * Math.PI * 2, d = 95 + r() * 40;
+      const x = cx + Math.cos(a) * d * 0.9, y = cy + Math.sin(a) * d * 1.2;
+      if (x < 40 || x > 280 || y < 50 || y > 370) continue;
+      stamp(wd, x, y, 10 + r() * 8, 5, 1);
+      break;
+    }
+  }
+  borderForest(wd, 8);
+  // henge of stone pillars
+  for (let k = 0; k < 7; k++) {
+    const a = (k / 7) * Math.PI * 2 + 0.3;
+    addPillar(wd, cx + Math.cos(a) * 52, cy + Math.sin(a) * 40, k % 3 === 2);
+  }
+  wd.start = { x: cx, y: cy };
+  return wd;
+}
+
+function makeEscortWorld(n, seed) {
+  const h = Math.min(1700, 760 + 150 * Math.min(n, 6));
+  const wd = newWorld(320, h, seed, 'escort');
+  const r = wd.rng;
+  // route from the start pin (bottom) to the goal pin (top)
+  const pts = [];
+  let x = 110 + r() * 100, y = h - 56;
+  pts.push({ x: x, y: y });
+  while (y > 190) {
+    y -= 120 + r() * 50;
+    x = clamp(x + (r() - 0.5) * 220, 70, 250);
+    pts.push({ x: x, y: y });
+  }
+  pts.push({ x: clamp(x + (r() - 0.5) * 120, 80, 240), y: 56 });
+  for (let i = 0; i < pts.length - 1; i++) {
+    const a = pts[i], b = pts[i + 1];
+    const L = Math.hypot(b.x - a.x, b.y - a.y);
+    for (let t = 0; t < L; t += 3) wd.path.push({ x: lerp(a.x, b.x, t / L), y: lerp(a.y, b.y, t / L) });
+  }
+  wd.path.push(pts[pts.length - 1]);
+  const ph = r() * 10;
+  for (let i = 0; i < wd.path.length; i += 2) {
+    const p = wd.path[i];
+    const rad = 40 + 12 * Math.sin(i * 0.05 + ph) + 8 * Math.sin(i * 0.13 + ph * 2);
+    stamp(wd, p.x, p.y, rad, 8, 0);
+  }
+  // side glades
+  for (let k = 0; k < 6 + n; k++) {
+    const p = wd.path[Math.floor(r() * wd.path.length)];
+    const a = r() * Math.PI * 2;
+    stamp(wd, p.x + Math.cos(a) * 46, p.y + Math.sin(a) * 30, 22 + r() * 18, 8, 0);
+  }
+  stamp(wd, pts[0].x, pts[0].y, 56, 6, 0);
+  stamp(wd, pts[pts.length - 1].x, pts[pts.length - 1].y, 54, 6, 0);
+  // tree islands that keep the corridor open
+  for (let k = 0; k < 30 + n * 6; k++) {
+    const p = wd.path[Math.floor(r() * wd.path.length)];
+    const rad = 7 + r() * 11;
+    const ix = p.x + (r() - 0.5) * 110, iy = p.y + (r() - 0.5) * 60;
+    if (minPathDist(wd, ix, iy) < rad + 20) continue;
+    if (Math.hypot(ix - pts[0].x, iy - pts[0].y) < 70) continue;
+    if (Math.hypot(ix - pts[pts.length - 1].x, iy - pts[pts.length - 1].y) < 70) continue;
+    stamp(wd, ix, iy, rad, 4, 1);
+  }
+  borderForest(wd, 8);
+  // gate pillars along the route
+  for (let i = 40; i < wd.path.length - 40; i += 70 + Math.floor(r() * 40)) {
+    const p = wd.path[i], q = wd.path[Math.min(wd.path.length - 1, i + 3)];
+    const dx = q.x - p.x, dy = q.y - p.y;
+    const l = Math.hypot(dx, dy) || 1;
+    const nx = -dy / l, ny = dx / l;
+    for (const sgn of [-1, 1]) {
+      const gx = p.x + nx * 24 * sgn, gy = p.y + ny * 24 * sgn;
+      if (clearAround(wd, gx, gy, 5)) addPillar(wd, gx, gy, r() < 0.3);
+    }
+  }
+  for (let k = 0; k < 4 + n; k++) {
+    const p = wd.path[Math.floor(r() * wd.path.length)];
+    const gx = p.x + (r() - 0.5) * 90, gy = p.y + (r() - 0.5) * 50;
+    if (minPathDist(wd, gx, gy) > 14 && clearAround(wd, gx, gy, 6)) addPillar(wd, gx, gy, r() < 0.5);
+  }
+  wd.start = { x: pts[0].x, y: pts[0].y };
+  wd.goal = { x: pts[pts.length - 1].x, y: pts[pts.length - 1].y };
+  return wd;
+}
+
+function renderWorld(wd) {
+  const w = wd.w, h = wd.h, m = wd.mask;
+  const c = makeCanvas(w, h);
+  const g = c.getContext('2d');
+  const img = g.createImageData(w, h);
+  const d32 = new Uint32Array(img.data.buffer);
+  const P = {};
+  for (const k of PAL_KEYS) { const v = PAL_RGB[k][0]; P[k] = (0xff000000 | packLE(v[0], v[1], v[2])) >>> 0; }
+  // distance (inside the forest) to the nearest meadow pixel: lets crowns bulge a little past the edge
+  const dist = new Float32Array(w * h);
+  for (let i = 0; i < w * h; i++) dist[i] = m[i] === 1 ? 1e6 : 0;
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const i = y * w + x;
+    if (!dist[i]) continue;
+    let d = dist[i];
+    if (x > 0) d = Math.min(d, dist[i - 1] + 1);
+    if (y > 0) {
+      d = Math.min(d, dist[i - w] + 1);
+      if (x > 0) d = Math.min(d, dist[i - w - 1] + 1.41);
+      if (x < w - 1) d = Math.min(d, dist[i - w + 1] + 1.41);
+    }
+    dist[i] = d;
+  }
+  for (let y = h - 1; y >= 0; y--) for (let x = w - 1; x >= 0; x--) {
+    const i = y * w + x;
+    if (!dist[i]) continue;
+    let d = dist[i];
+    if (x < w - 1) d = Math.min(d, dist[i + 1] + 1);
+    if (y < h - 1) {
+      d = Math.min(d, dist[i + w] + 1);
+      if (x < w - 1) d = Math.min(d, dist[i + w + 1] + 1.41);
+      if (x > 0) d = Math.min(d, dist[i + w - 1] + 1.41);
+    }
+    dist[i] = d;
+  }
+  // rounded tree crowns, painted top to bottom so lower crowns overlap upper ones
+  const vis = new Uint8Array(w * h);
+  for (let i = 0; i < w * h; i++) vis[i] = m[i] === 1 ? 1 : 0;
+  const crownCol = new Uint32Array(w * h);
+  const crowns = [];
+  for (let gy = 0; gy < h; gy += 9) for (let gx = 0; gx < w; gx += 10) {
+    const cx = Math.floor(gx + hash2(gx, gy) * 9), cy = Math.floor(gy + hash2(gy + 3, gx) * 8);
+    if (cx >= w || cy >= h || m[cy * w + cx] !== 1) continue;
+    const R = Math.min(5 + hash2(cx, cy) * 4, dist[cy * w + cx] + 3);
+    if (R >= 3) crowns.push({ x: cx, y: cy, r: R });
+  }
+  crowns.sort((a, b) => a.y - b.y);
+  for (const cr of crowns) {
+    const R = cr.r;
+    for (let dy = -Math.ceil(R); dy <= Math.ceil(R); dy++) for (let dx = -Math.ceil(R); dx <= Math.ceil(R); dx++) {
+      const x = cr.x + dx, y = cr.y + dy;
+      if (x < 0 || y < 0 || x >= w || y >= h) continue;
+      const d = Math.sqrt(dx * dx + dy * dy * 1.2);
+      if (d > R) continue;
+      const i = y * w + x;
+      vis[i] = 1;
+      let col = P.t;
+      if (d > R - 1.3) col = dy > -R * 0.25 ? P.i : (hash2(x, y) < 0.45 ? P.s : P.t);
+      else if ((dx * 0.4 + dy * 0.9) / R > 0.5 && ((x + y) & 1)) col = P.i;
+      crownCol[i] = col;
+    }
+  }
+  const can = (x, y) => (x < 0 || y < 0 || x >= w || y >= h) ? true : vis[y * w + x] === 1;
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const i = y * w + x;
+      if (vis[i] === 1) {
+        // canopy: crown shading, with an indigo undertone along the lower edge
+        let below = 0;
+        for (let dd = 1; dd <= 3; dd++) if (!can(x, y + dd)) { below = dd; break; }
+        let col = crownCol[i] || P.t;
+        if (below === 1 || below === 2) col = P.i;
+        else if (below === 3 && ((x + y) & 1)) col = P.i;
+        d32[i] = col;
+      } else {
+        // ground: undergrowth band with trunks under canopy, seafoam fringe, flat olive
+        let up = 0;
+        for (let dd = 1; dd <= 10; dd++) if (can(x, y - dd)) { up = dd; break; }
+        const side = can(x - 1, y) || can(x + 1, y) || can(x - 2, y) || can(x + 2, y) ||
+          can(x, y + 1) || can(x - 1, y + 1) || can(x + 1, y + 1);
+        const trunk = hash2(x, 7) < 0.2;
+        let col = P.g;
+        if (up && up <= 3) col = P.i;
+        else if (up && up <= 8) col = (trunk && up <= 7) ? P.i : P.s;
+        else if (up >= 9 && ((x + y) & 1)) col = P.s;
+        else if (side) col = P.s;
+        d32[i] = col;
+      }
+    }
+  }
+  // canopy texture marks ("v" and "^" leaf clusters)
+  for (let y = 2; y < h - 4; y += 3) {
+    for (let x = 1; x < w - 4; x += 4) {
+      const hx = x + Math.floor(hash2(x, y) * 3), hy = y + Math.floor(hash2(y, x) * 2);
+      if (!(can(hx, hy) && can(hx + 2, hy) && can(hx + 1, hy + 1) && can(hx + 1, hy + 3) && can(hx + 1, hy - 1))) continue;
+      if (hash2(hx * 3, hy * 5) < 0.45) continue;
+      if (d32[hy * w + hx] !== P.t || d32[hy * w + hx + 2] !== P.t) continue;
+      const v = hash2(hx, hy * 7) < 0.6;
+      d32[hy * w + hx] = P.i;
+      d32[hy * w + hx + 2] = P.i;
+      d32[(hy + (v ? 1 : -1)) * w + hx + 1] = P.i;
+      if (hash2(hx + 11, hy) < 0.12) d32[(hy - 1) * w + hx + 3] = P.s;
+    }
+  }
+  // sparse ground specks: grass tufts and the odd flower
+  for (let k = 0; k < (w * h) / 260; k++) {
+    const x = Math.floor(wd.rng() * (w - 6)), y = Math.floor(wd.rng() * h);
+    const i = y * w + x;
+    if (d32[i] !== P.g || d32[i + 2] !== P.g || d32[i + 4] !== P.g) continue;
+    const t = wd.rng();
+    if (t < 0.8) { d32[i] = P.h; d32[i + 2] = P.h; if (wd.rng() < 0.6) d32[i + 4] = P.h; }
+    else if (t < 0.9) d32[i] = P.n;
+    else if (t < 0.96) d32[i] = P.w;
+    else d32[i] = P.y;
+  }
+  // pillar shadows
+  for (const p of wd.pillars) {
+    for (let k = 0; k < 6; k++) {
+      const sx = p.x + 2 + k, sy = p.y - 1 + Math.floor(k / 2);
+      for (let q = 0; q < 2; q++) {
+        const yy = sy + q;
+        if (sx < w && yy < h && d32[yy * w + sx] === P.g) d32[yy * w + sx] = P.h;
+      }
+    }
+  }
+  // goal pen ring + start ring
+  if (wd.goal) {
+    const R = wd.goalR;
+    for (let a = 0; a < Math.PI * 2; a += 0.02) {
+      const xx = Math.round(wd.goal.x + Math.cos(a) * R), yy = Math.round(wd.goal.y + Math.sin(a) * R * 0.8);
+      if (xx >= 0 && yy >= 0 && xx < w && yy < h && ((xx + yy) & 1)) d32[yy * w + xx] = P.h;
+    }
+  }
+  if (wd.start && wd.kind === 'escort') {
+    for (let a = 0; a < Math.PI * 2; a += 0.05) {
+      const xx = Math.round(wd.start.x + Math.cos(a) * 14), yy = Math.round(wd.start.y + Math.sin(a) * 10);
+      if (xx >= 0 && yy >= 0 && xx < w && yy < h && ((xx + yy) & 1) === 0) d32[yy * w + xx] = P.h;
+    }
+  }
+  g.putImageData(img, 0, 0);
+  // pen fence posts (gap facing south)
+  if (wd.goal) {
+    for (let k = 0; k < 18; k++) {
+      const a = (k / 18) * Math.PI * 2;
+      if (Math.abs(a - Math.PI / 2) < 0.5) continue;
+      const xx = Math.round(wd.goal.x + Math.cos(a) * wd.goalR), yy = Math.round(wd.goal.y + Math.sin(a) * wd.goalR * 0.8);
+      g.fillStyle = C.b; g.fillRect(xx, yy - 3, 1, 3);
+      g.fillStyle = C.n; g.fillRect(xx, yy - 4, 1, 1);
+    }
+  }
+  wd.canvas = c;
+  return wd;
+}
+
+function meadowNear(x, y, r) {
+  for (let a = 0; a < 8; a++) {
+    const ang = (a / 8) * Math.PI * 2;
+    for (let d = 6; d <= r; d += 6) if (maskAt(x + Math.cos(ang) * d, y + Math.sin(ang) * d) === 0) return true;
+  }
+  return false;
+}
+// forest point near (cx, cy) that borders the meadow, ideally off-camera
+function forestSpawn(cx, cy, dmin, dmax) {
+  for (let t = 0; t < 80; t++) {
+    const a = rand() * Math.PI * 2, d = rr(dmin, dmax);
+    const x = cx + Math.cos(a) * d, y = cy + Math.sin(a) * d;
+    if (x < 4 || y < 4 || x > world.w - 4 || y > world.h - 4) continue;
+    if (canopy(x, y) && meadowNear(x, y, 18) && !onScreen(x, y, 6)) return { x: x, y: y };
+  }
+  for (let t = 0; t < 80; t++) {
+    const a = rand() * Math.PI * 2, d = rr(dmin * 0.6, dmax * 1.3);
+    const x = clamp(cx + Math.cos(a) * d, 4, world.w - 4), y = clamp(cy + Math.sin(a) * d, 4, world.h - 4);
+    if (canopy(x, y) && meadowNear(x, y, 24)) return { x: x, y: y };
+  }
+  return { x: 6, y: clamp(cy, 6, world.h - 6) };
+}
+// nearest point a few pixels deep inside the forest
+function forestExit(x, y) {
+  let bestP = null, bd = 1e9;
+  for (let a = 0; a < 16; a++) {
+    const ang = (a / 16) * Math.PI * 2;
+    const dx = Math.cos(ang), dy = Math.sin(ang);
+    for (let d = 4; d < 280; d += 4) {
+      const xx = x + dx * d, yy = y + dy * d;
+      if (canopy(xx, yy) && canopy(xx + dx * 10, yy + dy * 10)) {
+        if (d < bd) { bd = d; bestP = { x: xx + dx * 12, y: yy + dy * 12 }; }
+        break;
+      }
+    }
+  }
+  return bestP || { x: x < world.w / 2 ? -10 : world.w + 10, y: y };
+}
+
 // ---------------------------------------------------------------------
-// Input (keyboard, mouse, touch)
+// Camera: smooth lerp follow with velocity lead
+// ---------------------------------------------------------------------
+const cam = { x: 0, y: 0, cx: 0, cy: 0 };
+let camFracX = 0, camFracY = 0, OX = 0, OY = 0;
+let shake = 0;
+function clampCam() {
+  cam.cx = clamp(cam.cx, W / 2 + 1, world.w - W / 2 - 1);
+  cam.cy = clamp(cam.cy, H / 2 + 1, world.h - H / 2 - 1);
+  cam.x = cam.cx - W / 2;
+  cam.y = cam.cy - H / 2;
+}
+function snapCam(x, y) { cam.cx = x; cam.cy = y; clampCam(); }
+function onScreen(x, y, m) {
+  return x > cam.x - m && x < cam.x + W + m && y > cam.y - m && y < cam.y + H + m;
+}
+function updateCamera(dt) {
+  let tx = cam.cx, ty = cam.cy;
+  if (state === 'MENU') {
+    tx = world.w / 2 + Math.sin(realTime * 0.15) * 60;
+    ty = world.h / 2 + Math.cos(realTime * 0.11) * 50;
+  } else if (players.length) {
+    let sx = 0, sy = 0, svx = 0, svy = 0;
+    for (const p of players) { sx += p.x; sy += p.y; svx += p.vx; svy += p.vy; }
+    const n = players.length;
+    tx = sx / n + (svx / n) * 0.32;
+    ty = sy / n + (svy / n) * 0.32 - 8;
+  }
+  const k = damp(state === 'MENU' ? 1 : 3.2, dt);
+  cam.cx += (tx - cam.cx) * k;
+  cam.cy += (ty - cam.cy) * k;
+  clampCam();
+}
+
+// ---------------------------------------------------------------------
+// Input: devices (two keyboard halves + mouse, touch, up to 4 gamepads)
 // ---------------------------------------------------------------------
 const keys = {};
+const events = [];
 const touch = { stickId: null, sx: 0, sy: 0, cx: 0, cy: 0, active: false, used: false };
+const padPrev = {};
+const DEVICE_NAMES = {
+  kbL: 'WASD + SPACE', kbR: 'ARROWS + ENTER', touch: 'TOUCH',
+  pad0: 'GAMEPAD 1', pad1: 'GAMEPAD 2', pad2: 'GAMEPAD 3', pad3: 'GAMEPAD 4'
+};
+function pushEv(dev, type) { events.push({ dev: dev, type: type }); }
 
-function anyGesture() {
-  initAudio();
-}
 window.addEventListener('keydown', (e) => {
   const k = e.key;
-  if ([' ', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(k)) e.preventDefault();
-  anyGesture();
-  if (e.repeat) {
-    keys[k.toLowerCase()] = true;
-    return;
-  }
+  if ([' ', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Tab', 'Backspace'].includes(k)) e.preventDefault();
+  initAudio();
   keys[k.toLowerCase()] = true;
-  if (k === ' ' || k === 'Spacebar') actionPress();
-  else if (k === 'Enter') {
-    if (state === 'MENU') startGame();
-    else if (state === 'GAMEOVER') tryRestart();
-  } else if (k === 'r' || k === 'R') {
-    if (state === 'GAMEOVER') tryRestart();
-  } else if (k === 'm' || k === 'M') {
-    setMuted(!muted);
-  } else if (k === 'p' || k === 'P' || k === 'Escape') {
-    if (state === 'PLAYING') { paused = !paused; SFX.click(); }
-  }
+  if (e.repeat) return;
+  const lk = k.toLowerCase();
+  if (k === ' ') pushEv('kbL', 'action');
+  else if (k === 'Enter' || e.code === 'ShiftRight' || k === '/') pushEv('kbR', 'action');
+  else if (lk === 'w') pushEv('kbL', 'up');
+  else if (lk === 's') pushEv('kbL', 'down');
+  else if (lk === 'a') pushEv('kbL', 'left');
+  else if (lk === 'd') pushEv('kbL', 'right');
+  else if (k === 'ArrowUp') pushEv('kbR', 'up');
+  else if (k === 'ArrowDown') pushEv('kbR', 'down');
+  else if (k === 'ArrowLeft') pushEv('kbR', 'left');
+  else if (k === 'ArrowRight') pushEv('kbR', 'right');
+  else if (lk === 'p' || k === 'Escape') pushEv('kb', 'pause');
+  else if (k === 'Backspace') pushEv('kb', 'back');
+  else if (lk === 'r') pushEv('kb', 'restart');
+  else if (lk === 'm') setMuted(!muted);
 });
-window.addEventListener('keyup', (e) => {
-  keys[e.key.toLowerCase()] = false;
-});
+window.addEventListener('keyup', (e) => { keys[e.key.toLowerCase()] = false; });
 window.addEventListener('blur', () => {
   for (const k in keys) keys[k] = false;
   if (state === 'PLAYING') paused = true;
 });
 view.addEventListener('mousedown', (e) => {
-  anyGesture();
+  initAudio();
   view.focus();
-  if (e.button === 0) actionPress();
+  if (e.button === 0) pushEv('kbL', 'action');
 });
 view.addEventListener('contextmenu', (e) => e.preventDefault());
 
@@ -1159,18 +974,20 @@ function toGame(clientX, clientY) {
 }
 view.addEventListener('touchstart', (e) => {
   e.preventDefault();
-  anyGesture();
+  initAudio();
   touch.used = true;
   for (const t of e.changedTouches) {
     const p = toGame(t.clientX, t.clientY);
-    if (state === 'PLAYING' && !paused && p.x < W * 0.5 && touch.stickId === null) {
-      touch.stickId = t.identifier;
-      touch.sx = p.x; touch.sy = p.y; touch.cx = p.x; touch.cy = p.y;
-      touch.active = true;
-    } else if (state === 'PLAYING' && paused) {
-      paused = false;
+    if (state === 'PLAYING') {
+      if (paused) { paused = false; continue; }
+      if (p.x > W - 22 && p.y < 16) { pushEv('touch', 'pause'); continue; }
+      if (p.x < W * 0.55 && touch.stickId === null) {
+        touch.stickId = t.identifier;
+        touch.sx = p.x; touch.sy = p.y; touch.cx = p.x; touch.cy = p.y;
+        touch.active = true;
+      } else pushEv('touch', 'action');
     } else {
-      actionPress();
+      events.push({ dev: 'touch', type: 'tap', x: p.x, y: p.y });
     }
   }
 }, { passive: false });
@@ -1185,277 +1002,479 @@ view.addEventListener('touchmove', (e) => {
 }, { passive: false });
 function endTouch(e) {
   e.preventDefault();
-  for (const t of e.changedTouches) {
-    if (t.identifier === touch.stickId) {
-      touch.stickId = null;
-      touch.active = false;
-    }
-  }
+  for (const t of e.changedTouches) if (t.identifier === touch.stickId) { touch.stickId = null; touch.active = false; }
 }
 view.addEventListener('touchend', endTouch, { passive: false });
 view.addEventListener('touchcancel', endTouch, { passive: false });
 
-function getMoveInput() {
+function getPads() {
+  try { return navigator.getGamepads ? navigator.getGamepads() : []; } catch (e) { return []; }
+}
+function pollPads() {
+  const pads = getPads();
+  for (let i = 0; i < 4; i++) {
+    const p = pads && pads[i];
+    const dev = 'pad' + i;
+    if (!p || !p.connected) { padPrev[dev] = null; continue; }
+    const b = (n) => !!(p.buttons[n] && p.buttons[n].pressed);
+    const ax = p.axes[0] || 0, ay = p.axes[1] || 0;
+    const now = {
+      action: b(0) || b(2), back: b(1), pause: b(9),
+      up: b(12) || ay < -0.6, down: b(13) || ay > 0.6, left: b(14) || ax < -0.6, right: b(15) || ax > 0.6
+    };
+    const prev = padPrev[dev];
+    if (prev) for (const k in now) if (now[k] && !prev[k]) pushEv(dev, k);
+    padPrev[dev] = now;
+  }
+}
+// With only one keyboard player, both key sets control that player.
+function kbOtherFree(dev) {
+  const other = dev === 'kbL' ? 'kbR' : 'kbL';
+  return !players.some(p => p.dev === other);
+}
+function readMove(dev) {
   let x = 0, y = 0;
-  if (keys['a'] || keys['arrowleft']) x -= 1;
-  if (keys['d'] || keys['arrowright']) x += 1;
-  if (keys['w'] || keys['arrowup']) y -= 1;
-  if (keys['s'] || keys['arrowdown']) y += 1;
-  if (touch.active) {
-    const dx = touch.cx - touch.sx, dy = touch.cy - touch.sy;
-    const d = len(dx, dy);
-    if (d > 4) {
-      // snap to 8 directions for consistency with keyboard
-      const a = Math.round(Math.atan2(dy, dx) / (Math.PI / 4)) * (Math.PI / 4);
-      x = Math.round(Math.cos(a));
-      y = Math.round(Math.sin(a));
+  const L = () => { if (keys['a']) x -= 1; if (keys['d']) x += 1; if (keys['w']) y -= 1; if (keys['s']) y += 1; };
+  const R = () => { if (keys['arrowleft']) x -= 1; if (keys['arrowright']) x += 1; if (keys['arrowup']) y -= 1; if (keys['arrowdown']) y += 1; };
+  if (dev === 'kbL') { L(); if (kbOtherFree('kbL')) R(); }
+  else if (dev === 'kbR') { R(); if (kbOtherFree('kbR')) L(); }
+  else if (dev === 'touch') {
+    if (touch.active) {
+      const dx = touch.cx - touch.sx, dy = touch.cy - touch.sy;
+      const d = len(dx, dy);
+      if (d > 2) { const m = Math.min(1, d / 14); x = (dx / d) * m; y = (dy / d) * m; }
     }
+    return { x: x, y: y };
+  } else if (dev.startsWith('pad')) {
+    const p = getPads()[+dev[3]];
+    if (p && p.connected) {
+      x = p.axes[0] || 0; y = p.axes[1] || 0;
+      const d = len(x, y);
+      if (d < 0.22) { x = 0; y = 0; } else { const m = Math.min(1, (d - 0.22) / 0.7); x = (x / d) * m; y = (y / d) * m; }
+      const b = (n) => !!(p.buttons[n] && p.buttons[n].pressed);
+      if (b(14)) x = -1; if (b(15)) x = 1; if (b(12)) y = -1; if (b(13)) y = 1;
+    }
+    const l = len(x, y);
+    if (l > 1) { x /= l; y /= l; }
+    return { x: x, y: y };
   }
   const l = len(x, y);
   if (l > 0) { x /= l; y /= l; }
   return { x: x, y: y };
 }
-
-function actionPress() {
-  if (state === 'MENU') { startGame(); return; }
-  if (state === 'GAMEOVER') { tryRestart(); return; }
-  if (state === 'PLAYING') {
-    if (paused) { paused = false; return; }
-    tryRam();
+function playerForDev(dev) {
+  let p = players.find(q => q.dev === dev);
+  if (!p && (dev === 'kbL' || dev === 'kbR')) {
+    const other = dev === 'kbL' ? 'kbR' : 'kbL';
+    if (kbOtherFree(other)) p = players.find(q => q.dev === other);
   }
-}
-function startGame() {
-  initAudio();
-  SFX.click();
-  state = 'PLAYING';
-  resetGame();
-}
-function tryRestart() {
-  if (realTime - gameOverTime < 0.9) return;
-  startGame();
+  return p || null;
 }
 
 // ---------------------------------------------------------------------
-// Goat
+// Game state
 // ---------------------------------------------------------------------
-function tryRam() {
-  if (goat.ramT > 0) { goat.ramQueue = 0.15; return; }
-  if (goat.cd > 0) {
-    if (goat.cd < 0.18) goat.ramQueue = 0.2;
-    return;
+const RAM_DURATION = 0.3;
+const RAM_COOLDOWN = 1.4;
+const RAM_SPEED = 220;
+const BARK_COOLDOWN = 0.9;
+const BARK_RADIUS = 38;
+const GOAT_SPEED = 70;
+const DOG_SPEED = 96;
+const PANIC_RADIUS = 40;
+const SHEEP_MAX = 14;
+const P_COL = ['y', 'r', 's', 'w'];
+
+let state = 'MENU';     // MENU | PLAYING | RESULTS | GAMEOVER
+let mode = 'escort';    // escort | defend
+let paused = false;
+let realTime = 0;
+let stateTime = 0;
+let hitStop = 0;
+let dayProgress = 0, dayTarget = 0;
+let lastBaa = 0;
+let score = 0, rescued = 0, delivered = 0, lostCount = 0;
+let gameOverDelay = 0;
+let newBest = false;
+let best = { escort: 0, defend: 0 };
+const hotData = (window.claude && window.claude.hot && window.claude.hot.data) || {};
+try {
+  const b = JSON.parse(localStorage.getItem('goatGuardianBest2') || '{}');
+  best.escort = b.escort | 0; best.defend = b.defend | 0;
+} catch (e) { /* storage unavailable */ }
+if (hotData.best) {
+  best.escort = Math.max(best.escort, hotData.best.escort | 0);
+  best.defend = Math.max(best.defend, hotData.best.defend | 0);
+}
+if (window.claude && window.claude.hot && typeof window.claude.hot.snapshot === 'function') {
+  window.claude.hot.snapshot(() => ({ best: best }));
+}
+function saveBest() {
+  if (score > best[mode]) {
+    best[mode] = score;
+    try { localStorage.setItem('goatGuardianBest2', JSON.stringify(best)); } catch (e) { /* ignore */ }
+    return true;
   }
-  goat.ramT = RAM_DURATION;
-  goat.cd = RAM_COOLDOWN;
-  goat.ramId++;
-  goat.ramQueue = 0;
-  const inp = getMoveInput();
-  if (inp.x || inp.y) {
-    goat.fx = inp.x; goat.fy = inp.y;
-    if (Math.abs(inp.x) > 0.2) goat.side = Math.sign(inp.x);
+  return false;
+}
+
+let players = [];       // {slot, dev, kind, ready, body...}
+let sheep = [];
+let enemies = [];
+let particles = [];
+let texts = [];
+let fireflies = [];
+let banner = { t: 0, a: '', b: '' };
+const wave = { n: 0, phase: 'intro', t: 0, toSpawn: 0, spawnT: 0, interval: 2 };
+const mission = { n: 1, herdStart: 12, penned: 0, spawnT: 4, interval: 5, cap: 3, time: 0, kills: 0 };
+let menuCountdown = -1;
+
+function makeSheep(x, y) {
+  return {
+    x: x, y: y, vx: 0, vy: 0, side: rand() < 0.5 ? -1 : 1, panic: 0, herd: 0,
+    grazeT: rr(0.5, 3), grazing: rand() < 0.5, chew: rand() * 10, wander: rand() * 6.28,
+    walk: 0, baaCd: rr(0, 2), flash: 0, penned: false
+  };
+}
+function spawnHerd(cx, cy, n) {
+  sheep = [];
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * Math.PI * 2 + rr(-0.3, 0.3);
+    const r = rr(5, 18);
+    let x = cx + Math.cos(a) * r, y = cy + Math.sin(a) * r * 0.8;
+    if (blocked(x, y)) { x = cx + rr(-2, 2); y = cy + rr(-2, 2); }
+    sheep.push(makeSheep(x, y));
   }
-  goat.vx = goat.fx * RAM_SPEED;
-  goat.vy = goat.fy * RAM_SPEED;
-  dust(goat.x - goat.fx * 6, goat.y, 14, 4, 55);
-  shake = Math.max(shake, 1.5);
+}
+function makePlayerBody(p, x, y) {
+  Object.assign(p, { x: x, y: y, vx: 0, vy: 0, fx: 0, fy: -1, side: 1, cd: 0, ramT: 0, ramId: 0, actT: 0, walk: 0, bonk: 0, queue: 0 });
+}
+
+// ---------------------------------------------------------------------
+// Particles & floating text (palette colours only, no alpha)
+// ---------------------------------------------------------------------
+function addParticle(p) { if (particles.length > 500) particles.shift(); particles.push(p); }
+function dust(x, y, n, spread, speed) {
+  for (let i = 0; i < n; i++) {
+    const a = rand() * Math.PI * 2, s = rr(0.2, 1) * (speed || 24);
+    addParticle({ x: x + rr(-spread, spread), y: y + rr(-1, 1), vx: Math.cos(a) * s, vy: Math.sin(a) * s * 0.5 - rr(3, 10),
+      life: rr(0.3, 0.7), max: 0.7, col: pick(['n', 'l', 'h']), g: -4, drag: 3, kind: 'px' });
+  }
+}
+function impactBurst(x, y) {
+  for (let i = 0; i < 18; i++) {
+    const a = rand() * Math.PI * 2, s = rr(30, 120);
+    addParticle({ x: x, y: y, vx: Math.cos(a) * s, vy: Math.sin(a) * s * 0.75, life: rr(0.15, 0.4), max: 0.4,
+      col: pick(['w', 'y', 'y', 'r']), g: 50, drag: 4, kind: 'px' });
+  }
+  addParticle({ x: x, y: y, life: 0.25, max: 0.25, r0: 2, r1: 15, col: 'w', kind: 'ring' });
+}
+function popBurst(x, y, col) {
+  for (let i = 0; i < 12; i++) {
+    const a = (i / 12) * Math.PI * 2, s = rr(40, 80);
+    addParticle({ x: x, y: y, vx: Math.cos(a) * s, vy: Math.sin(a) * s * 0.8, life: rr(0.2, 0.4), max: 0.4,
+      col: rand() < 0.5 ? col : 'w', g: 0, drag: 5, kind: 'px' });
+  }
+  addParticle({ x: x, y: y, life: 0.2, max: 0.2, r0: 1, r1: 10, col: 'w', kind: 'ring' });
+}
+function woolPuff(x, y, n) {
+  for (let i = 0; i < n; i++) addParticle({ x: x + rr(-3, 3), y: y + rr(-4, 0), vx: rr(-30, 30), vy: rr(-40, -5),
+    life: rr(0.3, 0.8), max: 0.8, col: pick(['w', 'w', 'l']), g: 40, drag: 2.5, kind: 'px' });
+}
+function leafBurst(x, y) {
+  for (let i = 0; i < 8; i++) addParticle({ x: x + rr(-5, 5), y: y + rr(-6, 0), vx: rr(-24, 24), vy: rr(-30, 0),
+    life: rr(0.4, 0.9), max: 0.9, col: pick(['t', 's', 'i']), g: 40, drag: 2, kind: 'px' });
+}
+function addText(x, y, str, col) { texts.push({ x: x, y: y, str: str, col: col, life: 1.0, max: 1.0 }); }
+function updateParticles(dt) {
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.life -= dt;
+    if (p.life <= 0) { particles.splice(i, 1); continue; }
+    if (p.kind === 'px') {
+      const k = Math.max(0, 1 - p.drag * dt);
+      p.vx *= k; p.vy *= k; p.vy += p.g * dt;
+      p.x += p.vx * dt; p.y += p.vy * dt;
+    }
+  }
+  for (let i = texts.length - 1; i >= 0; i--) {
+    const t = texts[i];
+    t.life -= dt; t.y -= 14 * dt;
+    if (t.life <= 0) texts.splice(i, 1);
+  }
+}
+
+// ---------------------------------------------------------------------
+// Movement with forest / structure collision (axis-separated slide)
+// ---------------------------------------------------------------------
+function moveBody(e, dx, dy, r) {
+  let hit = false;
+  if (dx) {
+    const nx = e.x + dx, ex = nx + (dx > 0 ? r : -r);
+    if (!blocked(ex, e.y) && !blocked(ex, e.y - 1)) e.x = nx;
+    else { hit = true; e.vx *= -0.1; }
+  }
+  if (dy) {
+    const ny = e.y + dy, ey = ny + (dy > 0 ? 1 : -1);
+    if (!blocked(e.x - r, ey) && !blocked(e.x + r, ey)) e.y = ny;
+    else { hit = true; e.vy *= -0.1; }
+  }
+  e.x = clamp(e.x, 2, world.w - 2);
+  e.y = clamp(e.y, 2, world.h - 2);
+  return hit;
+}
+
+// ---------------------------------------------------------------------
+// Players: goat (ram charge) and dog (bark)
+// ---------------------------------------------------------------------
+function playerAction(p) {
+  if (p.kind === 'goat') tryRam(p);
+  else tryBark(p);
+}
+function tryRam(p) {
+  if (p.ramT > 0) { p.queue = 0.15; return; }
+  if (p.cd > 0) { if (p.cd < 0.2) p.queue = 0.22; return; }
+  p.ramT = RAM_DURATION;
+  p.cd = RAM_COOLDOWN;
+  p.ramId++;
+  p.queue = 0;
+  const inp = readMove(p.dev);
+  if (len(inp.x, inp.y) > 0.3) { const l = len(inp.x, inp.y); p.fx = inp.x / l; p.fy = inp.y / l; }
+  p.vx = p.fx * RAM_SPEED; p.vy = p.fy * RAM_SPEED;
+  dust(p.x - p.fx * 4, p.y, 10, 3, 40);
+  shake = Math.max(shake, 1.2);
   SFX.dash();
 }
-
-function updateGoat(dt) {
-  const inp = getMoveInput();
-  if (goat.ramQueue > 0) {
-    goat.ramQueue -= dt;
-    if (goat.cd <= 0 && goat.ramT <= 0) tryRam();
+function tryBark(p) {
+  if (p.cd > 0) { if (p.cd < 0.2) p.queue = 0.22; return; }
+  p.cd = BARK_COOLDOWN;
+  p.actT = 0.25;
+  p.queue = 0;
+  SFX.bark();
+  addParticle({ x: p.x, y: p.y - 3, life: 0.35, max: 0.35, r0: 4, r1: BARK_RADIUS, col: 'w', kind: 'ring' });
+  addText(p.x, p.y - 14, 'WOOF', 'w');
+  // drive the herd away from the dog
+  for (const s of sheep) {
+    const dx = s.x - p.x, dy = s.y - p.y;
+    const d = len(dx, dy);
+    if (d < BARK_RADIUS && d > 0.01) {
+      const k = 1 - d / BARK_RADIUS;
+      s.vx += (dx / d) * 70 * k + p.vx * 0.2;
+      s.vy += (dy / d) * 70 * k + p.vy * 0.2;
+      s.herd = 0.8;
+      s.grazing = false;
+    }
   }
-  if (goat.ramT > 0) {
-    goat.ramT -= dt;
-    // slight steering while charging
-    if (inp.x || inp.y) {
-      const nx = goat.fx + inp.x * 2.0 * dt;
-      const ny = goat.fy + inp.y * 2.0 * dt;
-      const l = len(nx, ny) || 1;
-      goat.fx = nx / l; goat.fy = ny / l;
+  // scare predators: stun, and send them running once fear >= hp
+  for (const e of enemies) {
+    if (e.state === 'launched' || e.state === 'emerge' || e.state === 'flee') continue;
+    const dx = e.x - p.x, dy = e.y - p.y;
+    const d = len(dx, dy);
+    if (d > BARK_RADIUS - 4) continue;
+    const l = d || 1;
+    e.vx = (dx / l) * 140; e.vy = (dy / l) * 140;
+    e.flash = 0.12;
+    if (e.carry) releaseCarried(e);
+    e.fear++;
+    if (e.fear >= e.hp) {
+      e.state = 'stun'; e.t = 0.5; e.thenFlee = true;
+      score++; mission.kills++;
+      addText(e.x, e.y - 12, 'SCRAM!', 'y');
+    } else {
+      e.state = 'stun'; e.t = 1.2;
+      addText(e.x, e.y - 12, 'STUN', 'y');
+      SFX.stun();
     }
-    const k = 0.55 + 0.45 * Math.max(0, goat.ramT / RAM_DURATION);
-    goat.vx = goat.fx * RAM_SPEED * k;
-    goat.vy = goat.fy * RAM_SPEED * k;
-    if (rand() < 0.8) dust(goat.x - goat.fx * 7, goat.y, 2, 2, 25);
-    if (goat.ramT <= 0) {
-      goat.vx *= 0.3;
-      goat.vy *= 0.3;
-      dust(goat.x + goat.fx * 4, goat.y, 6, 3, 30);
-    }
-  } else {
-    const spd = len(goat.vx, goat.vy);
-    if (inp.x || inp.y) {
-      const dot = inp.x * goat.fx + inp.y * goat.fy;
-      if (dot < 0.35 && spd > 35) dust(goat.x, goat.y, 6, 3, 40);
-      goat.fx = inp.x; goat.fy = inp.y;
-      if (Math.abs(inp.x) > 0.2) goat.side = Math.sign(inp.x);
-    }
-    const k = Math.min(1, dt * 11);
-    goat.vx += (inp.x * GOAT_SPEED - goat.vx) * k;
-    goat.vy += (inp.y * GOAT_SPEED - goat.vy) * k;
-    if (spd > 70 && rand() < dt * 8) dust(goat.x - goat.fx * 5, goat.y, 1, 2, 12);
   }
-  if (goat.cd > 0) goat.cd = Math.max(0, goat.cd - dt);
-  if (goat.bonk > 0) goat.bonk -= dt;
-
-  goat.x += goat.vx * dt;
-  goat.y += goat.vy * dt;
-  goat.walk += len(goat.vx, goat.vy) * dt;
-
-  // field bounds
-  let hitWall = false;
-  if (goat.x < FIELD.x0 + 6) { goat.x = FIELD.x0 + 6; hitWall = true; }
-  if (goat.x > FIELD.x1 - 6) { goat.x = FIELD.x1 - 6; hitWall = true; }
-  if (goat.y < FIELD.y0 + 2) { goat.y = FIELD.y0 + 2; hitWall = true; }
-  if (goat.y > FIELD.y1) { goat.y = FIELD.y1; hitWall = true; }
-  if (hitWall && goat.ramT > 0 && goat.bonk <= 0) {
-    goat.bonk = 0.3;
-    goat.ramT = 0;
-    goat.vx *= -0.2; goat.vy *= -0.2;
-    shake = Math.max(shake, 3);
-    dust(goat.x + goat.fx * 6, goat.y, 10, 3, 50);
-    leafBurst(goat.x + goat.fx * 10, goat.y - 4);
-    SFX.bump();
+}
+function updatePlayers(dt) {
+  for (const p of players) {
+    const inp = readMove(p.dev);
+    if (p.queue > 0) { p.queue -= dt; if (p.cd <= 0 && p.ramT <= 0) playerAction(p); }
+    if (p.cd > 0) p.cd = Math.max(0, p.cd - dt);
+    if (p.actT > 0) p.actT -= dt;
+    if (p.bonk > 0) p.bonk -= dt;
+    const maxS = p.kind === 'dog' ? DOG_SPEED : GOAT_SPEED;
+    if (p.ramT > 0) {
+      p.ramT -= dt;
+      if (len(inp.x, inp.y) > 0.2) {
+        const nx = p.fx + inp.x * 2 * dt, ny = p.fy + inp.y * 2 * dt;
+        const l = len(nx, ny) || 1;
+        p.fx = nx / l; p.fy = ny / l;
+      }
+      const k = 0.55 + 0.45 * Math.max(0, p.ramT / RAM_DURATION);
+      p.vx = p.fx * RAM_SPEED * k; p.vy = p.fy * RAM_SPEED * k;
+      if (rand() < 0.7) dust(p.x - p.fx * 5, p.y, 1, 1, 18);
+      if (p.ramT <= 0) { p.vx *= 0.35; p.vy *= 0.35; }
+    } else {
+      // gentle acceleration / deceleration curves: fluid, floating motion
+      const moving = len(inp.x, inp.y) > 0.05;
+      const rate = moving ? (p.kind === 'dog' ? 7 : 5.5) : (p.kind === 'dog' ? 5 : 3.8);
+      const k = damp(rate, dt);
+      const ovx = p.vx, ovy = p.vy;
+      p.vx += (inp.x * maxS - p.vx) * k;
+      p.vy += (inp.y * maxS - p.vy) * k;
+      const sp = len(p.vx, p.vy);
+      if (sp > 6) {
+        const nfx = p.vx / sp, nfy = p.vy / sp;
+        if (nfx * p.fx + nfy * p.fy < 0.2 && len(ovx, ovy) > 40) dust(p.x, p.y, 4, 2, 30);
+        p.fx = lerp(p.fx, nfx, damp(14, dt)); p.fy = lerp(p.fy, nfy, damp(14, dt));
+        const l = len(p.fx, p.fy) || 1; p.fx /= l; p.fy /= l;
+      }
+      if (sp > 60 && rand() < dt * 6) dust(p.x - p.fx * 4, p.y, 1, 1, 10);
+    }
+    if (Math.abs(p.vx) > 4) p.side = p.vx < 0 ? -1 : 1;
+    const hit = moveBody(p, p.vx * dt, p.vy * dt, 3);
+    if (hit && p.ramT > 0 && p.bonk <= 0) {
+      p.bonk = 0.3; p.ramT = 0;
+      p.vx *= -0.3; p.vy *= -0.3;
+      shake = Math.max(shake, 2.5);
+      dust(p.x + p.fx * 4, p.y, 8, 2, 40);
+      leafBurst(p.x + p.fx * 6, p.y - 3);
+      SFX.bump();
+    }
+    p.walk += len(p.vx, p.vy) * dt;
+  }
+  // players nudge each other apart
+  for (let i = 0; i < players.length; i++) for (let j = i + 1; j < players.length; j++) {
+    const a = players[i], b = players[j];
+    const dx = b.x - a.x, dy = b.y - a.y, d = len(dx, dy);
+    if (d < 7 && d > 0.01) {
+      const k = (7 - d) * 0.5;
+      moveBody(a, -dx / d * k, -dy / d * k, 3);
+      moveBody(b, dx / d * k, dy / d * k, 3);
+    }
+  }
+  // shared camera leash: keep everyone on screen
+  if (players.length > 1) {
+    for (const p of players) {
+      const nx = clamp(p.x, cam.x + 6, cam.x + W - 6), ny = clamp(p.y, cam.y + 16, cam.y + H - 4);
+      if (!blocked(nx, ny)) { p.x = nx; p.y = ny; }
+    }
   }
 }
 
 // ---------------------------------------------------------------------
-// Herd (Boids)
+// Herd: Boids (cohesion, separation, alignment) + panic vector,
+// goats lead the flock, dogs press it from behind
 // ---------------------------------------------------------------------
-const NEIGHBOR_R = 42;
-const SEP_R = 13;
-
+const NEIGHBOR_R = 26;
+const SEP_R = 8;
+function herdCenter() {
+  let x = 0, y = 0, n = 0;
+  for (const s of sheep) if (!s.penned) { x += s.x; y += s.y; n++; }
+  if (!n) {
+    if (players.length && state !== 'MENU') return { x: players[0].x, y: players[0].y };
+    return { x: world.start ? world.start.x : world.w / 2, y: world.start ? world.start.y : world.h / 2 };
+  }
+  return { x: x / n, y: y / n };
+}
 function updateSheep(dt) {
   const threats = enemies.filter(e => e.state === 'hunt' || e.state === 'carry' || e.state === 'stun');
-  const herdC = flockCenter();
+  const shepherds = state === 'MENU' ? [] : players;
+  const hc = herdCenter();
   for (const s of sheep) {
-    let cx = 0, cy = 0, avx = 0, avy = 0, sx = 0, sy = 0, n = 0, panicN = 0;
+    let cx = 0, cy = 0, avx = 0, avy = 0, sx = 0, sy = 0, n = 0;
     for (const o of sheep) {
-      if (o === s) continue;
+      if (o === s || o.penned !== s.penned) continue;
       const dx = o.x - s.x, dy = o.y - s.y;
       const d2 = dx * dx + dy * dy;
       if (d2 < NEIGHBOR_R * NEIGHBOR_R) {
-        n++;
-        cx += o.x; cy += o.y;
-        avx += o.vx; avy += o.vy;
-        if (o.panic > 0) panicN++;
-        if (d2 < SEP_R * SEP_R && d2 > 0.0001) {
-          const d = Math.sqrt(d2);
+        n++; cx += o.x; cy += o.y; avx += o.vx; avy += o.vy;
+        if (d2 < SEP_R * SEP_R) {
+          const d = Math.sqrt(d2) || 0.01;
           const k = (SEP_R - d) / SEP_R;
-          sx -= (dx / d) * k;
-          sy -= (dy / d) * k;
-        } else if (d2 <= 0.0001) {
-          sx += rr(-1, 1); sy += rr(-1, 1);
+          sx -= (dx / d) * k; sy -= (dy / d) * k;
         }
       }
     }
     let ax = 0, ay = 0;
-    // panic check
     let threat = null, td = PANIC_RADIUS;
-    for (const e of threats) {
+    if (!s.penned) for (const e of threats) {
+      if (canopy(e.x, e.y) && e.state !== 'carry') continue;
       const d = len(e.x - s.x, e.y - s.y);
       if (d < td) { td = d; threat = e; }
     }
     const wasPanic = s.panic > 0;
+    if (threat) { s.panic = 0.8; s.grazing = false; } else if (s.panic > 0) s.panic -= dt;
+    if (s.herd > 0) s.herd -= dt;
+
     if (threat) {
-      s.panic = 0.9;
-      s.grazing = false;
-    } else if (s.panic > 0) {
-      s.panic -= dt;
-    }
-    if (threat) {
-      // PANIC VECTOR: overrides flocking, flee directly away from predator
-      let fx = s.x - threat.x, fy = s.y - threat.y;
+      // PANIC VECTOR: overrides flocking, flee directly away from the predator
+      const fx = s.x - threat.x, fy = s.y - threat.y;
       const l = len(fx, fy) || 1;
-      fx /= l; fy /= l;
-      const urgency = 1 + (1 - td / PANIC_RADIUS) * 0.6;
-      const desiredX = fx * 72 * urgency, desiredY = fy * 72 * urgency;
-      ax += (desiredX - s.vx) * 6;
-      ay += (desiredY - s.vy) * 6;
-      ax += sx * 60; ay += sy * 60;
-      if (!wasPanic && realTime - lastBaa > 0.22 && s.baaCd <= 0) {
-        SFX.baa(true);
-        lastBaa = realTime;
-        s.baaCd = 1.2;
-      }
+      const urg = 1 + (1 - td / PANIC_RADIUS) * 0.6;
+      ax += ((fx / l) * 58 * urg - s.vx) * 6;
+      ay += ((fy / l) * 58 * urg - s.vy) * 6;
+      ax += sx * 50; ay += sy * 50;
+      if (!wasPanic && realTime - lastBaa > 0.25 && s.baaCd <= 0) { SFX.baa(true); lastBaa = realTime; s.baaCd = 1.2; }
     } else {
       if (n > 0) {
         cx /= n; cy /= n; avx /= n; avy /= n;
-        // Cohesion
-        ax += (cx - s.x) * 0.55;
-        ay += (cy - s.y) * 0.55;
-        // Alignment
-        ax += (avx - s.vx) * (s.panic > 0 ? 2.2 : 0.9);
-        ay += (avy - s.vy) * (s.panic > 0 ? 2.2 : 0.9);
+        ax += (cx - s.x) * 0.7; ay += (cy - s.y) * 0.7;           // cohesion
+        ax += (avx - s.vx) * 1.1; ay += (avy - s.vy) * 1.1;       // alignment
       }
-      // weak whole-herd cohesion so stragglers rejoin the flock
-      ax += (herdC.x - s.x) * 0.12;
-      ay += (herdC.y - s.y) * 0.12;
-      // Separation
-      ax += sx * 140;
-      ay += sy * 140;
-      // Wander / graze
+      if (!s.penned) { ax += (hc.x - s.x) * 0.1; ay += (hc.y - s.y) * 0.1; }
+      ax += sx * 110; ay += sy * 110;                             // separation
       s.wander += rr(-2, 2) * dt;
-      if (!s.grazing) {
-        ax += Math.cos(s.wander) * 10;
-        ay += Math.sin(s.wander) * 7;
-      }
-      // Loosely follow the shepherd goat when far away
-      const gd = len(goat.x - s.x, goat.y - s.y);
-      if (gd > 75) {
-        ax += ((goat.x - s.x) / gd) * 14;
-        ay += ((goat.y - s.y) / gd) * 14;
-      }
-      // nervous neighbours make others jittery
-      if (panicN > 0) {
-        ax += s.vx * 0.6;
-        ay += s.vy * 0.6;
-      }
-      // graze state machine
+      if (!s.grazing) { ax += Math.cos(s.wander) * 6; ay += Math.sin(s.wander) * 5; }
       s.grazeT -= dt;
       if (s.grazeT <= 0) {
         s.grazing = !s.grazing;
         s.grazeT = s.grazing ? rr(1.5, 4) : rr(1, 3);
-        if (!s.grazing && rand() < 0.08 && realTime - lastBaa > 1.5 && state !== 'GAMEOVER') {
-          SFX.baa(false);
-          lastBaa = realTime;
-        }
+        if (!s.grazing && rand() < 0.06 && realTime - lastBaa > 2 && state === 'PLAYING') { SFX.baa(false); lastBaa = realTime; }
       }
     }
     if (s.baaCd > 0) s.baaCd -= dt;
-    // goat personal space
-    const gdx = s.x - goat.x, gdy = s.y - goat.y;
-    const gd2 = gdx * gdx + gdy * gdy;
-    const gR = goat.ramT > 0 ? 18 : 14;
-    if (gd2 < gR * gR && gd2 > 0.001) {
-      const d = Math.sqrt(gd2);
-      const k = (gR - d) / gR;
-      ax += (gdx / d) * k * (goat.ramT > 0 ? 900 : 260);
-      ay += (gdy / d) * k * (goat.ramT > 0 ? 900 : 260);
+    for (const p of shepherds) {
+      const dx = s.x - p.x, dy = s.y - p.y;
+      const d = len(dx, dy) || 0.01;
+      if (p.kind === 'dog') {
+        if (d < 30) {
+          const k = (30 - d) / 30;
+          ax += (dx / d) * k * 230; ay += (dy / d) * k * 230;
+          s.herd = Math.max(s.herd, 0.4); s.grazing = false;
+        }
+      } else {
+        const R = p.ramT > 0 ? 14 : 10;
+        if (d < R) {
+          const k = (R - d) / R, f = p.ramT > 0 ? 700 : 220;
+          ax += (dx / d) * k * f; ay += (dy / d) * k * f;
+        } else if (!threat && d > 22 && d < 70 && !s.penned) {
+          ax -= (dx / d) * 16; ay -= (dy / d) * 16;
+          if (len(p.vx, p.vy) > 20) s.grazing = false;
+        }
+      }
     }
-    // bounds
-    const m = 16;
-    if (s.x < FIELD.x0 + m) ax += (FIELD.x0 + m - s.x) * 9;
-    if (s.x > FIELD.x1 - m) ax -= (s.x - (FIELD.x1 - m)) * 9;
-    if (s.y < FIELD.y0 + m) ay += (FIELD.y0 + m - s.y) * 9;
-    if (s.y > FIELD.y1 - m) ay -= (s.y - (FIELD.y1 - m)) * 9;
-
-    s.vx += ax * dt;
-    s.vy += ay * dt;
-    const maxS = s.panic > 0 ? 82 : (s.grazing ? 9 : 26);
+    // steer clear of forest and stones
+    for (let a = 0; a < 8; a++) {
+      const ang = (a / 8) * Math.PI * 2;
+      const ox = Math.cos(ang), oy = Math.sin(ang);
+      if (blocked(s.x + ox * 6, s.y + oy * 5)) { ax -= ox * 70; ay -= oy * 70; }
+    }
+    s.vx += ax * dt; s.vy += ay * dt;
+    const maxS = s.panic > 0 ? 62 : (s.herd > 0 ? 46 : (s.grazing ? 6 : 17));
     const sp = len(s.vx, s.vy);
-    if (sp > maxS) { s.vx = (s.vx / sp) * maxS; s.vy = (s.vy / sp) * maxS; }
-    if (s.panic <= 0) {
-      const damp = Math.max(0, 1 - dt * (s.grazing ? 4 : 1.2));
-      s.vx *= damp; s.vy *= damp;
+    if (sp > maxS) { s.vx = s.vx / sp * maxS; s.vy = s.vy / sp * maxS; }
+    if (s.panic <= 0) { const k = Math.max(0, 1 - dt * (s.grazing ? 4 : 1.4)); s.vx *= k; s.vy *= k; }
+    moveBody(s, s.vx * dt, s.vy * dt, 2);
+    // pen at the goal pin
+    if (world.goal) {
+      const gx = s.x - world.goal.x, gy = (s.y - world.goal.y) / 0.8;
+      const gd = len(gx, gy);
+      if (!s.penned && gd < world.goalR - 6 && state === 'PLAYING') {
+        s.penned = true; s.flash = 0.6; s.panic = 0;
+        mission.penned++; delivered++;
+        addText(s.x, s.y - 10, 'SAFE', 'y');
+        SFX.pen();
+      }
+      if (s.penned && gd > world.goalR - 5) {
+        const k = (world.goalR - 5) / gd;
+        s.x = world.goal.x + gx * k; s.y = world.goal.y + gy * k * 0.8;
+        s.vx *= 0.5; s.vy *= 0.5;
+      }
     }
-    s.x += s.vx * dt;
-    s.y += s.vy * dt;
-    s.x = clamp(s.x, FIELD.x0 + 4, FIELD.x1 - 4);
-    s.y = clamp(s.y, FIELD.y0 + 4, FIELD.y1);
-    if (Math.abs(s.vx) > 3) s.side = s.vx < 0 ? -1 : 1;
+    if (Math.abs(s.vx) > 2) s.side = s.vx < 0 ? -1 : 1;
     s.walk += len(s.vx, s.vy) * dt;
     s.chew += dt;
     if (s.flash > 0) s.flash -= dt;
@@ -1463,65 +1482,45 @@ function updateSheep(dt) {
 }
 
 // ---------------------------------------------------------------------
-// Enemies
+// Enemies: shadow wolves (from the forest) and bats (from the sky)
 // ---------------------------------------------------------------------
-function edgePoint(margin) {
-  const side = Math.floor(rand() * 4);
-  let x, y;
-  if (side === 0) { x = rr(FIELD.x0 + 20, FIELD.x1 - 20); y = FIELD.y0 - margin; }
-  else if (side === 1) { x = rr(FIELD.x0 + 20, FIELD.x1 - 20); y = FIELD.y1 + margin; }
-  else if (side === 2) { x = FIELD.x0 - margin; y = rr(FIELD.y0 + 15, FIELD.y1 - 10); }
-  else { x = FIELD.x1 + margin; y = rr(FIELD.y0 + 15, FIELD.y1 - 10); }
-  return { x: x, y: y, side: side };
-}
-function exitPoint(x, y) {
-  const dl = x - FIELD.x0, dr = FIELD.x1 - x, dtp = y - FIELD.y0, db = FIELD.y1 - y;
-  const m = Math.min(dl, dr, dtp, db);
-  if (m === dl) return { x: FIELD.x0 - 50, y: y };
-  if (m === dr) return { x: FIELD.x1 + 50, y: y };
-  if (m === dtp) return { x: x, y: FIELD.y0 - 50 };
-  return { x: x, y: FIELD.y1 + 50 };
-}
-function spawnEnemy() {
-  const n = wave.n;
-  const batChance = n < 2 ? 0 : Math.min(0.5, 0.18 + n * 0.05);
-  const isBat = rand() < batChance;
-  if (isBat) {
-    const p = edgePoint(26);
-    enemies.push({
-      type: 'bat', x: p.x, y: p.y, vx: 0, vy: 0, state: 'hunt', t: 0, hp: 1,
-      speed: Math.min(78, 44 + n * 3), accel: 150, side: 1, anim: rand() * 6,
-      alt: 14, lastRam: -1, rot: 0, spin: 0, carry: null, flash: 0, phase: rand() * 6.28, alpha: false
-    });
+function spawnEnemy(level) {
+  const hc = herdCenter();
+  const batChance = level < 2 ? 0 : Math.min(0.45, 0.15 + level * 0.05);
+  if (rand() < batChance) {
+    const a = rand() * Math.PI * 2;
+    const x = clamp(hc.x + Math.cos(a) * 160, 4, world.w - 4), y = clamp(hc.y + Math.sin(a) * 170, 4, world.h - 4);
+    enemies.push({ type: 'bat', x: x, y: y, vx: 0, vy: 0, state: 'hunt', t: 0, hp: 1, fear: 0,
+      speed: Math.min(62, 34 + level * 3), accel: 120, side: 1, anim: rand() * 6, alt: 10, hits: {},
+      carry: null, flash: 0, phase: rand() * 6.28, alpha: false });
   } else {
-    const p = edgePoint(10);
-    const alpha = n >= 3 && rand() < Math.min(0.4, (n - 2) * 0.09);
-    enemies.push({
-      type: 'wolf', x: p.x, y: p.y, vx: 0, vy: 0, state: 'emerge', t: 0.9, hp: alpha ? 2 : 1,
-      speed: Math.min(92, 52 + n * 3.5) * (alpha ? 0.9 : 1), accel: 260, side: p.x > FIELD_CX ? -1 : 1,
-      anim: rand() * 6, alt: 0, lastRam: -1, rot: 0, spin: 0, carry: null, flash: 0, phase: rand() * 6.28, alpha: alpha
-    });
-    leafBurst(p.x, p.y);
+    const p = forestSpawn(hc.x, hc.y, 100, 170);
+    const alpha = level >= 3 && rand() < Math.min(0.4, (level - 2) * 0.09);
+    enemies.push({ type: 'wolf', x: p.x, y: p.y, vx: 0, vy: 0, state: 'emerge', t: 1.0, hp: alpha ? 2 : 1, fear: 0,
+      speed: Math.min(76, 42 + level * 3.2) * (alpha ? 0.92 : 1), accel: 200, side: 1, anim: rand() * 6, alt: 0,
+      hits: {}, carry: null, flash: 0, phase: rand() * 6.28, alpha: alpha });
   }
 }
 function nearestSheep(x, y) {
-  let best = null, bd = 1e9;
+  let b = null, bd = 1e9;
   for (const s of sheep) {
+    if (s.penned) continue;
     const d = (s.x - x) * (s.x - x) + (s.y - y) * (s.y - y);
-    if (d < bd) { bd = d; best = s; }
+    if (d < bd) { bd = d; b = s; }
   }
-  return best;
+  return b;
 }
 function steerTo(e, tx, ty, speed, dt) {
   let dx = tx - e.x, dy = ty - e.y;
   const d = len(dx, dy) || 1;
   dx /= d; dy /= d;
-  e.vx += (dx * speed - e.vx) * Math.min(1, (e.accel / Math.max(speed, 1)) * dt);
-  e.vy += (dy * speed - e.vy) * Math.min(1, (e.accel / Math.max(speed, 1)) * dt);
+  const k = Math.min(1, (e.accel / Math.max(speed, 1)) * dt);
+  e.vx += (dx * speed - e.vx) * k;
+  e.vy += (dy * speed - e.vy) * k;
   return d;
 }
 function killEnemy(e, i) {
-  popBurst(e.x, e.y - e.alt - 4, e.type === 'bat' ? '#a03a6a' : (e.alpha ? '#8a74b8' : '#6c7288'));
+  popBurst(e.x, e.y - e.alt - 3, 'i');
   SFX.pop();
   enemies.splice(i, 1);
 }
@@ -1529,18 +1528,17 @@ function releaseCarried(e) {
   if (!e.carry) return;
   const s = e.carry;
   e.carry = null;
-  s.x = clamp(e.x, FIELD.x0 + 6, FIELD.x1 - 6);
-  s.y = clamp(e.y, FIELD.y0 + 6, FIELD.y1 - 2);
-  s.vx = rr(-30, 30); s.vy = rr(-30, 30);
-  s.panic = 1.2;
-  s.flash = 0.6;
+  let x = e.x, y = e.y;
+  if (blocked(x, y)) { const hc = herdCenter(); x = lerp(x, hc.x, 0.3); y = lerp(y, hc.y, 0.3); }
+  if (blocked(x, y) && players.length) { x = players[0].x; y = players[0].y; }
+  s.x = x; s.y = y; s.vx = rr(-20, 20); s.vy = rr(-20, 20);
+  s.panic = 1; s.flash = 0.6;
   sheep.push(s);
   rescued++;
-  addText(s.x, s.y - 18, 'SAVED!', '#9cff8a', false);
+  addText(s.x, s.y - 12, 'SAVED', 'y');
   SFX.rescue();
-  woolPuff(s.x, s.y, 8);
+  woolPuff(s.x, s.y, 6);
 }
-
 function updateEnemies(dt) {
   for (let i = enemies.length - 1; i >= 0; i--) {
     const e = enemies[i];
@@ -1548,7 +1546,6 @@ function updateEnemies(dt) {
     if (e.flash > 0) e.flash -= dt;
     if (e.state === 'emerge') {
       e.t -= dt;
-      if (rand() < dt * 4) leafBurst(e.x, e.y);
       if (e.t <= 0) e.state = 'hunt';
       continue;
     }
@@ -1556,11 +1553,9 @@ function updateEnemies(dt) {
       e.t -= dt;
       const k = Math.max(0, 1 - dt * 2.5);
       e.vx *= k; e.vy *= k;
-      e.x += e.vx * dt;
-      e.y += e.vy * dt;
-      e.rot += e.spin * dt;
-      e.alt = Math.max(e.alt, 0) + dt * 40;
-      if (rand() < 0.6) addParticle({ x: e.x, y: e.y - e.alt - 3, vx: 0, vy: 0, life: 0.25, max: 0.25, size: 1, col: '#fff3a8', g: 0, drag: 0, kind: 'px' });
+      e.x += e.vx * dt; e.y += e.vy * dt;
+      e.alt += dt * 30;
+      if (rand() < 0.5) addParticle({ x: e.x, y: e.y - e.alt - 2, vx: 0, vy: 0, life: 0.2, max: 0.2, col: 'y', g: 0, drag: 0, kind: 'px' });
       if (e.t <= 0) killEnemy(e, i);
       continue;
     }
@@ -1568,646 +1563,648 @@ function updateEnemies(dt) {
       e.t -= dt;
       const k = Math.max(0, 1 - dt * 5);
       e.vx *= k; e.vy *= k;
-      e.x += e.vx * dt;
-      e.y += e.vy * dt;
-      e.x = clamp(e.x, FIELD.x0 - 30, FIELD.x1 + 30);
-      e.y = clamp(e.y, FIELD.y0 - 30, FIELD.y1 + 30);
-      if (e.t <= 0) e.state = 'hunt';
+      e.x += e.vx * dt; e.y += e.vy * dt;
+      if (e.t <= 0) {
+        if (e.thenFlee) { e.state = 'flee'; e.exit = forestExit(e.x, e.y); }
+        else e.state = 'hunt';
+      }
       continue;
     }
     let spd = e.speed;
     if (e.state === 'hunt') {
       const target = nearestSheep(e.x, e.y);
-      if (!target) {
-        e.state = 'carry';
-        e.exit = exitPoint(e.x, e.y);
-      } else {
-        let d = len(target.x - e.x, target.y - e.y);
-        if (e.type === 'wolf' && d < 34) spd *= 1.35;          // lunge
+      if (!target) { e.state = 'flee'; e.exit = forestExit(e.x, e.y); }
+      else {
+        const d = len(target.x - e.x, target.y - e.y);
+        if (e.type === 'wolf' && d < 26) spd *= 1.35;   // lunge
         let tx = target.x, ty = target.y;
         if (e.type === 'bat') {
-          // sinusoidal swoop
-          const px = -(target.y - e.y) / (d || 1), py = (target.x - e.x) / (d || 1);
-          const w = Math.sin(e.anim * 4 + e.phase) * Math.min(28, d * 0.4);
-          tx += px * w; ty += py * w;
+          const pxv = -(target.y - e.y) / (d || 1), pyv = (target.x - e.x) / (d || 1);
+          const w = Math.sin(e.anim * 4 + e.phase) * Math.min(20, d * 0.4);
+          tx += pxv * w; ty += pyv * w;
         }
-        d = steerTo(e, tx, ty, spd, dt);
-        // capture
-        const cd = len(target.x - e.x, target.y - e.y);
-        if (cd < (e.type === 'bat' ? 7 : 8)) {
+        steerTo(e, tx, ty, spd, dt);
+        if (len(target.x - e.x, target.y - e.y) < 5) {
           const idx = sheep.indexOf(target);
           if (idx >= 0) sheep.splice(idx, 1);
           e.carry = target;
           e.state = 'carry';
-          e.exit = exitPoint(e.x, e.y);
-          woolPuff(target.x, target.y, 12);
+          e.exit = forestExit(e.x, e.y);
+          woolPuff(target.x, target.y, 8);
           SFX.capture();
           if (realTime - lastBaa > 0.15) { SFX.baa(true); lastBaa = realTime; }
-          addText(target.x, target.y - 16, 'HELP!', '#ff8a8a', false);
-          shake = Math.max(shake, 1);
+          addText(target.x, target.y - 12, 'HELP!', 'r');
         }
       }
-    } else if (e.state === 'carry') {
-      if (!e.exit) e.exit = exitPoint(e.x, e.y);
-      steerTo(e, e.exit.x, e.exit.y, spd * (e.carry ? 0.68 : 1.0), dt);
-      if (e.x < FIELD.x0 - 34 || e.x > FIELD.x1 + 34 || e.y < FIELD.y0 - 34 || e.y > FIELD.y1 + 34) {
+    } else if (e.state === 'carry' || e.state === 'flee') {
+      if (!e.exit) e.exit = forestExit(e.x, e.y);
+      const d = steerTo(e, e.exit.x, e.exit.y, spd * (e.carry ? 0.66 : 1.25), dt);
+      if (d < 5 || e.x < -8 || e.y < -8 || e.x > world.w + 8 || e.y > world.h + 8) {
         if (e.carry) {
           lostCount++;
-          addText(clamp(e.x, FIELD.x0 + 20, FIELD.x1 - 20), clamp(e.y, FIELD.y0 + 10, FIELD.y1 - 10), 'SHEEP LOST', '#ff6a6a', false);
+          addText(clamp(e.x, cam.x + 20, cam.x + W - 20), clamp(e.y, cam.y + 24, cam.y + H - 10), 'LOST', 'r');
           SFX.lost();
         }
         enemies.splice(i, 1);
         continue;
       }
     }
-    // separation between enemies
     for (const o of enemies) {
-      if (o === e || o.state === 'launched' || o.state === 'emerge' || o.type !== e.type) continue;
-      const dx = e.x - o.x, dy = e.y - o.y;
-      const d2 = dx * dx + dy * dy;
-      if (d2 < 100 && d2 > 0.001) {
-        const d = Math.sqrt(d2);
-        e.vx += (dx / d) * 120 * dt;
-        e.vy += (dy / d) * 120 * dt;
-      }
+      if (o === e || o.type !== e.type || o.state === 'launched' || o.state === 'emerge') continue;
+      const dx = e.x - o.x, dy = e.y - o.y, d2 = dx * dx + dy * dy;
+      if (d2 < 64 && d2 > 0.001) { const d = Math.sqrt(d2); e.vx += dx / d * 90 * dt; e.vy += dy / d * 90 * dt; }
     }
-    e.x += e.vx * dt;
-    e.y += e.vy * dt;
+    e.x += e.vx * dt; e.y += e.vy * dt;
     if (Math.abs(e.vx) > 2) e.side = e.vx < 0 ? -1 : 1;
-    if (e.type === 'bat') e.alt = 14 + Math.sin(e.anim * 5 + e.phase) * 3;
-    // soft body push with the goat (when not ramming)
-    if (goat.ramT <= 0 && e.type === 'wolf') {
-      const dx = e.x - goat.x, dy = e.y - goat.y;
-      const d = len(dx, dy);
-      if (d < 11 && d > 0.01) {
-        const push = (11 - d);
-        e.x += (dx / d) * push * 0.7;
-        e.y += (dy / d) * push * 0.7;
-        goat.x -= (dx / d) * push * 0.3;
-        goat.y -= (dy / d) * push * 0.3;
-      }
-    }
+    if (e.type === 'bat') e.alt = 10 + Math.sin(e.anim * 5 + e.phase) * 2;
   }
 }
-
-// Ram hitbox vs enemies
 function checkRamHits() {
-  if (goat.ramT <= 0) return;
-  const hx = goat.x + goat.fx * 7;
-  const hy = goat.y - 4 + goat.fy * 5;
-  for (let i = enemies.length - 1; i >= 0; i--) {
-    const e = enemies[i];
-    if (e.state === 'launched' || e.state === 'emerge' || e.lastRam === goat.ramId) continue;
-    const ey = e.y - (e.type === 'bat' ? Math.min(e.alt, 10) : 4);
-    const d = len(e.x - hx, ey - hy);
-    const reach = e.type === 'bat' ? 14 : 13;
-    if (d > reach) continue;
-    e.lastRam = goat.ramId;
-    let dx = e.x - goat.x, dy = e.y - goat.y;
-    const l = len(dx, dy) || 1;
-    dx = dx / l * 0.5 + goat.fx * 0.8;
-    dy = dy / l * 0.5 + goat.fy * 0.8;
-    const l2 = len(dx, dy) || 1;
-    dx /= l2; dy /= l2;
-    e.hp--;
-    e.flash = 0.15;
-    impactBurst((e.x + goat.x) / 2 + goat.fx * 4, ey, e.type === 'bat' ? '#a03a6a' : '#6c7288');
-    dust(e.x, e.y, 10, 4, 60);
-    SFX.impact();
-    shake = Math.max(shake, 5);
-    hitStop = 0.06;
-    if (e.carry) releaseCarried(e);
-    if (e.hp <= 0) {
-      e.state = 'launched';
-      e.t = 0.38;
-      e.vx = dx * 330 + rr(-30, 30);
-      e.vy = dy * 330 + rr(-30, 30);
-      e.spin = (rand() < 0.5 ? -1 : 1) * rr(14, 22);
-      score++;
-      addText(e.x, e.y - 22, score % 10 === 0 ? 'x' + score + '!' : '+1', '#fff3a8', score % 10 === 0);
-    } else {
-      e.state = 'stun';
-      e.t = 1.5;
-      e.vx = dx * 230;
-      e.vy = dy * 230;
-      addText(e.x, e.y - 22, 'STUNNED', '#ffd040', false);
-      SFX.stun();
+  for (const p of players) {
+    if (p.kind !== 'goat' || p.ramT <= 0) continue;
+    const hx = p.x + p.fx * 5, hy = p.y - 3 + p.fy * 4;
+    for (let i = enemies.length - 1; i >= 0; i--) {
+      const e = enemies[i];
+      if (e.state === 'launched' || e.state === 'emerge' || e.hits[p.slot] === p.ramId) continue;
+      const ey = e.y - (e.type === 'bat' ? Math.min(e.alt, 8) : 3);
+      if (len(e.x - hx, ey - hy) > (e.type === 'bat' ? 10 : 9)) continue;
+      e.hits[p.slot] = p.ramId;
+      let dx = e.x - p.x, dy = e.y - p.y;
+      const l = len(dx, dy) || 1;
+      dx = dx / l * 0.5 + p.fx * 0.8; dy = dy / l * 0.5 + p.fy * 0.8;
+      const l2 = len(dx, dy) || 1; dx /= l2; dy /= l2;
+      e.hp--; e.flash = 0.15;
+      impactBurst((e.x + p.x) / 2, ey);
+      dust(e.x, e.y, 6, 3, 40);
+      SFX.impact();
+      shake = Math.max(shake, 3.5);
+      hitStop = 0.05;
+      if (e.carry) releaseCarried(e);
+      if (e.hp <= 0) {
+        e.state = 'launched'; e.t = 0.38;
+        e.vx = dx * 240 + rr(-20, 20); e.vy = dy * 240 + rr(-20, 20);
+        score++; mission.kills++;
+        addText(e.x, e.y - 14, '+1', 'y');
+      } else {
+        e.state = 'stun'; e.t = 1.4; e.vx = dx * 170; e.vy = dy * 170;
+        addText(e.x, e.y - 14, 'STUN', 'y');
+        SFX.stun();
+      }
+      p.vx *= 0.75; p.vy *= 0.75;
     }
-    goat.vx *= 0.75;
-    goat.vy *= 0.75;
   }
 }
 
 // ---------------------------------------------------------------------
-// Waves
+// Modes: ESCORT missions and DEFEND waves
 // ---------------------------------------------------------------------
-function updateWaves(dt) {
-  if (wave.banner > 0) wave.banner -= dt;
-  if (wave.phase === 'intro') {
-    wave.t -= dt;
-    if (wave.t <= 0) wave.phase = 'active';
-  } else if (wave.phase === 'active') {
+function placePlayers(cx, cy) {
+  players.forEach((p, i) => {
+    const a = (i / Math.max(1, players.length)) * Math.PI * 2 + Math.PI / 2;
+    let x = cx + Math.cos(a) * 20, y = cy + Math.sin(a) * 12 + 22;
+    if (blocked(x, y)) { x = cx + i * 4; y = cy + 16; }
+    makePlayerBody(p, x, y);
+  });
+}
+function startRun() {
+  score = 0; rescued = 0; delivered = 0; lostCount = 0; newBest = false; gameOverDelay = 0;
+  enemies = []; particles = []; texts = []; fireflies = [];
+  paused = false;
+  state = 'PLAYING';
+  stateTime = 0;
+  if (mode === 'escort') startMission(1, 12);
+  else startDefend();
+}
+function startDefend() {
+  world = renderWorld(makeDefendWorld(4242));
+  spawnHerd(world.start.x, world.start.y, 12);
+  placePlayers(world.start.x, world.start.y);
+  snapCam(world.start.x, world.start.y);
+  startWave(1);
+}
+function startWave(n) {
+  wave.n = n; wave.phase = 'intro'; wave.t = 2.2;
+  wave.toSpawn = 2 + n * 2;
+  wave.interval = Math.max(0.6, 2.4 - n * 0.15);
+  wave.spawnT = 0.3;
+  banner = { t: 2.4, a: 'WAVE ' + n, b: n === 1 ? 'GUARD THE HENGE' : 'THEY COME AGAIN' };
+  dayTarget = clamp((n - 1) / 8, 0, 1);
+  SFX.wave();
+}
+function startMission(n, herdN) {
+  mission.n = n; mission.herdStart = herdN; mission.penned = 0; mission.time = 0; mission.kills = 0;
+  mission.interval = Math.max(1.9, 5.5 - n * 0.5);
+  mission.cap = Math.min(8, 2 + n);
+  mission.spawnT = 5;
+  world = renderWorld(makeEscortWorld(n, 1000 + n * 77 + Math.floor(rand() * 1000)));
+  enemies = [];
+  spawnHerd(world.start.x, world.start.y - 6, herdN);
+  placePlayers(world.start.x, world.start.y);
+  snapCam(world.start.x, world.start.y - 40);
+  banner = { t: 3, a: 'MISSION ' + n, b: 'HERD THEM TO THE RED PIN' };
+  dayTarget = clamp((n - 1) / 5, 0, 1);
+  SFX.wave();
+}
+function updateDefend(dt) {
+  if (wave.phase === 'intro') { wave.t -= dt; if (wave.t <= 0) wave.phase = 'active'; }
+  else if (wave.phase === 'active') {
     if (wave.toSpawn > 0) {
       wave.spawnT -= dt;
       if (wave.spawnT <= 0) {
-        spawnEnemy();
-        wave.toSpawn--;
-        // occasional pack spawn on later waves
-        if (wave.n >= 4 && wave.toSpawn > 0 && rand() < 0.25) { spawnEnemy(); wave.toSpawn--; }
+        spawnEnemy(wave.n); wave.toSpawn--;
+        if (wave.n >= 4 && wave.toSpawn > 0 && rand() < 0.25) { spawnEnemy(wave.n); wave.toSpawn--; }
         wave.spawnT = wave.interval * rr(0.7, 1.3);
       }
     } else if (enemies.length === 0) {
-      wave.phase = 'clear';
-      wave.t = 2.6;
-      wave.banner = 2.4;
-      wave.bannerText = 'WAVE ' + wave.n + ' CLEAR!';
+      wave.phase = 'clear'; wave.t = 2.6;
+      let sub = 'THE FLOCK RESTS';
       if (sheep.length > 0 && sheep.length < SHEEP_MAX) {
-        const c = flockCenter();
-        const p = edgePoint(-6);
-        const s = makeSheep(p.x, p.y);
-        s.vx = (c.x - p.x) * 0.3; s.vy = (c.y - p.y) * 0.3;
-        sheep.push(s);
-        s.flash = 1;
-        wave.subText = 'A LOST LAMB RETURNS +1';
-        addText(s.x, s.y - 16, '+1 SHEEP', '#9cff8a', false);
-      } else {
-        wave.subText = 'THE FLOCK IS SAFE... FOR NOW';
+        const hc = herdCenter();
+        const s = makeSheep(hc.x + rr(-10, 10), hc.y + rr(-10, 10));
+        if (!blocked(s.x, s.y)) { sheep.push(s); s.flash = 1; sub = 'A LAMB RETURNS +1'; }
       }
+      banner = { t: 2.4, a: 'CLEAR!', b: sub };
       SFX.clear();
     }
-  } else if (wave.phase === 'clear') {
-    wave.t -= dt;
-    if (wave.t <= 0) startWave(wave.n + 1);
+  } else if (wave.phase === 'clear') { wave.t -= dt; if (wave.t <= 0) startWave(wave.n + 1); }
+}
+function updateEscort(dt) {
+  mission.time += dt;
+  dayTarget = clamp((mission.n - 1) / 5 + Math.min(0.15, mission.time / 600), 0, 1);
+  const active = sheep.filter(s => !s.penned).length;
+  if (active > 0) {
+    mission.spawnT -= dt;
+    const live = enemies.filter(e => e.state !== 'launched' && e.state !== 'flee').length;
+    if (mission.spawnT <= 0 && live < mission.cap) {
+      spawnEnemy(mission.n);
+      mission.spawnT = mission.interval * rr(0.7, 1.3);
+    }
+  }
+  const carrying = enemies.some(e => e.carry);
+  if (active === 0 && !carrying && mission.penned > 0) {
+    state = 'RESULTS';
+    stateTime = 0;
+    for (const e of enemies) if (e.state !== 'launched') { e.state = 'flee'; e.exit = forestExit(e.x, e.y); }
+    SFX.clear();
   }
 }
-function flockCenter() {
-  if (!sheep.length) return { x: FIELD_CX, y: FIELD_CY };
-  let x = 0, y = 0;
-  for (const s of sheep) { x += s.x; y += s.y; }
-  return { x: x / sheep.length, y: y / sheep.length };
+function nextMission() {
+  const herdN = Math.min(SHEEP_MAX, mission.penned + 2);
+  state = 'PLAYING';
+  stateTime = 0;
+  startMission(mission.n + 1, herdN);
+}
+function checkGameOver(dt) {
+  const carrying = enemies.some(e => e.carry);
+  if (sheep.length === 0 && !carrying) {
+    gameOverDelay += dt;
+    if (gameOverDelay > 1.2) {
+      state = 'GAMEOVER';
+      stateTime = 0;
+      newBest = saveBest();
+      SFX.gameover();
+    }
+  } else gameOverDelay = 0;
 }
 
-// ---------------------------------------------------------------------
-// Fireflies (dusk ambience)
-// ---------------------------------------------------------------------
 function updateFireflies(dt) {
-  const want = dayProgress > 0.55 ? Math.floor((dayProgress - 0.55) * 50) : 0;
+  const want = dayProgress > 0.55 ? Math.floor((dayProgress - 0.55) * 40) : 0;
   if (fireflies.length < want && rand() < dt * 3) {
-    fireflies.push({ x: rr(FIELD.x0, FIELD.x1), y: rr(FIELD.y0 - 20, FIELD.y1 + 10), ph: rand() * 6.28, vx: rr(-6, 6), vy: rr(-4, 4), life: rr(4, 9) });
+    fireflies.push({ x: cam.x + rr(0, W), y: cam.y + rr(0, H), ph: rand() * 6.28, vx: rr(-5, 5), vy: rr(-4, 4), life: rr(4, 9) });
   }
   for (let i = fireflies.length - 1; i >= 0; i--) {
     const f = fireflies[i];
-    f.life -= dt;
-    f.ph += dt * 3;
-    f.vx += rr(-20, 20) * dt;
-    f.vy += rr(-20, 20) * dt;
-    f.vx = clamp(f.vx, -10, 10); f.vy = clamp(f.vy, -8, 8);
+    f.life -= dt; f.ph += dt * 3;
+    f.vx = clamp(f.vx + rr(-16, 16) * dt, -8, 8); f.vy = clamp(f.vy + rr(-16, 16) * dt, -6, 6);
     f.x += f.vx * dt; f.y += f.vy * dt;
     if (f.life <= 0 || fireflies.length > want + 4) fireflies.splice(i, 1);
   }
 }
 
 // ---------------------------------------------------------------------
+// Menu / lobby (join with any device, swap goat/dog, pick mode)
+// ---------------------------------------------------------------------
+function freeSlot() {
+  for (let s = 0; s < 4; s++) if (!players.some(p => p.slot === s)) return s;
+  return -1;
+}
+function joinPlayer(dev) {
+  const slot = freeSlot();
+  if (slot < 0) return null;
+  const p = { slot: slot, dev: dev, kind: slot % 2 === 0 ? 'goat' : 'dog', ready: false };
+  makePlayerBody(p, 0, 0);
+  players.push(p);
+  players.sort((a, b) => a.slot - b.slot);
+  SFX.join();
+  return p;
+}
+function toggleMode() { mode = mode === 'escort' ? 'defend' : 'escort'; SFX.click(); }
+function menuEvent(ev) {
+  if (ev.type === 'tap') { menuTap(ev.x, ev.y); return; }
+  if (ev.type === 'pause' || ev.type === 'restart') return;
+  if (ev.type === 'back') {
+    const p = ev.dev === 'kb' ? players.filter(q => q.dev === 'kbL' || q.dev === 'kbR').pop() : players.find(q => q.dev === ev.dev);
+    if (p) { players.splice(players.indexOf(p), 1); SFX.click(); }
+    return;
+  }
+  const p = players.find(q => q.dev === ev.dev);
+  if (ev.type === 'up' || ev.type === 'down') { toggleMode(); return; }
+  if (!p) { if (ev.type === 'action') joinPlayer(ev.dev); return; }
+  if (ev.type === 'left' || ev.type === 'right') { p.kind = p.kind === 'goat' ? 'dog' : 'goat'; p.ready = false; SFX.click(); }
+  else if (ev.type === 'action') { p.ready = !p.ready; SFX.click(); }
+}
+const SLOT_Y0 = 104, SLOT_H = 32;
+function menuTap(x, y) {
+  const p = players.find(q => q.dev === 'touch');
+  if (!p) { joinPlayer('touch'); return; }
+  if (y > 82 && y < 100) { toggleMode(); return; }
+  const slotY = SLOT_Y0 + p.slot * SLOT_H;
+  if (y >= slotY && y < slotY + SLOT_H - 2) { p.kind = p.kind === 'goat' ? 'dog' : 'goat'; p.ready = false; SFX.click(); return; }
+  if (y > 234) { p.ready = !p.ready; SFX.click(); }
+}
+function updateMenu(dt) {
+  if (players.length && players.every(p => p.ready)) {
+    if (menuCountdown < 0) menuCountdown = 0.7;
+    menuCountdown -= dt;
+    if (menuCountdown <= 0) { menuCountdown = -1; startRun(); }
+  } else menuCountdown = -1;
+}
+function toMenu() {
+  state = 'MENU';
+  stateTime = 0;
+  paused = false;
+  for (const p of players) p.ready = false;
+  world = menuWorld;
+  enemies = []; particles = []; texts = [];
+  spawnHerd(world.start.x, world.start.y, 10);
+  dayTarget = 0;
+}
+
+// ---------------------------------------------------------------------
 // Update
 // ---------------------------------------------------------------------
+function handleEvents() {
+  pollPads();
+  while (events.length) {
+    const ev = events.shift();
+    if (state === 'MENU') { menuEvent(ev); continue; }
+    if (ev.type === 'pause') {
+      if (state === 'PLAYING') { paused = !paused; SFX.click(); }
+      continue;
+    }
+    if (state === 'PLAYING') {
+      if (paused) {
+        if (ev.type === 'action' || ev.type === 'tap') paused = false;
+        else if (ev.type === 'back') toMenu();
+        continue;
+      }
+      if (ev.type === 'action') { const p = playerForDev(ev.dev); if (p) playerAction(p); }
+    } else if (state === 'RESULTS') {
+      if ((ev.type === 'action' || ev.type === 'tap') && stateTime > 1.2) nextMission();
+    } else if (state === 'GAMEOVER') {
+      if (stateTime < 1.0) continue;
+      if (ev.type === 'restart') startRun();
+      else if (ev.type === 'action' || ev.type === 'tap' || ev.type === 'back') toMenu();
+    }
+  }
+}
 function update(dt) {
   realTime += dt;
-  dayProgress += (dayTarget - dayProgress) * Math.min(1, dt * 0.6);
-  if (shake > 0) shake = Math.max(0, shake - dt * 18);
-
+  stateTime += dt;
+  handleEvents();
+  dayProgress += (dayTarget - dayProgress) * damp(0.5, dt);
+  if (shake > 0) shake = Math.max(0, shake - dt * 14);
   if (state === 'MENU') {
-    dayTarget = 0.18;
+    updateMenu(dt);
     updateSheep(dt);
     updateParticles(dt);
-    updateFireflies(dt);
+    updateCamera(dt);
     return;
   }
   if (state === 'PLAYING') {
     if (paused) return;
-    if (hitStop > 0) {
-      hitStop -= dt;
-      updateParticles(dt * 0.25);
-      return;
-    }
-    gameTime += dt;
-    updateGoat(dt);
+    if (hitStop > 0) { hitStop -= dt; updateParticles(dt * 0.25); return; }
+    updatePlayers(dt);
     checkRamHits();
     updateSheep(dt);
     updateEnemies(dt);
-    updateWaves(dt);
-    updateParticles(dt);
-    updateFireflies(dt);
-    // game over: herd empty and nobody left to rescue
-    const carrying = enemies.some(e => e.carry);
-    if (sheep.length === 0 && !carrying) {
-      gameOverDelay += dt;
-      if (gameOverDelay > 1.2) {
-        state = 'GAMEOVER';
-        gameOverTime = realTime;
-        if (score > best) {
-          best = score;
-          newBest = true;
-          try { localStorage.setItem('goatGuardianBest', String(best)); } catch (e) { /* storage unavailable */ }
-        }
-        SFX.gameover();
-      }
-    } else {
-      gameOverDelay = 0;
-    }
-    return;
-  }
-  if (state === 'GAMEOVER') {
+    if (mode === 'defend') updateDefend(dt); else updateEscort(dt);
+    if (state === 'PLAYING') checkGameOver(dt);
+    if (banner.t > 0) banner.t -= dt;
+  } else {
+    updatePlayers(dt);
+    updateSheep(dt);
     updateEnemies(dt);
-    updateParticles(dt);
-    updateFireflies(dt);
+    if (state === 'RESULTS' && stateTime > 6) nextMission();
   }
+  updateParticles(dt);
+  updateFireflies(dt);
+  updateCamera(dt);
 }
 
 // ---------------------------------------------------------------------
 // Rendering
 // ---------------------------------------------------------------------
+function wx(x) { return Math.round(x) - OX; }
+function wy(y) { return Math.round(y) - OY; }
 function sheepSprite(s) {
-  if (s.panic > 0) return (Math.floor(s.walk / 4) % 2 === 0) ? SPR.sheepPanic : SPR.sheepWalk;
-  if (s.grazing) return (Math.floor(s.chew * 4) % 2 === 0) ? SPR.sheepGrazeA : SPR.sheepGrazeB;
-  if (len(s.vx, s.vy) > 5) return (Math.floor(s.walk / 4) % 2 === 0) ? SPR.sheepIdle : SPR.sheepWalk;
-  return SPR.sheepIdle;
+  const moving = len(s.vx, s.vy) > 4;
+  const f = Math.floor(s.walk / 3) % 2;
+  if (s.panic > 0) return f ? S.sheepPanic : S.sheepWalk;
+  if (s.grazing && !moving) return (Math.floor(s.chew * 4) % 2) ? S.sheepGrazeA : S.sheepGrazeB;
+  if (moving) return f ? S.sheepIdle : S.sheepWalk;
+  return S.sheepIdle;
 }
-function drawSheep(s) {
-  const spr = sheepSprite(s);
-  const bob = (!s.grazing && s.panic <= 0 && len(s.vx, s.vy) < 5) ? (Math.sin(realTime * 2 + s.bob) > 0.85 ? -1 : 0) : 0;
-  const flash = s.flash > 0 && Math.floor(s.flash * 12) % 2 === 0;
-  drawSpr(spr, s.x, s.y + bob, s.side < 0, flash);
-  if (s.panic > 0 && Math.floor(realTime * 6 + s.bob) % 2 === 0) {
-    // sweat drop / alarm mark
-    ctx.fillStyle = '#ffffff';
-    const ex = Math.round(s.x + (s.side < 0 ? -4 : 4));
-    const ey = Math.round(s.y - 14);
-    ctx.fillRect(ex, ey, 1, 3);
-    ctx.fillRect(ex, ey + 4, 1, 1);
+function drawWorldScene() {
+  G = bctx;
+  bctx.fillStyle = C.k;
+  bctx.fillRect(0, 0, BW, BH);
+  bctx.drawImage(world.canvas, OX, OY, BW, BH, 0, 0, BW, BH);
+  const showPlayers = state !== 'MENU';
+
+  for (const s of sheep) drawShadow(wx(s.x), wy(s.y), 7);
+  if (showPlayers) for (const p of players) drawShadow(wx(p.x), wy(p.y), 8);
+  for (const e of enemies) {
+    if (e.state === 'emerge' || canopy(e.x, e.y)) continue;
+    drawShadow(wx(e.x), wy(e.y), e.type === 'bat' ? 5 : 9);
   }
-}
-function drawGoat() {
-  let spr;
-  if (goat.ramT > 0) spr = SPR.goatRam;
-  else if (len(goat.vx, goat.vy) > 8) spr = (Math.floor(goat.walk / 6) % 2 === 0) ? SPR.goatA : SPR.goatB;
-  else spr = SPR.goatA;
-  const bob = (goat.ramT <= 0 && len(goat.vx, goat.vy) > 8 && Math.floor(goat.walk / 6) % 2 === 1) ? -1 : 0;
-  // charge streaks
-  if (goat.ramT > 0) {
-    ctx.fillStyle = 'rgba(255,250,220,0.55)';
-    for (let i = 1; i <= 3; i++) {
-      const tx = goat.x - goat.fx * i * 7;
-      const ty = goat.y - 7 - goat.fy * i * 7;
-      ctx.fillRect(Math.round(tx - 3 + i), Math.round(ty) + (i % 2) * 3, 6 - i, 1);
+  // depth-sorted ground entities
+  const list = [];
+  for (const s of sheep) list.push({ y: s.y, k: 0, o: s });
+  for (const e of enemies) if (e.type === 'wolf') list.push({ y: e.y, k: 1, o: e });
+  if (showPlayers) for (const p of players) list.push({ y: p.y, k: 2, o: p });
+  for (const pl of world.pillars) if (onScreen(pl.x, pl.y, 20)) list.push({ y: pl.y, k: 3, o: pl });
+  list.sort((a, b) => a.y - b.y);
+  for (const it of list) {
+    if (it.k === 0) {
+      const s = it.o;
+      const fl = s.flash > 0 && Math.floor(s.flash * 12) % 2 === 0;
+      drawSpr(sheepSprite(s), wx(s.x), wy(s.y), s.side < 0, { white: fl });
+      if (s.panic > 0 && Math.floor(realTime * 6) % 2 === 0) px(wx(s.x) + (s.side < 0 ? -3 : 3), wy(s.y) - 9, 'w');
+    } else if (it.k === 1) drawEnemy(it.o);
+    else if (it.k === 2) drawPlayer(it.o);
+    else drawSpr(it.o.broken ? S.pillarBroken : S.pillar, wx(it.o.x), wy(it.o.y), false);
+  }
+  if (world.goal) {
+    const bob = Math.round(Math.sin(realTime * 3) * 1.5);
+    drawSpr(S.pinGoal, wx(world.goal.x), wy(world.goal.y) - 10 + bob, false);
+  }
+  if (world.kind === 'escort' && world.start) drawSpr(S.pinStart, wx(world.start.x), wy(world.start.y) - 6, false);
+  // eyes lurking in the forest
+  for (const e of enemies) {
+    if (e.state === 'emerge' || (e.type === 'wolf' && canopy(e.x, e.y) && e.state !== 'launched')) {
+      if (Math.floor((e.anim + e.phase) * 3) % 5 === 0) continue;
+      const x = wx(e.x), y = wy(e.y) - 4;
+      const col = e.alpha ? 'y' : 'r';
+      px(x - 1, y, col); px(x + 1, y, col);
+      if (e.carry) px(x + 3, y + 1, 'w');
     }
   }
-  drawSpr(spr, goat.x, goat.y + bob, goat.side < 0, false);
-  // personal ram cooldown pip-bar
-  if (goat.cd > 0 && state === 'PLAYING') {
-    const w = 14;
-    const f = 1 - goat.cd / RAM_COOLDOWN;
-    const x = Math.round(goat.x - w / 2), y = Math.round(goat.y + 3);
-    ctx.fillStyle = 'rgba(0,0,0,0.55)';
-    ctx.fillRect(x - 1, y - 1, w + 2, 3);
-    ctx.fillStyle = '#ffb040';
-    ctx.fillRect(x, y, Math.round(w * f), 1);
+  for (const e of enemies) if (e.type === 'bat') drawEnemy(e);
+  for (const p of particles) {
+    if (p.kind === 'ring') {
+      const a = clamp(p.life / p.max, 0, 1);
+      const r = lerp(p.r1, p.r0, a);
+      const n = Math.max(10, Math.floor(r * 2.5));
+      for (let i = 0; i < n; i += (a < 0.4 ? 2 : 1)) {
+        const ang = (i / n) * Math.PI * 2;
+        px(wx(p.x + Math.cos(ang) * r), wy(p.y + Math.sin(ang) * r * 0.7), p.col);
+      }
+    } else {
+      if (p.life / p.max < 0.3 && Math.floor(p.life * 30) % 2) continue;
+      px(wx(p.x), wy(p.y), p.col);
+    }
+  }
+  for (const t of texts) {
+    if (t.life / t.max < 0.3 && Math.floor(t.life * 20) % 2 === 0) continue;
+    text(t.str, wx(t.x), wy(t.y), t.col, { align: 'center', outline: 'k' });
+  }
+}
+function drawPlayer(p) {
+  const x = wx(p.x), y = wy(p.y);
+  const moving = len(p.vx, p.vy) > 8;
+  const f = Math.floor(p.walk / 5) % 2;
+  let s;
+  if (p.kind === 'goat') s = p.ramT > 0 ? S.goatRam : (moving && f ? S.goatB : S.goatA);
+  else s = p.actT > 0 ? S.dogBark : (moving && f ? S.dogB : S.dogA);
+  const bob = moving && f && p.ramT <= 0 ? -1 : 0;
+  if (p.ramT > 0) for (let i = 1; i <= 3; i++) px(x - Math.round(p.fx * i * 5), y - 4 - Math.round(p.fy * i * 5) + (i % 2), 'w');
+  drawSpr(s, x, y + bob, p.side < 0);
+  if (players.length > 1) {
+    const c = P_COL[p.slot];
+    const my = y - s.h - 2 + bob;
+    rect(x - 1, my, 3, 1, c); px(x, my + 1, c);
+  }
+  if (p.cd > 0 && state === 'PLAYING') {
+    const total = p.kind === 'goat' ? RAM_COOLDOWN : BARK_COOLDOWN;
+    const w = 7, fl = Math.round(w * (1 - p.cd / total));
+    rect(x - 3, y + 2, w, 1, 'k');
+    if (fl > 0) rect(x - 3, y + 2, fl, 1, 'y');
   }
 }
 function drawEnemy(e) {
   if (e.state === 'emerge') return;
-  let spr;
-  if (e.type === 'bat') spr = (Math.floor(e.anim * 10) % 2 === 0) ? SPR.batUp : SPR.batDown;
+  if (e.type === 'wolf' && canopy(e.x, e.y) && e.state !== 'launched') return;
+  let s;
+  if (e.type === 'bat') s = (Math.floor(e.anim * 10) % 2) ? S.batUp : S.batDown;
   else {
-    const fast = len(e.vx, e.vy) > 10 && e.state !== 'stun';
+    const fast = len(e.vx, e.vy) > 8 && e.state !== 'stun';
     const f = fast ? Math.floor(e.anim * 10) % 2 : 0;
-    spr = e.alpha ? (f ? SPR.alphaB : SPR.alphaA) : (f ? SPR.wolfB : SPR.wolfA);
+    s = e.alpha ? (f ? S.alphaB : S.alphaA) : (f ? S.wolfB : S.wolfA);
   }
-  const flash = e.flash > 0;
-  const y = e.y - e.alt;
+  const x = wx(e.x), y = wy(e.y - e.alt);
   if (e.state === 'launched') {
-    ctx.save();
-    ctx.translate(Math.round(e.x), Math.round(y - spr.h / 2));
-    ctx.rotate(e.rot);
-    const img = flash || Math.floor(e.t * 20) % 2 === 0 ? (e.side < 0 ? spr.wl : spr.wr) : (e.side < 0 ? spr.l : spr.r);
-    ctx.drawImage(img, -Math.round(spr.w / 2), -Math.round(spr.h / 2));
-    ctx.restore();
+    const tum = Math.floor(e.t * 16) % 2 === 0;
+    drawSpr(s, x, y, e.side < 0, { upside: tum, white: !tum && Math.floor(e.t * 30) % 2 === 0 });
     return;
   }
-  // carried sheep
-  if (e.carry && e.type === 'bat') {
-    const s = SPR.sheepPanic;
-    drawSpr(s, e.x, y + s.h - 2 + Math.sin(e.anim * 8) * 1, e.side < 0, false);
-  }
-  const stunWobble = e.state === 'stun' ? Math.round(Math.sin(e.anim * 30)) : 0;
-  drawSpr(spr, e.x + stunWobble, y, e.side < 0, flash);
-  if (e.carry && e.type === 'wolf') {
-    drawSpr(SPR.sheepPanic, e.x + e.side * 12, y + 1, e.side < 0, false);
-  }
+  if (e.carry && e.type === 'bat') drawSpr(S.sheepPanic, x, y + 6, e.side < 0);
+  const wob = e.state === 'stun' ? Math.round(Math.sin(e.anim * 30)) : 0;
+  drawSpr(s, x + wob, y, e.side < 0, { white: e.flash > 0 });
+  if (e.carry && e.type === 'wolf') drawSpr(S.sheepPanic, x + e.side * 8, y + 1, e.side < 0);
   if (e.state === 'stun') {
-    // orbiting stars
-    for (let k = 0; k < 3; k++) {
-      const a = e.anim * 6 + k * 2.094;
-      const sx = Math.round(e.x + Math.cos(a) * 7);
-      const sy = Math.round(y - spr.h - 3 + Math.sin(a) * 2);
-      ctx.fillStyle = '#ffe060';
-      ctx.fillRect(sx, sy, 1, 1);
-      ctx.fillRect(sx - 1, sy, 3, 1);
-      ctx.fillRect(sx, sy - 1, 1, 3);
+    for (let k = 0; k < 2; k++) {
+      const a = e.anim * 6 + k * Math.PI;
+      px(x + Math.round(Math.cos(a) * 5), y - s.h - 2 + Math.round(Math.sin(a)), 'y');
     }
-  }
-  if (e.alpha && e.state !== 'stun' && e.hp > 1) {
-    // alpha marker: glowing mane pixels
-    if (Math.floor(realTime * 4) % 2 === 0) {
-      ctx.fillStyle = '#ffd040';
-      ctx.fillRect(Math.round(e.x - e.side * 2), Math.round(y - spr.h - 2), 1, 1);
-    }
-  }
-}
-function drawEmergeEyes() {
-  for (const e of enemies) {
-    if (e.state !== 'emerge') continue;
-    const blink = Math.floor(e.t * 10) % 4 !== 0;
-    if (!blink) continue;
-    ctx.fillStyle = e.alpha ? '#ffd040' : '#ff3434';
-    const x = Math.round(e.x), y = Math.round(e.y - 6);
-    ctx.fillRect(x - 2, y, 2, 1);
-    ctx.fillRect(x + 1, y, 2, 1);
-    ctx.fillStyle = 'rgba(255,60,60,0.25)';
-    ctx.fillRect(x - 3, y - 1, 7, 3);
-  }
-}
-function drawParticles() {
-  for (const p of particles) {
-    const a = clamp(p.life / p.max, 0, 1);
-    if (p.kind === 'ring') {
-      const r = lerp(p.r1, p.r0, a);
-      ctx.fillStyle = p.col;
-      ctx.globalAlpha = a;
-      const n = Math.max(10, Math.floor(r * 3));
-      for (let i = 0; i < n; i++) {
-        const ang = (i / n) * Math.PI * 2;
-        ctx.fillRect(Math.round(p.x + Math.cos(ang) * r), Math.round(p.y + Math.sin(ang) * r * 0.6), 1, 1);
-      }
-      ctx.globalAlpha = 1;
-    } else if (p.kind === 'flash') {
-      const r = Math.round(lerp(p.r1, p.r0, a));
-      ctx.fillStyle = p.col;
-      ctx.globalAlpha = a;
-      ctx.fillRect(Math.round(p.x - r), Math.round(p.y - 1), r * 2, 3);
-      ctx.fillRect(Math.round(p.x - 1), Math.round(p.y - r), 3, r * 2);
-      ctx.globalAlpha = 1;
-    } else {
-      ctx.globalAlpha = p.kind === 'spark' ? 1 : Math.min(1, a * 1.6);
-      ctx.fillStyle = p.col;
-      ctx.fillRect(Math.round(p.x), Math.round(p.y), p.size, p.size);
-      if (p.kind === 'spark' && p.px !== undefined) {
-        ctx.globalAlpha = 0.5;
-        ctx.fillRect(Math.round((p.x + p.px) / 2), Math.round((p.y + p.py) / 2), 1, 1);
-      }
-      ctx.globalAlpha = 1;
-    }
-  }
-}
-function drawWorld() {
-  ctx.drawImage(bgCanvas, 0, 0);
-  // shadows
-  for (const s of sheep) drawShadow(s.x, s.y, 12);
-  for (const e of enemies) {
-    if (e.state === 'emerge') continue;
-    drawShadow(e.x, e.y, e.type === 'bat' ? 8 : 16);
-  }
-  drawShadow(goat.x, goat.y, 15);
-
-  // depth-sorted ground entities
-  const list = [];
-  for (const s of sheep) list.push({ y: s.y, kind: 0, o: s });
-  for (const e of enemies) if (e.type === 'wolf' || e.state === 'launched') list.push({ y: e.y, kind: 1, o: e });
-  list.push({ y: goat.y, kind: 2, o: goat });
-  list.sort((a, b) => a.y - b.y);
-  for (const it of list) {
-    if (it.kind === 0) drawSheep(it.o);
-    else if (it.kind === 1) drawEnemy(it.o);
-    else drawGoat();
-  }
-  // foreground tree band
-  ctx.drawImage(fgCanvas, 0, 0);
-  drawEmergeEyes();
-  // flying enemies above everything
-  for (const e of enemies) if (e.type === 'bat' && e.state !== 'launched') drawEnemy(e);
-  drawParticles();
-  for (const t of texts) {
-    const a = t.life / t.max;
-    if (a < 0.3 && Math.floor(t.life * 20) % 2 === 0) continue;
-    drawText(t.str, t.x, t.y, t.col, { s: t.s, align: 'center', outline: '#1a1010' });
-  }
-}
-function applyDayTint() {
-  const tint = tintAt(dayProgress);
-  if (dayProgress > 0.01) {
-    ctx.globalCompositeOperation = 'multiply';
-    ctx.fillStyle = 'rgb(' + tint.c[0] + ',' + tint.c[1] + ',' + tint.c[2] + ')';
-    ctx.fillRect(0, 0, W, H);
-    ctx.globalCompositeOperation = 'lighter';
-    const g = ctx.createRadialGradient(W * 0.85, -20, 10, W * 0.85, -20, W * 0.9);
-    g.addColorStop(0, 'rgba(' + tint.glow[0] + ',' + tint.glow[1] + ',' + tint.glow[2] + ',' + (tint.ga * 2.2).toFixed(3) + ')');
-    g.addColorStop(1, 'rgba(' + tint.glow[0] + ',' + tint.glow[1] + ',' + tint.glow[2] + ',0)');
-    ctx.fillStyle = g;
-    ctx.fillRect(0, 0, W, H);
-    ctx.globalCompositeOperation = 'source-over';
-    if (dayProgress > 0.4) {
-      ctx.globalAlpha = clamp((dayProgress - 0.4) * 0.9, 0, 0.55);
-      ctx.drawImage(vignetteCanvas, 0, 0);
-      ctx.globalAlpha = 1;
-    }
-  }
-  // fireflies glow on top of tint
-  if (fireflies.length) {
-    ctx.globalCompositeOperation = 'lighter';
-    for (const f of fireflies) {
-      const b = 0.5 + 0.5 * Math.sin(f.ph);
-      if (b < 0.2) continue;
-      ctx.fillStyle = 'rgba(200,255,120,' + (b * 0.35).toFixed(3) + ')';
-      ctx.fillRect(Math.round(f.x) - 1, Math.round(f.y) - 1, 3, 3);
-      ctx.fillStyle = 'rgba(240,255,170,' + b.toFixed(3) + ')';
-      ctx.fillRect(Math.round(f.x), Math.round(f.y), 1, 1);
-    }
-    ctx.globalCompositeOperation = 'source-over';
   }
 }
 
-function drawPanel(x, y, w, h) {
-  ctx.fillStyle = 'rgba(12,10,8,0.72)';
-  ctx.fillRect(x, y, w, h);
-  ctx.fillStyle = 'rgba(255,240,200,0.18)';
-  ctx.fillRect(x, y, w, 1);
-  ctx.fillStyle = 'rgba(0,0,0,0.5)';
-  ctx.fillRect(x, y + h, w, 1);
+// HUD (separate canvas: no sub-pixel shift, no palette swap)
+const dimPatterns = (() => {
+  const a = makeCanvas(2, 2), ag = a.getContext('2d');
+  ag.fillStyle = C.k; ag.fillRect(0, 0, 1, 1); ag.fillRect(1, 1, 1, 1);
+  const b = makeCanvas(4, 4), bg = b.getContext('2d');
+  bg.fillStyle = C.k; bg.fillRect(0, 0, 1, 1); bg.fillRect(2, 2, 1, 1); bg.fillRect(2, 0, 1, 1); bg.fillRect(0, 2, 1, 1);
+  return { full: hctx.createPattern(a, 'repeat'), light: hctx.createPattern(b, 'repeat') };
+})();
+function ditherDim(full) {
+  hctx.fillStyle = full ? dimPatterns.full : dimPatterns.light;
+  hctx.fillRect(0, 0, W, H);
+}
+function edgeArrow(tx, ty, col, blink) {
+  const sx = tx - cam.x, sy = ty - cam.y;
+  if (sx > 2 && sx < W - 2 && sy > 12 && sy < H - 2) return;
+  if (blink && Math.floor(realTime * 4) % 2) return;
+  const cx = W / 2, cy = H / 2;
+  let dx = sx - cx, dy = sy - cy;
+  const l = len(dx, dy) || 1;
+  dx /= l; dy /= l;
+  const t = Math.min((W / 2 - 6) / Math.max(1e-6, Math.abs(dx)), (H / 2 - 12) / Math.max(1e-6, Math.abs(dy)));
+  const ax = cx + dx * t, ay = cy + dy * t;
+  for (let i = 0; i < 4; i++) {
+    const bx = ax - dx * i, by = ay - dy * i;
+    for (let j = -i; j <= i; j++) px(bx - dy * j * 0.8, by + dx * j * 0.8, col);
+  }
 }
 function drawHUD() {
-  // top bar
-  drawPanel(0, 0, W, 15);
-  // score
-  drawText('SCORE', 6, 5, '#c8b890', {});
-  drawText(String(score).padStart(3, '0'), 30, 5, '#fff3a8', {});
-  // sheep counter with icon
-  const icon = SPR.sheepIdle;
-  ctx.drawImage(icon.r, 56, 2);
-  const sc = sheep.length;
-  const sheepCol = sc <= 3 ? (Math.floor(realTime * 4) % 2 ? '#ff5a5a' : '#ffffff') : '#ffffff';
-  drawText('x' + sc, 74, 5, sheepCol, {});
-  // ram cooldown meter (center)
-  const bx = W / 2 - 40, by = 4, bw = 80, bh = 7;
-  drawText('RAM', bx - 16, 5, '#c8b890', {});
-  ctx.fillStyle = '#000000';
-  ctx.fillRect(bx - 1, by - 1, bw + 2, bh + 2);
-  ctx.fillStyle = '#2a2018';
-  ctx.fillRect(bx, by, bw, bh);
-  let fill, col;
-  if (goat.ramT > 0) {
-    fill = 1;
-    col = '#ffffff';
-  } else if (goat.cd > 0) {
-    fill = 1 - goat.cd / RAM_COOLDOWN;
-    col = '#e07a30';
+  G = hctx;
+  hctx.clearRect(0, 0, W, H);
+  if (state === 'MENU') { drawMenu(); return; }
+  // minimal corner HUD
+  const active = sheep.filter(s => !s.penned).length;
+  G.drawImage(S.sheepIdle.r, 3, 3);
+  const low = active <= 3 && Math.floor(realTime * 4) % 2;
+  text(String(active), 12, 4, low ? 'r' : 'w', { shadow: 'k' });
+  if (mode === 'escort') {
+    text('PEN ' + mission.penned, 24, 4, 'y', { shadow: 'k' });
+    text('M' + mission.n, W - 3, 4, 'w', { align: 'right', shadow: 'k' });
   } else {
-    fill = 1;
-    col = Math.floor(realTime * 3) % 2 ? '#ffd84a' : '#ffe98a';
+    text('W' + wave.n, W - 3, 4, 'w', { align: 'right', shadow: 'k' });
   }
-  ctx.fillStyle = col;
-  ctx.fillRect(bx, by, Math.round(bw * fill), bh);
-  ctx.fillStyle = 'rgba(255,255,255,0.35)';
-  ctx.fillRect(bx, by, Math.round(bw * fill), 1);
-  // tick marks
-  ctx.fillStyle = 'rgba(0,0,0,0.35)';
-  for (let i = 1; i < 8; i++) ctx.fillRect(bx + i * 10, by + 1, 1, bh - 1);
-  if (goat.cd <= 0 && goat.ramT <= 0) drawText('READY', bx + bw + 6, 5, '#ffe98a', {});
-  // wave + time of day
-  drawText('WAVE ' + wave.n, W - 6, 5, '#ffffff', { align: 'right' });
-  const sunX = W - 64;
-  const sunCol = dayProgress < 0.5 ? '#ffe070' : (dayProgress < 0.85 ? '#ff9a50' : '#ff6a8a');
-  ctx.fillStyle = sunCol;
-  ctx.fillRect(sunX, 4, 5, 7);
-  ctx.fillRect(sunX - 1, 5, 7, 5);
-  // remaining enemies indicator
-  const left = wave.toSpawn + enemies.length;
-  if (wave.phase === 'active') drawText('FOES ' + left, sunX - 8, 5, '#d0a0a0', { align: 'right' });
-
-  // wave banners
-  if (wave.banner > 0) {
-    const t = wave.banner;
-    const slide = t > 2.0 ? (t - 2.0) * 5 : 0;
-    const y = 92 - slide * 40;
-    const a = Math.min(1, t * 2);
-    ctx.globalAlpha = a;
-    drawText(wave.bannerText, W / 2, y, '#fff6d8', { s: 4, align: 'center', outline: '#3a1a0c' });
-    drawText(wave.subText, W / 2, y + 28, '#ffd27a', { s: 1, align: 'center', outline: '#2a1208' });
-    ctx.globalAlpha = 1;
+  if (touch.used && state === 'PLAYING') { rect(W - 18, 3, 1, 5, 'w'); rect(W - 16, 3, 1, 5, 'w'); }
+  if (world.goal && state === 'PLAYING') edgeArrow(world.goal.x, world.goal.y, 'y', false);
+  for (const e of enemies) if (e.carry) edgeArrow(e.x, e.y, 'r', true);
+  if (banner.t > 0 && state === 'PLAYING' && !(banner.t < 0.4 && Math.floor(banner.t * 20) % 2)) {
+    text(banner.a, W / 2, 96, 'w', { s: 2, align: 'center', outline: 'k' });
+    text(banner.b, W / 2, 114, 'y', { align: 'center', outline: 'k' });
   }
-
-  // touch joystick
   if (touch.active) {
-    ctx.globalAlpha = 0.35;
-    ctx.fillStyle = '#ffffff';
-    for (let i = 0; i < 24; i++) {
-      const a = (i / 24) * Math.PI * 2;
-      ctx.fillRect(Math.round(touch.sx + Math.cos(a) * 16), Math.round(touch.sy + Math.sin(a) * 16), 1, 1);
-    }
+    for (let i = 0; i < 16; i++) { const a = i / 16 * Math.PI * 2; px(touch.sx + Math.cos(a) * 12, touch.sy + Math.sin(a) * 12, 'w'); }
     let dx = touch.cx - touch.sx, dy = touch.cy - touch.sy;
     const d = len(dx, dy);
-    if (d > 14) { dx = dx / d * 14; dy = dy / d * 14; }
-    ctx.fillRect(Math.round(touch.sx + dx - 4), Math.round(touch.sy + dy - 4), 8, 8);
-    ctx.globalAlpha = 1;
+    if (d > 10) { dx = dx / d * 10; dy = dy / d * 10; }
+    rect(touch.sx + dx - 2, touch.sy + dy - 2, 4, 4, 'w');
   }
-  if (muted) drawText('MUTED', W - 6, H - 9, '#ff9a9a', { align: 'right', shadow: '#000' });
-}
-
-function drawMenu() {
-  ctx.fillStyle = 'rgba(10,6,4,0.45)';
-  ctx.fillRect(0, 0, W, H);
-  const bob = Math.round(Math.sin(realTime * 2) * 2);
-  drawText('GOAT', W / 2, 30 + bob, '#fff1c8', { s: 6, align: 'center', outline: '#2a160a' });
-  drawText('GUARDIAN', W / 2, 66 + bob, '#ffcf5a', { s: 4, align: 'center', outline: '#2a160a' });
-  drawText('PROTECT THE FLOCK UNTIL SUNDOWN', W / 2, 96, '#e8dcc0', { align: 'center', shadow: '#000' });
-  // controls box
-  const bx = W / 2 - 110, by = 112;
-  drawPanel(bx, by, 220, 76);
-  drawText('WASD / ARROWS', bx + 10, by + 10, '#ffe98a', {});
-  drawText('MOVE', bx + 120, by + 10, '#ffffff', {});
-  drawText('SPACE / CLICK', bx + 10, by + 22, '#ffe98a', {});
-  drawText('RAM CHARGE', bx + 120, by + 22, '#ffffff', {});
-  drawText('TOUCH', bx + 10, by + 34, '#ffe98a', {});
-  drawText('L: MOVE  R: RAM', bx + 120, by + 34, '#ffffff', {});
-  drawText('P / M', bx + 10, by + 46, '#ffe98a', {});
-  drawText('PAUSE / MUTE', bx + 120, by + 46, '#ffffff', {});
-  drawText('RAM WOLVES + BATS BEFORE THEY', W / 2, by + 58, '#c8b890', { align: 'center' });
-  drawText('DRAG YOUR SHEEP INTO THE WOODS', W / 2, by + 66, '#c8b890', { align: 'center' });
-  if (Math.floor(realTime * 2) % 2 === 0) {
-    drawText(touch.used ? 'TAP TO START' : 'PRESS SPACE TO START', W / 2, 202, '#ffffff', { s: 2, align: 'center', outline: '#2a160a' });
-  }
-  if (best > 0) drawText('BEST: ' + best, W / 2, 226, '#ffd27a', { align: 'center', shadow: '#000' });
-  if (muted) drawText('MUTED', W - 6, H - 9, '#ff9a9a', { align: 'right', shadow: '#000' });
-}
-function drawGameOver() {
-  const t = realTime - gameOverTime;
-  ctx.fillStyle = 'rgba(20,4,12,' + Math.min(0.62, t * 0.8).toFixed(3) + ')';
-  ctx.fillRect(0, 0, W, H);
-  if (t < 0.3) return;
-  drawText('THE FLOCK', W / 2, 40, '#ffe0d0', { s: 4, align: 'center', outline: '#2a0a10' });
-  drawText('IS LOST', W / 2, 66, '#ff7a6a', { s: 4, align: 'center', outline: '#2a0a10' });
-  const bx = W / 2 - 90, by = 100;
-  drawPanel(bx, by, 180, 64);
-  drawText('ENEMIES RAMMED', bx + 12, by + 10, '#c8b890', {});
-  drawText(String(score), bx + 168, by + 10, '#fff3a8', { align: 'right' });
-  drawText('WAVES REACHED', bx + 12, by + 22, '#c8b890', {});
-  drawText(String(wave.n), bx + 168, by + 22, '#ffffff', { align: 'right' });
-  drawText('SHEEP RESCUED', bx + 12, by + 34, '#c8b890', {});
-  drawText(String(rescued), bx + 168, by + 34, '#9cff8a', { align: 'right' });
-  drawText('BEST SCORE', bx + 12, by + 46, '#c8b890', {});
-  drawText(String(best), bx + 168, by + 46, '#ffd27a', { align: 'right' });
-  drawText('FINAL SCORE ' + score, W / 2, 176, '#ffffff', { s: 2, align: 'center', outline: '#2a0a10' });
-  if (newBest && Math.floor(realTime * 4) % 2 === 0) drawText('NEW BEST!', W / 2, 196, '#ffe060', { align: 'center', outline: '#2a0a10' });
-  if (t > 0.9 && Math.floor(realTime * 2) % 2 === 0) {
-    drawText(touch.used ? 'TAP TO PLAY AGAIN' : 'PRESS R OR SPACE TO RESTART', W / 2, 216, '#ffffff', { s: 1, align: 'center', outline: '#2a0a10' });
-  }
+  if (paused) drawPause();
+  if (state === 'RESULTS') drawResults();
+  if (state === 'GAMEOVER') drawGameOver();
+  if (muted) text('MUTED', W - 3, H - 8, 'r', { align: 'right', shadow: 'k' });
 }
 function drawPause() {
-  ctx.fillStyle = 'rgba(0,0,0,0.5)';
-  ctx.fillRect(0, 0, W, H);
-  drawText('PAUSED', W / 2, 110, '#ffffff', { s: 4, align: 'center', outline: '#000' });
-  drawText(touch.used ? 'TAP TO RESUME' : 'PRESS P OR SPACE TO RESUME', W / 2, 140, '#ffe98a', { align: 'center', outline: '#000' });
+  ditherDim(true);
+  text('PAUSED', W / 2, 90, 'w', { s: 2, align: 'center', outline: 'k' });
+  text('SCORE ' + score, W / 2, 112, 'y', { align: 'center' });
+  text(touch.used ? 'TAP TO RESUME' : 'P OR ACTION: RESUME', W / 2, 128, 'w', { align: 'center' });
+  text('BACKSPACE / B: MENU', W / 2, 138, 'l', { align: 'center' });
+}
+function drawResults() {
+  ditherDim(stateTime > 0.3);
+  const total = mission.herdStart;
+  text('MISSION ' + mission.n, W / 2, 70, 'w', { s: 2, align: 'center', outline: 'k' });
+  text('COMPLETE', W / 2, 86, 'y', { s: 2, align: 'center', outline: 'k' });
+  text('DELIVERED', 30, 116, 'l', {}); text(mission.penned + '/' + total, W - 30, 116, 'w', { align: 'right' });
+  text('PREDATORS', 30, 128, 'l', {}); text(String(mission.kills), W - 30, 128, 'w', { align: 'right' });
+  text('SCORE', 30, 140, 'l', {}); text(String(score), W - 30, 140, 'y', { align: 'right' });
+  const stars = mission.penned >= total ? 3 : (mission.penned >= total * 0.66 ? 2 : 1);
+  for (let i = 0; i < 3; i++) text('*', W / 2 - 14 + i * 10, 154, i < stars ? 'y' : 'i', { s: 2 });
+  if (stateTime > 1.2 && Math.floor(realTime * 2) % 2 === 0) text('ACTION: NEXT MISSION', W / 2, 180, 'w', { align: 'center' });
+}
+function drawGameOver() {
+  ditherDim(stateTime > 0.3);
+  if (stateTime < 0.3) return;
+  text('THE FLOCK', W / 2, 60, 'w', { s: 2, align: 'center', outline: 'k' });
+  text('IS LOST', W / 2, 76, 'r', { s: 2, align: 'center', outline: 'k' });
+  let y = 104;
+  const row = (a, b, c) => { text(a, 26, y, 'l', {}); text(String(b), W - 26, y, c, { align: 'right' }); y += 11; };
+  row('SCORE', score, 'y');
+  if (mode === 'escort') { row('MISSION', mission.n, 'w'); row('DELIVERED', delivered, 'w'); }
+  else row('WAVE', wave.n, 'w');
+  row('RESCUED', rescued, 'w');
+  row('BEST', best[mode], 'y');
+  if (newBest && Math.floor(realTime * 4) % 2 === 0) text('NEW BEST!', W / 2, y + 4, 'y', { align: 'center', outline: 'k' });
+  if (stateTime > 1.0 && Math.floor(realTime * 2) % 2 === 0) {
+    text('R: RETRY', W / 2, y + 22, 'w', { align: 'center' });
+    text('ACTION: MENU', W / 2, y + 32, 'w', { align: 'center' });
+  }
+}
+function drawMenu() {
+  ditherDim(true);
+  const bob = Math.round(Math.sin(realTime * 2) * 1.5);
+  text('GOAT', W / 2, 14 + bob, 'w', { s: 4, align: 'center', outline: 'k' });
+  text('GUARDIAN', W / 2, 40 + bob, 'y', { s: 2, align: 'center', outline: 'k' });
+  text('AND THE HERDING DOG', W / 2, 60, 'l', { align: 'center', outline: 'k' });
+  // mode selector
+  rect(8, 82, W - 16, 18, 'k');
+  text('^', 14, 85, 'l', {});
+  text('^', W - 18, 85, 'l', {});
+  text(mode === 'escort' ? 'ESCORT' : 'DEFEND', W / 2, 85, 'y', { align: 'center' });
+  text(mode === 'escort' ? 'PIN TO PIN MISSIONS' : 'ENDLESS WAVES', W / 2, 92, 'l', { align: 'center' });
+  // player slots
+  for (let s = 0; s < 4; s++) {
+    const y = SLOT_Y0 + s * SLOT_H;
+    const p = players.find(q => q.slot === s);
+    rect(8, y, W - 16, SLOT_H - 4, 'k');
+    rect(8, y, 2, SLOT_H - 4, P_COL[s]);
+    text('P' + (s + 1), 14, y + 2, P_COL[s], {});
+    if (!p) {
+      if (Math.floor(realTime * 2 + s) % 2 === 0) text('PRESS ACTION', 30, y + 6, 'l', {});
+      text('TO JOIN', 30, y + 14, 's', {});
+      continue;
+    }
+    const sp = p.kind === 'goat' ? S.goatA : S.dogA;
+    rect(12, y + 9, 22, 16, 'g');
+    rect(12, y + 23, 22, 2, 'h');
+    G.drawImage(sp.r, 0, 0, sp.w, sp.h, 14, y + 10, sp.w * 2, sp.h * 2);
+    text(p.kind === 'goat' ? 'GOAT' : 'DOG', 38, y + 4, 'w', {});
+    text(p.kind === 'goat' ? 'RAM SMASHES FOES' : 'BARK MOVES HERD', 38, y + 11, 'l', {});
+    text(DEVICE_NAMES[p.dev] || p.dev, 38, y + 18, 's', {});
+    text(p.ready ? 'READY' : '< >', W - 12, y + 4, p.ready ? 'y' : 'l', { align: 'right' });
+  }
+  if (!players.length) {
+    if (Math.floor(realTime * 2) % 2 === 0) text('PRESS ACTION TO JOIN', W / 2, 240, 'w', { align: 'center', outline: 'k' });
+  } else {
+    const all = players.every(p => p.ready);
+    rect(30, 236, W - 60, 14, all ? 'y' : 'k');
+    text(all ? 'GO!' : 'ACTION: READY', W / 2, 241, all ? 'k' : 'w', { align: 'center' });
+  }
+  text('SPACE  ENTER  GAMEPAD  TAP', W / 2, 256, 's', { align: 'center', outline: 'k' });
+  text('L/R: GOAT OR DOG  U/D: MODE', W / 2, 264, 'l', { align: 'center', outline: 'k' });
+  if (best.escort || best.defend) text('BEST  ESCORT ' + best.escort + '  DEFEND ' + best.defend, W / 2, 276, 'y', { align: 'center', outline: 'k' });
+  else text('M: MUTE', W / 2, 276, 'l', { align: 'center', outline: 'k' });
 }
 
 function render() {
-  ctx.setTransform(1, 0, 0, 1, 0, 0);
-  ctx.globalAlpha = 1;
-  ctx.globalCompositeOperation = 'source-over';
-  ctx.fillStyle = '#10261f';
-  ctx.fillRect(0, 0, W, H);
-  const sx = shake > 0 ? Math.round(rr(-shake, shake)) : 0;
-  const sy = shake > 0 ? Math.round(rr(-shake, shake)) : 0;
-  ctx.setTransform(1, 0, 0, 1, sx, sy);
-  drawWorld();
-  ctx.setTransform(1, 0, 0, 1, 0, 0);
-  applyDayTint();
-  if (state === 'PLAYING') {
-    drawHUD();
-    if (paused) drawPause();
-  } else if (state === 'MENU') {
-    drawMenu();
-  } else if (state === 'GAMEOVER') {
-    drawHUD();
-    drawGameOver();
-  }
-  // present
+  const sx = shake > 0 ? rr(-shake, shake) : 0;
+  const sy = shake > 0 ? rr(-shake, shake) : 0;
+  const camX = cam.x + sx, camY = cam.y + sy;
+  const ix = Math.floor(camX), iy = Math.floor(camY);
+  camFracX = camX - ix; camFracY = camY - iy;
+  OX = ix - 1; OY = iy - 1;
+  drawWorldScene();
+  buildRemap(dayProgress);
+  applyRemap();
+  // fireflies glow over the swapped palette
+  bctx.fillStyle = PAL_DUSK.y;
+  for (const f of fireflies) if (Math.sin(f.ph) > -0.2) bctx.fillRect(wx(f.x), wy(f.y), 1, 1);
+  drawHUD();
+  // present: world with sub-pixel camera offset, then the HUD on top
   vctx.setTransform(1, 0, 0, 1, 0, 0);
   vctx.imageSmoothingEnabled = false;
-  vctx.drawImage(buf, 0, 0, view.width, view.height);
+  vctx.fillStyle = '#0c0816';
+  vctx.fillRect(0, 0, view.width, view.height);
+  const kx = view.width / W, ky = view.height / H;
+  vctx.drawImage(buf, 0, 0, BW, BH, (-1 - camFracX) * kx, (-1 - camFracY) * ky, BW * kx, BH * ky);
+  vctx.drawImage(hud, 0, 0, W, H, 0, 0, view.width, view.height);
 }
 
 // ---------------------------------------------------------------------
-// Main loop
+// Boot
 // ---------------------------------------------------------------------
-spawnHerd();
+world = renderWorld(makeDefendWorld(4242));
+const menuWorld = world;
+spawnHerd(world.start.x, world.start.y, 10);
+snapCam(world.start.x, world.start.y);
 let lastTs = null;
 function frame(ts) {
   if (lastTs === null) lastTs = ts;
