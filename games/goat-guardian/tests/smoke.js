@@ -1,7 +1,7 @@
-// Headless smoke test for Goat Guardian v0.3: node tests/smoke.js (needs Playwright + Chromium).
+// Headless smoke test for Goat Guardian v0.4: node tests/smoke.js (needs Playwright + Chromium).
 // Title -> Mode -> Players (2 keyboard players) -> escort, forces a ram and a bark, pens the herd,
 // advances a mission, runs 4-player defend, triggers game over, checks 6-direction facing and
-// adaptive resolution, and reports page errors.
+// adaptive resolution, starts and exits the attract-mode demo, and reports page errors.
 const path = require('path');
 const { chromium } = require('playwright');
 (async () => {
@@ -57,6 +57,15 @@ const { chromium } = require('playwright');
   st = await p.evaluate(() => state); if (st !== 'GAMEOVER') fail('game over ' + st);
   await p.keyboard.press('s'); await p.keyboard.press('s'); await p.keyboard.press('Space'); // TITLE
   st = await p.evaluate(() => state); if (st !== 'TITLE') fail('back to title ' + st);
+  // attract-mode demo: plays itself with AI shepherds, any key returns to the title
+  await p.evaluate(() => { ui.cursor = 1; });
+  await p.keyboard.press('Space');                 // WATCH DEMO
+  await p.waitForTimeout(3000);
+  st = await p.evaluate(() => ({ on: showcase.on, state, n: players.length, ai: players.every(q => q.dev.startsWith('ai')) }));
+  if (!st.on || st.state !== 'PLAYING' || !st.ai) fail('demo ' + JSON.stringify(st));
+  await p.keyboard.press('Space');
+  st = await p.evaluate(() => ({ on: showcase.on, state, real: players.every(q => !q.dev.startsWith('ai')) }));
+  if (st.on || st.state !== 'TITLE' || !st.real) fail('demo exit ' + JSON.stringify(st));
   const wasFs = await p.evaluate(() => isFs());
   await p.evaluate(() => exitFs());
   await p.waitForTimeout(300);

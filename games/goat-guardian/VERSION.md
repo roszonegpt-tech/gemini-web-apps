@@ -1,5 +1,5 @@
 # Version
 
-- **Version:** 0.3.0
-- **Build:** 3
+- **Version:** 0.4.0
+- **Build:** 4
 - **Last updated:** 2026-11-05

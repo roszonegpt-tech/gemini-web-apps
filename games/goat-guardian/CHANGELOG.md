@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-11-05
+### Added
+- Attract-mode gameplay demo ("WATCH DEMO" on the title, and automatically after 30 s idle): AI goats and dogs play three scenes: Escort (goat leads, dog drives, the herd is penned), Defend with 4-player co-op at sunset, and Nightfall (wave 8, alphas and bat swarms).
+- Units are labelled the first time they appear in a scene (goat, dog, sheep, shadow wolf, alpha wolf, bat). A caption bar shows the scene title and progress. Any button exits the demo.
+- Shepherd AI: goats hunt predators and walk the path ahead of the flock; dogs gather stragglers, drive the herd from behind, and bark at predators.
+- The demo uses a seeded RNG so it plays out the same way each time.
+
 ## [0.3.0] - 2026-11-05
 ### Added
 - 6-direction facing sprites (N, S, NE, NW, SE, SW) for goat, dog, sheep and wolves, including front/back ram and bark poses.

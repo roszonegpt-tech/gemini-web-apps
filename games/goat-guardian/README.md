@@ -12,6 +12,9 @@ All art is drawn from pixel matrices in code, and all sound is synthesized with 
 - **Escort**: drive the herd from the start pin (bottom) through the woods to the pen at the red pin (top). Sheep that enter the pen are safe. A mission is complete when every remaining sheep is penned. The next mission is longer and harder, and its herd is the sheep you delivered plus 2 lambs.
 - **Defend**: endless waves around a stone henge. Clearing a wave returns 1 lamb.
 
+## Demo
+Choose **Watch Demo** on the title screen, or leave the title screen idle for 30 seconds. AI goats and dogs then play Escort, 4-player Defend and Nightfall, with on-screen labels for every unit. Press any button to exit.
+
 ## Characters
 | | Goat | Dog |
 |---|---|---|

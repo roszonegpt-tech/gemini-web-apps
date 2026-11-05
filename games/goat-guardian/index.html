@@ -86,7 +86,8 @@ function mulberry32(seed) {
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
 }
-const rand = Math.random;
+let rngFn = Math.random;
+function rand() { return rngFn(); }
 function rr(a, b) { return a + rand() * (b - a); }
 function pick(arr) { return arr[Math.floor(rand() * arr.length)]; }
 function clamp(v, a, b) { return v < a ? a : (v > b ? b : v); }
@@ -1476,9 +1477,10 @@ function updateSheep(dt) {
 // ---------------------------------------------------------------------
 // Enemies: shadow wolves (from the forest) and bats (from the sky)
 // ---------------------------------------------------------------------
-function spawnEnemy(level) {
+function spawnEnemy(level, force) {
   const hc = herdCenter();
-  const batChance = level < 2 ? 0 : Math.min(0.45, 0.15 + level * 0.05);
+  let batChance = level < 2 ? 0 : Math.min(0.45, 0.15 + level * 0.05);
+  if (force) batChance = force.type === 'bat' ? 1 : 0;
   const base = { vx: 0, vy: 0, fx: 1, fy: 0.3, t: 0, fear: 0, anim: rand() * 6, hits: {}, carry: null, flash: 0, phase: rand() * 6.28 };
   if (rand() < batChance) {
     const a = rand() * Math.PI * 2;
@@ -1488,7 +1490,7 @@ function spawnEnemy(level) {
       speed: Math.min(62, 34 + level * 3), accel: 120, alt: 10, alpha: false }));
   } else {
     const p = forestSpawn(hc.x, hc.y, 100, Math.max(170, Math.max(W, H) * 0.6));
-    const alpha = level >= 3 && rand() < Math.min(0.4, (level - 2) * 0.09);
+    const alpha = force ? !!force.alpha : (level >= 3 && rand() < Math.min(0.4, (level - 2) * 0.09));
     enemies.push(Object.assign({}, base, { type: 'wolf', x: p.x, y: p.y, state: 'emerge', t: 1.0, hp: alpha ? 2 : 1,
       speed: Math.min(76, 42 + level * 3.2) * (alpha ? 0.92 : 1), accel: 200, alt: 0, alpha: alpha }));
   }
@@ -1770,6 +1772,265 @@ function updateFireflies(dt) {
 }
 
 // ---------------------------------------------------------------------
+// Showcase: attract-mode demo with AI shepherds (all modes and units)
+// ---------------------------------------------------------------------
+const showcase = { on: false, i: -1, t: 0, day: 0, saved: null, events: [], doneT: -1 };
+const aiVec = {};
+let lastInput = 0;
+const UNIT_TAGS = {
+  goat: ['GOAT', 'y'], dog: ['HERDING DOG', 'y'], sheep: ['SHEEP', 'w'],
+  wolf: ['SHADOW WOLF', 'r'], alpha: ['ALPHA WOLF', 'y'], bat: ['BAT', 'r']
+};
+function tag(o, label, col, t) { o.tag = label; o.tagCol = col; o.tagT = t || 2.6; }
+function aiPlayers(kinds) {
+  players = kinds.map((k, i) => {
+    const p = { slot: i, dev: 'ai' + i, kind: k, ready: true };
+    makePlayerBody(p, 0, 0);
+    aiVec[p.dev] = { x: 0, y: 0 };
+    return p;
+  });
+}
+function resetRunState() {
+  score = 0; rescued = 0; delivered = 0; lostCount = 0; gameOverDelay = 0; newBest = false;
+  enemies = []; particles = []; texts = []; fireflies = [];
+  paused = false; hitStop = 0;
+}
+const SCENES = [
+  {
+    title: 'ESCORT MODE', sub: 'GOAT LEADS  -  DOG DRIVES', dur: 40, day: 0,
+    setup() {
+      mode = 'escort';
+      resetRunState();
+      world = renderWorld(makeEscortWorld(2, 7777));
+      Object.assign(mission, { n: 2, herdStart: 10, penned: 0, time: 0, kills: 0, interval: 3.0, cap: 4, spawnT: 99 });
+      const p = world.path[Math.floor(world.path.length * 0.72)];
+      spawnHerd(p.x, p.y, 10);
+      aiPlayers(['goat', 'dog']);
+      placePlayers(p.x, p.y);
+      snapCam(p.x, p.y);
+      banner = { t: 3, a: 'ESCORT', b: 'HERD THE FLOCK TO THE RED PIN' };
+      tag(sheep[0], 'SHEEP', 'w', 3.5);
+      return [
+        { at: 1.2, run: () => spawnEnemy(2, { type: 'wolf' }) },
+        { at: 5.5, run: () => spawnEnemy(2, { type: 'bat' }) },
+        { at: 9.0, run: () => spawnEnemy(3, { type: 'wolf', alpha: true }) },
+        { at: 12.0, run: () => { mission.spawnT = 2; } }
+      ];
+    }
+  },
+  {
+    title: 'DEFEND MODE', sub: '4 PLAYER CO-OP  -  2 GOATS + 2 DOGS', dur: 28, day: 0.55,
+    setup() {
+      mode = 'defend';
+      resetRunState();
+      world = renderWorld(makeDefendWorld(4242));
+      spawnHerd(world.start.x, world.start.y, 12);
+      aiPlayers(['goat', 'dog', 'goat', 'dog']);
+      placePlayers(world.start.x, world.start.y);
+      snapCam(world.start.x, world.start.y);
+      startWave(4);
+      wave.toSpawn = 12; wave.interval = 1.3;
+      banner = { t: 3, a: 'DEFEND', b: 'HOLD THE HENGE AT SUNSET' };
+      return [
+        { at: 0.5, run: () => spawnEnemy(4, { type: 'wolf', alpha: true }) },
+        { at: 1.5, run: () => spawnEnemy(4, { type: 'bat' }) },
+        { at: 2.5, run: () => spawnEnemy(4, { type: 'wolf' }) },
+        { at: 3.5, run: () => spawnEnemy(4, { type: 'bat' }) }
+      ];
+    }
+  },
+  {
+    title: 'NIGHTFALL', sub: 'THE PACK GROWS AFTER DARK', dur: 26, day: 1.0,
+    setup() {
+      // continue in the same henge: keep the flock, crank the waves
+      resetRunState();
+      if (!world || world.kind !== 'defend') world = renderWorld(makeDefendWorld(4242));
+      if (sheep.length < 8) spawnHerd(world.start.x, world.start.y, 12);
+      startWave(8);
+      wave.toSpawn = 18; wave.interval = 0.8;
+      banner = { t: 3, a: 'NIGHTFALL', b: 'WAVE 8  -  ALPHAS + BAT SWARMS' };
+      return [
+        { at: 0.5, run: () => { spawnEnemy(8, { type: 'bat' }); spawnEnemy(8, { type: 'bat' }); } },
+        { at: 1.5, run: () => { spawnEnemy(8, { type: 'wolf', alpha: true }); spawnEnemy(8, { type: 'wolf', alpha: true }); } },
+        { at: 4.0, run: () => { spawnEnemy(8, { type: 'wolf' }); spawnEnemy(8, { type: 'bat' }); } }
+      ];
+    }
+  }
+];
+function startShowcase() {
+  if (!showcase.on) showcase.saved = players;
+  rngFn = mulberry32(20261105);   // repeatable demo
+  showcase.on = true;
+  showcase.i = -1;
+  nextScene();
+}
+function nextScene() {
+  showcase.i++;
+  if (showcase.i >= SCENES.length) { endShowcase(); return; }
+  const sc = SCENES[showcase.i];
+  showcase.t = 0;
+  showcase.doneT = -1;
+  showcase.day = sc.day;
+  goScreen('PLAYING');
+  showcase.events = sc.setup();
+  dayTarget = sc.day;
+  if (showcase.i === 0) dayProgress = sc.day;
+  players.forEach(p => tag(p, (p.kind === 'goat' ? 'GOAT' : 'DOG') + ' P' + (p.slot + 1), P_COL[p.slot], 3));
+  showcase.seen = {};
+}
+function endShowcase() {
+  showcase.on = false;
+  rngFn = Math.random;
+  players = showcase.saved || [];
+  for (const p of players) p.ready = false;
+  toTitle();
+  lastInput = realTime;
+}
+function updateShowcase(dt) {
+  const sc = SCENES[showcase.i];
+  if (!sc) return;
+  showcase.t += dt;
+  dayTarget = sc.day;
+  dayProgress += (sc.day - dayProgress) * damp(1.2, dt);
+  for (const ev of showcase.events) if (!ev.done && showcase.t >= ev.at) { ev.done = true; ev.run(); }
+  // label each unit type the first time it shows up in a scene
+  for (const e of enemies) {
+    if (e.tagged || e.state === 'emerge' || canopy(e.x, e.y)) continue;
+    const key = e.type === 'bat' ? 'bat' : (e.alpha ? 'alpha' : 'wolf');
+    e.tagged = true;
+    if (!showcase.seen[key]) { showcase.seen[key] = true; tag(e, UNIT_TAGS[key][0], UNIT_TAGS[key][1], 2.8); }
+  }
+  for (const o of players.concat(enemies, sheep)) if (o.tagT > 0) o.tagT -= dt;
+  if (state === 'PLAYING' && paused) paused = false;
+  if (state === 'RESULTS' || state === 'GAMEOVER') {
+    if (showcase.doneT < 0) showcase.doneT = showcase.t;
+    if (showcase.t - showcase.doneT > 3.2) nextScene();
+    return;
+  }
+  if (showcase.t > sc.dur) nextScene();
+}
+function drawShowcaseCaption() {
+  const sc = SCENES[showcase.i];
+  if (!sc) return;
+  const h = 24, y = H - h;
+  rect(0, y, W, h, 'k');
+  rect(0, y, W, 1, 'i');
+  rect(4, y + 5, 22, 9, 'r');
+  text('DEMO', 15, y + 7, 'w', { align: 'center' });
+  text(sc.title, 31, y + 5, 'y');
+  text(sc.sub, 31, y + 13, 'l');
+  text((showcase.i + 1) + '/' + SCENES.length, W - 4, y + 5, 's', { align: 'right' });
+  if (W >= 260) text('ANY BUTTON: EXIT', W - 4, y + 13, 'i', { align: 'right' });
+  // scene progress bar
+  const f = clamp(showcase.t / sc.dur, 0, 1);
+  rect(0, y - 1, Math.round(W * f), 1, 'y');
+}
+
+// AI shepherds: goats hunt predators and lead the flock, dogs press it toward the goal
+function steerVec(p, tx, ty) {
+  let dx = tx - p.x, dy = ty - p.y;
+  const d = len(dx, dy);
+  if (d < 2) return { x: 0, y: 0 };
+  dx /= d; dy /= d;
+  // simple obstacle probe: try rotating the heading if the way ahead is blocked
+  if (blocked(p.x + dx * 7, p.y + dy * 7)) {
+    for (const a of [0.7, -0.7, 1.4, -1.4, 2.1, -2.1]) {
+      const c = Math.cos(a), s = Math.sin(a);
+      const nx = dx * c - dy * s, ny = dx * s + dy * c;
+      if (!blocked(p.x + nx * 7, p.y + ny * 7)) { dx = nx; dy = ny; break; }
+    }
+  }
+  const m = Math.min(1, d / 14);
+  return { x: dx * m, y: dy * m };
+}
+function updateAI(dt) {
+  const hc = herdCenter();
+  let ahead = null;
+  if (world.goal) {
+    let bi = 0, bd = 1e9;
+    for (let i = 0; i < world.path.length; i += 3) {
+      const q = world.path[i];
+      const d = (q.x - hc.x) * (q.x - hc.x) + (q.y - hc.y) * (q.y - hc.y);
+      if (d < bd) { bd = d; bi = i; }
+    }
+    ahead = world.path[Math.min(world.path.length - 1, bi + 40)];
+    var lead = world.path[Math.min(world.path.length - 1, bi + 16)];
+    if (len(world.goal.x - hc.x, world.goal.y - hc.y) < 90) ahead = world.goal;
+  }
+  // herd spread: farthest unpenned sheep from the herd centre
+  let far = null, farD = 0;
+  for (const sh of sheep) {
+    if (sh.penned) continue;
+    const d = len(sh.x - hc.x, sh.y - hc.y);
+    if (d > farD) { farD = d; far = sh; }
+  }
+  const threats = enemies.filter(e => (e.state === 'hunt' || e.state === 'carry' || e.state === 'stun') && !canopy(e.x, e.y));
+  for (const p of players) {
+    if (!p.dev.startsWith('ai')) continue;
+    let near = null, nd = 1e9;
+    for (const e of threats) {
+      const dh = Math.min(len(e.x - hc.x, e.y - hc.y), e.carry ? 0 : 1e9);
+      const d = len(e.x - p.x, e.y - p.y);
+      const score = Math.min(d, dh + 20);
+      if (score < nd) { nd = score; near = e; }
+    }
+    let tx = p.x, ty = p.y;
+    const phase = realTime * 0.8 + p.slot * 1.6;
+    if (p.kind === 'goat') {
+      if (near && (nd < 120 || near.carry)) {
+        tx = near.x + near.vx * 0.25; ty = near.y + near.vy * 0.25;
+        const d = len(near.x - p.x, near.y - p.y);
+        if (d < 30 && p.cd <= 0 && p.ramT <= 0) {
+          aiVec[p.dev] = { x: (near.x - p.x) / (d || 1), y: (near.y - p.y) / (d || 1) };
+          p.fx = aiVec[p.dev].x; p.fy = aiVec[p.dev].y;
+          tryRam(p);
+          continue;
+        }
+      } else if ((ahead && ahead === world.goal)) {
+        tx = world.goal.x; ty = world.goal.y - 4;      // stand in the pen: sheep follow the goat in
+      } else if (ahead && lead) {
+        // walk the path a little ahead of the flock so the sheep follow it round bends
+        tx = lead.x; ty = lead.y;
+        const ld = len(tx - hc.x, ty - hc.y);
+        if (ld > 40) { tx = hc.x + (tx - hc.x) / ld * 40; ty = hc.y + (ty - hc.y) / ld * 40; }
+      } else {
+        tx = hc.x + Math.cos(phase) * 30; ty = hc.y + Math.sin(phase) * 22;
+      }
+    } else {
+      const d = near ? len(near.x - p.x, near.y - p.y) : 1e9;
+      if (near && d < BARK_RADIUS - 8 && p.cd <= 0) { tryBark(p); }
+      let straggler = null;
+      if ((ahead && ahead === world.goal)) {
+        let fd = 0;
+        for (const sh of sheep) {
+          if (sh.penned) continue;
+          const d2 = len(sh.x - world.goal.x, sh.y - world.goal.y);
+          if (d2 > fd) { fd = d2; straggler = sh; }
+        }
+      }
+      if (near && (nd < 90 || near.carry)) { tx = near.x; ty = near.y; }
+      else if (far && farD > 36 && !(ahead && ahead === world.goal)) {
+        // gather: get behind the straggler and push it back to the flock
+        const dx = far.x - hc.x, dy = far.y - hc.y, l = len(dx, dy) || 1;
+        tx = far.x + dx / l * 14; ty = far.y + dy / l * 14;
+      } else if (straggler) {
+        const dx = straggler.x - world.goal.x, dy = straggler.y - world.goal.y, l = len(dx, dy) || 1;
+        tx = straggler.x + dx / l * 16; ty = straggler.y + dy / l * 16;   // get behind it, push it in
+      } else if (ahead) {
+        const dx = ahead.x - hc.x, dy = ahead.y - hc.y, l = len(dx, dy) || 1;
+        const sway = Math.sin(realTime * 1.3 + p.slot) * 16;
+        tx = hc.x - dx / l * 22 + (-dy / l) * sway; ty = hc.y - dy / l * 22 + (dx / l) * sway;
+        // nudge stragglers with an occasional bark when tight behind the herd
+        if (len(hc.x - p.x, hc.y - p.y) < 34 && p.cd <= 0 && rand() < dt * 0.6) tryBark(p);
+      } else {
+        tx = hc.x + Math.cos(-phase) * 44; ty = hc.y + Math.sin(-phase) * 34;
+      }
+    }
+    aiVec[p.dev] = steerVec(p, tx, ty);
+  }
+}
+
+// ---------------------------------------------------------------------
 // Screens & menus
 // ---------------------------------------------------------------------
 function goScreen(s) {
@@ -1832,6 +2093,7 @@ function screenItems() {
   switch (state) {
     case 'TITLE': return [
       { label: 'PLAY', select: () => { autoFs(); goScreen('MODE'); } },
+      { label: 'WATCH DEMO', select: () => startShowcase() },
       { label: 'HOW TO PLAY', select: () => goScreen('HOWTO') },
       { label: 'OPTIONS', select: () => { optionsFrom = 'TITLE'; goScreen('OPTIONS'); } }
     ];
@@ -1911,6 +2173,11 @@ function playersEvent(ev) {
 // Single entry point for all input (called synchronously from DOM handlers,
 // so fullscreen requests count as user gestures).
 function dispatch(ev) {
+  lastInput = realTime;
+  if (showcase.on) {
+    if (['action', 'back', 'pause', 'tap', 'restart'].includes(ev.type)) endShowcase();
+    return;
+  }
   if (ev.type === 'fullscreen') { toggleFs(); return; }
   if (ev.type === 'mute') { setSound(!settings.sound); return; }
   if (state === 'PLAYERS') { playersEvent(ev); return; }
@@ -2038,6 +2305,7 @@ function readMove(dev) {
   let x = 0, y = 0;
   const L = () => { if (keys['a']) x -= 1; if (keys['d']) x += 1; if (keys['w']) y -= 1; if (keys['s']) y += 1; };
   const R = () => { if (keys['arrowleft']) x -= 1; if (keys['arrowright']) x += 1; if (keys['arrowup']) y -= 1; if (keys['arrowdown']) y += 1; };
+  if (dev.startsWith('ai')) return aiVec[dev] || { x: 0, y: 0 };
   if (dev === 'kbL') { L(); if (kbOtherFree('kbL')) R(); }
   else if (dev === 'kbR') { R(); if (kbOtherFree('kbR')) L(); }
   else if (dev === 'touch') {
@@ -2080,6 +2348,8 @@ function update(dt) {
   realTime += dt;
   stateTime += dt;
   pollPads();
+  if (state === 'TITLE' && !showcase.on && realTime - lastInput > 30 && stateTime > 30) startShowcase();
+  if (showcase.on) updateShowcase(dt);
   dayProgress += (dayTarget - dayProgress) * damp(0.5, dt);
   if (shake > 0) shake = Math.max(0, shake - dt * 14);
   if (isMenu()) {
@@ -2099,6 +2369,7 @@ function update(dt) {
   if (state === 'PLAYING') {
     if (paused) return;
     if (hitStop > 0) { hitStop -= dt; updateParticles(dt * 0.25); return; }
+    if (showcase.on) updateAI(dt);
     updatePlayers(dt);
     checkRamHits();
     updateSheep(dt);
@@ -2107,6 +2378,7 @@ function update(dt) {
     if (state === 'PLAYING') checkGameOver(dt);
     if (banner.t > 0) banner.t -= dt;
   } else {
+    if (showcase.on) updateAI(dt);
     updatePlayers(dt);
     updateSheep(dt);
     updateEnemies(dt);
@@ -2193,6 +2465,14 @@ function drawWorldScene() {
     } else {
       if (p.life / p.max < 0.3 && Math.floor(p.life * 30) % 2) continue;
       px(wx(p.x), wy(p.y), p.col);
+    }
+  }
+  if (showcase.on) {
+    for (const o of players.concat(enemies, sheep)) {
+      if (!(o.tagT > 0) || o.state === 'emerge' || (o.type === 'wolf' && canopy(o.x, o.y))) continue;
+      const x = wx(o.x), y = wy(o.y - (o.alt || 0)) - 16;
+      text(o.tag, x, y, o.tagCol || 'w', { align: 'center', outline: 'k' });
+      px(x, y + 7, o.tagCol || 'w'); px(x, y + 8, o.tagCol || 'w');
     }
   }
   for (const t of texts) {
@@ -2341,6 +2621,7 @@ function drawHUD() {
   }
   if (state === 'PLAYING' && paused) drawPause();
   if (state === 'RESULTS') drawResults();
+  if (showcase.on) drawShowcaseCaption();
   if (state === 'GAMEOVER') drawGameOver();
 }
 function colW() { return Math.min(W - 16, 168); }
@@ -2351,14 +2632,14 @@ function drawTitle() {
   text('GUARDIAN', W / 2, cy0 + big * 5 + 6, 'y', { s: 2, align: 'center', outline: 'k' });
   text('A HERDING TALE', W / 2, cy0 + big * 5 + 22, 'l', { align: 'center', outline: 'k' });
   const w = Math.min(W - 24, 120);
-  const y = Math.max(cy0 + big * 5 + 40, Math.round(H * 0.56));
-  rect(Math.round(W / 2 - w / 2) - 2, y - 2, w + 4, 3 * 14 + 2, 'k');
+  const y = Math.max(cy0 + big * 5 + 36, Math.min(Math.round(H * 0.52), H - 80));
+  rect(Math.round(W / 2 - w / 2) - 2, y - 2, w + 4, 4 * 14 + 2, 'k');
   drawList(screenItems(), W / 2, y, w, 14);
   const fy = H - 10;
   rect(0, fy - 3, W, 13, 'k');
   if (best.escort || best.defend) text('BEST  ESCORT ' + best.escort + '  DEFEND ' + best.defend, W / 2, fy, 'y', { align: 'center' });
   else text('1-4 PLAYERS  GOATS AND DOGS', W / 2, fy, 's', { align: 'center' });
-  text('V0.3', W - 3, fy - 12, 'i', { align: 'right', outline: 'k' });
+  text('V0.4', W - 3, fy - 12, 'i', { align: 'right', outline: 'k' });
 }
 function drawModeSelect() {
   screenBg();
