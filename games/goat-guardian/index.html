@@ -36,42 +36,33 @@
 </style>
 </head>
 <body>
-<div id="stage"><canvas id="game" tabindex="0" aria-label="Goat Guardian game. Press Space, Enter or a gamepad button to join."></canvas></div>
+<div id="stage"><canvas id="game" tabindex="0" aria-label="Goat Guardian game. Use arrows or WASD and Space or Enter to choose menu options."></canvas></div>
 <script>
 'use strict';
 
 /* =====================================================================
-   GOAT GUARDIAN  v0.2.0
-   Lo-fi portrait herding game. Up to 4 local players (goat or dog).
-   - 160x288 internal portrait buffer, smooth follow camera with
-     sub-pixel presentation, scrolling procedural worlds.
-   - Restricted 12-colour palette; day -> sunset -> dusk is a true
-     per-pixel palette swap of the rendered frame.
-   - Modes: ESCORT (drive the herd from the start pin to the pen at
-     the red pin) and DEFEND (endless waves around a stone henge).
+   GOAT GUARDIAN  v0.3.0
+   Lo-fi herding game for 1-4 local players (any mix of goat and dog).
+   - Adaptive low-res buffer: integer pixel scale, width/height follow the
+     screen so the game fills it (portrait or landscape).
+   - Smooth follow camera with sub-pixel presentation over scrolling worlds.
+   - Restricted 12-colour palette; day -> sunset -> dusk is a per-pixel
+     palette swap of every rendered frame.
+   - 6-direction sprites (N, S, NE, NW, SE, SW) for every animal.
+   - Screens: TITLE, MODE, PLAYERS, OPTIONS, HOWTO, PLAYING, RESULTS, GAMEOVER.
    - All art from pixel matrices, all audio synthesized (Web Audio).
    ===================================================================== */
 
 // ---------------------------------------------------------------------
-// Canvases
+// Canvases (sizes set by resize())
 // ---------------------------------------------------------------------
-const W = 160;
-const H = 288;
-const BW = W + 2;
-const BH = H + 2;
-
+let W = 160, H = 288, BW = W + 2, BH = H + 2, PIX = 1;
 const view = document.getElementById('game');
 const vctx = view.getContext('2d');
 const buf = document.createElement('canvas');
-buf.width = BW;
-buf.height = BH;
 const bctx = buf.getContext('2d', { willReadFrequently: true });
-bctx.imageSmoothingEnabled = false;
 const hud = document.createElement('canvas');
-hud.width = W;
-hud.height = H;
 const hctx = hud.getContext('2d');
-hctx.imageSmoothingEnabled = false;
 let G = bctx; // current draw target for sprite/text helpers
 
 function makeCanvas(w, h) {
@@ -81,24 +72,6 @@ function makeCanvas(w, h) {
   c.getContext('2d').imageSmoothingEnabled = false;
   return c;
 }
-
-function resize() {
-  const stage = document.getElementById('stage');
-  const ww = stage.clientWidth || window.innerWidth;
-  const wh = stage.clientHeight || window.innerHeight;
-  let s = Math.min(ww / W, wh / H);
-  if (s >= 2 && Math.floor(s) / s > 0.88) s = Math.floor(s);
-  const cssW = Math.max(1, Math.floor(W * s));
-  const cssH = Math.max(1, Math.floor(H * s));
-  const dpr = window.devicePixelRatio || 1;
-  view.style.width = cssW + 'px';
-  view.style.height = cssH + 'px';
-  view.width = Math.max(1, Math.round(cssW * dpr));
-  view.height = Math.max(1, Math.round(cssH * dpr));
-  vctx.imageSmoothingEnabled = false;
-}
-window.addEventListener('resize', resize);
-resize();
 
 // ---------------------------------------------------------------------
 // Math / RNG
@@ -255,37 +228,93 @@ function spr(rows) {
     wr: recolor(r, 'w'), wl: recolor(l, 'w'), w: r.width, h: r.height
   };
 }
-const S = {};
-// Sheep (7x6)
-S.sheepIdle = spr(['..ww...', '.wwwwkk', 'wwwwwkk', 'wwwwww.', '.llll..', '.k..k..']);
-S.sheepWalk = spr(['..ww...', '.wwwwkk', 'wwwwwkk', 'wwwwww.', '.llll..', 'k...k..']);
-S.sheepGrazeA = spr(['..ww...', '.wwww..', 'wwwwwk.', 'wwwwwkk', '.llll..', '.k..k..']);
-S.sheepGrazeB = spr(['..ww...', '.wwww..', 'wwwww..', 'wwwwwkk', '.llllk.', '.k..k..']);
-S.sheepPanic = spr(['..ww.kk', '.wwwwkk', 'wwwwww.', 'wwwwww.', '.llll..', 'k.k..k.']);
-// Goat (9x7)
-S.goatA = spr(['....ll...', '...l..nn.', '......nkn', 'nnnnnnnn.', 'nnnnnnbw.', '.bbbbb...', '.k.k.k.k.']);
-S.goatB = spr(['....ll...', '...l..nn.', '......nkn', 'nnnnnnnn.', 'nnnnnnbw.', '.bbbbb...', 'k..k..k.k']);
-S.goatRam = spr(['.........', '...ll....', 'nnnnl.ll.', 'nnnnnnnn.', 'nnnnnnnkn', '.bbbbb.w.', 'k..k.k..k']);
-// Dog, border collie (9x6)
-S.dogA = spr(['......k.k', 'w.....kkk', '.k....kwk', '.kkkkkkww', '.kkwwwk..', '.k.k..k.k']);
-S.dogB = spr(['......k.k', '.w....kkk', '.k....kwk', '.kkkkkkww', '.kkwwwk..', 'k..k.k..k']);
-S.dogBark = spr(['.....k.k.', 'w....kkk.', '.k...kwkw', '.kkkkkkw.', '.kkwwwk.w', '.k.k..k.k']);
-// Wolf (11x5)
-S.wolfA = spr(['.........i.', 'i.......iri', '.iiiiiiiiik', '.kiiiiiiik.', '.k.k..k.k..']);
-S.wolfB = spr(['.........i.', 'i.......iri', '.iiiiiiiiik', '.kiiiiiiik.', 'k...kk...k.']);
-S.alphaA = spr(['.........k.', 'k.......kyk', '.kkkkkkkkki', '.ikkkkkkki.', '.i.i..i.i..']);
-S.alphaB = spr(['.........k.', 'k.......kyk', '.kkkkkkkkki', '.ikkkkkkki.', 'i...ii...i.']);
-// Bat (7x4)
-S.batUp = spr(['i.....i', 'ii...ii', '.iikii.', '..krk..']);
-S.batDown = spr(['..kkk..', '.iirii.', 'ii...ii', 'i.....i']);
-// Structures
-S.pillar = spr([
-  'llllll', 'wwwwwl', '.wwwl.', '.wwwl.', '.wlwl.', '.wwll.', '.wwwl.', '.wwwl.',
-  '.wwwl.', '.lwwl.', '.wwwl.', 'lwwwwl', 'llllll'
-]);
-S.pillarBroken = spr(['..w...', '.wwl..', '.wwwl.', '.wlwl.', '.wwwl.', '.wwll.', 'lwwwwl', 'llllll']);
-S.pinGoal = spr(['.rrr.', 'rrwrr', 'rrrrr', '.rrr.', '..r..', '..k..']);
-S.pinStart = spr(['.lll.', 'llwll', 'lllll', '.lll.', '..l..', '..k..']);
+function walkPair(top, a, b) { return [spr(top.concat([a])), spr(top.concat([b]))]; }
+function swapRows(rows, map) { return rows.map(r => r.replace(/./g, c => map[c] || c)); }
+
+// Each animal: SE (side, face visible), NE (side, turned away), S (front), N (back).
+// NW / SW are mirrored SE / NE, giving 6 facing directions.
+const SP = {};
+{
+  // Sheep
+  const sideTop = ['..ww...', '.wwwwkk', 'wwwwwkk', 'wwwwww.', '.llll..'];
+  const sideBackTop = ['.....k.', '..wwwkk', '.wwwwwk', 'wwwwwww', '.llll..'];
+  const frontTop = ['.wwww.', 'wwwwww', 'wwkkww', 'wwkkww', '.llll.'];
+  const backTop = ['..kk..', '.wwww.', 'wwwwww', 'wwwwww', '.llll.'];
+  SP.sheep = {
+    SE: walkPair(sideTop, '.k..k..', 'k...k..'),
+    NE: walkPair(sideBackTop, '.k..k..', 'k...k..'),
+    S: walkPair(frontTop, '.k..k.', 'k....k'),
+    N: walkPair(backTop, '.k..k.', 'k....k'),
+    graze: [spr(['..ww...', '.wwww..', 'wwwwwk.', 'wwwwwkk', '.llll..', '.k..k..']),
+      spr(['..ww...', '.wwww..', 'wwwww..', 'wwwwwkk', '.llllk.', '.k..k..'])],
+    panic: spr(['..ww.kk', '.wwwwkk', 'wwwwww.', 'wwwwww.', '.llll..', 'k.k..k.'])
+  };
+  // Goat
+  const gSide = ['....ll...', '...l..nn.', '......nkn', 'nnnnnnnn.', 'nnnnnnbw.', '.bbbbb...'];
+  const gSideBack = ['....ll...', '...l.lnn.', '......nnn', 'nnnnnnnn.', 'nnnnnnb..', '.bbbbb...'];
+  const gFront = ['l.....l', '.l...l.', '..nnn..', '.nknkn.', '..nwn..', '.nbbbn.'];
+  const gBack = ['l.....l', '.l...l.', '..nnn..', '.nnnnn.', '.nnwnn.', '.nbbbn.'];
+  SP.goat = {
+    SE: walkPair(gSide, '.k.k.k.k.', 'k..k..k.k'),
+    NE: walkPair(gSideBack, '.k.k.k.k.', 'k..k..k.k'),
+    S: walkPair(gFront, '.k...k.', '..k.k..'),
+    N: walkPair(gBack, '.k...k.', '..k.k..'),
+    act: {
+      SE: spr(['.........', '...ll....', 'nnnnl.ll.', 'nnnnnnnn.', 'nnnnnnnkn', '.bbbbb.w.', 'k..k.k..k']),
+      NE: spr(['.........', '...ll....', 'nnnnl.ll.', 'nnnnnnnn.', 'nnnnnnnnn', '.bbbbb...', 'k..k.k..k']),
+      S: spr(['.......', 'l.....l', '.lnnnl.', '.nknkn.', '.nnnnn.', '.nbwbn.', 'k.....k']),
+      N: spr(['.......', 'l.....l', '.lnnnl.', '.nnnnn.', '.nnwnn.', '.nbbbn.', 'k.....k'])
+    }
+  };
+  // Dog (border collie)
+  const dSide = ['......k.k', 'w.....kkk', '.k....kwk', '.kkkkkkww', '.kkwwwk..'];
+  const dSideBack = ['......k.k', 'w.....kkk', '.k....kkk', '.kkkkkkk.', '.kkwwwk..'];
+  const dFront = ['.k...k.', '.kkkkk.', '.kkwkk.', '..wkw..', '.kwwwk.'];
+  const dBack = ['.k...k.', '.kkkkk.', '..kkk..', '.kkkkk.', '.kkwkk.'];
+  const bark = spr(['.....k.k.', 'w....kkk.', '.k...kwkw', '.kkkkkkw.', '.kkwwwk.w', '.k.k..k.k']);
+  SP.dog = {
+    SE: walkPair(dSide, '.k.k..k.k', 'k..k.k..k'),
+    NE: walkPair(dSideBack, '.k.k..k.k', 'k..k.k..k'),
+    S: walkPair(dFront, '.k...k.', '..k.k..'),
+    N: walkPair(dBack, '.k...k.', '..k.k..'),
+    act: {
+      SE: bark, NE: bark,
+      S: spr(['.k...k.', '.kkkkk.', '.kkwkk.', '..wrw..', '.kwwwk.', 'k.....k']),
+      N: spr(dBack.concat(['k.....k']))
+    }
+  };
+  // Wolves (alpha = palette swapped, yellow eyes)
+  const wSide = ['.........i.', 'i.......iri', '.iiiiiiiiik', '.kiiiiiiik.'];
+  const wSideBack = ['.........i.', 'i.......iii', '.iiiiiiiiik', '.kiiiiiiik.'];
+  const wFront = ['i.....i', 'iiiiiii', '.iriri.', '..iki..'];
+  const wBack = ['i.....i', 'iiiiiii', '.iiiii.', '..iii..'];
+  const legs = { SE: ['.k.k..k.k..', 'k...kk...k.'], S: ['.k...k.', '..k.k..'], N: ['.k.i.k.', '..kik..'] };
+  const build = (map) => {
+    const m = (rows) => map ? swapRows(rows, map) : rows;
+    return {
+      SE: walkPair(m(wSide), m([legs.SE[0]])[0], m([legs.SE[1]])[0]),
+      NE: walkPair(m(wSideBack), m([legs.SE[0]])[0], m([legs.SE[1]])[0]),
+      S: walkPair(m(wFront), m([legs.S[0]])[0], m([legs.S[1]])[0]),
+      N: walkPair(m(wBack), m([legs.N[0]])[0], m([legs.N[1]])[0])
+    };
+  };
+  SP.wolf = build(null);
+  SP.alpha = build({ i: 'k', k: 'i', r: 'y' });
+  SP.batUp = spr(['i.....i', 'ii...ii', '.iikii.', '..krk..']);
+  SP.batDown = spr(['..kkk..', '.iirii.', 'ii...ii', 'i.....i']);
+  SP.pillar = spr(['llllll', 'wwwwwl', '.wwwl.', '.wwwl.', '.wlwl.', '.wwll.', '.wwwl.', '.wwwl.',
+    '.wwwl.', '.lwwl.', '.wwwl.', 'lwwwwl', 'llllll']);
+  SP.pillarBroken = spr(['..w...', '.wwl..', '.wwwl.', '.wlwl.', '.wwwl.', '.wwll.', 'lwwwwl', 'llllll']);
+  SP.pinGoal = spr(['.rrr.', 'rrwrr', 'rrrrr', '.rrr.', '..r..', '..k..']);
+  SP.pinStart = spr(['.lll.', 'llwll', 'lllll', '.lll.', '..l..', '..k..']);
+}
+// facing: 6 directions from a facing vector
+function faceDir(fx, fy) {
+  const a = Math.atan2(fy, fx) * 57.2958;
+  if (a < -58 && a > -122) return 'N';
+  if (a > 58 && a < 122) return 'S';
+  return fy < -0.2 ? 'NE' : 'SE';
+}
 
 function drawSpr(s, x, y, left, opts) {
   const o = opts || {};
@@ -302,6 +331,10 @@ function px(x, y, key) {
 function rect(x, y, w, h, key) {
   G.fillStyle = PAL_DAY[key];
   G.fillRect(Math.round(x), Math.round(y), w, h);
+}
+function frame(x, y, w, h, key) {
+  rect(x, y, w, 1, key); rect(x, y + h - 1, w, 1, key);
+  rect(x, y, 1, h, key); rect(x + w - 1, y, 1, h, key);
 }
 function drawShadow(x, y, w) {
   const x0 = Math.round(x - w / 2), yy = Math.round(y);
@@ -327,9 +360,9 @@ const FONT = {
   '/': '001001010100100', '+': '000010111010000', "'": '010010000000000', ',': '000000000010100',
   '?': '110001010000010', '(': '001010010010001', ')': '100010010010100', '>': '100110111110100',
   '<': '001011111011001', '=': '000111000111000', 'x': '000101010101000', ' ': '000000000000000',
-  '^': '010111000000000', '*': '000010111010101'
+  '^': '010111000000000', '*': '000010111010101', '&': '010101010101011'
 };
-function textWidth(str, s) { return str.length ? (str.length * 4 - 1) * s : 0; }
+function textWidth(str, s) { return str.length ? (str.length * 4 - 1) * (s || 1) : 0; }
 function drawTextRaw(str, x, y, col, s) {
   G.fillStyle = col;
   let cx = x;
@@ -360,25 +393,38 @@ function text(str, x, y, key, opts) {
 }
 
 // ---------------------------------------------------------------------
+// Settings (persisted per viewer)
+// ---------------------------------------------------------------------
+const settings = { sound: true, shake: true, fullscreen: true };
+try {
+  const s = JSON.parse(localStorage.getItem('goatGuardianSettings') || '{}');
+  for (const k in settings) if (typeof s[k] === 'boolean') settings[k] = s[k];
+} catch (e) { /* storage unavailable */ }
+function saveSettings() {
+  try { localStorage.setItem('goatGuardianSettings', JSON.stringify(settings)); } catch (e) { /* ignore */ }
+}
+
+// ---------------------------------------------------------------------
 // Audio (Web Audio synthesis)
 // ---------------------------------------------------------------------
-let AC = null, master = null, noiseBuf = null, muted = false;
+let AC = null, master = null, noiseBuf = null;
 function initAudio() {
   if (AC) { if (AC.state === 'suspended') AC.resume(); return; }
   const Ctor = window.AudioContext || window.webkitAudioContext;
   if (!Ctor) return;
   try { AC = new Ctor(); } catch (e) { AC = null; return; }
   master = AC.createGain();
-  master.gain.value = muted ? 0 : 0.45;
+  master.gain.value = settings.sound ? 0.45 : 0;
   master.connect(AC.destination);
   noiseBuf = AC.createBuffer(1, Math.floor(AC.sampleRate), AC.sampleRate);
   const d = noiseBuf.getChannelData(0);
   for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
 }
 function audioReady() { return AC && master && AC.state !== 'closed'; }
-function setMuted(m) {
-  muted = m;
-  if (master) master.gain.setTargetAtTime(m ? 0 : 0.45, AC.currentTime, 0.02);
+function setSound(on) {
+  settings.sound = on;
+  saveSettings();
+  if (master) master.gain.setTargetAtTime(on ? 0.45 : 0, AC.currentTime, 0.02);
 }
 function envGain(t0, attack, peak, decay) {
   const g = AC.createGain();
@@ -524,7 +570,9 @@ const SFX = {
     tone('sine', 130, 65, 1.0, 0.3, t + 0.66);
   },
   bump() { if (audioReady()) tone('sine', 120, 60, 0.08, 0.25); },
+  move() { if (audioReady()) tone('square', 520, 520, 0.03, 0.06, undefined, { type: 'lowpass', freq: 1800 }); },
   click() { if (audioReady()) tone('square', 660, 990, 0.05, 0.08, undefined, { type: 'lowpass', freq: 2000 }); },
+  back() { if (audioReady()) tone('square', 660, 440, 0.06, 0.07, undefined, { type: 'lowpass', freq: 1800 }); },
   join() {
     if (!audioReady()) return;
     const t = AC.currentTime;
@@ -534,9 +582,43 @@ const SFX = {
 };
 
 // ---------------------------------------------------------------------
+// Fullscreen
+// ---------------------------------------------------------------------
+function fsSupported() {
+  const d = document.documentElement;
+  if (!(d.requestFullscreen || d.webkitRequestFullscreen)) return false;
+  if (document.fullscreenEnabled === false) return false;
+  if (document.fullscreenEnabled === undefined && document.webkitFullscreenEnabled === false) return false;
+  return true;
+}
+function isFs() { return !!(document.fullscreenElement || document.webkitFullscreenElement); }
+function enterFs() {
+  const d = document.documentElement;
+  try {
+    const p = (d.requestFullscreen || d.webkitRequestFullscreen).call(d);
+    if (p && p.catch) p.catch(() => {});
+  } catch (e) { /* refused */ }
+}
+function exitFs() {
+  try {
+    const f = document.exitFullscreen || document.webkitExitFullscreen;
+    if (f) { const p = f.call(document); if (p && p.catch) p.catch(() => {}); }
+  } catch (e) { /* ignore */ }
+}
+function toggleFs() {
+  if (!fsSupported()) return;
+  if (isFs()) { exitFs(); settings.fullscreen = false; }
+  else { enterFs(); settings.fullscreen = true; }
+  saveSettings();
+  SFX.click();
+}
+function autoFs() { if (settings.fullscreen && fsSupported() && !isFs()) enterFs(); }
+
+// ---------------------------------------------------------------------
 // Worlds (procedural maps with a forest mask)
 // mask: 0 meadow, 1 forest canopy, 2 solid structure
 // ---------------------------------------------------------------------
+const WORLD_W = 600;
 let world = null;
 
 function newWorld(w, h, seed, kind) {
@@ -555,7 +637,7 @@ function maskAt(x, y) {
 function blocked(x, y) { return maskAt(x, y) !== 0; }
 function canopy(x, y) { return maskAt(x, y) === 1; }
 
-function stamp(wd, cx, cy, r, rough, val, onlyIf) {
+function stamp(wd, cx, cy, r, rough, val) {
   const pad = Math.ceil(rough) + 2;
   const x0 = Math.max(0, Math.floor(cx - r - pad)), x1 = Math.min(wd.w - 1, Math.ceil(cx + r + pad));
   const y0 = Math.max(0, Math.floor(cy - r - pad)), y1 = Math.min(wd.h - 1, Math.ceil(cy + r + pad));
@@ -563,10 +645,7 @@ function stamp(wd, cx, cy, r, rough, val, onlyIf) {
     for (let x = x0; x <= x1; x++) {
       const d = Math.hypot(x - cx, y - cy);
       const n = wd.noise(x * 0.09, y * 0.09) - 0.5;
-      if (d < r + n * rough * 2) {
-        const i = y * wd.w + x;
-        if (onlyIf === undefined || wd.mask[i] === onlyIf) wd.mask[i] = val;
-      }
+      if (d < r + n * rough * 2) wd.mask[y * wd.w + x] = val;
     }
   }
 }
@@ -600,26 +679,24 @@ function addPillar(wd, x, y, broken) {
 }
 
 function makeDefendWorld(seed) {
-  const wd = newWorld(320, 420, seed, 'defend');
+  const wd = newWorld(WORLD_W, 460, seed, 'defend');
   const r = wd.rng;
-  const cx = 160, cy = 214;
-  for (let a = 0; a < Math.PI * 2; a += 0.12) {
+  const cx = WORLD_W / 2, cy = 232;
+  for (let a = 0; a < Math.PI * 2; a += 0.1) {
     const rad = 90 + r() * 30;
-    stamp(wd, cx + Math.cos(a) * 60, cy + Math.sin(a) * 90, rad * 0.62, 10, 0);
+    stamp(wd, cx + Math.cos(a) * 110, cy + Math.sin(a) * 92, rad * 0.62, 10, 0);
   }
-  stamp(wd, cx, cy, 110, 12, 0);
-  // inner tree clumps
-  for (let k = 0; k < 5; k++) {
+  stamp(wd, cx, cy, 115, 12, 0);
+  for (let k = 0; k < 7; k++) {
     for (let tries = 0; tries < 30; tries++) {
-      const a = r() * Math.PI * 2, d = 95 + r() * 40;
-      const x = cx + Math.cos(a) * d * 0.9, y = cy + Math.sin(a) * d * 1.2;
-      if (x < 40 || x > 280 || y < 50 || y > 370) continue;
-      stamp(wd, x, y, 10 + r() * 8, 5, 1);
+      const a = r() * Math.PI * 2, d = 110 + r() * 60;
+      const x = cx + Math.cos(a) * d * 1.3, y = cy + Math.sin(a) * d * 0.9;
+      if (x < 40 || x > WORLD_W - 40 || y < 50 || y > wd.h - 50) continue;
+      stamp(wd, x, y, 10 + r() * 9, 5, 1);
       break;
     }
   }
   borderForest(wd, 8);
-  // henge of stone pillars
   for (let k = 0; k < 7; k++) {
     const a = (k / 7) * Math.PI * 2 + 0.3;
     addPillar(wd, cx + Math.cos(a) * 52, cy + Math.sin(a) * 40, k % 3 === 2);
@@ -630,18 +707,17 @@ function makeDefendWorld(seed) {
 
 function makeEscortWorld(n, seed) {
   const h = Math.min(1700, 760 + 150 * Math.min(n, 6));
-  const wd = newWorld(320, h, seed, 'escort');
+  const wd = newWorld(WORLD_W, h, seed, 'escort');
   const r = wd.rng;
-  // route from the start pin (bottom) to the goal pin (top)
   const pts = [];
-  let x = 110 + r() * 100, y = h - 56;
+  let x = WORLD_W / 2 + (r() - 0.5) * 160, y = h - 56;
   pts.push({ x: x, y: y });
   while (y > 190) {
     y -= 120 + r() * 50;
-    x = clamp(x + (r() - 0.5) * 220, 70, 250);
+    x = clamp(x + (r() - 0.5) * 260, 90, WORLD_W - 90);
     pts.push({ x: x, y: y });
   }
-  pts.push({ x: clamp(x + (r() - 0.5) * 120, 80, 240), y: 56 });
+  pts.push({ x: clamp(x + (r() - 0.5) * 140, 100, WORLD_W - 100), y: 56 });
   for (let i = 0; i < pts.length - 1; i++) {
     const a = pts[i], b = pts[i + 1];
     const L = Math.hypot(b.x - a.x, b.y - a.y);
@@ -651,29 +727,26 @@ function makeEscortWorld(n, seed) {
   const ph = r() * 10;
   for (let i = 0; i < wd.path.length; i += 2) {
     const p = wd.path[i];
-    const rad = 40 + 12 * Math.sin(i * 0.05 + ph) + 8 * Math.sin(i * 0.13 + ph * 2);
+    const rad = 42 + 12 * Math.sin(i * 0.05 + ph) + 8 * Math.sin(i * 0.13 + ph * 2);
     stamp(wd, p.x, p.y, rad, 8, 0);
   }
-  // side glades
-  for (let k = 0; k < 6 + n; k++) {
+  for (let k = 0; k < 10 + n * 2; k++) {
     const p = wd.path[Math.floor(r() * wd.path.length)];
     const a = r() * Math.PI * 2;
-    stamp(wd, p.x + Math.cos(a) * 46, p.y + Math.sin(a) * 30, 22 + r() * 18, 8, 0);
+    stamp(wd, p.x + Math.cos(a) * 60, p.y + Math.sin(a) * 34, 22 + r() * 22, 8, 0);
   }
-  stamp(wd, pts[0].x, pts[0].y, 56, 6, 0);
-  stamp(wd, pts[pts.length - 1].x, pts[pts.length - 1].y, 54, 6, 0);
-  // tree islands that keep the corridor open
-  for (let k = 0; k < 30 + n * 6; k++) {
+  stamp(wd, pts[0].x, pts[0].y, 58, 6, 0);
+  stamp(wd, pts[pts.length - 1].x, pts[pts.length - 1].y, 56, 6, 0);
+  for (let k = 0; k < 40 + n * 8; k++) {
     const p = wd.path[Math.floor(r() * wd.path.length)];
     const rad = 7 + r() * 11;
-    const ix = p.x + (r() - 0.5) * 110, iy = p.y + (r() - 0.5) * 60;
+    const ix = p.x + (r() - 0.5) * 160, iy = p.y + (r() - 0.5) * 70;
     if (minPathDist(wd, ix, iy) < rad + 20) continue;
     if (Math.hypot(ix - pts[0].x, iy - pts[0].y) < 70) continue;
     if (Math.hypot(ix - pts[pts.length - 1].x, iy - pts[pts.length - 1].y) < 70) continue;
     stamp(wd, ix, iy, rad, 4, 1);
   }
   borderForest(wd, 8);
-  // gate pillars along the route
   for (let i = 40; i < wd.path.length - 40; i += 70 + Math.floor(r() * 40)) {
     const p = wd.path[i], q = wd.path[Math.min(wd.path.length - 1, i + 3)];
     const dx = q.x - p.x, dy = q.y - p.y;
@@ -686,7 +759,7 @@ function makeEscortWorld(n, seed) {
   }
   for (let k = 0; k < 4 + n; k++) {
     const p = wd.path[Math.floor(r() * wd.path.length)];
-    const gx = p.x + (r() - 0.5) * 90, gy = p.y + (r() - 0.5) * 50;
+    const gx = p.x + (r() - 0.5) * 100, gy = p.y + (r() - 0.5) * 50;
     if (minPathDist(wd, gx, gy) > 14 && clearAround(wd, gx, gy, 6)) addPillar(wd, gx, gy, r() < 0.5);
   }
   wd.start = { x: pts[0].x, y: pts[0].y };
@@ -702,7 +775,7 @@ function renderWorld(wd) {
   const d32 = new Uint32Array(img.data.buffer);
   const P = {};
   for (const k of PAL_KEYS) { const v = PAL_RGB[k][0]; P[k] = (0xff000000 | packLE(v[0], v[1], v[2])) >>> 0; }
-  // distance (inside the forest) to the nearest meadow pixel: lets crowns bulge a little past the edge
+  // distance inside the forest to the nearest meadow pixel (lets crowns bulge past the edge)
   const dist = new Float32Array(w * h);
   for (let i = 0; i < w * h; i++) dist[i] = m[i] === 1 ? 1e6 : 0;
   for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
@@ -761,7 +834,6 @@ function renderWorld(wd) {
     for (let x = 0; x < w; x++) {
       const i = y * w + x;
       if (vis[i] === 1) {
-        // canopy: crown shading, with an indigo undertone along the lower edge
         let below = 0;
         for (let dd = 1; dd <= 3; dd++) if (!can(x, y + dd)) { below = dd; break; }
         let col = crownCol[i] || P.t;
@@ -769,7 +841,6 @@ function renderWorld(wd) {
         else if (below === 3 && ((x + y) & 1)) col = P.i;
         d32[i] = col;
       } else {
-        // ground: undergrowth band with trunks under canopy, seafoam fringe, flat olive
         let up = 0;
         for (let dd = 1; dd <= 10; dd++) if (can(x, y - dd)) { up = dd; break; }
         const side = can(x - 1, y) || can(x + 1, y) || can(x - 2, y) || can(x + 2, y) ||
@@ -798,7 +869,7 @@ function renderWorld(wd) {
       if (hash2(hx + 11, hy) < 0.12) d32[(hy - 1) * w + hx + 3] = P.s;
     }
   }
-  // sparse ground specks: grass tufts and the odd flower
+  // sparse ground specks
   for (let k = 0; k < (w * h) / 260; k++) {
     const x = Math.floor(wd.rng() * (w - 6)), y = Math.floor(wd.rng() * h);
     const i = y * w + x;
@@ -809,7 +880,6 @@ function renderWorld(wd) {
     else if (t < 0.96) d32[i] = P.w;
     else d32[i] = P.y;
   }
-  // pillar shadows
   for (const p of wd.pillars) {
     for (let k = 0; k < 6; k++) {
       const sx = p.x + 2 + k, sy = p.y - 1 + Math.floor(k / 2);
@@ -819,7 +889,6 @@ function renderWorld(wd) {
       }
     }
   }
-  // goal pen ring + start ring
   if (wd.goal) {
     const R = wd.goalR;
     for (let a = 0; a < Math.PI * 2; a += 0.02) {
@@ -834,7 +903,6 @@ function renderWorld(wd) {
     }
   }
   g.putImageData(img, 0, 0);
-  // pen fence posts (gap facing south)
   if (wd.goal) {
     for (let k = 0; k < 18; k++) {
       const a = (k / 18) * Math.PI * 2;
@@ -855,7 +923,6 @@ function meadowNear(x, y, r) {
   }
   return false;
 }
-// forest point near (cx, cy) that borders the meadow, ideally off-camera
 function forestSpawn(cx, cy, dmin, dmax) {
   for (let t = 0; t < 80; t++) {
     const a = rand() * Math.PI * 2, d = rr(dmin, dmax);
@@ -870,13 +937,12 @@ function forestSpawn(cx, cy, dmin, dmax) {
   }
   return { x: 6, y: clamp(cy, 6, world.h - 6) };
 }
-// nearest point a few pixels deep inside the forest
 function forestExit(x, y) {
   let bestP = null, bd = 1e9;
   for (let a = 0; a < 16; a++) {
     const ang = (a / 16) * Math.PI * 2;
     const dx = Math.cos(ang), dy = Math.sin(ang);
-    for (let d = 4; d < 280; d += 4) {
+    for (let d = 4; d < 300; d += 4) {
       const xx = x + dx * d, yy = y + dy * d;
       if (canopy(xx, yy) && canopy(xx + dx * 10, yy + dy * 10)) {
         if (d < bd) { bd = d; bestP = { x: xx + dx * 12, y: yy + dy * 12 }; }
@@ -894,8 +960,9 @@ const cam = { x: 0, y: 0, cx: 0, cy: 0 };
 let camFracX = 0, camFracY = 0, OX = 0, OY = 0;
 let shake = 0;
 function clampCam() {
-  cam.cx = clamp(cam.cx, W / 2 + 1, world.w - W / 2 - 1);
-  cam.cy = clamp(cam.cy, H / 2 + 1, world.h - H / 2 - 1);
+  if (!world) return;
+  cam.cx = world.w <= W + 2 ? world.w / 2 : clamp(cam.cx, W / 2 + 1, world.w - W / 2 - 1);
+  cam.cy = world.h <= H + 2 ? world.h / 2 : clamp(cam.cy, H / 2 + 1, world.h - H / 2 - 1);
   cam.x = cam.cx - W / 2;
   cam.y = cam.cy - H / 2;
 }
@@ -904,172 +971,59 @@ function onScreen(x, y, m) {
   return x > cam.x - m && x < cam.x + W + m && y > cam.y - m && y < cam.y + H + m;
 }
 function updateCamera(dt) {
+  const actors = isMenu() ? demo : players;
   let tx = cam.cx, ty = cam.cy;
-  if (state === 'MENU') {
-    tx = world.w / 2 + Math.sin(realTime * 0.15) * 60;
-    ty = world.h / 2 + Math.cos(realTime * 0.11) * 50;
-  } else if (players.length) {
+  if (actors.length) {
     let sx = 0, sy = 0, svx = 0, svy = 0;
-    for (const p of players) { sx += p.x; sy += p.y; svx += p.vx; svy += p.vy; }
-    const n = players.length;
+    for (const p of actors) { sx += p.x; sy += p.y; svx += p.vx; svy += p.vy; }
+    const n = actors.length;
     tx = sx / n + (svx / n) * 0.32;
     ty = sy / n + (svy / n) * 0.32 - 8;
   }
-  const k = damp(state === 'MENU' ? 1 : 3.2, dt);
+  const k = damp(isMenu() ? 1.2 : 3.2, dt);
   cam.cx += (tx - cam.cx) * k;
   cam.cy += (ty - cam.cy) * k;
   clampCam();
 }
 
 // ---------------------------------------------------------------------
-// Input: devices (two keyboard halves + mouse, touch, up to 4 gamepads)
+// Adaptive resolution: integer pixel scale, fill the screen
 // ---------------------------------------------------------------------
-const keys = {};
-const events = [];
-const touch = { stickId: null, sx: 0, sy: 0, cx: 0, cy: 0, active: false, used: false };
-const padPrev = {};
-const DEVICE_NAMES = {
-  kbL: 'WASD + SPACE', kbR: 'ARROWS + ENTER', touch: 'TOUCH',
-  pad0: 'GAMEPAD 1', pad1: 'GAMEPAD 2', pad2: 'GAMEPAD 3', pad3: 'GAMEPAD 4'
-};
-function pushEv(dev, type) { events.push({ dev: dev, type: type }); }
-
-window.addEventListener('keydown', (e) => {
-  const k = e.key;
-  if ([' ', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Tab', 'Backspace'].includes(k)) e.preventDefault();
-  initAudio();
-  keys[k.toLowerCase()] = true;
-  if (e.repeat) return;
-  const lk = k.toLowerCase();
-  if (k === ' ') pushEv('kbL', 'action');
-  else if (k === 'Enter' || e.code === 'ShiftRight' || k === '/') pushEv('kbR', 'action');
-  else if (lk === 'w') pushEv('kbL', 'up');
-  else if (lk === 's') pushEv('kbL', 'down');
-  else if (lk === 'a') pushEv('kbL', 'left');
-  else if (lk === 'd') pushEv('kbL', 'right');
-  else if (k === 'ArrowUp') pushEv('kbR', 'up');
-  else if (k === 'ArrowDown') pushEv('kbR', 'down');
-  else if (k === 'ArrowLeft') pushEv('kbR', 'left');
-  else if (k === 'ArrowRight') pushEv('kbR', 'right');
-  else if (lk === 'p' || k === 'Escape') pushEv('kb', 'pause');
-  else if (k === 'Backspace') pushEv('kb', 'back');
-  else if (lk === 'r') pushEv('kb', 'restart');
-  else if (lk === 'm') setMuted(!muted);
-});
-window.addEventListener('keyup', (e) => { keys[e.key.toLowerCase()] = false; });
-window.addEventListener('blur', () => {
-  for (const k in keys) keys[k] = false;
-  if (state === 'PLAYING') paused = true;
-});
-view.addEventListener('mousedown', (e) => {
-  initAudio();
-  view.focus();
-  if (e.button === 0) pushEv('kbL', 'action');
-});
-view.addEventListener('contextmenu', (e) => e.preventDefault());
-
-function toGame(clientX, clientY) {
-  const r = view.getBoundingClientRect();
-  return { x: ((clientX - r.left) / r.width) * W, y: ((clientY - r.top) / r.height) * H };
+let dimPatterns = null;
+function buildDimPatterns() {
+  const a = makeCanvas(2, 2), ag = a.getContext('2d');
+  ag.fillStyle = C.k; ag.fillRect(0, 0, 1, 1); ag.fillRect(1, 1, 1, 1);
+  const b = makeCanvas(4, 4), bg = b.getContext('2d');
+  bg.fillStyle = C.k; bg.fillRect(0, 0, 1, 1); bg.fillRect(2, 2, 1, 1); bg.fillRect(2, 0, 1, 1); bg.fillRect(0, 2, 1, 1);
+  dimPatterns = { full: hctx.createPattern(a, 'repeat'), light: hctx.createPattern(b, 'repeat') };
 }
-view.addEventListener('touchstart', (e) => {
-  e.preventDefault();
-  initAudio();
-  touch.used = true;
-  for (const t of e.changedTouches) {
-    const p = toGame(t.clientX, t.clientY);
-    if (state === 'PLAYING') {
-      if (paused) { paused = false; continue; }
-      if (p.x > W - 22 && p.y < 16) { pushEv('touch', 'pause'); continue; }
-      if (p.x < W * 0.55 && touch.stickId === null) {
-        touch.stickId = t.identifier;
-        touch.sx = p.x; touch.sy = p.y; touch.cx = p.x; touch.cy = p.y;
-        touch.active = true;
-      } else pushEv('touch', 'action');
-    } else {
-      events.push({ dev: 'touch', type: 'tap', x: p.x, y: p.y });
-    }
-  }
-}, { passive: false });
-view.addEventListener('touchmove', (e) => {
-  e.preventDefault();
-  for (const t of e.changedTouches) {
-    if (t.identifier === touch.stickId) {
-      const p = toGame(t.clientX, t.clientY);
-      touch.cx = p.x; touch.cy = p.y;
-    }
-  }
-}, { passive: false });
-function endTouch(e) {
-  e.preventDefault();
-  for (const t of e.changedTouches) if (t.identifier === touch.stickId) { touch.stickId = null; touch.active = false; }
+function resize() {
+  const stage = document.getElementById('stage');
+  const dpr = window.devicePixelRatio || 1;
+  const dw = Math.max(1, Math.floor((stage.clientWidth || window.innerWidth) * dpr));
+  const dh = Math.max(1, Math.floor((stage.clientHeight || window.innerHeight) * dpr));
+  let k = Math.max(1, Math.round(dh / 288));
+  if (Math.floor(dw / k) < 144) k = Math.max(1, Math.floor(dw / 144));
+  if (Math.floor(dh / k) < 210) k = Math.max(1, Math.floor(dh / 210));
+  W = clamp(Math.floor(dw / k), 120, 560);
+  H = clamp(Math.floor(dh / k), 180, 420);
+  PIX = k;
+  BW = W + 2; BH = H + 2;
+  buf.width = BW; buf.height = BH;
+  hud.width = W; hud.height = H;
+  bctx.imageSmoothingEnabled = false;
+  hctx.imageSmoothingEnabled = false;
+  view.width = W * k;
+  view.height = H * k;
+  view.style.width = (W * k / dpr) + 'px';
+  view.style.height = (H * k / dpr) + 'px';
+  vctx.imageSmoothingEnabled = false;
+  buildDimPatterns();
+  clampCam();
 }
-view.addEventListener('touchend', endTouch, { passive: false });
-view.addEventListener('touchcancel', endTouch, { passive: false });
-
-function getPads() {
-  try { return navigator.getGamepads ? navigator.getGamepads() : []; } catch (e) { return []; }
-}
-function pollPads() {
-  const pads = getPads();
-  for (let i = 0; i < 4; i++) {
-    const p = pads && pads[i];
-    const dev = 'pad' + i;
-    if (!p || !p.connected) { padPrev[dev] = null; continue; }
-    const b = (n) => !!(p.buttons[n] && p.buttons[n].pressed);
-    const ax = p.axes[0] || 0, ay = p.axes[1] || 0;
-    const now = {
-      action: b(0) || b(2), back: b(1), pause: b(9),
-      up: b(12) || ay < -0.6, down: b(13) || ay > 0.6, left: b(14) || ax < -0.6, right: b(15) || ax > 0.6
-    };
-    const prev = padPrev[dev];
-    if (prev) for (const k in now) if (now[k] && !prev[k]) pushEv(dev, k);
-    padPrev[dev] = now;
-  }
-}
-// With only one keyboard player, both key sets control that player.
-function kbOtherFree(dev) {
-  const other = dev === 'kbL' ? 'kbR' : 'kbL';
-  return !players.some(p => p.dev === other);
-}
-function readMove(dev) {
-  let x = 0, y = 0;
-  const L = () => { if (keys['a']) x -= 1; if (keys['d']) x += 1; if (keys['w']) y -= 1; if (keys['s']) y += 1; };
-  const R = () => { if (keys['arrowleft']) x -= 1; if (keys['arrowright']) x += 1; if (keys['arrowup']) y -= 1; if (keys['arrowdown']) y += 1; };
-  if (dev === 'kbL') { L(); if (kbOtherFree('kbL')) R(); }
-  else if (dev === 'kbR') { R(); if (kbOtherFree('kbR')) L(); }
-  else if (dev === 'touch') {
-    if (touch.active) {
-      const dx = touch.cx - touch.sx, dy = touch.cy - touch.sy;
-      const d = len(dx, dy);
-      if (d > 2) { const m = Math.min(1, d / 14); x = (dx / d) * m; y = (dy / d) * m; }
-    }
-    return { x: x, y: y };
-  } else if (dev.startsWith('pad')) {
-    const p = getPads()[+dev[3]];
-    if (p && p.connected) {
-      x = p.axes[0] || 0; y = p.axes[1] || 0;
-      const d = len(x, y);
-      if (d < 0.22) { x = 0; y = 0; } else { const m = Math.min(1, (d - 0.22) / 0.7); x = (x / d) * m; y = (y / d) * m; }
-      const b = (n) => !!(p.buttons[n] && p.buttons[n].pressed);
-      if (b(14)) x = -1; if (b(15)) x = 1; if (b(12)) y = -1; if (b(13)) y = 1;
-    }
-    const l = len(x, y);
-    if (l > 1) { x /= l; y /= l; }
-    return { x: x, y: y };
-  }
-  const l = len(x, y);
-  if (l > 0) { x /= l; y /= l; }
-  return { x: x, y: y };
-}
-function playerForDev(dev) {
-  let p = players.find(q => q.dev === dev);
-  if (!p && (dev === 'kbL' || dev === 'kbR')) {
-    const other = dev === 'kbL' ? 'kbR' : 'kbL';
-    if (kbOtherFree(other)) p = players.find(q => q.dev === other);
-  }
-  return p || null;
-}
+window.addEventListener('resize', resize);
+document.addEventListener('fullscreenchange', resize);
+document.addEventListener('webkitfullscreenchange', resize);
 
 // ---------------------------------------------------------------------
 // Game state
@@ -1084,9 +1038,10 @@ const DOG_SPEED = 96;
 const PANIC_RADIUS = 40;
 const SHEEP_MAX = 14;
 const P_COL = ['y', 'r', 's', 'w'];
+const MENU_STATES = ['TITLE', 'MODE', 'PLAYERS', 'OPTIONS', 'HOWTO'];
 
-let state = 'MENU';     // MENU | PLAYING | RESULTS | GAMEOVER
-let mode = 'escort';    // escort | defend
+let state = 'TITLE';
+let mode = 'escort';
 let paused = false;
 let realTime = 0;
 let stateTime = 0;
@@ -1096,6 +1051,12 @@ let lastBaa = 0;
 let score = 0, rescued = 0, delivered = 0, lostCount = 0;
 let gameOverDelay = 0;
 let newBest = false;
+let optionsFrom = 'TITLE';
+let startCountdown = -1;
+const ui = { cursor: 0 };
+let hits = [];
+function isMenu() { return MENU_STATES.includes(state); }
+
 let best = { escort: 0, defend: 0 };
 const hotData = (window.claude && window.claude.hot && window.claude.hot.data) || {};
 try {
@@ -1118,7 +1079,8 @@ function saveBest() {
   return false;
 }
 
-let players = [];       // {slot, dev, kind, ready, body...}
+let players = [];
+let demo = [];
 let sheep = [];
 let enemies = [];
 let particles = [];
@@ -1127,11 +1089,11 @@ let fireflies = [];
 let banner = { t: 0, a: '', b: '' };
 const wave = { n: 0, phase: 'intro', t: 0, toSpawn: 0, spawnT: 0, interval: 2 };
 const mission = { n: 1, herdStart: 12, penned: 0, spawnT: 4, interval: 5, cap: 3, time: 0, kills: 0 };
-let menuCountdown = -1;
 
 function makeSheep(x, y) {
+  const left = rand() < 0.5;
   return {
-    x: x, y: y, vx: 0, vy: 0, side: rand() < 0.5 ? -1 : 1, panic: 0, herd: 0,
+    x: x, y: y, vx: 0, vy: 0, fx: left ? -1 : 1, fy: 0.3, panic: 0, herd: 0,
     grazeT: rr(0.5, 3), grazing: rand() < 0.5, chew: rand() * 10, wander: rand() * 6.28,
     walk: 0, baaCd: rr(0, 2), flash: 0, penned: false
   };
@@ -1147,7 +1109,7 @@ function spawnHerd(cx, cy, n) {
   }
 }
 function makePlayerBody(p, x, y) {
-  Object.assign(p, { x: x, y: y, vx: 0, vy: 0, fx: 0, fy: -1, side: 1, cd: 0, ramT: 0, ramId: 0, actT: 0, walk: 0, bonk: 0, queue: 0 });
+  Object.assign(p, { x: x, y: y, vx: 0, vy: 0, fx: 0, fy: 1, cd: 0, ramT: 0, ramId: 0, actT: 0, walk: 0, bonk: 0, queue: 0 });
 }
 
 // ---------------------------------------------------------------------
@@ -1186,6 +1148,7 @@ function leafBurst(x, y) {
     life: rr(0.4, 0.9), max: 0.9, col: pick(['t', 's', 'i']), g: 40, drag: 2, kind: 'px' });
 }
 function addText(x, y, str, col) { texts.push({ x: x, y: y, str: str, col: col, life: 1.0, max: 1.0 }); }
+function addShake(v) { if (settings.shake) shake = Math.max(shake, v); }
 function updateParticles(dt) {
   for (let i = particles.length - 1; i >= 0; i--) {
     const p = particles[i];
@@ -1223,6 +1186,14 @@ function moveBody(e, dx, dy, r) {
   e.y = clamp(e.y, 2, world.h - 2);
   return hit;
 }
+function updateFacing(e, dt, minSpeed) {
+  const sp = len(e.vx, e.vy);
+  if (sp > minSpeed) {
+    const nfx = e.vx / sp, nfy = e.vy / sp;
+    e.fx = lerp(e.fx, nfx, damp(14, dt)); e.fy = lerp(e.fy, nfy, damp(14, dt));
+    const l = len(e.fx, e.fy) || 1; e.fx /= l; e.fy /= l;
+  }
+}
 
 // ---------------------------------------------------------------------
 // Players: goat (ram charge) and dog (bark)
@@ -1242,7 +1213,7 @@ function tryRam(p) {
   if (len(inp.x, inp.y) > 0.3) { const l = len(inp.x, inp.y); p.fx = inp.x / l; p.fy = inp.y / l; }
   p.vx = p.fx * RAM_SPEED; p.vy = p.fy * RAM_SPEED;
   dust(p.x - p.fx * 4, p.y, 10, 3, 40);
-  shake = Math.max(shake, 1.2);
+  addShake(1.2);
   SFX.dash();
 }
 function tryBark(p) {
@@ -1253,7 +1224,6 @@ function tryBark(p) {
   SFX.bark();
   addParticle({ x: p.x, y: p.y - 3, life: 0.35, max: 0.35, r0: 4, r1: BARK_RADIUS, col: 'w', kind: 'ring' });
   addText(p.x, p.y - 14, 'WOOF', 'w');
-  // drive the herd away from the dog
   for (const s of sheep) {
     const dx = s.x - p.x, dy = s.y - p.y;
     const d = len(dx, dy);
@@ -1265,7 +1235,6 @@ function tryBark(p) {
       s.grazing = false;
     }
   }
-  // scare predators: stun, and send them running once fear >= hp
   for (const e of enemies) {
     if (e.state === 'launched' || e.state === 'emerge' || e.state === 'flee') continue;
     const dx = e.x - p.x, dy = e.y - p.y;
@@ -1318,24 +1287,21 @@ function updatePlayers(dt) {
       if (sp > 6) {
         const nfx = p.vx / sp, nfy = p.vy / sp;
         if (nfx * p.fx + nfy * p.fy < 0.2 && len(ovx, ovy) > 40) dust(p.x, p.y, 4, 2, 30);
-        p.fx = lerp(p.fx, nfx, damp(14, dt)); p.fy = lerp(p.fy, nfy, damp(14, dt));
-        const l = len(p.fx, p.fy) || 1; p.fx /= l; p.fy /= l;
       }
+      updateFacing(p, dt, 6);
       if (sp > 60 && rand() < dt * 6) dust(p.x - p.fx * 4, p.y, 1, 1, 10);
     }
-    if (Math.abs(p.vx) > 4) p.side = p.vx < 0 ? -1 : 1;
     const hit = moveBody(p, p.vx * dt, p.vy * dt, 3);
     if (hit && p.ramT > 0 && p.bonk <= 0) {
       p.bonk = 0.3; p.ramT = 0;
       p.vx *= -0.3; p.vy *= -0.3;
-      shake = Math.max(shake, 2.5);
+      addShake(2.5);
       dust(p.x + p.fx * 4, p.y, 8, 2, 40);
       leafBurst(p.x + p.fx * 6, p.y - 3);
       SFX.bump();
     }
     p.walk += len(p.vx, p.vy) * dt;
   }
-  // players nudge each other apart
   for (let i = 0; i < players.length; i++) for (let j = i + 1; j < players.length; j++) {
     const a = players[i], b = players[j];
     const dx = b.x - a.x, dy = b.y - a.y, d = len(dx, dy);
@@ -1354,6 +1320,35 @@ function updatePlayers(dt) {
   }
 }
 
+// Title-screen demo: a goat and a dog working the herd on their own
+function makeDemo() {
+  demo = [];
+  const c = world.start;
+  for (let i = 0; i < 2; i++) {
+    const d = { kind: i ? 'dog' : 'goat', slot: i, dev: 'demo' };
+    makePlayerBody(d, c.x + (i ? 70 : -60), c.y + 40);
+    demo.push(d);
+  }
+}
+function updateDemo(dt) {
+  const c = world.start;
+  demo.forEach((d, i) => {
+    const a = realTime * (i ? 0.42 : 0.3) + i * 2.4;
+    const rx = i ? 95 : 75, ry = i ? 70 : 58;
+    const tx = c.x + Math.cos(a) * rx, ty = c.y + Math.sin(a) * ry;
+    const dx = tx - d.x, dy = ty - d.y;
+    const L = len(dx, dy) || 1;
+    const sp = Math.min(i ? 62 : 40, L * 2.5);
+    d.vx += (dx / L * sp - d.vx) * damp(3, dt);
+    d.vy += (dy / L * sp - d.vy) * damp(3, dt);
+    moveBody(d, d.vx * dt, d.vy * dt, 3);
+    updateFacing(d, dt, 4);
+    d.walk += len(d.vx, d.vy) * dt;
+    if (d.actT > 0) d.actT -= dt;
+    if (i === 1 && Math.floor(realTime * 0.4) !== Math.floor((realTime - dt) * 0.4)) d.actT = 0.25;
+  });
+}
+
 // ---------------------------------------------------------------------
 // Herd: Boids (cohesion, separation, alignment) + panic vector,
 // goats lead the flock, dogs press it from behind
@@ -1364,14 +1359,14 @@ function herdCenter() {
   let x = 0, y = 0, n = 0;
   for (const s of sheep) if (!s.penned) { x += s.x; y += s.y; n++; }
   if (!n) {
-    if (players.length && state !== 'MENU') return { x: players[0].x, y: players[0].y };
+    if (players.length && !isMenu()) return { x: players[0].x, y: players[0].y };
     return { x: world.start ? world.start.x : world.w / 2, y: world.start ? world.start.y : world.h / 2 };
   }
   return { x: x / n, y: y / n };
 }
 function updateSheep(dt) {
   const threats = enemies.filter(e => e.state === 'hunt' || e.state === 'carry' || e.state === 'stun');
-  const shepherds = state === 'MENU' ? [] : players;
+  const shepherds = isMenu() ? demo : players;
   const hc = herdCenter();
   for (const s of sheep) {
     let cx = 0, cy = 0, avx = 0, avy = 0, sx = 0, sy = 0, n = 0;
@@ -1400,7 +1395,6 @@ function updateSheep(dt) {
     if (s.herd > 0) s.herd -= dt;
 
     if (threat) {
-      // PANIC VECTOR: overrides flocking, flee directly away from the predator
       const fx = s.x - threat.x, fy = s.y - threat.y;
       const l = len(fx, fy) || 1;
       const urg = 1 + (1 - td / PANIC_RADIUS) * 0.6;
@@ -1411,11 +1405,11 @@ function updateSheep(dt) {
     } else {
       if (n > 0) {
         cx /= n; cy /= n; avx /= n; avy /= n;
-        ax += (cx - s.x) * 0.7; ay += (cy - s.y) * 0.7;           // cohesion
-        ax += (avx - s.vx) * 1.1; ay += (avy - s.vy) * 1.1;       // alignment
+        ax += (cx - s.x) * 0.7; ay += (cy - s.y) * 0.7;
+        ax += (avx - s.vx) * 1.1; ay += (avy - s.vy) * 1.1;
       }
       if (!s.penned) { ax += (hc.x - s.x) * 0.1; ay += (hc.y - s.y) * 0.1; }
-      ax += sx * 110; ay += sy * 110;                             // separation
+      ax += sx * 110; ay += sy * 110;
       s.wander += rr(-2, 2) * dt;
       if (!s.grazing) { ax += Math.cos(s.wander) * 6; ay += Math.sin(s.wander) * 5; }
       s.grazeT -= dt;
@@ -1446,7 +1440,6 @@ function updateSheep(dt) {
         }
       }
     }
-    // steer clear of forest and stones
     for (let a = 0; a < 8; a++) {
       const ang = (a / 8) * Math.PI * 2;
       const ox = Math.cos(ang), oy = Math.sin(ang);
@@ -1458,7 +1451,6 @@ function updateSheep(dt) {
     if (sp > maxS) { s.vx = s.vx / sp * maxS; s.vy = s.vy / sp * maxS; }
     if (s.panic <= 0) { const k = Math.max(0, 1 - dt * (s.grazing ? 4 : 1.4)); s.vx *= k; s.vy *= k; }
     moveBody(s, s.vx * dt, s.vy * dt, 2);
-    // pen at the goal pin
     if (world.goal) {
       const gx = s.x - world.goal.x, gy = (s.y - world.goal.y) / 0.8;
       const gd = len(gx, gy);
@@ -1474,7 +1466,7 @@ function updateSheep(dt) {
         s.vx *= 0.5; s.vy *= 0.5;
       }
     }
-    if (Math.abs(s.vx) > 2) s.side = s.vx < 0 ? -1 : 1;
+    updateFacing(s, dt, 5);
     s.walk += len(s.vx, s.vy) * dt;
     s.chew += dt;
     if (s.flash > 0) s.flash -= dt;
@@ -1487,18 +1479,18 @@ function updateSheep(dt) {
 function spawnEnemy(level) {
   const hc = herdCenter();
   const batChance = level < 2 ? 0 : Math.min(0.45, 0.15 + level * 0.05);
+  const base = { vx: 0, vy: 0, fx: 1, fy: 0.3, t: 0, fear: 0, anim: rand() * 6, hits: {}, carry: null, flash: 0, phase: rand() * 6.28 };
   if (rand() < batChance) {
     const a = rand() * Math.PI * 2;
-    const x = clamp(hc.x + Math.cos(a) * 160, 4, world.w - 4), y = clamp(hc.y + Math.sin(a) * 170, 4, world.h - 4);
-    enemies.push({ type: 'bat', x: x, y: y, vx: 0, vy: 0, state: 'hunt', t: 0, hp: 1, fear: 0,
-      speed: Math.min(62, 34 + level * 3), accel: 120, side: 1, anim: rand() * 6, alt: 10, hits: {},
-      carry: null, flash: 0, phase: rand() * 6.28, alpha: false });
+    const R = Math.max(W, H) * 0.6 + 20;
+    const x = clamp(hc.x + Math.cos(a) * R, 4, world.w - 4), y = clamp(hc.y + Math.sin(a) * R, 4, world.h - 4);
+    enemies.push(Object.assign({}, base, { type: 'bat', x: x, y: y, state: 'hunt', hp: 1,
+      speed: Math.min(62, 34 + level * 3), accel: 120, alt: 10, alpha: false }));
   } else {
-    const p = forestSpawn(hc.x, hc.y, 100, 170);
+    const p = forestSpawn(hc.x, hc.y, 100, Math.max(170, Math.max(W, H) * 0.6));
     const alpha = level >= 3 && rand() < Math.min(0.4, (level - 2) * 0.09);
-    enemies.push({ type: 'wolf', x: p.x, y: p.y, vx: 0, vy: 0, state: 'emerge', t: 1.0, hp: alpha ? 2 : 1, fear: 0,
-      speed: Math.min(76, 42 + level * 3.2) * (alpha ? 0.92 : 1), accel: 200, side: 1, anim: rand() * 6, alt: 0,
-      hits: {}, carry: null, flash: 0, phase: rand() * 6.28, alpha: alpha });
+    enemies.push(Object.assign({}, base, { type: 'wolf', x: p.x, y: p.y, state: 'emerge', t: 1.0, hp: alpha ? 2 : 1,
+      speed: Math.min(76, 42 + level * 3.2) * (alpha ? 0.92 : 1), accel: 200, alt: 0, alpha: alpha }));
   }
 }
 function nearestSheep(x, y) {
@@ -1576,7 +1568,7 @@ function updateEnemies(dt) {
       if (!target) { e.state = 'flee'; e.exit = forestExit(e.x, e.y); }
       else {
         const d = len(target.x - e.x, target.y - e.y);
-        if (e.type === 'wolf' && d < 26) spd *= 1.35;   // lunge
+        if (e.type === 'wolf' && d < 26) spd *= 1.35;
         let tx = target.x, ty = target.y;
         if (e.type === 'bat') {
           const pxv = -(target.y - e.y) / (d || 1), pyv = (target.x - e.x) / (d || 1);
@@ -1615,7 +1607,7 @@ function updateEnemies(dt) {
       if (d2 < 64 && d2 > 0.001) { const d = Math.sqrt(d2); e.vx += dx / d * 90 * dt; e.vy += dy / d * 90 * dt; }
     }
     e.x += e.vx * dt; e.y += e.vy * dt;
-    if (Math.abs(e.vx) > 2) e.side = e.vx < 0 ? -1 : 1;
+    updateFacing(e, dt, 4);
     if (e.type === 'bat') e.alt = 10 + Math.sin(e.anim * 5 + e.phase) * 2;
   }
 }
@@ -1637,7 +1629,7 @@ function checkRamHits() {
       impactBurst((e.x + p.x) / 2, ey);
       dust(e.x, e.y, 6, 3, 40);
       SFX.impact();
-      shake = Math.max(shake, 3.5);
+      addShake(3.5);
       hitStop = 0.05;
       if (e.carry) releaseCarried(e);
       if (e.hp <= 0) {
@@ -1664,14 +1656,14 @@ function placePlayers(cx, cy) {
     let x = cx + Math.cos(a) * 20, y = cy + Math.sin(a) * 12 + 22;
     if (blocked(x, y)) { x = cx + i * 4; y = cy + 16; }
     makePlayerBody(p, x, y);
+    p.fy = -1;
   });
 }
 function startRun() {
   score = 0; rescued = 0; delivered = 0; lostCount = 0; newBest = false; gameOverDelay = 0;
   enemies = []; particles = []; texts = []; fireflies = [];
   paused = false;
-  state = 'PLAYING';
-  stateTime = 0;
+  goScreen('PLAYING');
   if (mode === 'escort') startMission(1, 12);
   else startDefend();
 }
@@ -1742,16 +1734,14 @@ function updateEscort(dt) {
   }
   const carrying = enemies.some(e => e.carry);
   if (active === 0 && !carrying && mission.penned > 0) {
-    state = 'RESULTS';
-    stateTime = 0;
+    goScreen('RESULTS');
     for (const e of enemies) if (e.state !== 'launched') { e.state = 'flee'; e.exit = forestExit(e.x, e.y); }
     SFX.clear();
   }
 }
 function nextMission() {
   const herdN = Math.min(SHEEP_MAX, mission.penned + 2);
-  state = 'PLAYING';
-  stateTime = 0;
+  goScreen('PLAYING');
   startMission(mission.n + 1, herdN);
 }
 function checkGameOver(dt) {
@@ -1759,14 +1749,12 @@ function checkGameOver(dt) {
   if (sheep.length === 0 && !carrying) {
     gameOverDelay += dt;
     if (gameOverDelay > 1.2) {
-      state = 'GAMEOVER';
-      stateTime = 0;
+      goScreen('GAMEOVER');
       newBest = saveBest();
       SFX.gameover();
     }
   } else gameOverDelay = 0;
 }
-
 function updateFireflies(dt) {
   const want = dayProgress > 0.55 ? Math.floor((dayProgress - 0.55) * 40) : 0;
   if (fireflies.length < want && rand() < dt * 3) {
@@ -1782,13 +1770,41 @@ function updateFireflies(dt) {
 }
 
 // ---------------------------------------------------------------------
-// Menu / lobby (join with any device, swap goat/dog, pick mode)
+// Screens & menus
 // ---------------------------------------------------------------------
+function goScreen(s) {
+  state = s;
+  stateTime = 0;
+  ui.cursor = 0;
+  startCountdown = -1;
+}
+function useMenuWorld() {
+  if (world !== menuWorld) {
+    world = menuWorld;
+    enemies = []; particles = []; texts = []; fireflies = [];
+    spawnHerd(world.start.x, world.start.y, 10);
+    makeDemo();
+    snapCam(world.start.x, world.start.y);
+  }
+  paused = false;
+  dayTarget = 0;
+}
+function toTitle() {
+  useMenuWorld();
+  goScreen('TITLE');
+}
 function freeSlot() {
   for (let s = 0; s < 4; s++) if (!players.some(p => p.slot === s)) return s;
   return -1;
 }
+function normDev(dev) {
+  if (dev === 'mouse') return players.some(p => p.dev === 'kbL') && !players.some(p => p.dev === 'kbR') ? 'kbR' : 'kbL';
+  if (dev === 'kb') return 'kbL';
+  return dev;
+}
 function joinPlayer(dev) {
+  dev = normDev(dev);
+  if (players.some(p => p.dev === dev)) return null;
   const slot = freeSlot();
   if (slot < 0) return null;
   const p = { slot: slot, dev: dev, kind: slot % 2 === 0 ? 'goat' : 'dog', ready: false };
@@ -1798,84 +1814,283 @@ function joinPlayer(dev) {
   SFX.join();
   return p;
 }
-function toggleMode() { mode = mode === 'escort' ? 'defend' : 'escort'; SFX.click(); }
-function menuEvent(ev) {
-  if (ev.type === 'tap') { menuTap(ev.x, ev.y); return; }
-  if (ev.type === 'pause' || ev.type === 'restart') return;
-  if (ev.type === 'back') {
-    const p = ev.dev === 'kb' ? players.filter(q => q.dev === 'kbL' || q.dev === 'kbR').pop() : players.find(q => q.dev === ev.dev);
-    if (p) { players.splice(players.indexOf(p), 1); SFX.click(); }
+function enterPlayers(dev) {
+  useMenuWorld();
+  goScreen('PLAYERS');
+  for (const p of players) p.ready = false;
+  if (!players.length && dev) joinPlayer(dev);
+}
+function onOff(v) { return v ? 'ON' : 'OFF'; }
+function optionItems() {
+  return [
+    { label: 'SOUND', value: onOff(settings.sound), select: () => { setSound(!settings.sound); SFX.click(); }, change: () => { setSound(!settings.sound); SFX.click(); } },
+    { label: 'SCREEN SHAKE', value: onOff(settings.shake), select: () => { settings.shake = !settings.shake; saveSettings(); SFX.click(); }, change: () => { settings.shake = !settings.shake; saveSettings(); SFX.click(); } },
+    { label: 'FULLSCREEN', value: fsSupported() ? onOff(isFs()) : 'N/A', select: toggleFs, change: toggleFs }
+  ];
+}
+function screenItems() {
+  switch (state) {
+    case 'TITLE': return [
+      { label: 'PLAY', select: () => { autoFs(); goScreen('MODE'); } },
+      { label: 'HOW TO PLAY', select: () => goScreen('HOWTO') },
+      { label: 'OPTIONS', select: () => { optionsFrom = 'TITLE'; goScreen('OPTIONS'); } }
+    ];
+    case 'MODE': return [
+      { label: 'ESCORT', select: (dev) => { mode = 'escort'; enterPlayers(dev); } },
+      { label: 'DEFEND', select: (dev) => { mode = 'defend'; enterPlayers(dev); } },
+      { label: 'BACK', select: () => goScreen('TITLE') }
+    ];
+    case 'OPTIONS': return optionItems().concat([{ label: 'BACK', select: () => goScreen(optionsFrom) }]);
+    case 'HOWTO': return [{ label: 'BACK', select: () => goScreen('TITLE') }];
+    case 'PLAYING': return [
+      { label: 'RESUME', select: () => { paused = false; } },
+      optionItems()[0], optionItems()[1],
+      { label: 'QUIT TO TITLE', select: toTitle }
+    ];
+    case 'RESULTS': return [
+      { label: 'NEXT MISSION', select: nextMission },
+      { label: 'QUIT TO TITLE', select: toTitle }
+    ];
+    case 'GAMEOVER': return [
+      { label: 'RETRY', select: startRun },
+      { label: 'CHANGE PLAYERS', select: (dev) => enterPlayers(dev) },
+      { label: 'TITLE', select: toTitle }
+    ];
+  }
+  return [];
+}
+function screenBack() {
+  if (state === 'MODE' || state === 'HOWTO') { goScreen('TITLE'); SFX.back(); }
+  else if (state === 'OPTIONS') { goScreen(optionsFrom); SFX.back(); }
+  else if (state === 'PLAYING' && paused) { paused = false; SFX.back(); }
+}
+function listEvent(ev) {
+  const items = screenItems();
+  const n = items.length;
+  if (!n) return;
+  ui.cursor = clamp(ui.cursor, 0, n - 1);
+  const it = items[ui.cursor];
+  if (ev.type === 'up') { ui.cursor = (ui.cursor - 1 + n) % n; SFX.move(); }
+  else if (ev.type === 'down') { ui.cursor = (ui.cursor + 1) % n; SFX.move(); }
+  else if (ev.type === 'left' || ev.type === 'right') { if (it.change) it.change(ev.type === 'left' ? -1 : 1); }
+  else if (ev.type === 'action') { SFX.click(); it.select(ev.dev); }
+  else if (ev.type === 'back' || ev.type === 'pause') screenBack();
+  else if (ev.type === 'tap') {
+    for (const h of hits) {
+      if (ev.x >= h.x && ev.x < h.x + h.w && ev.y >= h.y && ev.y < h.y + h.h) {
+        if (h.i !== undefined) { ui.cursor = h.i; SFX.click(); items[h.i].select(ev.dev); }
+        else if (h.fn) h.fn(ev.dev);
+        return;
+      }
+    }
+  }
+}
+function playersEvent(ev) {
+  if (ev.type === 'tap') {
+    for (const h of hits) {
+      if (ev.x >= h.x && ev.x < h.x + h.w && ev.y >= h.y && ev.y < h.y + h.h) { h.fn(ev.dev); return; }
+    }
+    return;
+  }
+  if (ev.type === 'back' || ev.type === 'pause') {
+    let p;
+    if (ev.dev === 'kb') p = players.slice().reverse().find(q => q.dev === 'kbL' || q.dev === 'kbR');
+    else p = players.find(q => q.dev === ev.dev);
+    if (p) { players.splice(players.indexOf(p), 1); SFX.back(); }
+    if (!players.length) goScreen('MODE');
     return;
   }
   const p = players.find(q => q.dev === ev.dev);
-  if (ev.type === 'up' || ev.type === 'down') { toggleMode(); return; }
-  if (!p) { if (ev.type === 'action') joinPlayer(ev.dev); return; }
-  if (ev.type === 'left' || ev.type === 'right') { p.kind = p.kind === 'goat' ? 'dog' : 'goat'; p.ready = false; SFX.click(); }
-  else if (ev.type === 'action') { p.ready = !p.ready; SFX.click(); }
+  if (ev.type === 'action') {
+    if (!p) joinPlayer(ev.dev);
+    else { p.ready = !p.ready; SFX.click(); }
+  } else if ((ev.type === 'left' || ev.type === 'right') && p) {
+    p.kind = p.kind === 'goat' ? 'dog' : 'goat'; p.ready = false; SFX.move();
+  }
 }
-const SLOT_Y0 = 104, SLOT_H = 32;
-function menuTap(x, y) {
-  const p = players.find(q => q.dev === 'touch');
-  if (!p) { joinPlayer('touch'); return; }
-  if (y > 82 && y < 100) { toggleMode(); return; }
-  const slotY = SLOT_Y0 + p.slot * SLOT_H;
-  if (y >= slotY && y < slotY + SLOT_H - 2) { p.kind = p.kind === 'goat' ? 'dog' : 'goat'; p.ready = false; SFX.click(); return; }
-  if (y > 234) { p.ready = !p.ready; SFX.click(); }
+// Single entry point for all input (called synchronously from DOM handlers,
+// so fullscreen requests count as user gestures).
+function dispatch(ev) {
+  if (ev.type === 'fullscreen') { toggleFs(); return; }
+  if (ev.type === 'mute') { setSound(!settings.sound); return; }
+  if (state === 'PLAYERS') { playersEvent(ev); return; }
+  if (state === 'PLAYING' && !paused) {
+    if (ev.type === 'pause') { paused = true; ui.cursor = 0; SFX.click(); }
+    else if (ev.type === 'action') { const p = playerForDev(ev.dev); if (p) playerAction(p); }
+    return;
+  }
+  if ((state === 'RESULTS' || state === 'GAMEOVER') && stateTime < 0.8) return;
+  if (state === 'GAMEOVER' && ev.type === 'restart') { startRun(); return; }
+  listEvent(ev);
 }
-function updateMenu(dt) {
-  if (players.length && players.every(p => p.ready)) {
-    if (menuCountdown < 0) menuCountdown = 0.7;
-    menuCountdown -= dt;
-    if (menuCountdown <= 0) { menuCountdown = -1; startRun(); }
-  } else menuCountdown = -1;
+
+// ---------------------------------------------------------------------
+// Input devices (two keyboard halves, mouse, touch, up to 4 gamepads)
+// ---------------------------------------------------------------------
+const keys = {};
+const touch = { stickId: null, sx: 0, sy: 0, cx: 0, cy: 0, active: false, used: false };
+const padPrev = {};
+const DEVICE_NAMES = {
+  kbL: 'WASD + SPACE', kbR: 'ARROWS + ENTER', touch: 'TOUCH',
+  pad0: 'GAMEPAD 1', pad1: 'GAMEPAD 2', pad2: 'GAMEPAD 3', pad3: 'GAMEPAD 4'
+};
+window.addEventListener('keydown', (e) => {
+  const k = e.key;
+  if ([' ', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Tab', 'Backspace'].includes(k)) e.preventDefault();
+  initAudio();
+  keys[k.toLowerCase()] = true;
+  if (e.repeat) return;
+  const lk = k.toLowerCase();
+  const ev = (dev, type) => dispatch({ dev: dev, type: type });
+  if (k === ' ') ev('kbL', 'action');
+  else if (k === 'Enter' || e.code === 'ShiftRight' || k === '/') ev('kbR', 'action');
+  else if (lk === 'w') ev('kbL', 'up');
+  else if (lk === 's') ev('kbL', 'down');
+  else if (lk === 'a') ev('kbL', 'left');
+  else if (lk === 'd') ev('kbL', 'right');
+  else if (k === 'ArrowUp') ev('kbR', 'up');
+  else if (k === 'ArrowDown') ev('kbR', 'down');
+  else if (k === 'ArrowLeft') ev('kbR', 'left');
+  else if (k === 'ArrowRight') ev('kbR', 'right');
+  else if (lk === 'p' || k === 'Escape') ev('kb', 'pause');
+  else if (k === 'Backspace') ev('kb', 'back');
+  else if (lk === 'r') ev('kb', 'restart');
+  else if (lk === 'm') ev('kb', 'mute');
+  else if (lk === 'f') ev('kb', 'fullscreen');
+});
+window.addEventListener('keyup', (e) => { keys[e.key.toLowerCase()] = false; });
+window.addEventListener('blur', () => {
+  for (const k in keys) keys[k] = false;
+  if (state === 'PLAYING' && !paused) { paused = true; ui.cursor = 0; }
+});
+function toGame(clientX, clientY) {
+  const r = view.getBoundingClientRect();
+  return { x: ((clientX - r.left) / r.width) * W, y: ((clientY - r.top) / r.height) * H };
 }
-function toMenu() {
-  state = 'MENU';
-  stateTime = 0;
-  paused = false;
-  for (const p of players) p.ready = false;
-  world = menuWorld;
-  enemies = []; particles = []; texts = [];
-  spawnHerd(world.start.x, world.start.y, 10);
-  dayTarget = 0;
+view.addEventListener('mousedown', (e) => {
+  initAudio();
+  view.focus();
+  if (e.button !== 0) return;
+  if (state === 'PLAYING' && !paused) { dispatch({ dev: 'kbL', type: 'action' }); return; }
+  const p = toGame(e.clientX, e.clientY);
+  dispatch({ dev: 'mouse', type: 'tap', x: p.x, y: p.y });
+});
+view.addEventListener('contextmenu', (e) => e.preventDefault());
+view.addEventListener('touchstart', (e) => {
+  e.preventDefault();
+  initAudio();
+  touch.used = true;
+  for (const t of e.changedTouches) {
+    const p = toGame(t.clientX, t.clientY);
+    if (state === 'PLAYING' && !paused) {
+      if (p.x > W - 22 && p.y < 16) { dispatch({ dev: 'touch', type: 'pause' }); continue; }
+      if (p.x < W * 0.55 && touch.stickId === null) {
+        touch.stickId = t.identifier;
+        touch.sx = p.x; touch.sy = p.y; touch.cx = p.x; touch.cy = p.y;
+        touch.active = true;
+      } else dispatch({ dev: 'touch', type: 'action' });
+    } else {
+      dispatch({ dev: 'touch', type: 'tap', x: p.x, y: p.y });
+    }
+  }
+}, { passive: false });
+view.addEventListener('touchmove', (e) => {
+  e.preventDefault();
+  for (const t of e.changedTouches) {
+    if (t.identifier === touch.stickId) {
+      const p = toGame(t.clientX, t.clientY);
+      touch.cx = p.x; touch.cy = p.y;
+    }
+  }
+}, { passive: false });
+function endTouch(e) {
+  e.preventDefault();
+  for (const t of e.changedTouches) if (t.identifier === touch.stickId) { touch.stickId = null; touch.active = false; }
+}
+view.addEventListener('touchend', endTouch, { passive: false });
+view.addEventListener('touchcancel', endTouch, { passive: false });
+
+function getPads() {
+  try { return navigator.getGamepads ? navigator.getGamepads() : []; } catch (e) { return []; }
+}
+function pollPads() {
+  const pads = getPads();
+  for (let i = 0; i < 4; i++) {
+    const p = pads && pads[i];
+    const dev = 'pad' + i;
+    if (!p || !p.connected) { padPrev[dev] = null; continue; }
+    const b = (n) => !!(p.buttons[n] && p.buttons[n].pressed);
+    const ax = p.axes[0] || 0, ay = p.axes[1] || 0;
+    const now = {
+      action: b(0) || b(2), back: b(1), pause: b(9),
+      up: b(12) || ay < -0.6, down: b(13) || ay > 0.6, left: b(14) || ax < -0.6, right: b(15) || ax > 0.6
+    };
+    const prev = padPrev[dev];
+    if (prev) for (const k in now) if (now[k] && !prev[k]) { initAudio(); dispatch({ dev: dev, type: k }); }
+    padPrev[dev] = now;
+  }
+}
+function kbOtherFree(dev) {
+  const other = dev === 'kbL' ? 'kbR' : 'kbL';
+  return !players.some(p => p.dev === other);
+}
+function readMove(dev) {
+  let x = 0, y = 0;
+  const L = () => { if (keys['a']) x -= 1; if (keys['d']) x += 1; if (keys['w']) y -= 1; if (keys['s']) y += 1; };
+  const R = () => { if (keys['arrowleft']) x -= 1; if (keys['arrowright']) x += 1; if (keys['arrowup']) y -= 1; if (keys['arrowdown']) y += 1; };
+  if (dev === 'kbL') { L(); if (kbOtherFree('kbL')) R(); }
+  else if (dev === 'kbR') { R(); if (kbOtherFree('kbR')) L(); }
+  else if (dev === 'touch') {
+    if (touch.active) {
+      const dx = touch.cx - touch.sx, dy = touch.cy - touch.sy;
+      const d = len(dx, dy);
+      if (d > 2) { const m = Math.min(1, d / 14); x = (dx / d) * m; y = (dy / d) * m; }
+    }
+    return { x: x, y: y };
+  } else if (dev.startsWith('pad')) {
+    const p = getPads()[+dev[3]];
+    if (p && p.connected) {
+      x = p.axes[0] || 0; y = p.axes[1] || 0;
+      const d = len(x, y);
+      if (d < 0.22) { x = 0; y = 0; } else { const m = Math.min(1, (d - 0.22) / 0.7); x = (x / d) * m; y = (y / d) * m; }
+      const b = (n) => !!(p.buttons[n] && p.buttons[n].pressed);
+      if (b(14)) x = -1; if (b(15)) x = 1; if (b(12)) y = -1; if (b(13)) y = 1;
+    }
+    const l = len(x, y);
+    if (l > 1) { x /= l; y /= l; }
+    return { x: x, y: y };
+  }
+  const l = len(x, y);
+  if (l > 0) { x /= l; y /= l; }
+  return { x: x, y: y };
+}
+function playerForDev(dev) {
+  let p = players.find(q => q.dev === dev);
+  if (!p && (dev === 'kbL' || dev === 'kbR')) {
+    const other = dev === 'kbL' ? 'kbR' : 'kbL';
+    if (kbOtherFree(other)) p = players.find(q => q.dev === other);
+  }
+  return p || null;
 }
 
 // ---------------------------------------------------------------------
 // Update
 // ---------------------------------------------------------------------
-function handleEvents() {
-  pollPads();
-  while (events.length) {
-    const ev = events.shift();
-    if (state === 'MENU') { menuEvent(ev); continue; }
-    if (ev.type === 'pause') {
-      if (state === 'PLAYING') { paused = !paused; SFX.click(); }
-      continue;
-    }
-    if (state === 'PLAYING') {
-      if (paused) {
-        if (ev.type === 'action' || ev.type === 'tap') paused = false;
-        else if (ev.type === 'back') toMenu();
-        continue;
-      }
-      if (ev.type === 'action') { const p = playerForDev(ev.dev); if (p) playerAction(p); }
-    } else if (state === 'RESULTS') {
-      if ((ev.type === 'action' || ev.type === 'tap') && stateTime > 1.2) nextMission();
-    } else if (state === 'GAMEOVER') {
-      if (stateTime < 1.0) continue;
-      if (ev.type === 'restart') startRun();
-      else if (ev.type === 'action' || ev.type === 'tap' || ev.type === 'back') toMenu();
-    }
-  }
-}
 function update(dt) {
   realTime += dt;
   stateTime += dt;
-  handleEvents();
+  pollPads();
   dayProgress += (dayTarget - dayProgress) * damp(0.5, dt);
   if (shake > 0) shake = Math.max(0, shake - dt * 14);
-  if (state === 'MENU') {
-    updateMenu(dt);
+  if (isMenu()) {
+    if (state === 'PLAYERS') {
+      if (players.length && players.every(p => p.ready)) {
+        if (startCountdown < 0) startCountdown = 1.0;
+        startCountdown -= dt;
+        if (startCountdown <= 0) { startRun(); return; }
+      } else startCountdown = -1;
+    }
+    updateDemo(dt);
     updateSheep(dt);
     updateParticles(dt);
     updateCamera(dt);
@@ -1895,7 +2110,6 @@ function update(dt) {
     updatePlayers(dt);
     updateSheep(dt);
     updateEnemies(dt);
-    if (state === 'RESULTS' && stateTime > 6) nextMission();
   }
   updateParticles(dt);
   updateFireflies(dt);
@@ -1903,54 +2117,60 @@ function update(dt) {
 }
 
 // ---------------------------------------------------------------------
-// Rendering
+// Rendering: world
 // ---------------------------------------------------------------------
 function wx(x) { return Math.round(x) - OX; }
 function wy(y) { return Math.round(y) - OY; }
 function sheepSprite(s) {
   const moving = len(s.vx, s.vy) > 4;
-  const f = Math.floor(s.walk / 3) % 2;
-  if (s.panic > 0) return f ? S.sheepPanic : S.sheepWalk;
-  if (s.grazing && !moving) return (Math.floor(s.chew * 4) % 2) ? S.sheepGrazeA : S.sheepGrazeB;
-  if (moving) return f ? S.sheepIdle : S.sheepWalk;
-  return S.sheepIdle;
+  if (s.grazing && !moving) return { spr: SP.sheep.graze[Math.floor(s.chew * 4) % 2], left: s.fx < 0 };
+  const dir = faceDir(s.fx, s.fy);
+  const f = moving ? Math.floor(s.walk / 3) % 2 : 0;
+  return { spr: SP.sheep[dir][f], left: s.fx < 0 };
+}
+function actorSprite(p) {
+  const dir = faceDir(p.fx, p.fy);
+  const set = SP[p.kind];
+  const moving = len(p.vx, p.vy) > 8;
+  const f = moving ? Math.floor(p.walk / 5) % 2 : 0;
+  if ((p.kind === 'goat' && p.ramT > 0) || (p.kind === 'dog' && p.actT > 0)) return { spr: set.act[dir], f: 0 };
+  return { spr: set[dir][f], f: f };
 }
 function drawWorldScene() {
   G = bctx;
-  bctx.fillStyle = C.k;
+  bctx.fillStyle = C.t;
   bctx.fillRect(0, 0, BW, BH);
   bctx.drawImage(world.canvas, OX, OY, BW, BH, 0, 0, BW, BH);
-  const showPlayers = state !== 'MENU';
+  const actors = isMenu() ? demo : players;
 
   for (const s of sheep) drawShadow(wx(s.x), wy(s.y), 7);
-  if (showPlayers) for (const p of players) drawShadow(wx(p.x), wy(p.y), 8);
+  for (const p of actors) drawShadow(wx(p.x), wy(p.y), 8);
   for (const e of enemies) {
     if (e.state === 'emerge' || canopy(e.x, e.y)) continue;
     drawShadow(wx(e.x), wy(e.y), e.type === 'bat' ? 5 : 9);
   }
-  // depth-sorted ground entities
   const list = [];
   for (const s of sheep) list.push({ y: s.y, k: 0, o: s });
   for (const e of enemies) if (e.type === 'wolf') list.push({ y: e.y, k: 1, o: e });
-  if (showPlayers) for (const p of players) list.push({ y: p.y, k: 2, o: p });
+  for (const p of actors) list.push({ y: p.y, k: 2, o: p });
   for (const pl of world.pillars) if (onScreen(pl.x, pl.y, 20)) list.push({ y: pl.y, k: 3, o: pl });
   list.sort((a, b) => a.y - b.y);
   for (const it of list) {
     if (it.k === 0) {
       const s = it.o;
       const fl = s.flash > 0 && Math.floor(s.flash * 12) % 2 === 0;
-      drawSpr(sheepSprite(s), wx(s.x), wy(s.y), s.side < 0, { white: fl });
-      if (s.panic > 0 && Math.floor(realTime * 6) % 2 === 0) px(wx(s.x) + (s.side < 0 ? -3 : 3), wy(s.y) - 9, 'w');
+      const ss = sheepSprite(s);
+      drawSpr(ss.spr, wx(s.x), wy(s.y), ss.left, { white: fl });
+      if (s.panic > 0 && Math.floor(realTime * 6) % 2 === 0) px(wx(s.x) + (s.fx < 0 ? -3 : 3), wy(s.y) - 9, 'w');
     } else if (it.k === 1) drawEnemy(it.o);
-    else if (it.k === 2) drawPlayer(it.o);
-    else drawSpr(it.o.broken ? S.pillarBroken : S.pillar, wx(it.o.x), wy(it.o.y), false);
+    else if (it.k === 2) drawActor(it.o);
+    else drawSpr(it.o.broken ? SP.pillarBroken : SP.pillar, wx(it.o.x), wy(it.o.y), false);
   }
   if (world.goal) {
     const bob = Math.round(Math.sin(realTime * 3) * 1.5);
-    drawSpr(S.pinGoal, wx(world.goal.x), wy(world.goal.y) - 10 + bob, false);
+    drawSpr(SP.pinGoal, wx(world.goal.x), wy(world.goal.y) - 10 + bob, false);
   }
-  if (world.kind === 'escort' && world.start) drawSpr(S.pinStart, wx(world.start.x), wy(world.start.y) - 6, false);
-  // eyes lurking in the forest
+  if (world.kind === 'escort' && world.start) drawSpr(SP.pinStart, wx(world.start.x), wy(world.start.y) - 6, false);
   for (const e of enemies) {
     if (e.state === 'emerge' || (e.type === 'wolf' && canopy(e.x, e.y) && e.state !== 'launched')) {
       if (Math.floor((e.anim + e.phase) * 3) % 5 === 0) continue;
@@ -1980,17 +2200,14 @@ function drawWorldScene() {
     text(t.str, wx(t.x), wy(t.y), t.col, { align: 'center', outline: 'k' });
   }
 }
-function drawPlayer(p) {
+function drawActor(p) {
   const x = wx(p.x), y = wy(p.y);
-  const moving = len(p.vx, p.vy) > 8;
-  const f = Math.floor(p.walk / 5) % 2;
-  let s;
-  if (p.kind === 'goat') s = p.ramT > 0 ? S.goatRam : (moving && f ? S.goatB : S.goatA);
-  else s = p.actT > 0 ? S.dogBark : (moving && f ? S.dogB : S.dogA);
-  const bob = moving && f && p.ramT <= 0 ? -1 : 0;
+  const a = actorSprite(p);
+  const s = a.spr;
+  const bob = a.f && p.ramT <= 0 ? -1 : 0;
   if (p.ramT > 0) for (let i = 1; i <= 3; i++) px(x - Math.round(p.fx * i * 5), y - 4 - Math.round(p.fy * i * 5) + (i % 2), 'w');
-  drawSpr(s, x, y + bob, p.side < 0);
-  if (players.length > 1) {
+  drawSpr(s, x, y + bob, p.fx < 0);
+  if (players.length > 1 && !isMenu()) {
     const c = P_COL[p.slot];
     const my = y - s.h - 2 + bob;
     rect(x - 1, my, 3, 1, c); px(x, my + 1, c);
@@ -2006,22 +2223,23 @@ function drawEnemy(e) {
   if (e.state === 'emerge') return;
   if (e.type === 'wolf' && canopy(e.x, e.y) && e.state !== 'launched') return;
   let s;
-  if (e.type === 'bat') s = (Math.floor(e.anim * 10) % 2) ? S.batUp : S.batDown;
+  if (e.type === 'bat') s = (Math.floor(e.anim * 10) % 2) ? SP.batUp : SP.batDown;
   else {
     const fast = len(e.vx, e.vy) > 8 && e.state !== 'stun';
     const f = fast ? Math.floor(e.anim * 10) % 2 : 0;
-    s = e.alpha ? (f ? S.alphaB : S.alphaA) : (f ? S.wolfB : S.wolfA);
+    s = (e.alpha ? SP.alpha : SP.wolf)[faceDir(e.fx, e.fy)][f];
   }
+  const left = e.fx < 0;
   const x = wx(e.x), y = wy(e.y - e.alt);
   if (e.state === 'launched') {
     const tum = Math.floor(e.t * 16) % 2 === 0;
-    drawSpr(s, x, y, e.side < 0, { upside: tum, white: !tum && Math.floor(e.t * 30) % 2 === 0 });
+    drawSpr(s, x, y, left, { upside: tum, white: !tum && Math.floor(e.t * 30) % 2 === 0 });
     return;
   }
-  if (e.carry && e.type === 'bat') drawSpr(S.sheepPanic, x, y + 6, e.side < 0);
+  if (e.carry && e.type === 'bat') drawSpr(SP.sheep.panic, x, y + 6, left);
   const wob = e.state === 'stun' ? Math.round(Math.sin(e.anim * 30)) : 0;
-  drawSpr(s, x + wob, y, e.side < 0, { white: e.flash > 0 });
-  if (e.carry && e.type === 'wolf') drawSpr(S.sheepPanic, x + e.side * 8, y + 1, e.side < 0);
+  drawSpr(s, x + wob, y, left, { white: e.flash > 0 });
+  if (e.carry && e.type === 'wolf') drawSpr(SP.sheep.panic, x + (left ? -8 : 8), y + 1, left);
   if (e.state === 'stun') {
     for (let k = 0; k < 2; k++) {
       const a = e.anim * 6 + k * Math.PI;
@@ -2030,14 +2248,9 @@ function drawEnemy(e) {
   }
 }
 
-// HUD (separate canvas: no sub-pixel shift, no palette swap)
-const dimPatterns = (() => {
-  const a = makeCanvas(2, 2), ag = a.getContext('2d');
-  ag.fillStyle = C.k; ag.fillRect(0, 0, 1, 1); ag.fillRect(1, 1, 1, 1);
-  const b = makeCanvas(4, 4), bg = b.getContext('2d');
-  bg.fillStyle = C.k; bg.fillRect(0, 0, 1, 1); bg.fillRect(2, 2, 1, 1); bg.fillRect(2, 0, 1, 1); bg.fillRect(0, 2, 1, 1);
-  return { full: hctx.createPattern(a, 'repeat'), light: hctx.createPattern(b, 'repeat') };
-})();
+// ---------------------------------------------------------------------
+// Rendering: HUD & screens (separate canvas, never palette-swapped)
+// ---------------------------------------------------------------------
 function ditherDim(full) {
   hctx.fillStyle = full ? dimPatterns.full : dimPatterns.light;
   hctx.fillRect(0, 0, W, H);
@@ -2057,15 +2270,54 @@ function edgeArrow(tx, ty, col, blink) {
     for (let j = -i; j <= i; j++) px(bx - dy * j * 0.8, by + dx * j * 0.8, col);
   }
 }
+// vertical option list with a highlighted cursor row
+function drawList(items, cx, y, w, rowH, enabled) {
+  const x = Math.round(cx - w / 2);
+  items.forEach((it, i) => {
+    const yy = y + i * rowH;
+    const sel = i === ui.cursor && enabled !== false;
+    rect(x, yy, w, rowH - 2, sel ? 'i' : 'k');
+    if (sel) { rect(x, yy, 2, rowH - 2, 'y'); text('>', x + 5, yy + Math.floor((rowH - 7) / 2), 'y'); }
+    const ty = yy + Math.floor((rowH - 7) / 2);
+    const col = enabled === false ? 'i' : (sel ? 'y' : 'l');
+    text(it.label, x + 12, ty, col);
+    if (it.value !== undefined) text(it.value, x + w - 6, ty, enabled === false ? 'i' : (sel ? 'w' : 's'), { align: 'right' });
+    hits.push({ x: x, y: yy, w: w, h: rowH - 2, i: i });
+  });
+}
+function screenBg() {
+  rect(0, 0, W, H, 'k');
+  frame(2, 2, W - 4, H - 4, 'i');
+  // a strip of meadow and tree crowns along the bottom edge
+  rect(3, H - 22, W - 6, 19, 'g');
+  for (let x = 3; x < W - 3; x++) {
+    const hh = 6 + Math.round(3 * Math.sin(x * 0.35) + 2 * Math.sin(x * 0.13));
+    rect(x, H - 22, 1, hh, (x % 9 === 0) ? 'i' : 't');
+    rect(x, H - 22 + hh, 1, 2, 'i');
+    if (x % 6 === 0) rect(x, H - 20 + hh, 1, 3, 'i');
+    else rect(x, H - 20 + hh, 1, 3, 's');
+  }
+}
+function header(title) {
+  rect(0, 0, W, 20, 'k');
+  rect(0, 20, W, 1, 'i');
+  text(title, W / 2, 7, 'w', { align: 'center' });
+}
 function drawHUD() {
   G = hctx;
+  hits = [];
   hctx.clearRect(0, 0, W, H);
-  if (state === 'MENU') { drawMenu(); return; }
-  // minimal corner HUD
+  if (isMenu()) {
+    if (state === 'TITLE') drawTitle();
+    else if (state === 'MODE') drawModeSelect();
+    else if (state === 'PLAYERS') drawPlayerSelect();
+    else if (state === 'OPTIONS') drawOptions();
+    else if (state === 'HOWTO') drawHowTo();
+    return;
+  }
   const active = sheep.filter(s => !s.penned).length;
-  G.drawImage(S.sheepIdle.r, 3, 3);
-  const low = active <= 3 && Math.floor(realTime * 4) % 2;
-  text(String(active), 12, 4, low ? 'r' : 'w', { shadow: 'k' });
+  G.drawImage(SP.sheep.SE[0].r, 3, 3);
+  text(String(active), 12, 4, active <= 3 ? 'r' : 'w', { shadow: 'k' });
   if (mode === 'escort') {
     text('PEN ' + mission.penned, 24, 4, 'y', { shadow: 'k' });
     text('M' + mission.n, W - 3, 4, 'w', { align: 'right', shadow: 'k' });
@@ -2075,9 +2327,10 @@ function drawHUD() {
   if (touch.used && state === 'PLAYING') { rect(W - 18, 3, 1, 5, 'w'); rect(W - 16, 3, 1, 5, 'w'); }
   if (world.goal && state === 'PLAYING') edgeArrow(world.goal.x, world.goal.y, 'y', false);
   for (const e of enemies) if (e.carry) edgeArrow(e.x, e.y, 'r', true);
-  if (banner.t > 0 && state === 'PLAYING' && !(banner.t < 0.4 && Math.floor(banner.t * 20) % 2)) {
-    text(banner.a, W / 2, 96, 'w', { s: 2, align: 'center', outline: 'k' });
-    text(banner.b, W / 2, 114, 'y', { align: 'center', outline: 'k' });
+  if (banner.t > 0 && state === 'PLAYING' && !paused) {
+    const by = Math.round(H * 0.33);
+    text(banner.a, W / 2, by, 'w', { s: 2, align: 'center', outline: 'k' });
+    text(banner.b, W / 2, by + 18, 'y', { align: 'center', outline: 'k' });
   }
   if (touch.active) {
     for (let i = 0; i < 16; i++) { const a = i / 16 * Math.PI * 2; px(touch.sx + Math.cos(a) * 12, touch.sy + Math.sin(a) * 12, 'w'); }
@@ -2086,92 +2339,188 @@ function drawHUD() {
     if (d > 10) { dx = dx / d * 10; dy = dy / d * 10; }
     rect(touch.sx + dx - 2, touch.sy + dy - 2, 4, 4, 'w');
   }
-  if (paused) drawPause();
+  if (state === 'PLAYING' && paused) drawPause();
   if (state === 'RESULTS') drawResults();
   if (state === 'GAMEOVER') drawGameOver();
-  if (muted) text('MUTED', W - 3, H - 8, 'r', { align: 'right', shadow: 'k' });
+}
+function colW() { return Math.min(W - 16, 168); }
+function drawTitle() {
+  const cy0 = Math.round(H * 0.1);
+  const big = W >= 200 ? 5 : 4;
+  text('GOAT', W / 2, cy0, 'w', { s: big, align: 'center', outline: 'k' });
+  text('GUARDIAN', W / 2, cy0 + big * 5 + 6, 'y', { s: 2, align: 'center', outline: 'k' });
+  text('A HERDING TALE', W / 2, cy0 + big * 5 + 22, 'l', { align: 'center', outline: 'k' });
+  const w = Math.min(W - 24, 120);
+  const y = Math.max(cy0 + big * 5 + 40, Math.round(H * 0.56));
+  rect(Math.round(W / 2 - w / 2) - 2, y - 2, w + 4, 3 * 14 + 2, 'k');
+  drawList(screenItems(), W / 2, y, w, 14);
+  const fy = H - 10;
+  rect(0, fy - 3, W, 13, 'k');
+  if (best.escort || best.defend) text('BEST  ESCORT ' + best.escort + '  DEFEND ' + best.defend, W / 2, fy, 'y', { align: 'center' });
+  else text('1-4 PLAYERS  GOATS AND DOGS', W / 2, fy, 's', { align: 'center' });
+  text('V0.3', W - 3, fy - 12, 'i', { align: 'right', outline: 'k' });
+}
+function drawModeSelect() {
+  screenBg();
+  header('SELECT MODE');
+  const w = colW(), x = Math.round(W / 2 - w / 2);
+  const items = screenItems();
+  const cards = [
+    { title: 'ESCORT', l1: 'HERD THE FLOCK FROM PIN', l2: 'TO PIN ACROSS THE WOODS', best: best.escort, icon: SP.pinGoal },
+    { title: 'DEFEND', l1: 'HOLD THE STONE HENGE', l2: 'AGAINST ENDLESS WAVES', best: best.defend, icon: SP.pillar }
+  ];
+  const ch = Math.min(46, Math.floor((H - 100) / 2));
+  let y = Math.max(30, Math.round((H - 40 - (2 * ch + 6 + 16)) / 2) + 6);
+  cards.forEach((c, i) => {
+    const sel = ui.cursor === i;
+    rect(x, y, w, ch, sel ? 'i' : 'k');
+    frame(x, y, w, ch, sel ? 'y' : 'i');
+    rect(x + 6, y + 6, 18, ch - 12, 'g');
+    rect(x + 6, y + ch - 8, 18, 2, 'h');
+    G.drawImage(c.icon.r, Math.round(x + 15 - c.icon.w / 2), y + ch - 7 - c.icon.h);
+    text((sel ? '> ' : '') + c.title, x + 30, y + 7, sel ? 'y' : 'w');
+    text(c.l1, x + 30, y + 16, 'l');
+    text(c.l2, x + 30, y + 23, 'l');
+    text('BEST ' + c.best, x + 30, y + ch - 10, 's');
+    hits.push({ x: x, y: y, w: w, h: ch, i: i });
+    y += ch + 6;
+  });
+  ui.cursor = clamp(ui.cursor, 0, items.length - 1);
+  const by = y + 4;
+  const bw = 60, bx = Math.round(W / 2 - bw / 2);
+  const sel = ui.cursor === 2;
+  rect(bx, by, bw, 12, sel ? 'i' : 'k');
+  if (sel) rect(bx, by, 2, 12, 'y');
+  text('BACK', W / 2, by + 4, sel ? 'y' : 'l', { align: 'center' });
+  hits.push({ x: bx, y: by, w: bw, h: 12, i: 2 });
+  text('UP/DOWN TO CHOOSE  ACTION TO PICK', W / 2, H - 32, 's', { align: 'center' });
+}
+function drawPlayerSelect() {
+  screenBg();
+  header(mode === 'escort' ? 'ESCORT - PLAYERS' : 'DEFEND - PLAYERS');
+  // back button
+  rect(4, 5, 30, 11, 'i');
+  text('<', 7, 8, 'l'); text('BACK', 14, 8, 'l');
+  hits.push({ x: 0, y: 0, w: 36, h: 20, fn: () => { goScreen('MODE'); SFX.back(); } });
+  const w = colW(), x = Math.round(W / 2 - w / 2);
+  const bottom = 62;
+  const ch = clamp(Math.floor((H - 28 - bottom) / 4) - 4, 30, 42);
+  const top = Math.max(28, Math.round((H - bottom + 24 - 4 * (ch + 4)) / 2));
+  for (let s = 0; s < 4; s++) {
+    const y = top + s * (ch + 4);
+    const p = players.find(q => q.slot === s);
+    rect(x, y, w, ch, p ? 'k' : 'k');
+    frame(x, y, w, ch, p ? (p.ready ? 'y' : 'i') : 'i');
+    rect(x, y, 3, ch, P_COL[s]);
+    text('P' + (s + 1), x + 7, y + 4, P_COL[s]);
+    if (!p) {
+      text('OPEN SLOT', x + 7, y + 14, 'l');
+      text('PRESS ACTION OR TAP TO JOIN', x + 7, y + 22, 's');
+      hits.push({ x: x, y: y, w: w, h: ch, fn: (dev) => joinPlayer(dev === 'touch' ? 'touch' : normDev(dev)) });
+      continue;
+    }
+    const sp = SP[p.kind].SE[Math.floor(realTime * 4) % 2];
+    const bx = x + 8, by = y + 12, bw = 22, bh = ch - 16;
+    rect(bx, by, bw, bh, 'g');
+    rect(bx, by + bh - 3, bw, 3, 'h');
+    G.drawImage(sp.r, 0, 0, sp.w, sp.h, Math.round(bx + bw / 2 - sp.w), by + bh - 2 - sp.h * 2, sp.w * 2, sp.h * 2);
+    const tx = x + 36;
+    text('<', tx, y + 5, 'l');
+    text(p.kind === 'goat' ? 'GOAT' : 'DOG', tx + 8, y + 5, 'w');
+    text('>', tx + 8 + textWidth(p.kind === 'goat' ? 'GOAT' : 'DOG') + 4, y + 5, 'l');
+    hits.push({ x: tx - 2, y: y + 2, w: 46, h: 10, fn: () => { p.kind = p.kind === 'goat' ? 'dog' : 'goat'; p.ready = false; SFX.move(); } });
+    text(p.kind === 'goat' ? 'RAMS PREDATORS' : 'BARKS + HERDS', tx, y + 14, 'l');
+    text(DEVICE_NAMES[p.dev] || p.dev, tx, y + 22, 's');
+    const rw = 34, rx = x + w - rw - 5, ry = y + ch - 14;
+    rect(rx, ry, rw, 10, p.ready ? 'y' : 'i');
+    text(p.ready ? 'READY' : 'READY?', rx + rw / 2, ry + 3, p.ready ? 'k' : 'l', { align: 'center' });
+    hits.push({ x: rx - 2, y: ry - 2, w: rw + 4, h: 14, fn: () => { p.ready = !p.ready; SFX.click(); } });
+  }
+  const fy = H - bottom + 4;
+  if (startCountdown >= 0) {
+    const bw = colW();
+    rect(Math.round(W / 2 - bw / 2), fy, bw, 12, 'i');
+    rect(Math.round(W / 2 - bw / 2), fy, Math.round(bw * (1 - startCountdown / 1.0)), 12, 'y');
+    text('STARTING', W / 2, fy + 4, 'k', { align: 'center' });
+  } else {
+    text('LEFT/RIGHT: GOAT OR DOG', W / 2, fy, 'l', { align: 'center' });
+    text('ACTION: READY   BACK: LEAVE', W / 2, fy + 8, 'l', { align: 'center' });
+  }
+  text('GAME STARTS WHEN ALL ARE READY', W / 2, H - 32, 's', { align: 'center' });
+}
+function drawOptions() {
+  screenBg();
+  header('OPTIONS');
+  const items = screenItems();
+  drawList(items, W / 2, 34, colW(), 16);
+  text('LEFT/RIGHT OR ACTION TO CHANGE', W / 2, 34 + items.length * 16 + 8, 's', { align: 'center' });
+  text('F: FULLSCREEN   M: SOUND', W / 2, H - 32, 's', { align: 'center' });
+}
+function drawHowTo() {
+  screenBg();
+  header('HOW TO PLAY');
+  const w = colW(), x = Math.round(W / 2 - w / 2);
+  let y = 28;
+  const line = (s, col) => { text(s, x + 4, y, col || 'l'); y += 8; };
+  const icon = (sp) => { rect(x, y, 20, 14, 'g'); rect(x, y + 12, 20, 2, 'h'); G.drawImage(sp.r, Math.round(x + 10 - sp.w / 2), y + 12 - sp.h); };
+  icon(SP.goat.SE[0]);
+  text('GOAT', x + 26, y + 1, 'y'); text('RAM CHARGE SMASHES FOES', x + 26, y + 8, 'l'); y += 20;
+  icon(SP.dog.SE[0]);
+  text('DOG', x + 26, y + 1, 'y'); text('BARK SHOVES SHEEP + SCARES', x + 26, y + 8, 'l'); y += 20;
+  icon(SP.sheep.SE[0]);
+  text('SHEEP', x + 26, y + 1, 'y'); text('FOLLOW GOATS, FLEE DOGS', x + 26, y + 8, 'l'); y += 22;
+  line('ESCORT: HERD THE FLOCK INTO', 'w');
+  line('THE PEN AT THE RED PIN.', 'w');
+  line('DEFEND: SURVIVE THE WAVES.', 'w');
+  line('HIT A THIEF TO SAVE ITS SHEEP.', 'w');
+  y += 4;
+  line('KEYS  WASD+SPACE / ARROWS+ENTER', 's');
+  line('PADS  STICK + A   START: PAUSE', 's');
+  line('TOUCH DRAG LEFT  TAP RIGHT', 's');
+  line('P PAUSE  M SOUND  F FULLSCREEN', 's');
+  const by = Math.min(H - 40, y + 6);
+  drawList(screenItems(), W / 2, by, 60, 14);
 }
 function drawPause() {
   ditherDim(true);
-  text('PAUSED', W / 2, 90, 'w', { s: 2, align: 'center', outline: 'k' });
-  text('SCORE ' + score, W / 2, 112, 'y', { align: 'center' });
-  text(touch.used ? 'TAP TO RESUME' : 'P OR ACTION: RESUME', W / 2, 128, 'w', { align: 'center' });
-  text('BACKSPACE / B: MENU', W / 2, 138, 'l', { align: 'center' });
+  const items = screenItems();
+  const y0 = Math.round(H * 0.3);
+  text('PAUSED', W / 2, y0, 'w', { s: 2, align: 'center', outline: 'k' });
+  text('SCORE ' + score, W / 2, y0 + 16, 'y', { align: 'center' });
+  drawList(items, W / 2, y0 + 30, Math.min(W - 24, 130), 14);
 }
 function drawResults() {
   ditherDim(stateTime > 0.3);
   const total = mission.herdStart;
-  text('MISSION ' + mission.n, W / 2, 70, 'w', { s: 2, align: 'center', outline: 'k' });
-  text('COMPLETE', W / 2, 86, 'y', { s: 2, align: 'center', outline: 'k' });
-  text('DELIVERED', 30, 116, 'l', {}); text(mission.penned + '/' + total, W - 30, 116, 'w', { align: 'right' });
-  text('PREDATORS', 30, 128, 'l', {}); text(String(mission.kills), W - 30, 128, 'w', { align: 'right' });
-  text('SCORE', 30, 140, 'l', {}); text(String(score), W - 30, 140, 'y', { align: 'right' });
+  const cx = W / 2, w = Math.min(W - 24, 130), x = Math.round(cx - w / 2);
+  let y = Math.round(H * 0.2);
+  text('MISSION ' + mission.n, cx, y, 'w', { s: 2, align: 'center', outline: 'k' }); y += 16;
+  text('COMPLETE', cx, y, 'y', { s: 2, align: 'center', outline: 'k' }); y += 22;
+  const row = (a, b, c) => { text(a, x + 4, y, 'l'); text(String(b), x + w - 4, y, c, { align: 'right' }); y += 10; };
+  row('DELIVERED', mission.penned + '/' + total, 'w');
+  row('PREDATORS', mission.kills, 'w');
+  row('SCORE', score, 'y');
   const stars = mission.penned >= total ? 3 : (mission.penned >= total * 0.66 ? 2 : 1);
-  for (let i = 0; i < 3; i++) text('*', W / 2 - 14 + i * 10, 154, i < stars ? 'y' : 'i', { s: 2 });
-  if (stateTime > 1.2 && Math.floor(realTime * 2) % 2 === 0) text('ACTION: NEXT MISSION', W / 2, 180, 'w', { align: 'center' });
+  for (let i = 0; i < 3; i++) text('*', cx - 14 + i * 10, y + 2, i < stars ? 'y' : 'i', { s: 2 });
+  y += 20;
+  drawList(screenItems(), cx, y, w, 14, stateTime >= 0.8);
 }
 function drawGameOver() {
   ditherDim(stateTime > 0.3);
   if (stateTime < 0.3) return;
-  text('THE FLOCK', W / 2, 60, 'w', { s: 2, align: 'center', outline: 'k' });
-  text('IS LOST', W / 2, 76, 'r', { s: 2, align: 'center', outline: 'k' });
-  let y = 104;
-  const row = (a, b, c) => { text(a, 26, y, 'l', {}); text(String(b), W - 26, y, c, { align: 'right' }); y += 11; };
+  const cx = W / 2, w = Math.min(W - 24, 130), x = Math.round(cx - w / 2);
+  let y = Math.round(H * 0.16);
+  text('THE FLOCK', cx, y, 'w', { s: 2, align: 'center', outline: 'k' }); y += 16;
+  text('IS LOST', cx, y, 'r', { s: 2, align: 'center', outline: 'k' }); y += 22;
+  const row = (a, b, c) => { text(a, x + 4, y, 'l'); text(String(b), x + w - 4, y, c, { align: 'right' }); y += 10; };
   row('SCORE', score, 'y');
   if (mode === 'escort') { row('MISSION', mission.n, 'w'); row('DELIVERED', delivered, 'w'); }
   else row('WAVE', wave.n, 'w');
   row('RESCUED', rescued, 'w');
   row('BEST', best[mode], 'y');
-  if (newBest && Math.floor(realTime * 4) % 2 === 0) text('NEW BEST!', W / 2, y + 4, 'y', { align: 'center', outline: 'k' });
-  if (stateTime > 1.0 && Math.floor(realTime * 2) % 2 === 0) {
-    text('R: RETRY', W / 2, y + 22, 'w', { align: 'center' });
-    text('ACTION: MENU', W / 2, y + 32, 'w', { align: 'center' });
-  }
-}
-function drawMenu() {
-  ditherDim(true);
-  const bob = Math.round(Math.sin(realTime * 2) * 1.5);
-  text('GOAT', W / 2, 14 + bob, 'w', { s: 4, align: 'center', outline: 'k' });
-  text('GUARDIAN', W / 2, 40 + bob, 'y', { s: 2, align: 'center', outline: 'k' });
-  text('AND THE HERDING DOG', W / 2, 60, 'l', { align: 'center', outline: 'k' });
-  // mode selector
-  rect(8, 82, W - 16, 18, 'k');
-  text('^', 14, 85, 'l', {});
-  text('^', W - 18, 85, 'l', {});
-  text(mode === 'escort' ? 'ESCORT' : 'DEFEND', W / 2, 85, 'y', { align: 'center' });
-  text(mode === 'escort' ? 'PIN TO PIN MISSIONS' : 'ENDLESS WAVES', W / 2, 92, 'l', { align: 'center' });
-  // player slots
-  for (let s = 0; s < 4; s++) {
-    const y = SLOT_Y0 + s * SLOT_H;
-    const p = players.find(q => q.slot === s);
-    rect(8, y, W - 16, SLOT_H - 4, 'k');
-    rect(8, y, 2, SLOT_H - 4, P_COL[s]);
-    text('P' + (s + 1), 14, y + 2, P_COL[s], {});
-    if (!p) {
-      if (Math.floor(realTime * 2 + s) % 2 === 0) text('PRESS ACTION', 30, y + 6, 'l', {});
-      text('TO JOIN', 30, y + 14, 's', {});
-      continue;
-    }
-    const sp = p.kind === 'goat' ? S.goatA : S.dogA;
-    rect(12, y + 9, 22, 16, 'g');
-    rect(12, y + 23, 22, 2, 'h');
-    G.drawImage(sp.r, 0, 0, sp.w, sp.h, 14, y + 10, sp.w * 2, sp.h * 2);
-    text(p.kind === 'goat' ? 'GOAT' : 'DOG', 38, y + 4, 'w', {});
-    text(p.kind === 'goat' ? 'RAM SMASHES FOES' : 'BARK MOVES HERD', 38, y + 11, 'l', {});
-    text(DEVICE_NAMES[p.dev] || p.dev, 38, y + 18, 's', {});
-    text(p.ready ? 'READY' : '< >', W - 12, y + 4, p.ready ? 'y' : 'l', { align: 'right' });
-  }
-  if (!players.length) {
-    if (Math.floor(realTime * 2) % 2 === 0) text('PRESS ACTION TO JOIN', W / 2, 240, 'w', { align: 'center', outline: 'k' });
-  } else {
-    const all = players.every(p => p.ready);
-    rect(30, 236, W - 60, 14, all ? 'y' : 'k');
-    text(all ? 'GO!' : 'ACTION: READY', W / 2, 241, all ? 'k' : 'w', { align: 'center' });
-  }
-  text('SPACE  ENTER  GAMEPAD  TAP', W / 2, 256, 's', { align: 'center', outline: 'k' });
-  text('L/R: GOAT OR DOG  U/D: MODE', W / 2, 264, 'l', { align: 'center', outline: 'k' });
-  if (best.escort || best.defend) text('BEST  ESCORT ' + best.escort + '  DEFEND ' + best.defend, W / 2, 276, 'y', { align: 'center', outline: 'k' });
-  else text('M: MUTE', W / 2, 276, 'l', { align: 'center', outline: 'k' });
+  if (newBest) { text('NEW BEST!', cx, y + 2, 'y', { align: 'center', outline: 'k' }); y += 10; }
+  y += 8;
+  drawList(screenItems(), cx, y, w, 14, stateTime >= 0.8);
 }
 
 function render() {
@@ -2184,18 +2533,14 @@ function render() {
   drawWorldScene();
   buildRemap(dayProgress);
   applyRemap();
-  // fireflies glow over the swapped palette
   bctx.fillStyle = PAL_DUSK.y;
   for (const f of fireflies) if (Math.sin(f.ph) > -0.2) bctx.fillRect(wx(f.x), wy(f.y), 1, 1);
   drawHUD();
-  // present: world with sub-pixel camera offset, then the HUD on top
   vctx.setTransform(1, 0, 0, 1, 0, 0);
   vctx.imageSmoothingEnabled = false;
-  vctx.fillStyle = '#0c0816';
-  vctx.fillRect(0, 0, view.width, view.height);
-  const kx = view.width / W, ky = view.height / H;
-  vctx.drawImage(buf, 0, 0, BW, BH, (-1 - camFracX) * kx, (-1 - camFracY) * ky, BW * kx, BH * ky);
-  vctx.drawImage(hud, 0, 0, W, H, 0, 0, view.width, view.height);
+  const k = PIX;
+  vctx.drawImage(buf, 0, 0, BW, BH, Math.round((-1 - camFracX) * k), Math.round((-1 - camFracY) * k), BW * k, BH * k);
+  vctx.drawImage(hud, 0, 0, W, H, 0, 0, W * k, H * k);
 }
 
 // ---------------------------------------------------------------------
@@ -2203,18 +2548,20 @@ function render() {
 // ---------------------------------------------------------------------
 world = renderWorld(makeDefendWorld(4242));
 const menuWorld = world;
+resize();
 spawnHerd(world.start.x, world.start.y, 10);
+makeDemo();
 snapCam(world.start.x, world.start.y);
 let lastTs = null;
-function frame(ts) {
+function tick(ts) {
   if (lastTs === null) lastTs = ts;
   const dt = Math.min(0.05, Math.max(0, (ts - lastTs) / 1000));
   lastTs = ts;
   update(dt);
   render();
-  requestAnimationFrame(frame);
+  requestAnimationFrame(tick);
 }
-requestAnimationFrame(frame);
+requestAnimationFrame(tick);
 view.focus();
 </script>
 </body>

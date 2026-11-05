@@ -29,12 +29,13 @@ Ram or bark a predator that is carrying a sheep and the sheep is saved.
 | Gamepads 1–4 | Left stick or D-pad | A or X | B leaves the lobby, Start pauses |
 | Touch | Drag on the left side | Tap on the right side | Pause button in the top-right corner |
 
-**Lobby:** press Action to join, Left/Right to switch between goat and dog, Up/Down to change mode, and Action again to ready up. The game starts when everyone who joined is ready. Backspace or B removes a player.
+**Menus:** Title → Mode → Players. In menus, Up/Down moves the cursor, Action selects, and Back (Esc, Backspace or B) goes back. On the Players screen, any new device presses Action to join. Left/Right switches between goat and dog, and Action readies up. The game starts when everyone is ready. Options covers sound, screen shake and fullscreen.
 
-**In game:** P or Esc pauses, M mutes, R retries after a game over, and Backspace returns to the menu from pause.
+**In game:** P or Esc opens the pause menu, M toggles sound, F toggles fullscreen, and R retries after a game over.
 
 ## Tech notes
-- 160×288 portrait buffer, scaled to the window with nearest-neighbour sampling.
+- Adaptive low-res buffer drawn at a whole-number pixel scale. Its size follows the screen, so the game fills portrait phones and landscape monitors.
+- Six facing directions for every animal: front, back and four diagonals.
 - The camera follows the average position of all players with lerp damping and leads in the direction they're moving. The world is drawn at a sub-pixel offset, so scrolling is smooth even though the art is chunky.
 - Everything is drawn in a 12-colour day palette. Each frame is then palette-swapped pixel by pixel toward the sunset and dusk palettes.
 - Worlds are procedural: a forest mask, rounded tree crowns, undergrowth bands with trunks, stone pillars, and a pen at the goal.

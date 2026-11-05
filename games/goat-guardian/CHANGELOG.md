@@ -2,6 +2,20 @@
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-05
+### Added
+- 6-direction facing sprites (N, S, NE, NW, SE, SW) for goat, dog, sheep and wolves, including front/back ram and bark poses.
+- Proper screen flow: Title (live goat + dog herding demo), Mode select cards, Player select, Options, How to Play.
+- Options: sound, screen shake, fullscreen (saved per browser). F toggles fullscreen; PLAY enters fullscreen when the browser allows it.
+- Option-list menus for pause, mission results and game over (retry / change players / title).
+- Mouse and touch can tap any menu option.
+
+### Changed
+- Adaptive resolution: integer pixel scale with the buffer sized to the screen, so the game fills portrait and landscape screens.
+- Worlds widened to 600 px so wide screens still scroll.
+- Join prompts and menu prompts no longer blink; player slots show static "open slot" options.
+- Input is dispatched synchronously from DOM events (needed for fullscreen requests).
+
 ## [0.2.0] - 2026-11-05
 ### Added
 - Escort missions: herd the flock from the start pin to a pen at the red pin across procedurally generated forest worlds that get longer each mission. Includes results screen with stars.
