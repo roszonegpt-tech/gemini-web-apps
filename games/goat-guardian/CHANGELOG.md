@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-11-05
+### Added
+- Ambient birds: V-formation flocks of 3–7 birds and an occasional gliding heron cross the sky, with shadows sweeping over the meadow and forest. They appear in play, on the title screen and in the trailer, but not at night or in rain. Wind drifts them, and flocks chirp as they pass.
+- In-game trailer (`startTrailer()`): a ~62 s cinematic cut with title cards, a letterbox, a closer camera, and clips of every mode, predator and feature, ending on the logo with "Play now". When the title screen is left idle, it alternates between the gameplay demo and the trailer.
+- `tools/trailer/` (`make.sh`, `record.js`, `render_audio.js`): records the trailer at 1080p, renders a soundtrack offline from the game's music themes, timed to the real scene cuts, and muxes `build/trailer/goat-guardian-trailer.mp4`.
+- `.gitignore` for `build/`.
+
 ## [0.7.0] - 2026-11-05
 ### Added
 1. Weather per map: rain (hides lurking eyes), wind (slows bats and hawks, blows leaves), fog (sight shrinks around players), and storm (rain, wind and lightning).

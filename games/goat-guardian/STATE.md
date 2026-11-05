@@ -1,6 +1,6 @@
 # State — Goat Guardian
 
-**Version:** 0.7.0 · **Status:** Playable. v0.7.0 adds all 20 items from the feature list (see CHANGELOG). `index.html` is about 5,000 lines.
+**Version:** 0.8.0 · **Status:** Playable. v0.8.0 adds ambient birds and a cinematic trailer.
 
 ## Snapshot
 - The whole game is in `index.html`. Its sections are: canvases, palette and remap, sprites, font, audio, world generation and rendering, camera, input devices, state, particles, collision, players, herd boids, enemies, modes, lobby, update, render, and boot.
@@ -13,6 +13,8 @@
 - **Creatures:** enemy types are wolf (with alpha and boss variants), bat, fox and hawk. Sheep types are normal, ram, lamb and golden. Player kinds are goat, dog and wolf (Versus only).
 - **Progression:** `bells` and `upg` reset each run. `progress.medals` and `progress.daily` are saved in `goatGuardianMaps`. Looks are defined in `GOAT_SKINS`, `DOG_SKINS` and `WOOL_SKINS`, unlocked by `totalMedals()`.
 - **Editor:** the `ED` object holds a 75x175 grid of 8px cells. Share codes look like `GG1|rle|pillars|start|goal` and are saved under `goatGuardianCustom`.
+- **Birds:** the `birds` array is filled by `spawnFlock(big)` and updated by `updateBirds()`. `drawBirdShadows()` draws the shadows on the ground layer and `drawBirds()` draws the birds above everything.
+- **Trailer:** the `TRAILER` scene list is played through the showcase system with `showcase.trailer = true`. In trailer mode `resize()` uses `dh / 180`, which gives a closer camera, and `drawTrailerOverlay()` draws the cards, letterbox and captions. `window.__trailerMark(id)` is called at every cut so `tools/trailer/` can time the soundtrack.
 - **Music:** `updateMusic()` schedules the `THEMES` loops on `musicBus` every frame.
 - **PWA:** the service worker registers only when the page is served over http(s), has the manifest link, and isn't running inside an artifact.
 - **Pause menu:** while `paused` is true, `pauseView` selects the sub-view: main, options, controls, restart or exit. `pauseItems()` builds each list and `openPause()` opens the menu. The title Exit goes to the `BYE` menu state.
@@ -28,6 +30,7 @@
 - **Assets:** no Universal Assets are used. Everything is procedural.
 
 ## Verified
+- v0.8.0: the smoke test checks that birds spawn and that the trailer starts, advances and exits back to the title. `tools/trailer/make.sh` rebuilt the 1080p trailer (64.7 s, h264 + AAC) end to end.
 - v0.7.0: the smoke test also covers the story intro, Versus (both sides filled, timeout win), Daily and Endless starts, stomp, whistle, buying an upgrade, medals and unlocks, the editor route and share-code round trip, and the colour-safe remap.
 - A runtime sweep of every mode, the editor, the story, How to Play, the pause shop and key remap, night and fog had no page errors.
 - Over a local http server, the service worker registers and the game reloads offline.

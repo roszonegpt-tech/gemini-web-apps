@@ -1,4 +1,4 @@
-// Headless smoke test for Goat Guardian v0.7: node tests/smoke.js (needs Playwright + Chromium).
+// Headless smoke test for Goat Guardian v0.8: node tests/smoke.js (needs Playwright + Chromium).
 // Title -> Mode -> Players (2 keyboard players) -> escort, forces a ram and a bark, pens the herd,
 // advances a mission, runs 4-player defend, triggers game over, checks 6-direction facing and
 // adaptive resolution, starts and exits the attract-mode demo, and reports page errors.
@@ -136,6 +136,17 @@ const { chromium } = require('playwright');
   if (feat.stomp !== 'stun' || feat.whistle === false || feat.upgrade !== 1 || feat.bellsLeft !== 14) fail('abilities/shop ' + JSON.stringify(feat));
   if (!feat.medal || feat.total < 3 || !feat.unlocked) fail('medals ' + JSON.stringify(feat));
   if (feat.editor !== 'EDITOR' || !feat.route || !feat.codeOk || !feat.cbRemap) fail('editor/cb ' + JSON.stringify(feat));
+  // v0.8: birds and the trailer
+  const v8 = await p.evaluate(async () => {
+    spawnFlock(false); spawnFlock(true);
+    const n = birds.length;
+    startTrailer();
+    await new Promise(r => setTimeout(r, 4500));
+    const mid = { on: showcase.on, trailer: showcase.trailer, i: showcase.i, W: W };
+    endShowcase();
+    return { n, mid, after: state, W2: W };
+  });
+  if (v8.n < 4 || !v8.mid.on || !v8.mid.trailer || v8.mid.i < 1 || v8.after !== 'TITLE') fail('birds/trailer ' + JSON.stringify(v8));
   const wasFs = await p.evaluate(() => isFs());
   await p.evaluate(() => exitFs());
   await p.waitForTimeout(300);

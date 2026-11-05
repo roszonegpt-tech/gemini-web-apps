@@ -182,7 +182,7 @@ function buildRemap(p) {
   remapTable = m;
 }
 function nightAmount() {
-  if (isMenu() || state === 'LOADING' || showcase.on) return 0;
+  if (isMenu() || state === 'LOADING' || (showcase.on && !showcase.trailer)) return 0;
   return clamp((dayProgress - 0.78) / 0.14, 0, 1);
 }
 // one pass per frame: palette swap, then fog (palette-coloured) and night darkness
@@ -356,6 +356,11 @@ const SP = {};
     S: walkPair(['.ww.', 'wkkw', 'wwww', '.ll.'], 'k..k', '.kk.'),
     N: walkPair(['.kk.', 'wwww', 'wwww', '.ll.'], 'k..k', '.kk.')
   };
+  // Ambient birds (harmless): small flock birds and a big gliding heron
+  SP.birdUp = spr(['i...i', '.i.i.', '..k..']);
+  SP.birdDown = spr(['.....', 'iikii', 'i...i']);
+  SP.heronUp = spr(['ii...........ii', '.iii.......iii.', '...iiikkkiii...', '......kk.k.....']);
+  SP.heronDown = spr(['......kk.......', '..iiiikkkiiii..', '.ii.........ii.', 'i.............i']);
   SP.batUp = spr(['i.....i', 'ii...ii', '.iikii.', '..krk..']);
   SP.batDown = spr(['..kkk..', '.iirii.', 'ii...ii', 'i.....i']);
   SP.pillar = spr(['llllll', 'wwwwwl', '.wwwl.', '.wwwl.', '.wlwl.', '.wwll.', '.wwwl.', '.wwwl.',
@@ -1595,6 +1600,72 @@ function ditherOn(lev, x, y) {
 }
 
 // ---------------------------------------------------------------------
+// Ambient birds: V-formation flocks and the odd heron gliding over,
+// with shadows sweeping across the ground
+// ---------------------------------------------------------------------
+let birds = [];
+let birdT = 4;
+function spawnFlock(big) {
+  const ang = rand() * Math.PI * 2;
+  const dx = Math.cos(ang), dy = Math.sin(ang) * 0.6;
+  const l = len(dx, dy) || 1;
+  const vx = dx / l, vy = dy / l;
+  // start just off-camera, upwind of the view, and cross it
+  const cx = cam.x + W / 2 - vx * (W * 0.6 + 40) + rr(-W * 0.25, W * 0.25) * Math.abs(vy);
+  const cy = cam.y + H / 2 - vy * (H * 0.6 + 40) + rr(-H * 0.25, H * 0.25) * Math.abs(vx);
+  if (big) {
+    birds.push({ x: cx, y: cy, alt: 46, vx: vx * 26, vy: vy * 26, flap: rand() * 6, big: true, life: 40 });
+  } else {
+    const n = 3 + Math.floor(rand() * 5), sp = 44 + rand() * 18, alt = 34 + rand() * 16;
+    for (let i = 0; i < n; i++) {
+      const row = Math.ceil(i / 2), side = i % 2 ? 1 : -1;
+      // V formation: trail behind the leader on alternating sides
+      const ox = -vx * row * 8 + (-vy) * side * row * 7, oy = -vy * row * 8 + vx * side * row * 7;
+      birds.push({ x: cx + ox, y: cy + oy, alt: alt + rr(-2, 2), vx: vx * sp, vy: vy * sp, flap: rand() * 6, big: false, life: 30 });
+    }
+    if (onScreen(cx + vx * 60, cy + vy * 60, 40) && audioReady() && rand() < 0.6) {
+      const t = AC.currentTime;
+      for (let k = 0; k < 3; k++) tone('square', 2600 + rand() * 600, 3200 + rand() * 500, 0.05, 0.03, t + k * 0.09, { type: 'bandpass', freq: 3000, q: 4 });
+    }
+  }
+}
+function updateBirds(dt) {
+  birdT -= dt;
+  const night = dayProgress > 0.85 && !isMenu();
+  if (birdT <= 0) {
+    birdT = isMenu() ? rr(5, 9) : rr(9, 18);
+    if (!night && !isRain()) spawnFlock(rand() < 0.22);
+  }
+  for (let i = birds.length - 1; i >= 0; i--) {
+    const b = birds[i];
+    b.life -= dt;
+    b.flap += dt * (b.big ? 3 : 9 + (i % 3));
+    const wind = isWind() ? weather.wind * 14 : 0;
+    b.x += (b.vx + wind) * dt; b.y += b.vy * dt;
+    b.alt += Math.sin(b.flap * 0.3) * dt * 2;
+    if (b.life <= 0) birds.splice(i, 1);
+  }
+}
+function drawBirdShadows() {
+  for (const b of birds) {
+    if (!onScreen(b.x, b.y, 20)) continue;
+    const x = wx(b.x + b.alt * 0.25), y = wy(b.y);
+    const col = maskAt(b.x + b.alt * 0.25, b.y) === 1 ? 'i' : 'h';
+    if (b.big) { rect(x - 5, y, 11, 1, col); rect(x - 2, y + 1, 5, 1, col); }
+    else { rect(x - 1, y, 3, 1, col); }
+  }
+}
+function drawBirds() {
+  for (const b of birds) {
+    const sx = wx(b.x), sy = wy(b.y - b.alt);
+    if (sx < -20 || sy < -20 || sx > BW + 20 || sy > BH + 20) continue;
+    const up = b.big ? Math.sin(b.flap) > 0.6 : Math.floor(b.flap) % 2 === 0;
+    const sp = b.big ? (up ? SP.heronUp : SP.heronDown) : (up ? SP.birdUp : SP.birdDown);
+    drawSpr(sp, sx, sy, b.vx < 0);
+  }
+}
+
+// ---------------------------------------------------------------------
 // Camera: smooth lerp follow with velocity lead
 // ---------------------------------------------------------------------
 const cam = { x: 0, y: 0, cx: 0, cy: 0 };
@@ -1644,7 +1715,7 @@ function resize() {
   const dpr = window.devicePixelRatio || 1;
   const dw = Math.max(1, Math.floor((stage.clientWidth || window.innerWidth) * dpr));
   const dh = Math.max(1, Math.floor((stage.clientHeight || window.innerHeight) * dpr));
-  let k = Math.max(1, Math.round(dh / 288));
+  let k = Math.max(1, Math.round(dh / (typeof showcase !== 'undefined' && showcase.trailer ? 180 : 288)));
   if (Math.floor(dw / k) < 144) k = Math.max(1, Math.floor(dw / 144));
   if (Math.floor(dh / k) < 210) k = Math.max(1, Math.floor(dh / 210));
   W = clamp(Math.floor(dw / k), 120, 560);
@@ -3009,6 +3080,7 @@ function updateFireflies(dt) {
 const showcase = { on: false, i: -1, t: 0, day: 0, saved: null, events: [], doneT: -1 };
 const aiVec = {};
 let lastInput = 0;
+let attractN = 0;
 const UNIT_TAGS = {
   goat: ['GOAT', 'y'], dog: ['HERDING DOG', 'y'], sheep: ['SHEEP', 'w'],
   wolf: ['SHADOW WOLF', 'r'], alpha: ['ALPHA WOLF', 'y'], bat: ['BAT', 'r'],
@@ -3092,29 +3164,209 @@ const SCENES = [
     }
   }
 ];
+
+// ---------------------------------------------------------------------
+// Trailer: a fast-cut cinematic version of the showcase (title cards,
+// action clips of every mode and unit, logo finale)
+// ---------------------------------------------------------------------
+function trailerDefend(idx, kinds, day) {
+  resetRunState();
+  mode = 'defend';
+  world = getMapWorld('defend', idx);
+  if (!world.canvas) renderWorld(world);
+  setWeather('');
+  wave.map = idx; wave.n = 3; wave.phase = 'active'; wave.toSpawn = 0;
+  spawnHerd(world.start.x, world.start.y, 12);
+  aiPlayers(kinds);
+  placePlayers(world.start.x, world.start.y);
+  snapCam(world.start.x, world.start.y);
+  dayProgress = day; birds = [];
+}
+function trailerEscort(idx, frac, kinds, day) {
+  resetRunState();
+  mode = 'escort';
+  const ew = escortWorld(idx);
+  useWorld(ew.wd, ew.def);
+  Object.assign(mission, { n: 3, herdStart: 10, penned: 0, time: 0, kills: 0, lost: 0, interval: 99, cap: 6, spawnT: 99, map: idx, name: ew.name, par: 999, bossSpawned: true });
+  const p = world.path[Math.floor(world.path.length * frac)];
+  spawnHerd(p.x, p.y, 10);
+  aiPlayers(kinds);
+  placePlayers(p.x, p.y);
+  snapCam(p.x, p.y - 20);
+  dayProgress = day; birds = [];
+}
+// put an enemy right next to the action (skip the slow emerge)
+function spawnNear(type, opts, dist) {
+  const hc = herdCenter();
+  spawnEnemy(5, Object.assign({ type: type }, opts || {}));
+  const e = enemies[enemies.length - 1];
+  const a = rand() * Math.PI * 2, d = dist || 70;
+  let x = hc.x + Math.cos(a) * d, y = hc.y + Math.sin(a) * d * 0.7;
+  if ((type === 'wolf' || type === 'fox') && !(opts && opts.open && !blocked(x, y))) { const fsp = forestSpawn(hc.x, hc.y, d * 0.6, d * 1.4); x = fsp.x; y = fsp.y; }
+  e.x = x; e.y = y;
+  if (e.state === 'emerge') e.t = opts && opts.open ? 0.05 : 0.25;
+  return e;
+}
+const TRAILER = [
+  { id: 'cold', card: ['SOMETHING HUNTS', 'IN THE WOODS...'], eyes: 'r', dur: 3.2, day: 0.9, setup() { trailerDefend(0, ['goat', 'dog'], 0.9); return []; } },
+  { id: 'pack', cap: 'THE PACK IS HUNGRY', dur: 4.6, day: 0.66, setup() {
+      trailerDefend(0, ['goat', 'dog'], 0.66);
+      return [0, 0.4, 0.8, 1.3, 1.8].map((t, i) => ({ at: t, run: () => spawnNear('wolf', { alpha: i === 3 }, 80) }));
+    } },
+  { id: 'need', card: ['THE FLOCK NEEDS', 'A GUARDIAN'], dur: 2.0, day: 0.66, setup() { return []; } },
+  { id: 'ram', cap: 'GOATS RAM', dur: 5.0, day: 0.12, setup() {
+      trailerDefend(4, ['goat', 'goat'], 0.12);
+      return [0.1, 0.5, 0.9, 1.4, 2.0, 2.6, 3.2].map((t) => ({ at: t, run: () => spawnNear(rand() < 0.3 ? 'bat' : 'wolf', { open: true }, 48) }));
+    } },
+  { id: 'herd', cap: 'DOGS HERD THE FLOCK', dur: 5.0, day: 0.02, setup() {
+      trailerEscort(1, 0.35, ['dog', 'goat'], 0.02);
+      return [{ at: 0.2, run: () => spawnFlock(false) }, { at: 1.5, run: () => spawnNear('bat', null, 60) }, { at: 2.5, run: () => spawnFlock(true) }];
+    } },
+  { id: 'coop', cap: '1-4 PLAYER CO-OP', dur: 5.0, day: 0.4, setup() {
+      trailerDefend(9, ['goat', 'dog', 'goat', 'dog'], 0.4);
+      return [0, 0.3, 0.6, 0.9, 1.2, 1.6, 2.0, 2.5].map((t, i) => ({ at: t, run: () => spawnNear(['wolf', 'bat', 'fox', 'wolf'][i % 4], null, 70) }));
+    } },
+  { id: 'worse', card: ['FOXES. HAWKS.', 'AND SOMETHING BIGGER...'], eyes: 'y', dur: 2.2, day: 0.4, setup() { return []; } },
+  { id: 'boss', cap: 'BOSS FIGHTS', dur: 7.0, day: 0.6, setup() {
+      trailerDefend(5, ['goat', 'goat', 'dog'], 0.6);
+      return [{ at: 0.1, run: () => { const e = spawnNear('wolf', { boss: true }, 70); e.t = 0.2; } },
+        { at: 1.5, run: () => spawnNear('hawk', null, 90) }, { at: 3, run: () => spawnNear('fox', null, 70) }];
+    } },
+  { id: 'storm', cap: 'RIVERS, STORMS AND FOG', dur: 5.4, day: 0.32, setup() {
+      trailerEscort(7, 0.24, ['goat', 'dog'], 0.32);
+      setWeather('storm'); weather.nextBolt = 1.2;
+      return [{ at: 1.0, run: () => spawnNear('wolf', null, 70) }];
+    } },
+  { id: 'night', cap: 'SURVIVE THE NIGHT', dur: 5.0, day: 1.0, setup() {
+      trailerDefend(0, ['goat', 'dog'], 1.0);
+      return [0, 0.5, 1.2, 2.0].map((t) => ({ at: t, run: () => spawnNear('wolf', { alpha: rand() < 0.4 }, 75) }));
+    } },
+  { id: 'wolf', cap: 'OR PLAY AS THE WOLF', dur: 4.6, day: 0.5, setup() {
+      trailerDefend(1, ['wolf', 'goat', 'dog'], 0.5);
+      mode = 'versus'; Object.assign(versus, { t: 150, taken: 0, hits: 0, packT: 99, winner: '' });
+      const w = players[0]; const sp = forestSpawn(world.start.x, world.start.y, 50, 80); w.x = sp.x; w.y = sp.y;
+      return [];
+    } },
+  { id: 'build', cap: 'BUILD AND SHARE MAPS', dur: 4.6, day: 0, editor: true, setup() {
+      showcase.edBackup = ED.grid ? { grid: ED.grid.slice(), pillars: ED.pillars.slice(), start: ED.start, goal: ED.goal } : null;
+      edDefault();
+      openEditor();
+      ED.msgT = 0; ED.tool = 0; ED.brush = 3;
+      return [];
+    } },
+  { id: 'count', card: ['5 MODES   20 MAPS', 'GOATS  DOGS  WOLVES', '1-4 PLAYERS'], dur: 3.0, day: 0.2, setup() {
+      if (showcase.edBackup) { Object.assign(ED, showcase.edBackup); showcase.edBackup = null; }
+      goScreen('PLAYING');
+      trailerDefend(6, ['goat', 'dog'], 0.2);
+      return [];
+    } },
+  { id: 'title', finale: true, dur: 6.0, day: 0.15, setup() {
+      players = [];
+      world = menuWorld; enemies = []; particles = []; texts = [];
+      spawnHerd(world.start.x, world.start.y, 10, true);
+      makeDemo();
+      snapCam(world.start.x, world.start.y);
+      dayProgress = 0.15; setWeather('');
+      goScreen('TITLE');
+      return [{ at: 0.1, run: () => spawnFlock(false) }, { at: 0.8, run: () => spawnFlock(true) }, { at: 2.0, run: () => spawnFlock(false) }];
+    } }
+];
+function startTrailer() {
+  if (!showcase.on) showcase.saved = players;
+  rngFn = mulberry32(777);
+  showcase.on = true;
+  showcase.trailer = true;
+  showcase.scenes = TRAILER;
+  showcase.i = -1;
+  resize();            // closer camera for the trailer
+  nextScene();
+}
+function trailerPaint(dt) {
+  // the editor scene paints a new route by itself
+  const t = showcase.t;
+  ED.cx = ED.w / 2 + Math.sin(t * 2.2) * 120;
+  ED.cy = ED.h - 120 - t * 140;
+  ED.tool = t < 1.6 ? 0 : (t < 2.8 ? 2 : (t < 3.6 ? 4 : 0));
+  edPaint();
+  if (Math.floor(t * 3) !== Math.floor((t - dt) * 3)) { const keepTool = ED.tool; ED.tool = 5; ED.cx += 30; edPaint(); ED.tool = keepTool; }
+  updateEditor(dt);
+}
+function drawTrailerOverlay() {
+  const sc = showcase.scenes[showcase.i];
+  if (!sc) return;
+  const bar = Math.round(H * 0.07);
+  const t = showcase.t;
+  if (sc.card) {
+    rect(0, 0, W, H, 'k');
+    const lines = sc.card;
+    const s = W >= 400 ? 4 : (W >= 260 ? 3 : 2);
+    const reveal = clamp(t / 0.35, 0, 1);
+    let y = Math.round(H / 2 - (lines.length * (s * 5 + 8)) / 2);
+    lines.forEach((ln, i) => {
+      if (t > 0.18 * i) text(ln, W / 2, y, i === lines.length - 1 && lines.length > 1 ? 'y' : 'w', { s: s, align: 'center' });
+      y += s * 5 + 8;
+    });
+    if (reveal < 1) { G.fillStyle = PAL_DAY.k; for (let yy = 0; yy < H; yy += 2) G.fillRect(0, yy, W, 1); }
+    if (sc.eyes) {
+      for (let k = 0; k < 6; k++) {
+        if (Math.floor(t * 2.5 + k * 1.3) % 4 === 0) continue;
+        const ex = Math.round(W * (0.12 + 0.15 * k) + Math.sin(k * 7) * 10), ey = Math.round(H * (k % 2 ? 0.18 : 0.8));
+        rect(ex - 3, ey, 2, 1, sc.eyes); rect(ex + 2, ey, 2, 1, sc.eyes);
+      }
+    }
+    return;
+  }
+  // cinematic letterbox
+  rect(0, 0, W, bar, 'k');
+  rect(0, H - bar, W, bar, 'k');
+  if (sc.finale) {
+    const k = clamp((t - 1.2) / 0.6, 0, 1);
+    if (k > 0) {
+      text('PLAY NOW', W / 2, H - bar - 30, 'w', { s: 2, align: 'center', outline: 'k' });
+      text('FREE IN YOUR BROWSER  -  1-4 PLAYERS', W / 2, H - bar - 12, 'y', { align: 'center', outline: 'k' });
+    }
+    return;
+  }
+  if (sc.cap) {
+    const slide = Math.round(clamp(1 - t / 0.25, 0, 1) * 40);
+    const w = textWidth(sc.cap, 2) + 14;
+    rect(8 - slide, H - bar - 24, w, 18, 'k');
+    rect(8 - slide, H - bar - 24, 3, 18, 'y');
+    text(sc.cap, 16 - slide, H - bar - 20, 'w', { s: 2 });
+  }
+}
 function startShowcase() {
   if (!showcase.on) showcase.saved = players;
   rngFn = mulberry32(20261105);   // repeatable demo
   showcase.on = true;
+  showcase.trailer = false;
+  showcase.scenes = SCENES;
   showcase.i = -1;
   nextScene();
 }
 function nextScene() {
+  const list = showcase.scenes || SCENES;
   showcase.i++;
-  if (showcase.i >= SCENES.length) { endShowcase(); return; }
-  const sc = SCENES[showcase.i];
+  if (showcase.i >= list.length) { endShowcase(); return; }
+  const sc = list[showcase.i];
   showcase.t = 0;
   showcase.doneT = -1;
   showcase.day = sc.day;
-  goScreen('PLAYING');
+  if (!sc.card && !sc.editor && !sc.finale) goScreen('PLAYING');
   showcase.events = sc.setup();
   dayTarget = sc.day;
   if (showcase.i === 0) dayProgress = sc.day;
-  players.forEach(p => tag(p, (p.kind === 'goat' ? 'GOAT' : 'DOG') + ' P' + (p.slot + 1), P_COL[p.slot], 3));
-  showcase.seen = {};
+  if (!showcase.trailer) players.forEach(p => tag(p, (p.kind === 'goat' ? 'GOAT' : 'DOG') + ' P' + (p.slot + 1), P_COL[p.slot], 3));
+  showcase.seen = showcase.trailer ? { wolf: 1, alpha: 1, bat: 1, fox: 1, hawk: 1 } : {};
+  if (typeof window.__trailerMark === 'function') window.__trailerMark(sc.id || ('scene' + showcase.i));
 }
 function endShowcase() {
+  if (showcase.edBackup) { Object.assign(ED, showcase.edBackup); showcase.edBackup = null; }
+  const wasTrailer = showcase.trailer;
   showcase.on = false;
+  showcase.trailer = false;
+  showcase.scenes = SCENES;
+  if (wasTrailer) resize();
   rngFn = Math.random;
   players = showcase.saved || [];
   for (const p of players) p.ready = false;
@@ -3122,11 +3374,18 @@ function endShowcase() {
   lastInput = realTime;
 }
 function updateShowcase(dt) {
-  const sc = SCENES[showcase.i];
+  const list = showcase.scenes || SCENES;
+  const sc = list[showcase.i];
   if (!sc) return;
   showcase.t += dt;
   dayTarget = sc.day;
-  dayProgress += (sc.day - dayProgress) * damp(1.2, dt);
+  dayProgress += (sc.day - dayProgress) * damp(showcase.trailer ? 6 : 1.2, dt);
+  if (sc.editor && state === 'EDITOR') trailerPaint(dt);
+  if (showcase.trailer && (sc.card || sc.finale || sc.editor)) {
+    for (const ev of showcase.events) if (!ev.done && showcase.t >= ev.at) { ev.done = true; ev.run(); }
+    if (showcase.t > sc.dur) nextScene();
+    return;
+  }
   for (const ev of showcase.events) if (!ev.done && showcase.t >= ev.at) { ev.done = true; ev.run(); }
   // label each unit type the first time it shows up in a scene
   for (const e of enemies) {
@@ -3139,12 +3398,13 @@ function updateShowcase(dt) {
   if (state === 'PLAYING' && paused) paused = false;
   if (state === 'RESULTS' || state === 'GAMEOVER') {
     if (showcase.doneT < 0) showcase.doneT = showcase.t;
-    if (showcase.t - showcase.doneT > 3.2) nextScene();
+    if (showcase.t - showcase.doneT > (showcase.trailer ? 0.1 : 3.2)) nextScene();
     return;
   }
   if (showcase.t > sc.dur) nextScene();
 }
 function drawShowcaseCaption() {
+  if (showcase.trailer) { drawTrailerOverlay(); return; }
   const sc = SCENES[showcase.i];
   if (!sc) return;
   const h = 24, y = H - h;
@@ -4126,7 +4386,7 @@ function update(dt) {
   realTime += dt;
   stateTime += dt;
   pollPads();
-  if (state === 'TITLE' && !showcase.on && realTime - lastInput > 30 && stateTime > 30) startShowcase();
+  if (state === 'TITLE' && !showcase.on && realTime - lastInput > 30 && stateTime > 30) { attractN = (attractN || 0) + 1; if (attractN % 2) startShowcase(); else startTrailer(); }
   if (showcase.on) updateShowcase(dt);
   dayProgress += (dayTarget - dayProgress) * damp(0.5, dt);
   if (shake > 0) shake = Math.max(0, shake - dt * 14);
@@ -4141,6 +4401,7 @@ function update(dt) {
     updateDemo(dt);
     updateSheep(dt);
     updateParticles(dt);
+    updateBirds(dt);
     updateCamera(dt);
     return;
   }
@@ -4169,6 +4430,7 @@ function update(dt) {
   updateParticles(dt);
   updateFireflies(dt);
   updateWeather(dt);
+  updateBirds(dt);
   updateDecals(dt);
   updateCamera(dt);
 }
@@ -4211,6 +4473,7 @@ function drawWorldScene() {
     if (d.life < 1 && ((d.x + d.y) & 1)) continue;
     px(wx(d.x), wy(d.y), d.col);
   }
+  drawBirdShadows();
   for (const s of sheep) drawShadow(wx(s.x), wy(s.y), s.type === 'lamb' ? 5 : 7);
   for (const p of actors) drawShadow(wx(p.x), wy(p.y), 8);
   for (const e of enemies) {
@@ -4261,6 +4524,7 @@ function drawWorldScene() {
     }
   }
   for (const e of enemies) if (e.type === 'bat' || e.type === 'hawk') drawEnemy(e);
+  drawBirds();
   for (const p of particles) {
     if (p.kind === 'ring') {
       const a = clamp(p.life / p.max, 0, 1);
@@ -4275,7 +4539,7 @@ function drawWorldScene() {
       px(wx(p.x), wy(p.y), p.col);
     }
   }
-  if (showcase.on) {
+  if (showcase.on && !showcase.trailer) {
     for (const o of players.concat(enemies, sheep)) {
       if (!(o.tagT > 0) || o.state === 'emerge' || (o.type === 'wolf' && canopy(o.x, o.y))) continue;
       const x = wx(o.x), y = wy(o.y - (o.alt || 0)) - 16;
@@ -4449,6 +4713,7 @@ function drawHUD() {
     else if (state === 'BYE') drawBye();
     else if (state === 'KEYS') drawKeys();
     else if (state === 'STORY') drawStory();
+    if (showcase.on && showcase.trailer) drawShowcaseCaption();
     return;
   }
   if (state === 'LOADING') {
@@ -4457,6 +4722,7 @@ function drawHUD() {
     text(loadLabel, W / 2, Math.round(H / 2) + 6, 'y', { align: 'center' });
     return;
   }
+  if (showcase.on && showcase.trailer) { drawShowcaseCaption(); return; }
   const active = sheep.filter(s => !s.penned).length;
   G.drawImage(SP.sheep.SE[0].r, 3, 3);
   text(String(active), 12, 4, active <= 3 ? 'r' : 'w', { shadow: 'k' });
@@ -4501,7 +4767,7 @@ function drawHUD() {
   if (comboN >= 2 && realTime - comboT < 2.5) text('COMBO x' + comboN, W / 2, 4, 'y', { align: 'center', shadow: 'k' });
   if (world.goal && state === 'PLAYING') edgeArrow(world.goal.x, world.goal.y, 'y', false);
   for (const e of enemies) if (e.carry) edgeArrow(e.x, e.y, 'r', true);
-  if (banner.t > 0 && state === 'PLAYING' && !paused) {
+  if (banner.t > 0 && state === 'PLAYING' && !paused && !showcase.trailer) {
     const by = Math.round(H * 0.33);
     text(banner.a, W / 2, by, 'w', { s: 2, align: 'center', outline: 'k' });
     text(banner.b, W / 2, by + 18, 'y', { align: 'center', outline: 'k' });
@@ -4532,13 +4798,14 @@ function drawTitle() {
   text('A HERDING TALE', W / 2, cy0 + big * 5 + 22, 'l', { align: 'center', outline: 'k' });
   const w = Math.min(W - 24, 120);
   const y = Math.max(cy0 + big * 5 + 28, Math.min(Math.round(H * 0.48), H - 104));
+  if (showcase.on && showcase.trailer) return;
   rect(Math.round(W / 2 - w / 2) - 2, y - 2, w + 4, 6 * 14 + 2, 'k');
   drawList(screenItems(), W / 2, y, w, 14);
   const fy = H - 10;
   rect(0, fy - 3, W, 13, 'k');
   if (best.escort || best.defend) text('BEST  ESCORT ' + best.escort + '  DEFEND ' + best.defend, W / 2, fy, 'y', { align: 'center' });
   else text('1-4 PLAYERS  GOATS AND DOGS', W / 2, fy, 's', { align: 'center' });
-  text('V0.7', W - 3, fy - 12, 'i', { align: 'right', outline: 'k' });
+  text('V0.8', W - 3, fy - 12, 'i', { align: 'right', outline: 'k' });
 }
 const MODES = [
   { id: 'escort', title: 'ESCORT', l1: 'HERD THE FLOCK PIN TO PIN', icon: 'pinGoal' },
@@ -4874,6 +5141,7 @@ function drawGameOver() {
 function renderEditor() {
   hits = [];
   drawEditor();
+  if (showcase.on && showcase.trailer) { G = hctx; drawShowcaseCaption(); }
   vctx.setTransform(1, 0, 0, 1, 0, 0);
   vctx.imageSmoothingEnabled = false;
   vctx.drawImage(hud, 0, 0, W, H, 0, 0, W * PIX, H * PIX);

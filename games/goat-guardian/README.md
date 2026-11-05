@@ -20,6 +20,10 @@ All art is drawn from pixel matrices in code, and all sound is synthesized with 
 - **Accessibility:** remappable keys, a colour-safe palette, reduced flashing, and game speed.
 - **Installable app:** when served from GitHub Pages it installs to a home screen and works offline.
 
+## Trailer
+- In the game, the title screen alternates between the gameplay demo and the trailer when left idle.
+- To build the video file, run `tools/trailer/make.sh` (needs Node, Playwright and ffmpeg). It writes `build/trailer/goat-guardian-trailer.mp4`: 1080p, about 65 s, with a soundtrack synthesized from the game's music.
+
 ## Maps
 - **Escort routes:** 1 Meadow Run (the original), 2 Birch Bend, 3 Switchbacks, 4 Twin Trails, 5 Stone Road, 6 Wolf Hollow, 7 Open Moor, 8 Lake of Pines, 9 The Long March, 10 Sunset Summit. Routes 2–10 get longer and wider.
 - **Defend arenas:** The Henge, Twin Glades, Ring Road, Crossroads, Ruined Plaza, Crescent, Grove Isles, Long Valley, Clover, Great Circle.
@@ -77,5 +81,6 @@ goat-guardian/
 ├─ VERSION.md
 ├─ STATE.md        # AI handoff snapshot
 ├─ TODO.md
-└─ tests/smoke.js  # Playwright headless smoke test
+├─ tests/smoke.js          # Playwright headless smoke test
+└─ tools/trailer/          # trailer recorder + soundtrack renderer (output goes to build/, ignored by git)
 ```
