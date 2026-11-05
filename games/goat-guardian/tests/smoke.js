@@ -1,4 +1,4 @@
-// Headless smoke test for Goat Guardian v0.5: node tests/smoke.js (needs Playwright + Chromium).
+// Headless smoke test for Goat Guardian v0.6: node tests/smoke.js (needs Playwright + Chromium).
 // Title -> Mode -> Players (2 keyboard players) -> escort, forces a ram and a bark, pens the herd,
 // advances a mission, runs 4-player defend, triggers game over, checks 6-direction facing and
 // adaptive resolution, starts and exits the attract-mode demo, and reports page errors.
@@ -49,6 +49,27 @@ const { chromium } = require('playwright');
   st = await p.evaluate(() => paused); if (!st) fail('pause');
   await p.keyboard.press('Space');
   st = await p.evaluate(() => paused); if (st) fail('resume');
+  // pause menu: options sub-view, controls, exit confirmation (NO), restart confirmation (NO)
+  const box = await p.evaluate(() => { const r = view.getBoundingClientRect(); return { x: r.left + (W - 7) / W * r.width, y: r.top + 7 / H * r.height }; });
+  await p.mouse.click(box.x, box.y);               // on-screen pause button
+  st = await p.evaluate(() => ({ paused, pauseView })); if (!st.paused || st.pauseView !== 'main') fail('pause button ' + JSON.stringify(st));
+  await p.keyboard.press('s'); await p.keyboard.press('s'); await p.keyboard.press('Space');
+  st = await p.evaluate(() => ({ pauseView, n: screenItems().length })); if (st.pauseView !== 'options' || st.n !== 5) fail('pause options ' + JSON.stringify(st));
+  const shake0 = await p.evaluate(() => settings.shake);
+  await p.keyboard.press('s'); await p.keyboard.press('d');
+  st = await p.evaluate(() => settings.shake); if (st === shake0) fail('options toggle');
+  await p.keyboard.press('a');
+  await p.keyboard.press('Escape');
+  st = await p.evaluate(() => ({ paused, pauseView, c: ui.cursor })); if (!st.paused || st.pauseView !== 'main' || st.c !== 2) fail('options back ' + JSON.stringify(st));
+  await p.keyboard.press('s'); await p.keyboard.press('Space');
+  st = await p.evaluate(() => pauseView); if (st !== 'controls') fail('controls ' + st);
+  await p.keyboard.press('Escape');
+  await p.keyboard.press('s'); await p.keyboard.press('Space');   // EXIT TO TITLE -> confirm
+  st = await p.evaluate(() => ({ pauseView, c: ui.cursor })); if (st.pauseView !== 'exit' || st.c !== 1) fail('exit confirm ' + JSON.stringify(st));
+  await p.keyboard.press('Space');                                 // NO
+  st = await p.evaluate(() => ({ state, paused, pauseView })); if (st.state !== 'PLAYING' || st.pauseView !== 'main') fail('exit cancel ' + JSON.stringify(st));
+  await p.keyboard.press('Escape');                                // resume
+  st = await p.evaluate(() => paused); if (st) fail('esc resume');
   await p.evaluate(() => { for (const s of sheep) { s.x = world.goal.x; s.y = world.goal.y; } enemies.length = 0; });
   await p.waitForTimeout(1200);
   st = await p.evaluate(() => state); if (st !== 'RESULTS') fail('results ' + st);
@@ -67,6 +88,11 @@ const { chromium } = require('playwright');
   st = await p.evaluate(() => state); if (st !== 'GAMEOVER') fail('game over ' + st);
   await p.keyboard.press('s'); await p.keyboard.press('s'); await p.keyboard.press('s'); await p.keyboard.press('Space'); // TITLE
   st = await p.evaluate(() => state); if (st !== 'TITLE') fail('back to title ' + st);
+  await p.evaluate(() => { ui.cursor = 4; });
+  await p.keyboard.press('Space');                 // EXIT
+  st = await p.evaluate(() => state); if (st !== 'BYE') fail('exit screen ' + st);
+  await p.keyboard.press('Space');
+  st = await p.evaluate(() => state); if (st !== 'TITLE') fail('bye -> title ' + st);
   // attract-mode demo: plays itself with AI shepherds, any key returns to the title
   await p.evaluate(() => { ui.cursor = 1; });
   await p.keyboard.press('Space');                 // WATCH DEMO

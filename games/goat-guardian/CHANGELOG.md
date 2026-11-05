@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-11-05
+### Added
+- On-screen pause button (top-right) for mouse and touch, alongside P, Esc and gamepad Start.
+- Pause menu: Resume, Restart Route/Arena (asks to confirm), Options (sound, screen shake, fullscreen and solo AI helper, all opened inside the pause menu), Controls and Exit to Title (asks to confirm).
+- Title menu Exit: leaves fullscreen and shows a goodbye screen with Back to Title. Browsers don't let a page close a tab it didn't open, so the screen asks the player to close it.
+
 ## [0.5.0] - 2026-11-05
 ### Added
 - 10 escort routes: Meadow Run (the original map, kept as level 1), Birch Bend, Switchbacks, Twin Trails, Stone Road, Wolf Hollow, Open Moor, Lake of Pines, The Long March and Sunset Summit. Levels 2–10 are larger, from 640x1400 up to 800x2900, compared with 600x1060 for level 1.

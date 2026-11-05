@@ -42,7 +42,7 @@ Ram or bark a predator that is carrying a sheep and the sheep is saved.
 
 **Menus:** Title → Mode → Players. In menus, Up/Down moves the cursor, Action selects, and Back (Esc, Backspace or B) goes back. On the Players screen, any new device presses Action to join. Left/Right switches between goat and dog, and Action readies up. The game starts when everyone is ready. Options covers sound, screen shake and fullscreen.
 
-**In game:** P or Esc opens the pause menu, M toggles sound, F toggles fullscreen, and R retries after a game over.
+**In game:** click or tap the pause button in the top-right, or press P, Esc or Start, to open the pause menu. It offers Resume, Restart, Options, Controls and Exit to Title. M toggles sound, F toggles fullscreen, and R retries after a game over. The title menu also has Exit.
 
 ## Tech notes
 - Adaptive low-res buffer drawn at a whole-number pixel scale. Its size follows the screen, so the game fills portrait phones and landscape monitors.

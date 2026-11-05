@@ -1301,7 +1301,7 @@ const DOG_SPEED = 96;
 const PANIC_RADIUS = 40;
 const SHEEP_MAX = 14;
 const P_COL = ['y', 'r', 's', 'w'];
-const MENU_STATES = ['TITLE', 'MODE', 'MAPS', 'PLAYERS', 'OPTIONS', 'HOWTO'];
+const MENU_STATES = ['TITLE', 'MODE', 'MAPS', 'PLAYERS', 'OPTIONS', 'HOWTO', 'BYE'];
 
 let state = 'TITLE';
 let mode = 'escort';
@@ -2422,7 +2422,8 @@ function screenItems() {
       { label: 'PLAY', select: () => { autoFs(); goScreen('MODE'); } },
       { label: 'WATCH DEMO', select: () => startShowcase() },
       { label: 'HOW TO PLAY', select: () => goScreen('HOWTO') },
-      { label: 'OPTIONS', select: () => { optionsFrom = 'TITLE'; goScreen('OPTIONS'); } }
+      { label: 'OPTIONS', select: () => { optionsFrom = 'TITLE'; goScreen('OPTIONS'); } },
+      { label: 'EXIT', select: exitGame }
     ];
     case 'MODE': return [
       { label: 'ESCORT', select: () => { mode = 'escort'; goMaps(); } },
@@ -2441,11 +2442,8 @@ function screenItems() {
     }
     case 'OPTIONS': return optionItems().concat([{ label: 'BACK', select: () => goScreen(optionsFrom) }]);
     case 'HOWTO': return [{ label: 'BACK', select: () => goScreen('TITLE') }];
-    case 'PLAYING': return [
-      { label: 'RESUME', select: () => { paused = false; } },
-      optionItems()[0], optionItems()[1],
-      { label: 'QUIT TO TITLE', select: toTitle }
-    ];
+    case 'BYE': return [{ label: 'BACK TO TITLE', select: () => goScreen('TITLE') }];
+    case 'PLAYING': return pauseItems();
     case 'RESULTS': return [
       { label: 'NEXT MISSION', select: nextMission },
       { label: 'QUIT TO TITLE', select: toTitle }
@@ -2459,8 +2457,54 @@ function screenItems() {
   }
   return [];
 }
+// Pause menu: main list, options, controls and confirmation sub-views
+let pauseView = 'main';
+function openPause() {
+  if (state !== 'PLAYING' || paused) return;
+  paused = true;
+  pauseView = 'main';
+  ui.cursor = 0;
+  SFX.click();
+}
+function setPauseView(v, cursor) { pauseView = v; ui.cursor = cursor || 0; }
+function restartCurrent() {
+  if (mode === 'escort') selMap.escort = mission.map || 0;
+  else selMap.defend = wave.map || 0;
+  startRun();
+}
+function pauseItems() {
+  if (pauseView === 'options') {
+    return optionItems().concat([{ label: 'BACK', select: () => setPauseView('main', 2) }]);
+  }
+  if (pauseView === 'controls') return [{ label: 'BACK', select: () => setPauseView('main', 3) }];
+  if (pauseView === 'restart') return [
+    { label: 'YES, RESTART', select: restartCurrent },
+    { label: 'NO', select: () => setPauseView('main', 1) }
+  ];
+  if (pauseView === 'exit') return [
+    { label: 'YES, EXIT', select: toTitle },
+    { label: 'NO', select: () => setPauseView('main', 4) }
+  ];
+  return [
+    { label: 'RESUME', select: () => { paused = false; } },
+    { label: mode === 'escort' ? 'RESTART ROUTE' : 'RESTART ARENA', select: () => setPauseView('restart', 1) },
+    { label: 'OPTIONS', select: () => setPauseView('options') },
+    { label: 'CONTROLS', select: () => setPauseView('controls') },
+    { label: 'EXIT TO TITLE', select: () => setPauseView('exit', 1) }
+  ];
+}
+// Title-screen exit: leave fullscreen and rest on a goodbye card
+function exitGame() {
+  if (isFs()) exitFs();
+  goScreen('BYE');
+  try { window.close(); } catch (e) { /* tabs the page did not open cannot be closed */ }
+}
 function screenBack() {
-  if (state === 'MODE' || state === 'HOWTO') { goScreen('TITLE'); SFX.back(); }
+  if (state === 'PLAYING' && paused && pauseView !== 'main') {
+    const back = { options: 2, controls: 3, restart: 1, exit: 4 }[pauseView] || 0;
+    setPauseView('main', back); SFX.back(); return;
+  }
+  if (state === 'MODE' || state === 'HOWTO' || state === 'BYE') { goScreen('TITLE'); SFX.back(); }
   else if (state === 'MAPS') { goScreen('MODE'); SFX.back(); }
   else if (state === 'OPTIONS') { goScreen(optionsFrom); SFX.back(); }
   else if (state === 'PLAYING' && paused) { paused = false; SFX.back(); }
@@ -2524,7 +2568,7 @@ function dispatch(ev) {
   if (ev.type === 'mute') { setSound(!settings.sound); return; }
   if (state === 'PLAYERS') { playersEvent(ev); return; }
   if (state === 'PLAYING' && !paused) {
-    if (ev.type === 'pause') { paused = true; ui.cursor = 0; SFX.click(); }
+    if (ev.type === 'pause') openPause();
     else if (ev.type === 'action') { const p = playerForDev(ev.dev); if (p) playerAction(p); }
     return;
   }
@@ -2573,7 +2617,7 @@ window.addEventListener('keydown', (e) => {
 window.addEventListener('keyup', (e) => { keys[e.key.toLowerCase()] = false; });
 window.addEventListener('blur', () => {
   for (const k in keys) keys[k] = false;
-  if (state === 'PLAYING' && !paused) { paused = true; ui.cursor = 0; }
+  if (state === 'PLAYING' && !paused) { openPause(); }
 });
 function toGame(clientX, clientY) {
   const r = view.getBoundingClientRect();
@@ -2583,8 +2627,12 @@ view.addEventListener('mousedown', (e) => {
   initAudio();
   view.focus();
   if (e.button !== 0) return;
-  if (state === 'PLAYING' && !paused) { dispatch({ dev: 'kbL', type: 'action' }); return; }
   const p = toGame(e.clientX, e.clientY);
+  if (state === 'PLAYING' && !paused) {
+    if (p.x > W - 16 && p.y < 15) dispatch({ dev: 'mouse', type: 'pause' });
+    else dispatch({ dev: 'kbL', type: 'action' });
+    return;
+  }
   dispatch({ dev: 'mouse', type: 'tap', x: p.x, y: p.y });
 });
 view.addEventListener('contextmenu', (e) => e.preventDefault());
@@ -2595,7 +2643,7 @@ view.addEventListener('touchstart', (e) => {
   for (const t of e.changedTouches) {
     const p = toGame(t.clientX, t.clientY);
     if (state === 'PLAYING' && !paused) {
-      if (p.x > W - 22 && p.y < 16) { dispatch({ dev: 'touch', type: 'pause' }); continue; }
+      if (p.x > W - 18 && p.y < 17) { dispatch({ dev: 'touch', type: 'pause' }); continue; }
       if (p.x < W * 0.55 && touch.stickId === null) {
         touch.stickId = t.identifier;
         touch.sx = p.x; touch.sy = p.y; touch.cx = p.x; touch.cy = p.y;
@@ -2943,6 +2991,7 @@ function drawHUD() {
     else if (state === 'OPTIONS') drawOptions();
     else if (state === 'HOWTO') drawHowTo();
     else if (state === 'MAPS') drawMapSelect();
+    else if (state === 'BYE') drawBye();
     return;
   }
   if (state === 'LOADING') {
@@ -2956,11 +3005,16 @@ function drawHUD() {
   text(String(active), 12, 4, active <= 3 ? 'r' : 'w', { shadow: 'k' });
   if (mode === 'escort') {
     text('PEN ' + mission.penned, 24, 4, 'y', { shadow: 'k' });
-    text('M' + mission.n, W - 3, 4, 'w', { align: 'right', shadow: 'k' });
+    text('M' + mission.n, W - 16, 4, 'w', { align: 'right', shadow: 'k' });
   } else {
-    text('W' + wave.n, W - 3, 4, 'w', { align: 'right', shadow: 'k' });
+    text('W' + wave.n, W - 16, 4, 'w', { align: 'right', shadow: 'k' });
   }
-  if (touch.used && state === 'PLAYING') { rect(W - 18, 3, 1, 5, 'w'); rect(W - 16, 3, 1, 5, 'w'); }
+  if (state === 'PLAYING' && !showcase.on) {
+    // pause button (click / tap), also P, Esc or gamepad Start
+    rect(W - 13, 2, 11, 10, 'k');
+    frame(W - 13, 2, 11, 10, paused ? 'y' : 'i');
+    rect(W - 10, 4, 2, 6, paused ? 'y' : 'w'); rect(W - 6, 4, 2, 6, paused ? 'y' : 'w');
+  }
   if (world.goal && state === 'PLAYING') edgeArrow(world.goal.x, world.goal.y, 'y', false);
   for (const e of enemies) if (e.carry) edgeArrow(e.x, e.y, 'r', true);
   if (banner.t > 0 && state === 'PLAYING' && !paused) {
@@ -2988,8 +3042,8 @@ function drawTitle() {
   text('GUARDIAN', W / 2, cy0 + big * 5 + 6, 'y', { s: 2, align: 'center', outline: 'k' });
   text('A HERDING TALE', W / 2, cy0 + big * 5 + 22, 'l', { align: 'center', outline: 'k' });
   const w = Math.min(W - 24, 120);
-  const y = Math.max(cy0 + big * 5 + 36, Math.min(Math.round(H * 0.52), H - 80));
-  rect(Math.round(W / 2 - w / 2) - 2, y - 2, w + 4, 4 * 14 + 2, 'k');
+  const y = Math.max(cy0 + big * 5 + 32, Math.min(Math.round(H * 0.5), H - 92));
+  rect(Math.round(W / 2 - w / 2) - 2, y - 2, w + 4, 5 * 14 + 2, 'k');
   drawList(screenItems(), W / 2, y, w, 14);
   const fy = H - 10;
   rect(0, fy - 3, W, 13, 'k');
@@ -3170,10 +3224,39 @@ function drawHowTo() {
 function drawPause() {
   ditherDim(true);
   const items = screenItems();
-  const y0 = Math.round(H * 0.3);
-  text('PAUSED', W / 2, y0, 'w', { s: 2, align: 'center', outline: 'k' });
-  text('SCORE ' + score, W / 2, y0 + 16, 'y', { align: 'center' });
-  drawList(items, W / 2, y0 + 30, Math.min(W - 24, 130), 14);
+  const w = Math.min(W - 20, 150), x = Math.round(W / 2 - w / 2);
+  const titles = { main: 'PAUSED', options: 'OPTIONS', controls: 'CONTROLS', restart: 'RESTART?', exit: 'EXIT?' };
+  const bodyH = pauseView === 'controls' ? 70 : (pauseView === 'restart' || pauseView === 'exit' ? 18 : 0);
+  const panelH = 34 + bodyH + items.length * 14 + 8;
+  const y0 = Math.max(18, Math.round(H / 2 - panelH / 2));
+  rect(x - 4, y0 - 4, w + 8, panelH, 'k');
+  frame(x - 4, y0 - 4, w + 8, panelH, 'i');
+  text(titles[pauseView], W / 2, y0 + 2, pauseView === 'main' ? 'w' : 'y', { s: 2, align: 'center' });
+  const where = mode === 'escort' ? 'M' + mission.n + ' ' + ESCORT_MAPS[mission.map || 0].name : 'W' + wave.n + ' ' + DEFEND_MAPS[wave.map || 0].name;
+  text(where, W / 2, y0 + 17, 'l', { align: 'center' });
+  text('SCORE ' + score, W / 2, y0 + 24, 's', { align: 'center' });
+  let y = y0 + 34;
+  if (pauseView === 'controls') {
+    const lines = [['MOVE', 'WASD / ARROWS / STICK'], ['ACTION', 'SPACE / ENTER / A / TAP'], ['GOAT', 'RAM CHARGE'], ['DOG', 'BARK'],
+      ['PAUSE', 'P / ESC / START'], ['SOUND', 'M'], ['FULLSCREEN', 'F']];
+    for (const [a, b] of lines) { text(a, x + 2, y, 'y'); text(b, x + w - 2, y, 'l', { align: 'right' }); y += 10; }
+  } else if (pauseView === 'restart') {
+    text('PROGRESS ON THIS MAP IS LOST', W / 2, y + 2, 'l', { align: 'center' }); y += bodyH;
+  } else if (pauseView === 'exit') {
+    text('THE RUN WILL END', W / 2, y + 2, 'l', { align: 'center' }); y += bodyH;
+  }
+  drawList(items, W / 2, y, w, 14);
+}
+function drawBye() {
+  rect(0, 0, W, H, 'k');
+  const cy = Math.round(H / 2) - 30;
+  const sp = SP.goat.SE[0], dg = SP.dog.SE[Math.floor(realTime * 3) % 2];
+  rect(W / 2 - 30, cy - 6, 60, 24, 'g'); rect(W / 2 - 30, cy + 15, 60, 3, 'h');
+  G.drawImage(sp.r, 0, 0, sp.w, sp.h, Math.round(W / 2 - 24), cy + 16 - sp.h * 2, sp.w * 2, sp.h * 2);
+  G.drawImage(dg.l, 0, 0, dg.w, dg.h, Math.round(W / 2 + 4), cy + 16 - dg.h * 2, dg.w * 2, dg.h * 2);
+  text('THANKS FOR PLAYING', W / 2, cy + 28, 'w', { align: 'center' });
+  text('YOU CAN CLOSE THIS TAB NOW', W / 2, cy + 38, 'l', { align: 'center' });
+  drawList(screenItems(), W / 2, cy + 52, Math.min(W - 24, 110), 14);
 }
 function drawResults() {
   ditherDim(stateTime > 0.3);
