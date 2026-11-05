@@ -157,6 +157,12 @@ const { chromium } = require('playwright');
     const vis = (sp) => { const d = sp.r.getContext('2d').getImageData(0, 0, sp.w, sp.h).data; let t = sp.h, b = -1; for (let y = 0; y < sp.h; y++) for (let x = 0; x < sp.w; x++) if (d[(y * sp.w + x) * 4 + 3]) { t = Math.min(t, y); b = Math.max(b, y); } return b - t + 1; };
     out.taller = Math.min(...GOAT_BREEDS.map(b => vis(goatSet(b).E[0]))) > Math.max(...DOG_BREEDS.map(b => vis(canineSet(b.look).E[0])));
     out.locked = skinUnlocked('dog', 9);
+    out.boss = SP.boss.E[0].h >= 18 && SP.boss.run.S.length === 4 && SP.boss.N.length === 4;
+    // gait hysteresis + shared phase: a speed wobble around the threshold does not flip the gait
+    const o = { vx: 60, vy: 0 }; stepGait(o, 0.016, 58, 42);
+    let flips = 0, prev = o.gait;
+    for (let i = 0; i < 60; i++) { o.vx = 50 + Math.sin(i) * 6; stepGait(o, 0.016, 58, 42); if (o.gait !== prev) flips++; prev = o.gait; }
+    out.gaitFlips = flips;
     progress.medals.escort = progress.medals.escort.map(() => 7); progress.medals.defend = progress.medals.defend.map(() => 7);
     mode = 'defend'; enterPlayers('kbL'); players[0].kind = 'dog'; players.forEach(q => q.ready = true);
     await new Promise(r => setTimeout(r, 2600));
@@ -173,7 +179,7 @@ const { chromium } = require('playwright');
     toTitle();
     return out;
   });
-  if (v9.goats !== 9 || v9.dogs !== 10 || !v9.sets || v9.bob !== '0,-1,-2,-1' || !v9.taller || v9.locked) fail('breeds ' + JSON.stringify(v9));
+  if (v9.goats !== 9 || v9.dogs !== 10 || !v9.sets || v9.bob !== '0,-1,-1,0' || !v9.taller || v9.locked || !v9.boss || v9.gaitFlips) fail('breeds ' + JSON.stringify(v9));
   if (v9.corgi !== 'stun' || v9.pyrenees !== 'flee' || !v9.carry || !v9.drop || v9.ratter !== 'launched' || !v9.sit) fail('dog skills ' + JSON.stringify(v9));
   const wasFs = await p.evaluate(() => isFs());
   await p.evaluate(() => exitFs());

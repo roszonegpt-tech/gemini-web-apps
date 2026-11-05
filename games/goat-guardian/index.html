@@ -345,7 +345,7 @@ SP.ramSheep = recolorSet(SP.sheep, { w: 'l', l: 'h', k: 'b' });
 // Every animal: 8 directions (E, SE, NE, S, N + mirrors), a 4-frame walk,
 // a 4-frame bounding gallop (body bob + head pitch) and action poses.
 // ---------------------------------------------------------------------
-const RUN_BOB = [0, -1, -2, -1];
+const RUN_BOB = [0, -1, -1, 0];
 function gridOf(w, h) { return Array.from({ length: h }, () => Array(w).fill('.')); }
 function sprB(rows, bob) { const o = spr(rows); o.bob = bob || 0; return o; }
 function lowerRegion(rows, maxRow, xMin, dy, dx) {
@@ -384,20 +384,20 @@ const GLEGS = {
   side: {
     walk: [['..L.L...L.L..', '..L.L...L.L..', '..k.k...k.k..'], ['..L.L...L.L..', '.L...L.L...L.', '.k...k.k...k.'],
       ['..L.L...L.L..', '..L.L...L.L..', '..k.k...k.k..'], ['..L.L...L.L..', '...LL....LL..', '...kk....kk..']],
-    run: [['..L.L...L.L..', '.L.L.....L.L.', 'k.k.......k.k'], ['..L.L...L.L..', '...L.L.L.L...', '....kk.kk....'],
-      ['.LL.......LL.', '.............', '.............'], ['..L.L...L.L..', '.L.L.....L..L', 'k.k........k.']]
+    run: [['..L.L...L.L..', '.L.L.....L.L.', 'k.k.......k.k'], ['..L.L...L.L..', '..L.L...L.L..', '...k.k..k.k..'],
+      ['..L.L...L.L..', '...LL...LL...', '....kk.kk....'], ['..L.L...L.L..', '.L.L....L..L.', 'k.k.....k...k']]
   },
   q: {
     walk: [['..L.L..L.L...', '..L.L..L.L...', '..k.k..k.k...'], ['..L.L..L.L...', '.L...L..L..L.', '.k...k..k..k.'],
       ['..L.L..L.L...', '..L.L..L.L...', '..k.k..k.k...'], ['..L.L..L.L...', '...LL...LL...', '...kk...kk...']],
-    run: [['..L.L..L.L...', '.L.L.....L.L.', 'k.k.......k.k'], ['..L.L..L.L...', '...L.L.L.L...', '....kk.kk....'],
-      ['.LL......LL..', '.............', '.............'], ['..L.L..L.L...', '.L.L.....L..L', 'k.k........k.']]
+    run: [['..L.L..L.L...', '.L.L.....L.L.', 'k.k.......k.k'], ['..L.L..L.L...', '..L.L..L.L...', '...k.k.k.k...'],
+      ['..L.L..L.L...', '...LL..LL....', '....kk.kk....'], ['..L.L..L.L...', '.L.L...L..L..', 'k.k....k...k.']]
   },
   f: {
     walk: [['..L.L.L.L..', '..L.L.L.L..', '..k.k.k.k..'], ['..L.L.L.L..', '..L.L.L.k..', '..k.k.k....'],
       ['..L.L.L.L..', '..L.L.L.L..', '..k.k.k.k..'], ['..L.L.L.L..', '..k.L.L.L..', '....k.k.k..']],
     run: [['..L.L.L.L..', '.L..L.L..L.', '.k..k.k..k.'], ['..L.L.L.L..', '..L.k.k.L..', '..k.....k..'],
-      ['..LL...LL..', '...........', '...........'], ['..L.L.L.L..', '..k.L.L.k..', '....k.k....']]
+      ['..L.L.L.L..', '..LL...LL..', '..kk...kk..'], ['..L.L.L.L..', '..k.L.L.k..', '....k.k....']]
   }
 };
 // the nine goats from the reference sheet
@@ -519,7 +519,7 @@ function canineSide(d, pose, fr, view) {
   }
   // legs
   if (!lying && pose !== 'sit') {
-    const off = run ? [[-2, -1, 2, 1], [1, 1, -1, -1], [0, 0, 0, 0], [-1, -1, 2, 1]][fr] : [[0, 0, 0, 0], [1, -1, -1, 1], [0, 0, 0, 0], [-1, 1, 1, -1]][fr % 4];
+    const off = run ? [[-2, -1, 2, 1], [0, 1, -1, 0], [1, 1, -1, -1], [-1, -1, 1, 2]][fr] : [[0, 0, 0, 0], [1, -1, -1, 1], [0, 0, 0, 0], [-1, 1, 1, -1]][fr % 4];
     const tuck = run && fr === 2;
     const lx = [x0 + 1, x0 + 2, x1 - 1, x1];
     lx.forEach((x, i) => {
@@ -665,6 +665,59 @@ SP.dog = canineSet(DOG_BREEDS[0].look);
 SP.wolf = canineSet(WOLF_LOOK);
 SP.alpha = canineSet(ALPHA_LOOK);
 SP.fox = canineSet(FOX_LOOK);
+const BOSS_T = {
+  E: ['.......................l..l...', '......................lil.il..', '...................l.liiiiii..', '..............l.llliiiriiiii..',
+    '...........lllliiiiiiiyriiiii.', '.........lliiikiiiiiiiiiiiiiiw', '..ll...iiiiiikiiiiiiiiiiiikrrr', '.liil.iiiiiikiiiiiiiiiilliww..',
+    '.liiiiiiiiikiiiiiiiiiilllil...', '.liiiiiiiiiiiiiiiikiiiilll....', '..lii.iiiiiikkkkkkiiiiill.....', '..ll...iiiik......kiiii.......'],
+  S: ['....l.......l....', '...lil.....lil...', '...liiiiiiiiil...', '....iiiiiiiii....', '....iyriiiryi....', '...liiiilliiil...',
+    '..lliiilllliill..', '.llllilllklllll..', '.lllliirrrriilll.', '..llllwiiiwllll..', '...lllllllllll...', '....iiiiiiiii....', '....iiiiiiiii....'],
+  N: ['....l.......l....', '...lil.....lil...', '...liiiiiiiiil...', '....iiiliiiii....', '...liiiliiiiil...', '..lliiiiiiiiill..',
+    '.llliiiiiiiiilll.', '..iiiiiiiiiiiii..', '..iiiiiiiiiiiii..', '..iiiiiiiiiiiii..', '..iiiiiiiiiiiii..', '...iiiiiiiiiii...', '....iiiiiiiii....']
+};
+// dark outline around every filled pixel (1px border added on all sides)
+function outlineAll(rows) {
+  const W = Math.max(...rows.map(r => r.length)) + 2, H = rows.length + 2;
+  const g = [Array(W).fill('.')].concat(rows.map(r => ('.' + r.padEnd(W - 2, '.') + '.').split('')), [Array(W).fill('.')]);
+  const out = g.map(r => r.slice());
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    if (g[y][x] !== '.') continue;
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const c = g[y + dy] && g[y + dy][x + dx];
+      if (c && c !== '.' && c !== 'k') { out[y][x] = 'k'; break; }
+    }
+  }
+  return out.map(r => r.join(''));
+}
+function bossLegs(view, run, fr) {
+  const W = view === 'E' ? 30 : 17, rows = Array.from({ length: 5 }, () => Array(W).fill('.'));
+  const base = view === 'E' ? [6, 9, 17, 20] : (view === 'S' ? [5, 10] : [4, 11]);
+  const offs = view === 'E'
+    ? (run ? [[-3, -2, 3, 2], [0, 1, -1, 0], [2, 2, -2, -1], [-1, -2, 2, 3]][fr] : [[0, 0, 0, 0], [1, -1, -1, 1], [0, 0, 0, 0], [-1, 1, 1, -1]][fr])
+    : [0, 0];
+  const lift = view === 'E' ? [0, 0, 0, 0] : (run ? [[0, 0], [1, 0], [1, 1], [0, 1]][fr] : [[0, 0], [1, 0], [0, 0], [0, 1]][fr]);
+  const n = run && fr === 2 && view === 'E' ? 3 : 5;
+  base.forEach((bx, i) => {
+    const m = n - lift[i];
+    for (let k = 0; k < m; k++) {
+      const x = bx + Math.round(offs[i] * (k + 1) / 5);
+      const c = k === m - 1 ? 'k' : 'i';
+      if (x >= 0 && x + 1 < W) { rows[k][x] = c; rows[k][x + 1] = c; }
+    }
+  });
+  if (view === 'N') { rows[0][7] = rows[0][8] = rows[0][9] = 'i'; rows[1][7] = rows[1][9] = 'i'; rows[1][8] = 'l'; rows[2][8] = 'l'; }
+  return rows.map(r => r.join(''));
+}
+function bossSet() {
+  const set = { run: {}, act: {} };
+  for (const v of ['E', 'S', 'N']) {
+    set[v] = [0, 1, 2, 3].map(f => sprB(outlineAll(BOSS_T[v].concat(bossLegs(v, false, f))), 0));
+    set.run[v] = [0, 1, 2, 3].map(f => sprB(outlineAll(BOSS_T[v].concat(bossLegs(v, true, f))), RUN_BOB[f]));
+    set.act[v] = set[v][0];
+  }
+  for (const v of ['SE', 'NE']) { set[v] = set.E; set.run[v] = set.run.E; set.act[v] = set.act.E; }
+  return set;
+}
+SP.boss = bossSet();
 
 // facing: 6 directions from a facing vector
 // 8 directions for the goat: E, SE, S, N, NE (W, SW, NW mirror E, SE, NE)
@@ -674,6 +727,27 @@ function faceDir8(fx, fy) {
   if (a > 67.5 && a < 112.5) return 'S';
   if (ab < 22.5 || ab > 157.5) return 'E';
   return a > 0 ? 'SE' : 'NE';
+}
+// facing with hysteresis: the view only changes once the heading is well past
+// the sector edge, so a wobbling heading can't flip E/SE/NE every frame
+const DIR8_ANG = { E: 0, SE: 45, S: 90, N: -90, NE: -45 };
+function faceDirH(o) {
+  const a = Math.atan2(o.fy, Math.abs(o.fx)) * 57.2958;
+  if (o.dir8 && Math.abs(a - DIR8_ANG[o.dir8]) < 33) return o.dir8;
+  o.dir8 = faceDir8(Math.abs(o.fx) + 1e-6, o.fy);
+  return o.dir8;
+}
+function faceLeft(o) {
+  if (o.fx < -0.2) o.left = true; else if (o.fx > 0.2) o.left = false;
+  else if (o.left === undefined) o.left = o.fx < 0;
+  return o.left;
+}
+// walk and gallop share one stride phase (no frame jump when the gait changes),
+// and the gait itself switches with hysteresis
+function stepGait(o, dt, on, off) {
+  const sp = len(o.vx, o.vy);
+  if (o.gait === 'run') { if (sp < off) o.gait = 'walk'; } else if (sp > on) o.gait = 'run';
+  o.stepPh = ((o.stepPh || 0) + sp * dt / (o.gait === 'run' ? 7 : 4.5)) % 4;
 }
 function faceDir(fx, fy) {
   const a = Math.atan2(fy, fx) * 57.2958;
@@ -2562,7 +2636,8 @@ function updatePlayers(dt) {
     }
     const spNow = len(p.vx, p.vy);
     if (spNow < 4 && p.actT <= 0 && p.dashT <= 0) p.idleT += dt; else p.idleT = 0;
-    if (spNow > 4 && spNow < 26) p.slowT += dt; else p.slowT = 0;
+    if (spNow > 4 && spNow < 16) p.slowT += dt; else p.slowT = 0;
+    stepGait(p, dt, 58, 42);
     if (p.kind === 'wolf') { updateWolfPlayer(p, dt); p.walk += len(p.vx, p.vy) * dt; continue; }
     const hit = moveBody(p, p.vx * dt, p.vy * dt, 3);
     if (hit && p.ramT > 0 && p.bonk <= 0) {
@@ -2618,6 +2693,7 @@ function updateDemo(dt) {
     moveBody(d, d.vx * dt, d.vy * dt, 3);
     updateFacing(d, dt, 4);
     d.walk += len(d.vx, d.vy) * dt;
+    stepGait(d, dt, 58, 42);
     if (d.actT > 0) d.actT -= dt;
     if (i === 1 && Math.floor(realTime * 0.4) !== Math.floor((realTime - dt) * 0.4)) d.actT = 0.25;
   });
@@ -2988,6 +3064,7 @@ function updateEnemies(dt) {
     }
     e.x += e.vx * dt; e.y += e.vy * dt;
     updateFacing(e, dt, 4);
+    stepGait(e, dt, 48, 34);
     if (e.type === 'bat') e.alt = 10 + Math.sin(e.anim * 5 + e.phase) * 2;
   }
   // the Great Wolf: route 10 after 30 s, every 5th endless stage
@@ -5016,9 +5093,8 @@ function sheepSprite(s) {
   const f = moving ? Math.floor(s.walk / 3) % 2 : 0;
   return { spr: set[dir][f], left: s.fx < 0 };
 }
-const RUN_SPEED = 52;
 function actorSprite(p) {
-  const dir = faceDir8(p.fx, p.fy);
+  const dir = faceDirH(p);
   const side = dir === 'S' ? 'SE' : (dir === 'N' ? 'NE' : dir);
   const set = skinSet(p.kind, p.skin);
   const sp = len(p.vx, p.vy);
@@ -5027,10 +5103,11 @@ function actorSprite(p) {
     if (p.dashT > 0 || p.lungeT > 0) return { spr: set.pose.bite[side] };
     if (p.actT > 0) return { spr: set.act[dir] };
   }
-  if (sp > RUN_SPEED) return { spr: set.run[dir][Math.floor(p.walk / 7) % 4] };
+  const f = Math.floor(p.stepPh || 0) % 4;
+  if (p.gait === 'run' && sp > 4) return { spr: set.run[dir][f] };
   if (sp > 4) {
-    if (p.kind !== 'goat' && p.slowT > 0.6 && !p.carry) return { spr: set.pose.sniff[side][Math.floor(p.walk / 3) % 4] };
-    return { spr: set[dir][Math.floor(p.walk / 4) % 4] };
+    if (p.kind !== 'goat' && p.slowT > 1 && !p.carry) return { spr: set.pose.sniff[side][f] };
+    return { spr: set[dir][f] };
   }
   if (p.kind !== 'goat' && p.idleT > 2.5 && !p.carry && (state === 'PLAYING' || isMenu())) {
     if (p.idleT > 7) {
@@ -5149,7 +5226,7 @@ function drawActor(p) {
   const a = actorSprite(p);
   const s = a.spr;
   if (p.down > 0) {
-    drawSpr(s, x, y, p.fx < 0, { upside: true });
+    drawSpr(s, x, y, faceLeft(p), { upside: true });
     px(x, y - s.h - 4, 'r'); px(x, y - s.h - 3, 'r'); px(x, y - s.h - 1, 'r');
     const f = clamp(p.revive / 1.2, 0, 1);
     const n = 16;
@@ -5159,8 +5236,8 @@ function drawActor(p) {
   if (p.stun > 0) for (let k = 0; k < 2; k++) { const an = realTime * 6 + k * Math.PI; px(x + Math.round(Math.cos(an) * 5), y - s.h - 2, 'y'); }
   const bob = s.bob || 0;
   if (p.ramT > 0) for (let i = 1; i <= 3; i++) px(x - Math.round(p.fx * i * 5), y - 4 - Math.round(p.fy * i * 5) + (i % 2), 'w');
-  drawSpr(s, x, y + bob, p.fx < 0);
-  if (p.carry) drawSpr(SP.sheep.panic, x + (p.fx < 0 ? -8 : 8), y + 1 + (p.kind === 'dog' ? bob - 1 : 0), p.fx < 0);
+  drawSpr(s, x, y + bob, faceLeft(p));
+  if (p.carry) drawSpr(SP.sheep.panic, x + (faceLeft(p) ? -8 : 8), y + 1 + (p.kind === 'dog' ? bob - 1 : 0), faceLeft(p));
   if (p.kind === 'dog' && state === 'PLAYING' && dogBreed(p).aura && p.down <= 0) {
     // guardian aura: a slow ring of dots
     for (let i = 0; i < 10; i++) {
@@ -5201,20 +5278,19 @@ function drawEnemy(e) {
   else if (e.type === 'hawk') s = (Math.floor(e.anim * (e.state === 'dive' ? 4 : 8)) % 2) ? SP.hawkUp : SP.hawkDown;
   else {
     const spd = e.state === 'stun' || e.state === 'launched' ? 0 : len(e.vx, e.vy);
-    const set = e.type === 'fox' ? SP.fox : (e.alpha || e.boss ? SP.alpha : SP.wolf);
-    const dir = faceDir8(e.fx, e.fy);
-    if (spd > 40) s = set.run[dir][Math.floor((e.anim + e.phase) * 11) % 4];
-    else if (spd > 6) s = set[dir][Math.floor((e.anim + e.phase) * 7) % 4];
+    const set = e.boss ? SP.boss : (e.type === 'fox' ? SP.fox : (e.alpha ? SP.alpha : SP.wolf));
+    const dir = faceDirH(e), f = Math.floor(e.stepPh || 0) % 4;
+    if (spd > 6) s = (e.gait === 'run' ? set.run : set)[dir][f];
     else s = set[dir][0];
   }
   if (e.boss && e.state !== 'launched') {
-    const left = e.fx < 0, x = wx(e.x), y = wy(e.y);
+    const left = faceLeft(e), x = wx(e.x), y = wy(e.y);
     const wob = e.state === 'stun' ? Math.round(Math.sin(e.anim * 30)) : 0;
-    drawSprScaled(s, x + wob, y + (s.bob || 0) * 2, left, 2, { white: e.flash > 0 });
-    if (e.carry) drawSpr(SP.sheep.panic, x + (left ? -14 : 14), y + 1, left);
+    drawSpr(s, x + wob, y + (s.bob || 0), left, { white: e.flash > 0 });
+    if (e.carry) drawSpr(SP.sheep.panic, x + (left ? -15 : 15), y - 2, left);
     return;
   }
-  const left = e.fx < 0;
+  const left = faceLeft(e);
   const x = wx(e.x), y = wy(e.y - e.alt);
   if (e.state === 'launched') {
     const tum = Math.floor(e.t * 16) % 2 === 0;
@@ -5394,7 +5470,7 @@ function drawTitle() {
   rect(0, fy - 3, W, 13, 'k');
   if (best.escort || best.defend) text('BEST  ESCORT ' + best.escort + '  DEFEND ' + best.defend, W / 2, fy, 'y', { align: 'center' });
   else text('1-4 PLAYERS  GOATS AND DOGS', W / 2, fy, 's', { align: 'center' });
-  text('V0.9', W - 3, fy - 12, 'i', { align: 'right', outline: 'k' });
+  text('V0.9.1', W - 3, fy - 12, 'i', { align: 'right', outline: 'k' });
 }
 const MODES = [
   { id: 'escort', title: 'ESCORT', l1: 'HERD THE FLOCK PIN TO PIN', icon: 'pinGoal' },
@@ -5617,7 +5693,8 @@ function drawHowTo() {
     entry(SP.fox.SE[0], 'FOX', 'SNEAKS ALONG THE TREES');
     entry(SP.hawkUp, 'HAWK', 'CIRCLES, THEN DIVES. HIT IT LOW');
     entry(SP.batUp, 'BAT', 'SWOOPS IN FROM THE SKY');
-    entry(SP.alpha.S[0], 'GREAT WOLF', 'BOSS: ROUTE 10, EVERY 10 WAVES');
+    { const bs = SP.boss.E[0]; rect(x, y, 20, 14, 'g'); rect(x, y + 12, 20, 2, 'h'); G.drawImage(bs.r, bs.w - 18, 0, 18, 14, x + 1, y, 18, 14);
+      text('GREAT WOLF', x + 25, y + 1, 'y'); text('BOSS: ROUTE 10, EVERY 10 WAVES', x + 25, y + 8, 'l'); y += 18; }
   } else if (howPage === 5) {
     line('ESCORT: 10 ROUTES, PEN THE FLOCK', 'w');
     line('  AT THE RED PIN. MEDALS: TIME,', 'l');

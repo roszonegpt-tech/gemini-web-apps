@@ -1,6 +1,6 @@
 # State — Goat Guardian
 
-**Version:** 0.9.0 · **Status:** Playable. v0.9.0 adds 9 goat breeds, 10 farm dogs with their own skills, 4-frame walk and gallop cycles for every animal, and dog idle poses.
+**Version:** 0.9.1 · **Status:** Playable. v0.9.1 smooths the walk and run animation (shared stride phase and hysteresis) and redraws the Great Wolf boss. v0.9.0 added 9 goat breeds, 10 farm dogs with their own skills, 4-frame walk and gallop cycles for every animal, and dog idle poses.
 
 ## Snapshot
 - The whole game is in `index.html`. Its sections are: canvases, palette and remap, sprites, font, audio, world generation and rendering, camera, input devices, state, particles, collision, players, herd boids, enemies, modes, lobby, update, render, and boot.
@@ -11,7 +11,8 @@
   - Dogs, wolves and foxes come from `canineSet(look)`, using `canineSide` for the E, SE and NE views and `canineFront` for S and N. A look has the body parameters L, B, Lg, Hd, muz, ears, tail and fluffy, plus colour keys and a pattern.
   - Every set has `[dir][4 walk frames]`, `run[dir][4]` (each frame carries `.bob`) and `act[dir]`. Canines also have `pose.{sit, lie, alert, sniff[4], bite}`.
   - `faceDir8()` is used for all players, wolves and foxes. Sheep still use the 6-direction `faceDir()`.
-  - `actorSprite()` picks the frame: gallop above `RUN_SPEED` (52 px/s), otherwise walk, sniff, sit or lie (from `p.idleT` and `p.slowT`).
+  - `stepGait(o, dt, on, off)` advances `o.stepPh` (shared by walk and gallop) and switches `o.gait` with hysteresis. `faceDirH(o)` and `faceLeft(o)` give stable facing. `actorSprite()` and `drawEnemy()` read these, never `p.walk` or time.
+  - Great Wolf: `BOSS_T` templates (E, S, N) plus `bossLegs()` and `outlineAll()` build `SP.boss`, drawn at 1× (not scaled).
 - **Modes:** `escort`, `defend`, `daily`, `endless`, `versus` and `custom` (an editor map). `isEscort()` covers every escort-like mode. `escortWorld(src)` builds the world for a map index, `'daily'`, `'endless'` or `'custom'`.
 - **Mask values:** 0 meadow, 1 forest, 2 pillar, 3 ford (slow), 4 deep water (blocked), 5 brambles (slow; tangles sheep). `blocked()` and `terrainSlow()` read these. Hazards come from `addHazards(def)`, using `def.rivers` and `def.brambles`.
 - **Weather:** `def.weather` is `rain`, `wind`, `fog` or `storm`. `applyRemap()` also does the fog and night dithering using a vision grid built by `buildVisGrid()`.
@@ -36,6 +37,7 @@
 - **Assets:** no Universal Assets are used. Everything is procedural.
 
 ## Verified
+- v0.9.1: a frame log of a CPU dog shows walk and run frames advancing 0→1→2→3 through gait and direction changes (direction flips down from 11 to 7 in 4 s). The smoke test checks that gait does not flip under a speed wobble, and checks the boss sprite set. The boss was checked in play.
 - v0.9.0: the smoke test checks that there are 9 goat and 10 dog breeds, that every set has 4 walk and 4 gallop frames in 5 views, the gallop bob, that every goat is taller than every dog (by visible pixels: 13 vs at most 11), the Corgi nip stun, Pyrenees roar, Bernese carry and drop, Jack Russell ratter and the idle sit. Runtime sweeps with every breed under CPU control in Escort and Defend had no page errors. The Farm Dogs demo scene and the breeds trailer clip run cleanly.
 - v0.8.0: the smoke test checks that birds spawn and that the trailer starts, advances and exits back to the title. `tools/trailer/make.sh` rebuilt the 1080p trailer (64.7 s, h264 + AAC) end to end.
 - v0.7.0: the smoke test also covers the story intro, Versus (both sides filled, timeout win), Daily and Endless starts, stomp, whistle, buying an upgrade, medals and unlocks, the editor route and share-code round trip, and the colour-safe remap.

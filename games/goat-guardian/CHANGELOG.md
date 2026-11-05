@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+## [0.9.1] - 2026-11-05
+### Fixed
+- **Choppy walk and run.** CPU dogs' speed swings between about 20 and 90 px/s while herding. Each time it crossed 52 px/s the sprite switched between walk and run, and the two counted frames differently, so it jumped to an unrelated frame. Now:
+  - Walk and run share one stride phase (`stepGait`), so changing gait keeps the beat.
+  - The gait switches with hysteresis (run above 58, walk below 42; predators 48/34).
+  - Facing has hysteresis: the view changes 33° past the sector centre (`faceDirH`), and left/right flips only once the heading clearly crosses (`faceLeft`).
+  - Predators animate by distance travelled, not by time, so their feet no longer slide.
+- Smoother gallop: the legs fold under the body in the gathered frame instead of vanishing, and the body bob is gentler (0, -1, -1, 0).
+- Sniffing only happens when moving very slowly (under 16 px/s for over a second), so herding dogs no longer duck their heads.
+### Changed
+- **Great Wolf boss redrawn.** It used to be the black alpha wolf scaled 2×, which read as black blocks with eyes. It is now a hand-drawn full-size wolf (32×19): dark fur with a dark outline, a silver mane and ruff, a scar over glowing eyes, bared fangs and a bushy tail. It has side, front and back views, with a 4-frame walk and gallop.
+
 ## [0.9.0] - 2026-11-05
 ### Added
 - **9 goat breeds** from the reference sheet: Saanen, Alpine, Boer, Nubian (spotted), Valais Blackneck, Toggenburg (face stripes), Golden Guernsey, Oberhasli (dorsal stripe) and Pygmy (roan). Medals unlock them.
