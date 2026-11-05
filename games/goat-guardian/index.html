@@ -4,6 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Goat Guardian">
+<meta name="theme-color" content="#160c26">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="assets/icons/icon-192.png">
 <title>Goat Guardian</title>
 <style>
   :root { --bg: #0c0816; color-scheme: dark; }
@@ -144,8 +148,18 @@ function packLE(r, g, b) { return ((b << 16) | (g << 8) | r) >>> 0; }
 
 let remapTable = null;
 let remapQ = -1;
+// colour-safe mode: swap the red/green-dependent colours for magenta/blue/khaki
+const CB_OVERRIDE = [
+  { r: '#ff5fd2', t: '#2c4f86', s: '#5b80b6', g: '#b4ad62', h: '#968f50' },
+  { r: '#ff7ae0', t: '#3b3076', s: '#6658a0' },
+  { r: '#ff6ad8', t: '#262250' }
+];
+function targetRgb(k, i) {
+  if (typeof settings !== 'undefined' && settings.cb && CB_OVERRIDE[i][k]) return hexToRgb(CB_OVERRIDE[i][k]);
+  return PAL_RGB[k][i];
+}
 function paletteColorAt(k, p) {
-  const [d, s, n] = PAL_RGB[k];
+  const d = targetRgb(k, 0), s = targetRgb(k, 1), n = targetRgb(k, 2);
   if (p <= 0.6) {
     const t = p / 0.6;
     return [0, 1, 2].map(j => Math.round(lerp(d[j], s[j], t)));
@@ -154,30 +168,52 @@ function paletteColorAt(k, p) {
   return [0, 1, 2].map(j => Math.round(lerp(s[j], n[j], t)));
 }
 function buildRemap(p) {
-  const q = Math.round(clamp(p, 0, 1) * 96);
+  const q = Math.round(clamp(p, 0, 1) * 96) + (settings.cb ? 1000 : 0);
   if (q === remapQ) return;
   remapQ = q;
   if (q === 0) { remapTable = null; return; }
+  p = (q % 1000) / 96;
   const m = new Map();
   for (const k of PAL_KEYS) {
     const from = PAL_RGB[k][0];
-    const to = paletteColorAt(k, q / 96);
+    const to = paletteColorAt(k, p);
     m.set(packLE(from[0], from[1], from[2]), (0xff000000 | packLE(to[0], to[1], to[2])) >>> 0);
   }
   remapTable = m;
 }
+function nightAmount() {
+  if (isMenu() || state === 'LOADING' || showcase.on) return 0;
+  return clamp((dayProgress - 0.78) / 0.14, 0, 1);
+}
+// one pass per frame: palette swap, then fog (palette-coloured) and night darkness
 function applyRemap() {
-  if (!remapTable) return;
+  const fogOn = weather.kind === 'fog' && !isMenu() && state !== 'LOADING';
+  const night = nightAmount();
+  if (!remapTable && !fogOn && night <= 0) return;
   const img = bctx.getImageData(0, 0, BW, BH);
   const d = new Uint32Array(img.data.buffer);
-  let lastK = -1, lastV = 0;
-  for (let i = 0; i < d.length; i++) {
-    const k = d[i] & 0xffffff;
-    if (k !== lastK) {
-      lastK = k;
-      lastV = remapTable.get(k) || 0;
+  if (remapTable) {
+    let lastK = -1, lastV = 0;
+    for (let i = 0; i < d.length; i++) {
+      const k = d[i] & 0xffffff;
+      if (k !== lastK) { lastK = k; lastV = remapTable.get(k) || 0; }
+      if (lastV) d[i] = lastV;
     }
-    if (lastV) d[i] = lastV;
+  }
+  if (fogOn || night > 0) {
+    const cols = buildVisGrid(fogOn, night);
+    const fc = paletteColorAt('l', clamp(dayProgress, 0, 1));
+    const fogCol = (0xff000000 | packLE(fc[0], fc[1], fc[2])) >>> 0;
+    const darkCol = (0xff000000 | packLE(5, 3, 12)) >>> 0;
+    const col = night > 0 ? darkCol : fogCol;
+    for (let y = 0; y < BH; y++) {
+      const row = ((y / 3) | 0) * cols;
+      const wyy = y + OY;
+      for (let x = 0; x < BW; x++) {
+        const lev = visGrid[row + ((x / 3) | 0)];
+        if (lev && ditherOn(lev, x + OX, wyy)) d[y * BW + x] = col;
+      }
+    }
   }
   bctx.putImageData(img, 0, 0);
 }
@@ -301,6 +337,25 @@ const SP = {};
   };
   SP.wolf = build(null);
   SP.alpha = build({ i: 'k', k: 'i', r: 'y' });
+  // Fox (sneaky thief)
+  const fSide = ['......b.b', 'w....bbbk', 'wbbbbbbnn', '.bbbbnn..'];
+  const fSideB = ['......b.b', 'w....bbbb', 'wbbbbbbbb', '.bbbbnn..'];
+  const fFront = ['b...b', 'bbbbb', 'bnknb', '.nnn.'];
+  const fBack = ['b...b', 'bbbbb', 'bbbbb', '.bwb.'];
+  SP.fox = {
+    SE: walkPair(fSide, '.k.k.k.k.', 'k..k.k..k'), NE: walkPair(fSideB, '.k.k.k.k.', 'k..k.k..k'),
+    S: walkPair(fFront, '.k.k.', 'k...k'), N: walkPair(fBack, '.k.k.', 'k...k')
+  };
+  // Hawk (dives from the sky)
+  SP.hawkUp = spr(['b.........b', 'bb.......bb', '.bbnkkknbb.', '....kyk....']);
+  SP.hawkDown = spr(['....kyk....', '.bbnkkknbb.', 'bb.......bb', 'b.........b']);
+  // Lamb (small, quick, jumpy)
+  SP.lamb = {
+    SE: walkPair(['.ww..', 'wwwkk', 'wwww.', '.ll..'], '.k.k.', 'k..k.'),
+    NE: walkPair(['...k.', '.wwkk', 'wwwww', '.ll..'], '.k.k.', 'k..k.'),
+    S: walkPair(['.ww.', 'wkkw', 'wwww', '.ll.'], 'k..k', '.kk.'),
+    N: walkPair(['.kk.', 'wwww', 'wwww', '.ll.'], 'k..k', '.kk.')
+  };
   SP.batUp = spr(['i.....i', 'ii...ii', '.iikii.', '..krk..']);
   SP.batDown = spr(['..kkk..', '.iirii.', 'ii...ii', 'i.....i']);
   SP.pillar = spr(['llllll', 'wwwwwl', '.wwwl.', '.wwwl.', '.wlwl.', '.wwll.', '.wwwl.', '.wwwl.',
@@ -309,6 +364,35 @@ const SP = {};
   SP.pinGoal = spr(['.rrr.', 'rrwrr', 'rrrrr', '.rrr.', '..r..', '..k..']);
   SP.pinStart = spr(['.lll.', 'llwll', 'lllll', '.lll.', '..l..', '..k..']);
 }
+
+// Recolour a whole sprite set (used for sheep types and unlockable looks)
+function recolorPair(pair, map) {
+  const src = pair.r;
+  const c = makeCanvas(src.width, src.height);
+  const g = c.getContext('2d');
+  g.drawImage(src, 0, 0);
+  const img = g.getImageData(0, 0, c.width, c.height);
+  const d = img.data;
+  const lut = {};
+  for (const k in map) { const a = PAL_RGB[k][0], b = PAL_RGB[map[k]][0]; lut[a[0] + ',' + a[1] + ',' + a[2]] = b; }
+  for (let i = 0; i < d.length; i += 4) {
+    if (!d[i + 3]) continue;
+    const t = lut[d[i] + ',' + d[i + 1] + ',' + d[i + 2]];
+    if (t) { d[i] = t[0]; d[i + 1] = t[1]; d[i + 2] = t[2]; }
+  }
+  g.putImageData(img, 0, 0);
+  const l = transformCanvas(c, true, false);
+  return { r: c, l: l, ru: transformCanvas(c, false, true), lu: transformCanvas(c, true, true), wr: recolor(c, 'w'), wl: recolor(l, 'w'), w: c.width, h: c.height };
+}
+function recolorSet(set, map) {
+  if (Array.isArray(set)) return set.map(x => recolorSet(x, map));
+  if (set && set.r && set.l && set.w !== undefined) return recolorPair(set, map);
+  const out = {};
+  for (const k in set) out[k] = recolorSet(set[k], map);
+  return out;
+}
+SP.goldSheep = recolorSet(SP.sheep, { w: 'y', l: 'n' });
+SP.ramSheep = recolorSet(SP.sheep, { w: 'l', l: 'h', k: 'b' });
 // facing: 6 directions from a facing vector
 function faceDir(fx, fy) {
   const a = Math.atan2(fy, fx) * 57.2958;
@@ -320,7 +404,7 @@ function faceDir(fx, fy) {
 function drawSpr(s, x, y, left, opts) {
   const o = opts || {};
   let img;
-  if (o.white) img = left ? s.wl : s.wr;
+  if (o.white && !settings.reduceFlash) img = left ? s.wl : s.wr;
   else if (o.upside) img = left ? s.lu : s.ru;
   else img = left ? s.l : s.r;
   G.drawImage(img, Math.round(x - s.w / 2), Math.round(y - s.h + 1));
@@ -361,7 +445,8 @@ const FONT = {
   '/': '001001010100100', '+': '000010111010000', "'": '010010000000000', ',': '000000000010100',
   '?': '110001010000010', '(': '001010010010001', ')': '100010010010100', '>': '100110111110100',
   '<': '001011111011001', '=': '000111000111000', 'x': '000101010101000', ' ': '000000000000000',
-  '^': '010111000000000', '*': '000010111010101', '&': '010101010101011'
+  '^': '010111000000000', '*': '000010111010101', '&': '010101010101011',
+  '[': '110100100100110', ']': '011001001001011'
 };
 function textWidth(str, s) { return str.length ? (str.length * 4 - 1) * (s || 1) : 0; }
 function drawTextRaw(str, x, y, col, s) {
@@ -396,11 +481,33 @@ function text(str, x, y, key, opts) {
 // ---------------------------------------------------------------------
 // Settings (persisted per viewer)
 // ---------------------------------------------------------------------
-const settings = { sound: true, shake: true, fullscreen: true, autoHelper: true };
+const settings = {
+  sound: true, music: true, shake: true, fullscreen: true, autoHelper: true,
+  cb: false, reduceFlash: false, speed: 1, wool: 0, storySeen: false
+};
 try {
   const s = JSON.parse(localStorage.getItem('goatGuardianSettings') || '{}');
-  for (const k in settings) if (typeof s[k] === 'boolean') settings[k] = s[k];
+  for (const k in settings) if (typeof s[k] === typeof settings[k]) settings[k] = s[k];
 } catch (e) { /* storage unavailable */ }
+// remappable keyboard controls (two keyboard players)
+const DEFAULT_KEYS = {
+  kbL: { up: 'w', down: 's', left: 'a', right: 'd', action: ' ', ability: 'e' },
+  kbR: { up: 'arrowup', down: 'arrowdown', left: 'arrowleft', right: 'arrowright', action: 'enter', ability: '.' }
+};
+let keymap = JSON.parse(JSON.stringify(DEFAULT_KEYS));
+try {
+  const km = JSON.parse(localStorage.getItem('goatGuardianKeys') || 'null');
+  if (km && km.kbL && km.kbR) for (const d of ['kbL', 'kbR']) for (const a in keymap[d]) if (typeof km[d][a] === 'string') keymap[d][a] = km[d][a];
+} catch (e) { /* storage unavailable */ }
+function saveKeys() { try { localStorage.setItem('goatGuardianKeys', JSON.stringify(keymap)); } catch (e) { /* ignore */ } }
+function keyName(k) {
+  const names = { ' ': 'SPACE', arrowup: 'UP', arrowdown: 'DOWN', arrowleft: 'LEFT', arrowright: 'RIGHT', enter: 'ENTER',
+    shift: 'SHIFT', control: 'CTRL', alt: 'ALT', tab: 'TAB', backspace: 'BKSP' };
+  if (names[k]) return names[k];
+  const u = k.toUpperCase();
+  return u.length === 1 && FONT[u] ? u : u.slice(0, 5).replace(/[^A-Z0-9]/g, '?');
+}
+let remapWaiting = null;
 function saveSettings() {
   try { localStorage.setItem('goatGuardianSettings', JSON.stringify(settings)); } catch (e) { /* ignore */ }
 }
@@ -408,7 +515,7 @@ function saveSettings() {
 // ---------------------------------------------------------------------
 // Audio (Web Audio synthesis)
 // ---------------------------------------------------------------------
-let AC = null, master = null, noiseBuf = null;
+let AC = null, master = null, noiseBuf = null, musicBus = null;
 function initAudio() {
   if (AC) { if (AC.state === 'suspended') AC.resume(); return; }
   const Ctor = window.AudioContext || window.webkitAudioContext;
@@ -417,6 +524,9 @@ function initAudio() {
   master = AC.createGain();
   master.gain.value = settings.sound ? 0.45 : 0;
   master.connect(AC.destination);
+  musicBus = AC.createGain();
+  musicBus.gain.value = 0;
+  musicBus.connect(master);
   noiseBuf = AC.createBuffer(1, Math.floor(AC.sampleRate), AC.sampleRate);
   const d = noiseBuf.getChannelData(0);
   for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
@@ -571,6 +681,44 @@ const SFX = {
     tone('sine', 130, 65, 1.0, 0.3, t + 0.66);
   },
   bump() { if (audioReady()) tone('sine', 120, 60, 0.08, 0.25); },
+  stomp() {
+    if (!audioReady()) return;
+    const t = AC.currentTime;
+    tone('sine', 90, 30, 0.45, 1.0, t);
+    noise(0.4, 'lowpass', 400, 0.8, 1, t, 80);
+    tone('square', 160, 50, 0.15, 0.2, t, { type: 'lowpass', freq: 600 });
+  },
+  whistle() {
+    if (!audioReady()) return;
+    const t = AC.currentTime;
+    tone('sine', 1500, 2400, 0.16, 0.22, t);
+    tone('sine', 1700, 2800, 0.22, 0.22, t + 0.2);
+  },
+  howl() {
+    if (!audioReady()) return;
+    const t = AC.currentTime;
+    tone('sawtooth', 300, 520, 0.5, 0.12, t, { type: 'bandpass', freq: 900, q: 3 });
+    tone('sawtooth', 520, 360, 0.7, 0.12, t + 0.5, { type: 'bandpass', freq: 900, q: 3 });
+  },
+  screech() {
+    if (!audioReady()) return;
+    const t = AC.currentTime;
+    tone('sawtooth', 2200, 1200, 0.35, 0.12, t, { type: 'bandpass', freq: 2500, q: 4 });
+    noise(0.3, 'highpass', 3000, 0.15, 1, t);
+  },
+  roar() {
+    if (!audioReady()) return;
+    const t = AC.currentTime;
+    tone('sawtooth', 110, 60, 0.9, 0.3, t, { type: 'lowpass', freq: 500 });
+    noise(0.9, 'lowpass', 300, 0.5, 1, t);
+  },
+  combo(n) { if (audioReady()) tone('square', 523 * Math.pow(1.06, Math.min(n, 12)), 1046 * Math.pow(1.06, Math.min(n, 12)), 0.08, 0.08, undefined, { type: 'lowpass', freq: 3000 }); },
+  coin() {
+    if (!audioReady()) return;
+    const t = AC.currentTime;
+    tone('square', 988, 988, 0.05, 0.08, t, { type: 'lowpass', freq: 3000 });
+    tone('square', 1318, 1318, 0.12, 0.08, t + 0.05, { type: 'lowpass', freq: 3000 });
+  },
   move() { if (audioReady()) tone('square', 520, 520, 0.03, 0.06, undefined, { type: 'lowpass', freq: 1800 }); },
   click() { if (audioReady()) tone('square', 660, 990, 0.05, 0.08, undefined, { type: 'lowpass', freq: 2000 }); },
   back() { if (audioReady()) tone('square', 660, 440, 0.06, 0.07, undefined, { type: 'lowpass', freq: 1800 }); },
@@ -581,6 +729,67 @@ const SFX = {
     tone('square', 880, 880, 0.08, 0.1, t + 0.06, { type: 'lowpass', freq: 2200 });
   }
 };
+
+// ---------------------------------------------------------------------
+// Music: tiny chiptune sequencer, one loop per time of day
+// ---------------------------------------------------------------------
+const THEMES = {
+  day: { bpm: 112, wave: 'square', chords: [48, 43, 45, 41],
+    lead: [72, 0, 76, 0, 79, 0, 76, 0, 74, 0, 79, 0, 83, 0, 79, 0, 76, 0, 72, 0, 69, 0, 72, 0, 77, 0, 76, 0, 74, 0, 72, 0] },
+  dusk: { bpm: 92, wave: 'square', chords: [45, 41, 48, 43],
+    lead: [69, 0, 0, 72, 0, 0, 76, 0, 74, 0, 0, 72, 0, 0, 69, 0, 72, 0, 0, 74, 0, 0, 76, 0, 79, 0, 0, 76, 0, 74, 72, 0] },
+  night: { bpm: 76, wave: 'triangle', chords: [50, 45, 46, 48],
+    lead: [62, 0, 0, 0, 65, 0, 0, 0, 69, 0, 0, 0, 67, 0, 65, 0, 62, 0, 0, 0, 60, 0, 0, 0, 57, 0, 0, 0, 60, 0, 62, 0] }
+};
+const music = { step: 0, nextT: 0, theme: 'day' };
+function midiHz(n) { return 440 * Math.pow(2, (n - 69) / 12); }
+function musicNote(type, n, t, dur, vol, cutoff) {
+  const o = AC.createOscillator();
+  o.type = type;
+  o.frequency.setValueAtTime(midiHz(n), t);
+  const g = AC.createGain();
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(vol, t + 0.01);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  if (cutoff) {
+    const f = AC.createBiquadFilter();
+    f.type = 'lowpass'; f.frequency.value = cutoff;
+    o.connect(f); f.connect(g);
+  } else o.connect(g);
+  g.connect(musicBus);
+  o.start(t); o.stop(t + dur + 0.02);
+}
+function updateMusic() {
+  if (!audioReady() || !musicBus) return;
+  const want = settings.music ? (paused || state === 'LOADING' ? 0.25 : 1) * 0.5 : 0;
+  musicBus.gain.setTargetAtTime(want, AC.currentTime, 0.3);
+  if (!settings.music) { music.nextT = 0; return; }
+  const night = !isMenu() && dayProgress > 0.8, dusk = !isMenu() && dayProgress > 0.42;
+  const theme = night ? 'night' : (dusk ? 'dusk' : 'day');
+  if (theme !== music.theme && music.step % 16 === 0) music.theme = theme;
+  const th = THEMES[music.theme];
+  const stepDur = 60 / th.bpm / 4;
+  if (music.nextT < AC.currentTime) music.nextT = AC.currentTime + 0.05;
+  while (music.nextT < AC.currentTime + 0.15) {
+    const t = music.nextT, st = music.step % 32;
+    const root = th.chords[Math.floor(st / 8)];
+    const ln = th.lead[st];
+    if (ln) musicNote(th.wave, ln, t, stepDur * 1.8, 0.05, 2200);
+    if (st % 4 === 0) musicNote('triangle', root - 12, t, stepDur * 3, 0.12);
+    else if (st % 4 === 2) musicNote('triangle', root - 5, t, stepDur * 1.5, 0.08);
+    if (st % 8 === 4 && music.theme !== 'night') musicNote('square', root + 12 + 4, t, stepDur * 1.2, 0.025, 1500);
+    if (st % 2 === 0 && noiseBuf) {
+      const src = AC.createBufferSource(); src.buffer = noiseBuf;
+      const f = AC.createBiquadFilter(); f.type = 'highpass'; f.frequency.value = 6000;
+      const g = AC.createGain();
+      g.gain.setValueAtTime(st % 4 === 0 ? 0.04 : 0.02, t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.04);
+      src.connect(f); f.connect(g); g.connect(musicBus);
+      src.start(t, Math.random() * 0.5); src.stop(t + 0.05);
+    }
+    music.nextT += stepDur;
+    music.step++;
+  }
+}
 
 // ---------------------------------------------------------------------
 // Fullscreen
@@ -627,7 +836,7 @@ function newWorld(w, h, seed, kind) {
     w: w, h: h, kind: kind, seed: seed,
     mask: new Uint8Array(w * h).fill(1),
     rng: mulberry32(seed), noise: makeNoise(seed),
-    pillars: [], start: null, goal: null, goalR: 26, path: [], canvas: null
+    pillars: [], start: null, goal: null, goalR: 26, path: [], canvas: null, bridges: []
   };
 }
 function maskAt(x, y) {
@@ -635,7 +844,9 @@ function maskAt(x, y) {
   if (x < 0 || y < 0 || x >= world.w || y >= world.h) return 1;
   return world.mask[y * world.w + x];
 }
-function blocked(x, y) { return maskAt(x, y) !== 0; }
+// mask: 0 meadow, 1 forest, 2 pillar, 3 shallow ford, 4 deep water, 5 brambles
+function blocked(x, y) { const m = maskAt(x, y); return m === 1 || m === 2 || m === 4; }
+function terrainSlow(x, y) { const m = maskAt(x, y); return m === 3 ? 0.55 : (m === 5 ? 0.5 : 1); }
 function canopy(x, y) { return maskAt(x, y) === 1; }
 
 function stamp(wd, cx, cy, r, rough, val) {
@@ -841,6 +1052,18 @@ function renderWorld(wd) {
         if (below === 1 || below === 2) col = P.i;
         else if (below === 3 && ((x + y) & 1)) col = P.i;
         d32[i] = col;
+      } else if (m[i] === 4) {
+        // deep water: teal with seafoam ripples, dark bank on the upper edge
+        const top = y > 0 && m[i - w] !== 4 && m[i - w] !== 3;
+        d32[i] = top ? P.i : (hash2(x >> 2, y) < 0.1 || (hash2(x >> 3, y + 5) < 0.05) ? P.s : P.t);
+      } else if (m[i] === 3) {
+        // shallow ford: seafoam with ripples and stepping stones
+        const hh = hash2(x, y);
+        d32[i] = hh < 0.05 ? P.w : (hh < 0.08 ? P.l : P.s);
+      } else if (m[i] === 5) {
+        // brambles: tangled dark thorns with red berries
+        const hh = hash2(x * 3, y * 7);
+        d32[i] = hh < 0.05 ? P.r : (((x + y * 2) % 3 === 0 || hh < 0.3) ? P.i : P.h);
       } else {
         let up = 0;
         for (let dd = 1; dd <= 10; dd++) if (can(x, y - dd)) { up = dd; break; }
@@ -904,6 +1127,13 @@ function renderWorld(wd) {
     }
   }
   g.putImageData(img, 0, 0);
+  for (const b of wd.bridges) {
+    g.fillStyle = C.b; g.fillRect(b.x, b.y, b.w, b.h);
+    g.fillStyle = C.n;
+    for (let y = b.y + 1; y < b.y + b.h; y += 3) g.fillRect(b.x + 1, y, b.w - 2, 1);
+    g.fillStyle = C.k; g.fillRect(b.x, b.y, 1, b.h); g.fillRect(b.x + b.w - 1, b.y, 1, b.h);
+    g.fillStyle = C.i; g.fillRect(b.x, b.y + b.h, b.w, 1);
+  }
   if (wd.goal) {
     for (let k = 0; k < 18; k++) {
       const a = (k / 18) * Math.PI * 2;
@@ -922,28 +1152,80 @@ function renderWorld(wd) {
 // ---------------------------------------------------------------------
 const ESCORT_MAPS = [
   { name: 'MEADOW RUN', info: 'THE ORIGINAL ROUTE', legacy: true },
-  { name: 'BIRCH BEND', info: 'A LAZY WINDING TRAIL', w: 640, h: 1400, step: 150, swing: 120, rad: 42, radVar: 12, glades: 12, islands: 50, isMin: 7, isMax: 16, lakes: 0, gateEvery: 90, pillars: 6 },
-  { name: 'SWITCHBACKS', info: 'ZIG-ZAG UP THE HILL', w: 720, h: 1600, step: 110, swing: 230, zigzag: true, rad: 38, radVar: 8, glades: 8, islands: 40, isMin: 7, isMax: 14, lakes: 0, gateEvery: 110, pillars: 4 },
-  { name: 'TWIN TRAILS', info: 'THE PATH SPLITS AROUND GROVES', w: 700, h: 1700, step: 150, swing: 110, rad: 44, radVar: 10, glades: 10, islands: 50, isMin: 7, isMax: 15, lakes: 3, lakeR: 26, gateEvery: 120, pillars: 6 },
-  { name: 'STONE ROAD', info: 'ANCIENT PILLARS LINE THE WAY', w: 680, h: 1800, step: 140, swing: 130, rad: 42, radVar: 10, glades: 10, islands: 40, isMin: 7, isMax: 14, lakes: 1, lakeR: 22, gateEvery: 45, pillars: 26 },
-  { name: 'WOLF HOLLOW', info: 'NARROW AND CROWDED. MORE WOLVES', w: 700, h: 1900, step: 130, swing: 150, rad: 32, radVar: 6, glades: 6, islands: 90, isMin: 6, isMax: 12, lakes: 0, gateEvery: 120, pillars: 4, wolves: 1.35 },
-  { name: 'OPEN MOOR', info: 'WIDE OPEN SKY. MORE BATS', w: 800, h: 2000, step: 170, swing: 180, rad: 66, radVar: 16, glades: 22, islands: 20, isMin: 8, isMax: 16, lakes: 1, lakeR: 30, gateEvery: 0, pillars: 14, bats: 1.7 },
-  { name: 'LAKE OF PINES', info: 'ROUTE WEAVES ROUND PINE ISLES', w: 760, h: 2200, step: 160, swing: 140, rad: 44, radVar: 10, glades: 10, islands: 40, isMin: 7, isMax: 15, lakes: 5, lakeR: 30, gateEvery: 140, pillars: 8 },
-  { name: 'THE LONG MARCH', info: 'A VERY LONG WAY HOME', w: 760, h: 2600, step: 150, swing: 170, rad: 40, radVar: 12, glades: 16, islands: 80, isMin: 7, isMax: 16, lakes: 2, lakeR: 24, gateEvery: 100, pillars: 10 },
-  { name: 'SUNSET SUMMIT', info: 'EVERYTHING AT ONCE', w: 800, h: 2900, step: 120, swing: 240, zigzag: true, rad: 36, radVar: 10, glades: 14, islands: 90, isMin: 6, isMax: 14, lakes: 3, lakeR: 24, gateEvery: 70, pillars: 18, wolves: 1.2, bats: 1.2 }
+  { name: 'BIRCH BEND', info: 'A LAZY WINDING TRAIL', w: 640, h: 1400, step: 150, swing: 120, rad: 42, radVar: 12, glades: 12, islands: 50, isMin: 7, isMax: 16, lakes: 0, gateEvery: 90, pillars: 6, brambles: 5 },
+  { name: 'SWITCHBACKS', info: 'ZIG-ZAG UP THE HILL', w: 720, h: 1600, step: 110, swing: 230, zigzag: true, rad: 38, radVar: 8, glades: 8, islands: 40, isMin: 7, isMax: 14, lakes: 0, gateEvery: 110, pillars: 4, rivers: [[0.5, 'ford']] },
+  { name: 'TWIN TRAILS', info: 'THE PATH SPLITS AROUND GROVES', w: 700, h: 1700, step: 150, swing: 110, rad: 44, radVar: 10, glades: 10, islands: 50, isMin: 7, isMax: 15, lakes: 3, lakeR: 26, gateEvery: 120, pillars: 6, brambles: 8, weather: 'rain' },
+  { name: 'STONE ROAD', info: 'ANCIENT PILLARS LINE THE WAY', w: 680, h: 1800, step: 140, swing: 130, rad: 42, radVar: 10, glades: 10, islands: 40, isMin: 7, isMax: 14, lakes: 1, lakeR: 22, gateEvery: 45, pillars: 26, rivers: [[0.45, 'bridge']], weather: 'fog' },
+  { name: 'WOLF HOLLOW', info: 'NARROW AND CROWDED. MORE WOLVES', w: 700, h: 1900, step: 130, swing: 150, rad: 32, radVar: 6, glades: 6, islands: 90, isMin: 6, isMax: 12, lakes: 0, gateEvery: 120, pillars: 4, wolves: 1.35, rivers: [[0.6, 'bridge']], brambles: 6, weather: 'fog' },
+  { name: 'OPEN MOOR', info: 'WIDE OPEN SKY. MORE BATS', w: 800, h: 2000, step: 170, swing: 180, rad: 66, radVar: 16, glades: 22, islands: 20, isMin: 8, isMax: 16, lakes: 1, lakeR: 30, gateEvery: 0, pillars: 14, bats: 1.7, rivers: [[0.35, 'ford']], brambles: 8, weather: 'wind' },
+  { name: 'LAKE OF PINES', info: 'ROUTE WEAVES ROUND PINE ISLES', w: 760, h: 2200, step: 160, swing: 140, rad: 44, radVar: 10, glades: 10, islands: 40, isMin: 7, isMax: 15, lakes: 5, lakeR: 30, gateEvery: 140, pillars: 8, rivers: [[0.3, 'bridge'], [0.7, 'ford']], weather: 'rain' },
+  { name: 'THE LONG MARCH', info: 'A VERY LONG WAY HOME', w: 760, h: 2600, step: 150, swing: 170, rad: 40, radVar: 12, glades: 16, islands: 80, isMin: 7, isMax: 16, lakes: 2, lakeR: 24, gateEvery: 100, pillars: 10, rivers: [[0.25, 'ford'], [0.55, 'bridge'], [0.8, 'bridge']], brambles: 10, weather: 'wind' },
+  { name: 'SUNSET SUMMIT', info: 'EVERYTHING AT ONCE', w: 800, h: 2900, step: 120, swing: 240, zigzag: true, rad: 36, radVar: 10, glades: 14, islands: 90, isMin: 6, isMax: 14, lakes: 3, lakeR: 24, gateEvery: 70, pillars: 18, wolves: 1.2, bats: 1.2, rivers: [[0.3, 'bridge'], [0.65, 'ford']], brambles: 12, weather: 'storm' }
 ];
 const DEFEND_MAPS = [
   { name: 'THE HENGE', info: 'STONE RING CLEARING', legacy: true },
-  { name: 'TWIN GLADES', info: 'TWO GLADES, ONE PASS', shape: 'twin' },
+  { name: 'TWIN GLADES', info: 'TWO GLADES, ONE PASS', shape: 'twin', weather: 'rain' },
   { name: 'RING ROAD', info: 'CIRCLE A WOODED ISLE', shape: 'ring', h: 500 },
-  { name: 'CROSSROADS', info: 'FOUR ROADS MEET', shape: 'cross', h: 500 },
-  { name: 'RUINED PLAZA', info: 'A FIELD OF PILLARS', shape: 'plaza' },
+  { name: 'CROSSROADS', info: 'FOUR ROADS MEET', shape: 'cross', h: 500, weather: 'wind' },
+  { name: 'RUINED PLAZA', info: 'A FIELD OF PILLARS', shape: 'plaza', weather: 'fog' },
   { name: 'CRESCENT', info: 'MOON-SHAPED MEADOW', shape: 'crescent', h: 500 },
-  { name: 'GROVE ISLES', info: 'TREES EVERYWHERE', shape: 'grove', h: 500 },
-  { name: 'LONG VALLEY', info: 'A WINDING VALLEY FLOOR', shape: 'valley' },
-  { name: 'CLOVER', info: 'THREE-LEAF CLEARING', shape: 'clover', h: 500 },
-  { name: 'GREAT CIRCLE', info: 'THE BIG ONE. MORE BATS', shape: 'great', h: 560, bats: 1.4 }
+  { name: 'GROVE ISLES', info: 'TREES EVERYWHERE', shape: 'grove', h: 500, brambles: 7, weather: 'rain' },
+  { name: 'LONG VALLEY', info: 'A WINDING VALLEY FLOOR', shape: 'valley', weather: 'fog' },
+  { name: 'CLOVER', info: 'THREE-LEAF CLEARING', shape: 'clover', h: 500, weather: 'wind' },
+  { name: 'GREAT CIRCLE', info: 'THE BIG ONE. MORE BATS', shape: 'great', h: 560, bats: 1.4, weather: 'storm' }
 ];
+
+// Hazards: rivers (shallow ford or deep water with a narrow bridge) and bramble patches
+function addRiver(wd, frac, kind) {
+  const c = wd.path.length ? wd.path[Math.floor(frac * wd.path.length)] : { x: wd.w / 2, y: wd.h * frac };
+  const ph = wd.rng() * 6, half = 11;
+  const yAt = (x) => c.y + Math.sin(x * 0.02 + ph) * 10 - Math.sin(c.x * 0.02 + ph) * 10 + (x - c.x) * 0.04;
+  for (let x = 0; x < wd.w; x++) {
+    const yc = yAt(x);
+    for (let dy = -half; dy <= half; dy++) {
+      const y = Math.round(yc + dy);
+      if (y < 0 || y >= wd.h) continue;
+      const k = y * wd.w + x;
+      if (wd.mask[k] === 0 || wd.mask[k] === 5) wd.mask[k] = kind === 'ford' ? 3 : 4;
+    }
+  }
+  if (kind === 'bridge') {
+    const bw = 16, x0 = Math.round(c.x - bw / 2);
+    let y0 = 1e9, y1 = -1e9;
+    for (let x = x0; x <= x0 + bw; x++) { y0 = Math.min(y0, Math.round(yAt(x) - half - 2)); y1 = Math.max(y1, Math.round(yAt(x) + half + 2)); }
+    for (let y = y0; y <= y1; y++) for (let x = x0; x <= x0 + bw; x++) {
+      if (x < 0 || y < 0 || x >= wd.w || y >= wd.h) continue;
+      if (wd.mask[y * wd.w + x] === 4) wd.mask[y * wd.w + x] = 0;
+    }
+    wd.bridges.push({ x: x0, y: y0, w: bw + 1, h: y1 - y0 + 1 });
+  }
+}
+function addBrambles(wd, n) {
+  const r = wd.rng;
+  for (let k = 0; k < n; k++) {
+    let cx, cy;
+    if (wd.path.length) {
+      const i = Math.floor((0.12 + r() * 0.76) * wd.path.length);
+      const p = wd.path[i], q = wd.path[Math.min(wd.path.length - 1, i + 3)];
+      const dx = q.x - p.x, dy = q.y - p.y, l = Math.hypot(dx, dy) || 1;
+      const side = r() < 0.5 ? -1 : 1, off = 16 + r() * 22;
+      cx = p.x - dy / l * off * side; cy = p.y + dx / l * off * side;
+    } else {
+      const a = r() * Math.PI * 2, d = 60 + r() * 120;
+      cx = wd.start.x + Math.cos(a) * d * 1.4; cy = wd.start.y + Math.sin(a) * d * 0.8;
+    }
+    const rad = 6 + r() * 6;
+    for (let y = Math.floor(cy - rad - 3); y <= cy + rad + 3; y++) for (let x = Math.floor(cx - rad - 3); x <= cx + rad + 3; x++) {
+      if (x < 0 || y < 0 || x >= wd.w || y >= wd.h) continue;
+      const d = Math.hypot(x - cx, y - cy) + (wd.noise(x * 0.3, y * 0.3) - 0.5) * 5;
+      if (d < rad && wd.mask[y * wd.w + x] === 0) wd.mask[y * wd.w + x] = 5;
+    }
+  }
+}
+function addHazards(wd, def) {
+  for (const [frac, kind] of (def.rivers || [])) addRiver(wd, frac, kind);
+  if (def.brambles) addBrambles(wd, def.brambles);
+}
 
 function makeEscortMap(def, seed) {
   const w = def.w, h = def.h;
@@ -996,6 +1278,7 @@ function makeEscortMap(def, seed) {
     stamp(wd, c.x, c.y, def.lakeR + 32, 6, 0);
     stamp(wd, c.x, c.y, def.lakeR, 4, 1);
   }
+  addHazards(wd, def);
   borderForest(wd, 8);
   if (def.gateEvery) {
     for (let i = 40; i < wd.path.length - 40; i += def.gateEvery + Math.floor(r() * 30)) {
@@ -1108,6 +1391,8 @@ function makeDefendMap(def, seed) {
       ring(cx, cy, 140, 104, 14, false, 0.1);
       break;
   }
+  wd.start = start;
+  if (def.brambles) addBrambles(wd, def.brambles);
   borderForest(wd, 8);
   for (const [px2, py2, br] of pillars) if (clearAround(wd, px2, py2, 4)) addPillar(wd, px2, py2, br);
   if (blocked(start.x, start.y) || wd.mask[Math.round(start.y) * w + Math.round(start.x)] !== 0) {
@@ -1155,10 +1440,10 @@ function mapPreview(wd, bw, bh) {
   const img = g.createImageData(pw, ph);
   const d32 = new Uint32Array(img.data.buffer);
   const col = (k) => { const v = PAL_RGB[k][0]; return (0xff000000 | packLE(v[0], v[1], v[2])) >>> 0; };
-  const T = col('t'), Gc = col('g'), L = col('l'), I = col('i');
+  const T = col('t'), Gc = col('g'), L = col('l'), I = col('i'), S = col('s'), HH = col('h');
   for (let y = 0; y < ph; y++) for (let x = 0; x < pw; x++) {
     const m = wd.mask[Math.min(wd.h - 1, Math.floor((y + 0.5) * sc)) * wd.w + Math.min(wd.w - 1, Math.floor((x + 0.5) * sc))];
-    d32[y * pw + x] = m === 1 ? (((x + y) & 1) ? T : I) : (m === 2 ? L : Gc);
+    d32[y * pw + x] = m === 1 ? (((x + y) & 1) ? T : I) : (m === 2 ? L : (m === 3 ? S : (m === 4 ? I : (m === 5 ? HH : Gc))));
   }
   g.putImageData(img, 0, 0);
   const dot = (p, k) => { if (!p) return; g.fillStyle = PAL_DAY[k]; g.fillRect(Math.round(p.x / sc) - 1, Math.round(p.y / sc) - 1, 3, 3); };
@@ -1167,15 +1452,18 @@ function mapPreview(wd, bw, bh) {
   wd.preview = c; wd.previewKey = key;
   return c;
 }
-const progress = { escort: new Array(10).fill(0), defend: new Array(10).fill(0) };
+const progress = { escort: new Array(10).fill(0), defend: new Array(10).fill(0),
+  medals: { escort: new Array(10).fill(0), defend: new Array(10).fill(0) }, daily: { seed: 0, best: 0 } };
 try {
   const pr = JSON.parse(localStorage.getItem('goatGuardianMaps') || '{}');
   for (const k of ['escort', 'defend']) if (Array.isArray(pr[k])) pr[k].forEach((v, i) => { if (i < 10) progress[k][i] = v | 0; });
+  if (pr.medals) for (const k of ['escort', 'defend']) if (Array.isArray(pr.medals[k])) pr.medals[k].forEach((v, i) => { if (i < 10) progress.medals[k][i] = v | 0; });
+  if (pr.daily && pr.daily.seed) progress.daily = { seed: pr.daily.seed | 0, best: pr.daily.best | 0 };
 } catch (e) { /* storage unavailable */ }
 function saveProgress() {
   try { localStorage.setItem('goatGuardianMaps', JSON.stringify(progress)); } catch (e) { /* ignore */ }
 }
-const selMap = { escort: 0, defend: 0 };
+const selMap = { escort: 0, defend: 0, versus: 0 };
 let mapMods = { wolves: 1, bats: 1 };
 
 function meadowNear(x, y, r) {
@@ -1213,6 +1501,97 @@ function forestExit(x, y) {
     }
   }
   return bestP || { x: x < world.w / 2 ? -10 : world.w + 10, y: y };
+}
+
+// ---------------------------------------------------------------------
+// Weather (rain, wind, fog, storm) and the fog/night visibility pass
+// ---------------------------------------------------------------------
+const weather = { kind: '', flash: 0, nextBolt: 8, wind: 0 };
+function setWeather(kind) { weather.kind = kind || ''; weather.flash = 0; weather.nextBolt = 6 + Math.random() * 8; }
+function isRain() { return weather.kind === 'rain' || weather.kind === 'storm'; }
+function isWind() { return weather.kind === 'wind' || weather.kind === 'storm'; }
+function updateWeather(dt) {
+  weather.wind = isWind() ? Math.sin(realTime * 0.13) * 0.7 + 0.5 : 0;
+  if (weather.kind === 'storm') {
+    weather.nextBolt -= dt;
+    if (weather.nextBolt <= 0) {
+      weather.nextBolt = 7 + rand() * 9;
+      if (!settings.reduceFlash) weather.flash = 0.12;
+      if (audioReady()) { noise(1.6, 'lowpass', 220, 0.6, 1, AC.currentTime + 0.3, 60); tone('sine', 60, 30, 1.2, 0.3, AC.currentTime + 0.3); }
+    }
+  }
+  if (weather.flash > 0) weather.flash -= dt;
+  if (isWind() && rand() < dt * 6) {
+    const x = cam.x + (weather.wind > 0 ? -4 : W + 4), y = cam.y + rr(10, H);
+    addParticle({ x: x, y: y, vx: (weather.wind > 0 ? 1 : -1) * rr(60, 110), vy: rr(-8, 8), life: rr(2, 4), max: 4, col: pick(['t', 's', 'n']), g: 6, drag: 0.1, kind: 'px' });
+  }
+}
+function drawWeather() {
+  const t = realTime;
+  if (isRain()) {
+    const n = Math.floor(BW * BH / 700);
+    for (let i = 0; i < n; i++) {
+      const sp = 140 + hash2(i, 3) * 80;
+      const x = Math.floor((hash2(i, 1) * BW * 1.4 + t * sp * (0.35 + weather.wind * 0.4)) % (BW + 20)) - 10;
+      const y = Math.floor((hash2(i, 2) * BH + t * sp) % (BH + 10)) - 5;
+      G.fillStyle = PAL_DAY.l;
+      G.fillRect(x, y, 1, 1); G.fillRect(x - 1, y - 1, 1, 1); G.fillRect(x - 2, y - 2, 1, 1);
+    }
+    for (let i = 0; i < n / 8; i++) {
+      const ph = (t * 3 + hash2(i, 9) * 7) % 1;
+      if (ph > 0.25) continue;
+      const x = Math.floor(hash2(i, 7) * BW), y = Math.floor(hash2(i, 8) * BH);
+      G.fillStyle = PAL_DAY.w; G.fillRect(x - 1, y, 1, 1); G.fillRect(x + 1, y, 1, 1);
+    }
+  }
+  if (isWind()) {
+    for (let i = 0; i < 14; i++) {
+      const sp = 220 + hash2(i, 5) * 120;
+      const dir = weather.wind > 0 ? 1 : -1;
+      const x = Math.floor(((hash2(i, 4) * BW * 2 + t * sp * dir) % (BW * 2) + BW * 2) % (BW * 2)) - BW / 2;
+      const y = Math.floor(hash2(i, 6) * BH);
+      G.fillStyle = PAL_DAY.l;
+      G.fillRect(x, y, 5 + Math.floor(hash2(i, 2) * 6), 1);
+    }
+  }
+}
+// lights: players carry lanterns at night; fog limits sight around each player
+function visibilityLights() {
+  const L = [];
+  const actors = isMenu() ? [] : players;
+  for (const p of actors) L.push([p.x, p.y - 4, 64]);
+  return L;
+}
+let visGrid = null;
+function buildVisGrid(fogOn, nightAmt) {
+  const cs = 3, cols = Math.ceil(BW / cs), rows = Math.ceil(BH / cs);
+  if (!visGrid || visGrid.length !== cols * rows) visGrid = new Uint8Array(cols * rows);
+  const lights = visibilityLights();
+  if (nightAmt > 0) {
+    for (const f of fireflies) lights.push([f.x, f.y, 14]);
+    if (world.goal) lights.push([world.goal.x, world.goal.y, 38]);
+  }
+  for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+    const wxp = OX + c * cs + 1, wyp = OY + r * cs + 1;
+    let best = 1e9;
+    for (const l of lights) {
+      const d = Math.hypot(wxp - l[0], (wyp - l[1]) * 1.15) - l[2];
+      if (d < best) best = d;
+    }
+    // 0 clear .. 4 fully covered
+    let lev = best < -10 ? 0 : (best < 0 ? 1 : (best < 12 ? 2 : (best < 26 ? 3 : 4)));
+    if (nightAmt > 0) lev = Math.round(lev * nightAmt);
+    else if (fogOn) lev = Math.min(lev, 3);
+    visGrid[r * cols + c] = lev;
+  }
+  return cols;
+}
+function ditherOn(lev, x, y) {
+  if (lev <= 0) return false;
+  if (lev === 1) return (x & 3) === 0 && (y & 3) === 0;
+  if (lev === 2) return (x & 1) === 0 && (y & 1) === 0;
+  if (lev === 3) return ((x + y) & 1) === 0;
+  return true;
 }
 
 // ---------------------------------------------------------------------
@@ -1301,7 +1680,7 @@ const DOG_SPEED = 96;
 const PANIC_RADIUS = 40;
 const SHEEP_MAX = 14;
 const P_COL = ['y', 'r', 's', 'w'];
-const MENU_STATES = ['TITLE', 'MODE', 'MAPS', 'PLAYERS', 'OPTIONS', 'HOWTO', 'BYE'];
+const MENU_STATES = ['TITLE', 'MODE', 'MAPS', 'PLAYERS', 'OPTIONS', 'HOWTO', 'BYE', 'KEYS', 'STORY'];
 
 let state = 'TITLE';
 let mode = 'escort';
@@ -1320,11 +1699,11 @@ const ui = { cursor: 0 };
 let hits = [];
 function isMenu() { return MENU_STATES.includes(state); }
 
-let best = { escort: 0, defend: 0 };
+let best = { escort: 0, defend: 0, endless: 0 };
 const hotData = (window.claude && window.claude.hot && window.claude.hot.data) || {};
 try {
   const b = JSON.parse(localStorage.getItem('goatGuardianBest2') || '{}');
-  best.escort = b.escort | 0; best.defend = b.defend | 0;
+  best.escort = b.escort | 0; best.defend = b.defend | 0; best.endless = b.endless | 0;
 } catch (e) { /* storage unavailable */ }
 if (hotData.best) {
   best.escort = Math.max(best.escort, hotData.best.escort | 0);
@@ -1334,6 +1713,7 @@ if (window.claude && window.claude.hot && typeof window.claude.hot.snapshot === 
   window.claude.hot.snapshot(() => ({ best: best }));
 }
 function saveBest() {
+  if (best[mode] === undefined) return false;
   if (score > best[mode]) {
     best[mode] = score;
     try { localStorage.setItem('goatGuardianBest2', JSON.stringify(best)); } catch (e) { /* ignore */ }
@@ -1358,21 +1738,28 @@ function makeSheep(x, y) {
   return {
     x: x, y: y, vx: 0, vy: 0, fx: left ? -1 : 1, fy: 0.3, panic: 0, herd: 0,
     grazeT: rr(0.5, 3), grazing: rand() < 0.5, chew: rand() * 10, wander: rand() * 6.28,
-    walk: 0, baaCd: rr(0, 2), flash: 0, penned: false
+    walk: 0, baaCd: rr(0, 2), flash: 0, penned: false, type: 'normal', thorn: 0
   };
 }
-function spawnHerd(cx, cy, n) {
+function spawnHerd(cx, cy, n, plain) {
   sheep = [];
   for (let i = 0; i < n; i++) {
     const a = (i / n) * Math.PI * 2 + rr(-0.3, 0.3);
     const r = rr(5, 18);
     let x = cx + Math.cos(a) * r, y = cy + Math.sin(a) * r * 0.8;
     if (blocked(x, y)) { x = cx + rr(-2, 2); y = cy + rr(-2, 2); }
-    sheep.push(makeSheep(x, y));
+    const s = makeSheep(x, y);
+    if (!plain && !isMenu()) {
+      if (i === 0 && n >= 8) s.type = 'ram';
+      else if ((i === 1 || i === 2) && n >= 6) s.type = 'lamb';
+      else if (i === 3 && isEscort() && rand() < 0.5) s.type = 'golden';
+    }
+    sheep.push(s);
   }
 }
 function makePlayerBody(p, x, y) {
-  Object.assign(p, { x: x, y: y, vx: 0, vy: 0, fx: 0, fy: 1, cd: 0, ramT: 0, ramId: 0, actT: 0, walk: 0, bonk: 0, queue: 0 });
+  Object.assign(p, { x: x, y: y, vx: 0, vy: 0, fx: 0, fy: 1, cd: 0, cd2: 0, ramT: 0, ramId: 0, actT: 0, actT2: 0, walk: 0, bonk: 0,
+    queue: 0, queue2: 0, down: 0, revive: 0, stun: 0, carry: null, hits: {} });
 }
 
 // ---------------------------------------------------------------------
@@ -1410,8 +1797,34 @@ function leafBurst(x, y) {
   for (let i = 0; i < 8; i++) addParticle({ x: x + rr(-5, 5), y: y + rr(-6, 0), vx: rr(-24, 24), vy: rr(-30, 0),
     life: rr(0.4, 0.9), max: 0.9, col: pick(['t', 's', 'i']), g: 40, drag: 2, kind: 'px' });
 }
+
+// Ground decals (footprints in the grass, wool tufts left by thieves)
+let decals = [];
+function footprint(x, y) {
+  if (maskAt(x, y) !== 0) return;
+  if (decals.length > 420) decals.shift();
+  decals.push({ x: Math.round(x + rr(-1, 1)), y: Math.round(y), life: 4, col: 'h' });
+}
+function woolTuft(x, y) {
+  for (let i = 0; i < 6; i++) decals.push({ x: Math.round(x + rr(-4, 4)), y: Math.round(y + rr(-3, 3)), life: 10, col: rand() < 0.7 ? 'w' : 'l' });
+}
+function updateDecals(dt) {
+  for (let i = decals.length - 1; i >= 0; i--) { decals[i].life -= dt; if (decals[i].life <= 0) decals.splice(i, 1); }
+}
+// Team combo: chain takedowns within 2.5 s for bonus points
+let comboN = 0, comboT = -9, bells = 0;
+function addCombo(x, y) {
+  if (realTime - comboT < 2.5) comboN++; else comboN = 1;
+  comboT = realTime;
+  bells += 1;
+  if (comboN >= 2) {
+    score += comboN - 1;
+    addText(x, y - 22, 'COMBO x' + comboN, 'y');
+    SFX.combo(comboN);
+  }
+}
 function addText(x, y, str, col) { texts.push({ x: x, y: y, str: str, col: col, life: 1.0, max: 1.0 }); }
-function addShake(v) { if (settings.shake) shake = Math.max(shake, v); }
+function addShake(v) { if (settings.shake && !settings.reduceFlash) shake = Math.max(shake, v); }
 function updateParticles(dt) {
   for (let i = particles.length - 1; i >= 0; i--) {
     const p = particles[i];
@@ -1462,13 +1875,15 @@ function updateFacing(e, dt, minSpeed) {
 // Players: goat (ram charge) and dog (bark)
 // ---------------------------------------------------------------------
 function playerAction(p) {
+  if (p.down > 0 || p.stun > 0) return;
   if (p.kind === 'goat') tryRam(p);
-  else tryBark(p);
+  else if (p.kind === 'dog') tryBark(p);
+  else if (p.kind === 'wolf') wolfLunge(p);
 }
 function tryRam(p) {
   if (p.ramT > 0) { p.queue = 0.15; return; }
   if (p.cd > 0) { if (p.cd < 0.2) p.queue = 0.22; return; }
-  p.ramT = RAM_DURATION;
+  p.ramT = RAM_DURATION * upgradeMul('ram');
   p.cd = RAM_COOLDOWN;
   p.ramId++;
   p.queue = 0;
@@ -1485,13 +1900,15 @@ function tryBark(p) {
   p.actT = 0.25;
   p.queue = 0;
   SFX.bark();
-  addParticle({ x: p.x, y: p.y - 3, life: 0.35, max: 0.35, r0: 4, r1: BARK_RADIUS, col: 'w', kind: 'ring' });
+  const br = BARK_RADIUS * upgradeMul('bark');
+  addParticle({ x: p.x, y: p.y - 3, life: 0.35, max: 0.35, r0: 4, r1: br, col: 'w', kind: 'ring' });
   addText(p.x, p.y - 14, 'WOOF', 'w');
+  for (const q of players) if (q.kind === 'wolf' && len(q.x - p.x, q.y - p.y) < br) stunWolfPlayer(q, 0.9, p);
   for (const s of sheep) {
     const dx = s.x - p.x, dy = s.y - p.y;
     const d = len(dx, dy);
-    if (d < BARK_RADIUS && d > 0.01) {
-      const k = 1 - d / BARK_RADIUS;
+    if (d < br && d > 0.01) {
+      const k = (1 - d / br) * (s.type === 'ram' ? 0.4 : 1);
       s.vx += (dx / d) * 70 * k + p.vx * 0.2;
       s.vy += (dy / d) * 70 * k + p.vy * 0.2;
       s.herd = 0.8;
@@ -1502,15 +1919,18 @@ function tryBark(p) {
     if (e.state === 'launched' || e.state === 'emerge' || e.state === 'flee') continue;
     const dx = e.x - p.x, dy = e.y - p.y;
     const d = len(dx, dy);
-    if (d > BARK_RADIUS - 4) continue;
+    if (d > br - 4) continue;
+    if (e.type === 'hawk' && e.alt > 16) continue;
     const l = d || 1;
-    e.vx = (dx / l) * 140; e.vy = (dy / l) * 140;
+    e.vx = (dx / l) * (e.boss ? 50 : 140); e.vy = (dy / l) * (e.boss ? 50 : 140);
     e.flash = 0.12;
     if (e.carry) releaseCarried(e);
+    if (e.boss) { e.state = 'stun'; e.t = 0.5; addText(e.x, e.y - 22, 'GRR', 'y'); continue; }
     e.fear++;
     if (e.fear >= e.hp) {
       e.state = 'stun'; e.t = 0.5; e.thenFlee = true;
       score++; mission.kills++;
+      addCombo(e.x, e.y);
       addText(e.x, e.y - 12, 'SCRAM!', 'y');
     } else {
       e.state = 'stun'; e.t = 1.2;
@@ -1519,14 +1939,81 @@ function tryBark(p) {
     }
   }
 }
+
+// Second abilities: goat stomp, dog whistle (wolf howl lives in versus code)
+const STOMP_CD = 6, STOMP_R = 34, WHISTLE_CD = 7, WHISTLE_R = 90;
+function playerAbility(p) {
+  if (p.down > 0 || p.stun > 0) return;
+  if (p.cd2 > 0) { if (p.cd2 < 0.25) p.queue2 = 0.3; return; }
+  if (p.kind === 'goat') stomp(p);
+  else if (p.kind === 'dog') whistle(p);
+  else if (p.kind === 'wolf') howl(p);
+}
+function stomp(p) {
+  p.cd2 = STOMP_CD * upgradeMul('cool');
+  p.actT2 = 0.3;
+  SFX.stomp();
+  addShake(4);
+  dust(p.x, p.y, 18, 6, 60);
+  addParticle({ x: p.x, y: p.y - 2, life: 0.4, max: 0.4, r0: 4, r1: STOMP_R, col: 'y', kind: 'ring' });
+  addParticle({ x: p.x, y: p.y - 2, life: 0.3, max: 0.3, r0: 2, r1: STOMP_R * 0.6, col: 'w', kind: 'ring' });
+  addText(p.x, p.y - 14, 'STOMP', 'y');
+  for (const e of enemies) {
+    if (e.state === 'launched' || e.state === 'emerge' || (e.alt > 14)) continue;
+    const dx = e.x - p.x, dy = e.y - p.y, d = len(dx, dy);
+    if (d > STOMP_R) continue;
+    if (e.carry) releaseCarried(e);
+    e.state = 'stun'; e.t = e.boss ? 0.8 : 1.8; e.thenFlee = false;
+    e.vx = dx / (d || 1) * 90; e.vy = dy / (d || 1) * 90;
+    e.flash = 0.15;
+  }
+  for (const q of players) if (q.kind === 'wolf' && q !== p && len(q.x - p.x, q.y - p.y) < STOMP_R) stunWolfPlayer(q, 1.6, p);
+}
+function whistle(p) {
+  p.cd2 = WHISTLE_CD * upgradeMul('cool');
+  p.actT = 0.3;
+  SFX.whistle();
+  addParticle({ x: p.x, y: p.y - 4, life: 0.5, max: 0.5, r0: 6, r1: WHISTLE_R * 0.7, col: 's', kind: 'ring' });
+  addText(p.x, p.y - 14, 'PHWEET!', 's');
+  const goal = world.goal && isEscort() ? world.goal : { x: p.x, y: p.y };
+  for (const s of sheep) {
+    if (s.penned) continue;
+    if (len(s.x - p.x, s.y - p.y) > WHISTLE_R) continue;
+    s.call = { x: goal.x, y: goal.y, t: 2.6 };
+    s.grazing = false;
+  }
+}
 function updatePlayers(dt) {
   for (const p of players) {
+    if (p.down > 0) {
+      // knocked down: a teammate standing close revives faster
+      p.down -= dt;
+      const helper = players.some(q => q !== p && q.down <= 0 && q.kind !== 'wolf' && len(q.x - p.x, q.y - p.y) < 13);
+      if (helper) p.revive += dt; else p.revive = Math.max(0, p.revive - dt * 0.5);
+      p.vx *= Math.max(0, 1 - dt * 6); p.vy *= Math.max(0, 1 - dt * 6);
+      moveBody(p, p.vx * dt, p.vy * dt, 3);
+      if (p.revive >= 1.2 || p.down <= 0) {
+        if (p.revive >= 1.2) { addText(p.x, p.y - 14, 'BACK UP!', 'y'); SFX.rescue(); }
+        p.down = 0; p.revive = 0;
+      }
+      continue;
+    }
+    if (p.stun > 0) {
+      p.stun -= dt;
+      p.vx *= Math.max(0, 1 - dt * 5); p.vy *= Math.max(0, 1 - dt * 5);
+      moveBody(p, p.vx * dt, p.vy * dt, 3);
+      continue;
+    }
     const inp = readMove(p.dev);
     if (p.queue > 0) { p.queue -= dt; if (p.cd <= 0 && p.ramT <= 0) playerAction(p); }
+    if (p.queue2 > 0) { p.queue2 -= dt; if (p.cd2 <= 0) { p.queue2 = 0; playerAbility(p); } }
     if (p.cd > 0) p.cd = Math.max(0, p.cd - dt);
+    if (p.cd2 > 0) p.cd2 = Math.max(0, p.cd2 - dt);
+    if (p.actT2 > 0) p.actT2 -= dt;
     if (p.actT > 0) p.actT -= dt;
     if (p.bonk > 0) p.bonk -= dt;
-    const maxS = p.kind === 'dog' ? DOG_SPEED : GOAT_SPEED;
+    const maxS = (p.kind === 'dog' ? DOG_SPEED : (p.kind === 'wolf' ? WOLF_P_SPEED * (p.carry ? 0.7 : 1) : GOAT_SPEED)) *
+      (p.kind === 'wolf' ? 1 : terrainSlow(p.x, p.y) * upgradeMul('speed'));
     if (p.ramT > 0) {
       p.ramT -= dt;
       if (len(inp.x, inp.y) > 0.2) {
@@ -1554,6 +2041,7 @@ function updatePlayers(dt) {
       updateFacing(p, dt, 6);
       if (sp > 60 && rand() < dt * 6) dust(p.x - p.fx * 4, p.y, 1, 1, 10);
     }
+    if (p.kind === 'wolf') { updateWolfPlayer(p, dt); p.walk += len(p.vx, p.vy) * dt; continue; }
     const hit = moveBody(p, p.vx * dt, p.vy * dt, 3);
     if (hit && p.ramT > 0 && p.bonk <= 0) {
       p.bonk = 0.3; p.ramT = 0;
@@ -1563,6 +2051,7 @@ function updatePlayers(dt) {
       leafBurst(p.x + p.fx * 6, p.y - 3);
       SFX.bump();
     }
+    if (Math.floor(p.walk / 7) !== p.lastPrint && len(p.vx, p.vy) > 10) { p.lastPrint = Math.floor(p.walk / 7); footprint(p.x - 1, p.y); footprint(p.x + 1, p.y + 1); }
     p.walk += len(p.vx, p.vy) * dt;
   }
   for (let i = 0; i < players.length; i++) for (let j = i + 1; j < players.length; j++) {
@@ -1628,8 +2117,9 @@ function herdCenter() {
   return { x: x / n, y: y / n };
 }
 function updateSheep(dt) {
-  const threats = enemies.filter(e => e.state === 'hunt' || e.state === 'carry' || e.state === 'stun');
-  const shepherds = isMenu() ? demo : players;
+  const threats = enemies.filter(e => e.state === 'hunt' || e.state === 'carry' || e.state === 'stun' || e.state === 'dive')
+    .concat(players.filter(q => q.kind === 'wolf' && q.stun <= 0));
+  const shepherds = (isMenu() ? demo : players).filter(q => q.kind !== 'wolf');
   const hc = herdCenter();
   for (const s of sheep) {
     let cx = 0, cy = 0, avx = 0, avy = 0, sx = 0, sy = 0, n = 0;
@@ -1647,10 +2137,13 @@ function updateSheep(dt) {
       }
     }
     let ax = 0, ay = 0;
-    let threat = null, td = PANIC_RADIUS;
+    const pr = PANIC_RADIUS * (s.type === 'lamb' ? 1.4 : 1);
+    let threat = null, td = pr;
     if (!s.penned) for (const e of threats) {
       if (canopy(e.x, e.y) && e.state !== 'carry') continue;
       const d = len(e.x - s.x, e.y - s.y);
+      if (e.type === 'fox' && d > 22 && e.state !== 'carry') continue;     // foxes sneak up
+      if (e.type === 'hawk' && e.alt > 20) continue;
       if (d < td) { td = d; threat = e; }
     }
     const wasPanic = s.panic > 0;
@@ -1660,7 +2153,7 @@ function updateSheep(dt) {
     if (threat) {
       const fx = s.x - threat.x, fy = s.y - threat.y;
       const l = len(fx, fy) || 1;
-      const urg = 1 + (1 - td / PANIC_RADIUS) * 0.6;
+      const urg = 1 + (1 - td / pr) * 0.6;
       ax += ((fx / l) * 58 * urg - s.vx) * 6;
       ay += ((fy / l) * 58 * urg - s.vy) * 6;
       ax += sx * 50; ay += sy * 50;
@@ -1688,7 +2181,7 @@ function updateSheep(dt) {
       const d = len(dx, dy) || 0.01;
       if (p.kind === 'dog') {
         if (d < 30) {
-          const k = (30 - d) / 30;
+          const k = (30 - d) / 30 * (s.type === 'ram' ? 0.35 : 1);
           ax += (dx / d) * k * 230; ay += (dy / d) * k * 230;
           s.herd = Math.max(s.herd, 0.4); s.grazing = false;
         }
@@ -1703,13 +2196,23 @@ function updateSheep(dt) {
         }
       }
     }
+    if (s.call) {
+      s.call.t -= dt;
+      const dx = s.call.x - s.x, dy = s.call.y - s.y, d = len(dx, dy) || 1;
+      if (s.call.t <= 0 || d < 10 || threat) s.call = null;
+      else { ax += dx / d * 140; ay += dy / d * 140; s.herd = Math.max(s.herd, 0.3); }
+    }
     for (let a = 0; a < 8; a++) {
       const ang = (a / 8) * Math.PI * 2;
       const ox = Math.cos(ang), oy = Math.sin(ang);
       if (blocked(s.x + ox * 6, s.y + oy * 5)) { ax -= ox * 70; ay -= oy * 70; }
     }
     s.vx += ax * dt; s.vy += ay * dt;
-    const maxS = s.panic > 0 ? 62 : (s.herd > 0 ? 46 : (s.grazing ? 6 : 17));
+    const maxS = (s.panic > 0 ? 62 : (s.herd > 0 ? 46 : (s.grazing ? 6 : 17))) * terrainSlow(s.x, s.y) * (s.type === 'lamb' ? 1.3 : (s.type === 'ram' ? 0.85 : 1));
+    if (maskAt(s.x, s.y) === 5 && !s.penned) {
+      s.thorn = (s.thorn || 0) + dt;
+      if (s.thorn > 0.6 && !s.ouch) { s.ouch = true; addText(s.x, s.y - 10, 'OUCH', 'r'); SFX.baa(true); }
+    } else if (s.thorn) { s.thorn = Math.max(0, s.thorn - dt * 0.5); if (s.thorn < 0.3) s.ouch = false; }
     const sp = len(s.vx, s.vy);
     if (sp > maxS) { s.vx = s.vx / sp * maxS; s.vy = s.vy / sp * maxS; }
     if (s.panic <= 0) { const k = Math.max(0, 1 - dt * (s.grazing ? 4 : 1.4)); s.vx *= k; s.vy *= k; }
@@ -1719,7 +2222,8 @@ function updateSheep(dt) {
       const gd = len(gx, gy);
       if (!s.penned && gd < world.goalR - 6 && state === 'PLAYING') {
         s.penned = true; s.flash = 0.6; s.panic = 0;
-        mission.penned++; delivered++;
+        mission.penned++; delivered++; bells += 1;
+        if (s.type === 'golden') { score += 10; bells += 5; addText(s.x, s.y - 18, 'GOLD +10', 'y'); SFX.coin(); }
         addText(s.x, s.y - 10, 'SAFE', 'y');
         SFX.pen();
       }
@@ -1733,6 +2237,18 @@ function updateSheep(dt) {
     s.walk += len(s.vx, s.vy) * dt;
     s.chew += dt;
     if (s.flash > 0) s.flash -= dt;
+    if (state === 'PLAYING' && Math.floor(s.walk / 6) !== s.lastPrint && len(s.vx, s.vy) > 8) { s.lastPrint = Math.floor(s.walk / 6); footprint(s.x, s.y); }
+  }
+  // sheep tangled in brambles too long are lost
+  for (let i = sheep.length - 1; i >= 0; i--) {
+    const s = sheep[i];
+    if (s.thorn > 3 && state === 'PLAYING') {
+      sheep.splice(i, 1);
+      lostCount++;
+      woolPuff(s.x, s.y, 10); woolTuft(s.x, s.y);
+      addText(s.x, s.y - 12, 'TANGLED', 'r');
+      SFX.lost();
+    }
   }
 }
 
@@ -1743,9 +2259,33 @@ function spawnEnemy(level, force) {
   const hc = herdCenter();
   let batChance = level < 2 ? 0 : Math.min(0.45, 0.15 + level * 0.05);
   batChance = Math.min(0.8, batChance * (mapMods.bats || 1));
-  if (force) batChance = force.type === 'bat' ? 1 : 0;
-  const base = { vx: 0, vy: 0, fx: 1, fy: 0.3, t: 0, fear: 0, anim: rand() * 6, hits: {}, carry: null, flash: 0, phase: rand() * 6.28 };
-  if (rand() < batChance) {
+  const foxChance = level >= 3 ? 0.14 : 0, hawkChance = level >= 4 ? 0.1 : 0;
+  let type;
+  if (force) type = force.type;
+  else {
+    const r = rand();
+    type = r < batChance ? 'bat' : (r < batChance + foxChance ? 'fox' : (r < batChance + foxChance + hawkChance ? 'hawk' : 'wolf'));
+  }
+  const base = { vx: 0, vy: 0, fx: 1, fy: 0.3, t: 0, fear: 0, anim: rand() * 6, hits: {}, carry: null, flash: 0, phase: rand() * 6.28, downCd: 0 };
+  if (type === 'hawk') {
+    const a = rand() * Math.PI * 2, R = Math.max(W, H) * 0.6 + 30;
+    const x = clamp(hc.x + Math.cos(a) * R, 4, world.w - 4), y = clamp(hc.y + Math.sin(a) * R, 4, world.h - 4);
+    enemies.push(Object.assign({}, base, { type: 'hawk', x: x, y: y, state: 'circle', t: 2.0, hp: 1, speed: 66, accel: 150, alt: 40, alpha: false, target: null }));
+    return;
+  }
+  if (type === 'fox') {
+    const p = forestSpawn(hc.x, hc.y, 90, Math.max(160, Math.max(W, H) * 0.55));
+    enemies.push(Object.assign({}, base, { type: 'fox', x: p.x, y: p.y, state: 'emerge', t: 0.6, hp: 1, speed: Math.min(94, 62 + level * 3), accel: 260, alt: 0, alpha: false }));
+    return;
+  }
+  if (type === 'wolf' && force && force.boss) {
+    const p = forestSpawn(hc.x, hc.y, 110, 190);
+    enemies.push(Object.assign({}, base, { type: 'wolf', x: p.x, y: p.y, state: 'emerge', t: 1.6, hp: 8, maxHp: 8, speed: 56, accel: 160, alt: 0, alpha: true, boss: true }));
+    banner = { t: 3, a: 'GREAT WOLF', b: 'IT IS COMING FOR THE FLOCK' };
+    SFX.roar();
+    return;
+  }
+  if (type === 'bat') {
     const a = rand() * Math.PI * 2;
     const R = Math.max(W, H) * 0.6 + 20;
     const x = clamp(hc.x + Math.cos(a) * R, 4, world.w - 4), y = clamp(hc.y + Math.sin(a) * R, 4, world.h - 4);
@@ -1753,7 +2293,7 @@ function spawnEnemy(level, force) {
       speed: Math.min(62, 34 + level * 3), accel: 120, alt: 10, alpha: false }));
   } else {
     const p = forestSpawn(hc.x, hc.y, 100, Math.max(170, Math.max(W, H) * 0.6));
-    const alpha = force ? !!force.alpha : (level >= 3 && rand() < Math.min(0.4, (level - 2) * 0.09));
+    const alpha = force && force.type === 'wolf' ? !!force.alpha : (level >= 3 && rand() < Math.min(0.4, (level - 2) * 0.09));
     enemies.push(Object.assign({}, base, { type: 'wolf', x: p.x, y: p.y, state: 'emerge', t: 1.0, hp: alpha ? 2 : 1,
       speed: Math.min(76, 42 + level * 3.2) * (alpha ? 0.92 : 1), accel: 200, alt: 0, alpha: alpha }));
   }
@@ -1777,7 +2317,8 @@ function steerTo(e, tx, ty, speed, dt) {
   return d;
 }
 function killEnemy(e, i) {
-  popBurst(e.x, e.y - e.alt - 3, 'i');
+  popBurst(e.x, e.y - e.alt - 3, e.type === 'fox' || e.type === 'hawk' ? 'b' : 'i');
+  if (e.boss) { popBurst(e.x - 6, e.y - 6, 'y'); popBurst(e.x + 6, e.y - 2, 'w'); }
   SFX.pop();
   enemies.splice(i, 1);
 }
@@ -1827,13 +2368,57 @@ function updateEnemies(dt) {
       }
       continue;
     }
+    if (e.downCd > 0) e.downCd -= dt;
     let spd = e.speed;
+    if (e.type === 'wolf' || e.type === 'fox') spd *= terrainSlow(e.x, e.y);
+    if ((e.type === 'bat' || e.type === 'hawk') && isWind()) { spd *= 0.72; e.vx += weather.wind * 18 * dt; }
+    if (e.type === 'hawk' && (e.state === 'circle' || e.state === 'dive')) {
+      if (!e.target || e.target.penned || sheep.indexOf(e.target) < 0) e.target = nearestSheep(e.x, e.y);
+      if (!e.target) { e.state = 'flee'; e.exit = { x: e.x < world.w / 2 ? -40 : world.w + 40, y: e.y }; }
+      else if (e.state === 'circle') {
+        e.t -= dt;
+        const a = e.anim * 2.2;
+        steerTo(e, e.target.x + Math.cos(a) * 34, e.target.y + Math.sin(a) * 22, 74 * (isWind() ? 0.8 : 1), dt);
+        e.alt = lerp(e.alt, 40, dt * 2);
+        if (e.t <= 0 && len(e.x - e.target.x, e.y - e.target.y) < 70) { e.state = 'dive'; SFX.screech(); }
+      } else {
+        steerTo(e, e.target.x, e.target.y, 125, dt);
+        e.alt = Math.max(1, e.alt - dt * 62);
+        if (len(e.target.x - e.x, e.target.y - e.y) < 6 && e.alt < 7) {
+          const t = e.target, idx = sheep.indexOf(t);
+          if (idx >= 0) sheep.splice(idx, 1);
+          e.carry = t; e.state = 'carry';
+          e.exit = { x: e.x < world.w / 2 ? -40 : world.w + 40, y: e.y + rr(-60, 60) };
+          woolPuff(t.x, t.y, 8); woolTuft(t.x, t.y);
+          SFX.capture();
+          addText(t.x, t.y - 12, 'HELP!', 'r');
+        }
+      }
+      e.x += e.vx * dt; e.y += e.vy * dt;
+      updateFacing(e, dt, 4);
+      continue;
+    }
+    if (e.type === 'hawk' && e.state === 'carry') e.alt = Math.min(44, e.alt + dt * 12);
+    // alphas and the Great Wolf can knock a shepherd down
+    if ((e.alpha || e.boss) && e.type === 'wolf' && (e.state === 'hunt' || e.state === 'carry') && e.downCd <= 0) {
+      for (const q of players) {
+        if (q.kind === 'wolf' || q.down > 0 || q.ramT > 0) continue;
+        if (len(q.x - e.x, q.y - e.y) < (e.boss ? 10 : 7)) {
+          q.down = 6; q.revive = 0; q.vx = (q.x - e.x) * 6; q.vy = (q.y - e.y) * 6;
+          e.downCd = 3;
+          addText(q.x, q.y - 14, 'DOWN!', 'r');
+          addShake(3); SFX.bump();
+          break;
+        }
+      }
+    }
     if (e.state === 'hunt') {
       const target = nearestSheep(e.x, e.y);
       if (!target) { e.state = 'flee'; e.exit = forestExit(e.x, e.y); }
       else {
         const d = len(target.x - e.x, target.y - e.y);
         if (e.type === 'wolf' && d < 26) spd *= 1.35;
+        if (e.type === 'fox') spd *= d > 50 ? 0.75 : (d < 30 ? 1.5 : 1);
         let tx = target.x, ty = target.y;
         if (e.type === 'bat') {
           const pxv = -(target.y - e.y) / (d || 1), pyv = (target.x - e.x) / (d || 1);
@@ -1847,7 +2432,7 @@ function updateEnemies(dt) {
           e.carry = target;
           e.state = 'carry';
           e.exit = forestExit(e.x, e.y);
-          woolPuff(target.x, target.y, 8);
+          woolPuff(target.x, target.y, 8); woolTuft(target.x, target.y);
           SFX.capture();
           if (realTime - lastBaa > 0.15) { SFX.baa(true); lastBaa = realTime; }
           addText(target.x, target.y - 12, 'HELP!', 'r');
@@ -1855,7 +2440,7 @@ function updateEnemies(dt) {
       }
     } else if (e.state === 'carry' || e.state === 'flee') {
       if (!e.exit) e.exit = forestExit(e.x, e.y);
-      const d = steerTo(e, e.exit.x, e.exit.y, spd * (e.carry ? 0.66 : 1.25), dt);
+      const d = steerTo(e, e.exit.x, e.exit.y, spd * (e.carry ? (e.type === 'fox' ? 0.85 : 0.66) : 1.25), dt);
       if (d < 5 || e.x < -8 || e.y < -8 || e.x > world.w + 8 || e.y > world.h + 8) {
         if (e.carry) {
           lostCount++;
@@ -1875,16 +2460,33 @@ function updateEnemies(dt) {
     updateFacing(e, dt, 4);
     if (e.type === 'bat') e.alt = 10 + Math.sin(e.anim * 5 + e.phase) * 2;
   }
+  // the Great Wolf: route 10 after 30 s, every 5th endless stage
+  if (state === 'PLAYING' && isEscort() && !showcase.on && !mission.bossSpawned && mission.time > 30 &&
+      ((mode === 'escort' && mission.map === 9) || (mode === 'endless' && mission.n % 5 === 0))) {
+    mission.bossSpawned = true;
+    spawnEnemy(mission.n, { type: 'wolf', boss: true });
+  }
 }
 function checkRamHits() {
   for (const p of players) {
     if (p.kind !== 'goat' || p.ramT <= 0) continue;
     const hx = p.x + p.fx * 5, hy = p.y - 3 + p.fy * 4;
+    for (const q of players) {
+      if (q.kind !== 'wolf' || q.stun > 0 || q.hits[p.slot] === p.ramId) continue;
+      if (len(q.x - hx, q.y - 3 - hy) > 9) continue;
+      q.hits[p.slot] = p.ramId;
+      impactBurst((q.x + p.x) / 2, q.y - 3);
+      SFX.impact(); addShake(3);
+      stunWolfPlayer(q, 1.6, p);
+      versus.hits++; score++;
+    }
     for (let i = enemies.length - 1; i >= 0; i--) {
       const e = enemies[i];
       if (e.state === 'launched' || e.state === 'emerge' || e.hits[p.slot] === p.ramId) continue;
-      const ey = e.y - (e.type === 'bat' ? Math.min(e.alt, 8) : 3);
-      if (len(e.x - hx, ey - hy) > (e.type === 'bat' ? 10 : 9)) continue;
+      if (e.type === 'hawk' && e.alt >= 14) continue;
+      const flier = e.type === 'bat' || e.type === 'hawk';
+      const ey = e.y - (flier ? Math.min(e.alt, 8) : 3);
+      if (len(e.x - hx, ey - hy) > (flier ? 10 : (e.boss ? 14 : 9))) continue;
       e.hits[p.slot] = p.ramId;
       let dx = e.x - p.x, dy = e.y - p.y;
       const l = len(dx, dy) || 1;
@@ -1898,10 +2500,15 @@ function checkRamHits() {
       hitStop = 0.05;
       if (e.carry) releaseCarried(e);
       if (e.hp <= 0) {
-        e.state = 'launched'; e.t = 0.38;
-        e.vx = dx * 240 + rr(-20, 20); e.vy = dy * 240 + rr(-20, 20);
-        score++; mission.kills++;
-        addText(e.x, e.y - 14, '+1', 'y');
+        e.state = 'launched'; e.t = e.boss ? 0.9 : 0.38;
+        e.vx = dx * (e.boss ? 120 : 240) + rr(-20, 20); e.vy = dy * (e.boss ? 120 : 240) + rr(-20, 20);
+        score += e.boss ? 10 : 1; mission.kills++;
+        if (e.boss) { addText(e.x, e.y - 24, 'GREAT WOLF DOWN!', 'y'); bells += 10; SFX.roar(); addShake(6); }
+        else addText(e.x, e.y - 14, '+1', 'y');
+        addCombo(e.x, e.y);
+      } else if (e.boss) {
+        e.state = 'stun'; e.t = 0.45; e.vx = dx * 70; e.vy = dy * 70;
+        addText(e.x, e.y - 24, e.hp + ' HP', 'y');
       } else {
         e.state = 'stun'; e.t = 1.4; e.vx = dx * 170; e.vy = dy * 170;
         addText(e.x, e.y - 14, 'STUN', 'y');
@@ -1925,36 +2532,187 @@ function placePlayers(cx, cy) {
   });
 }
 let pendingLoad = null;
+let loadLabel = '';
 function requestLoad(fn, label) {
   pendingLoad = fn;
   loadLabel = label || '';
   goScreen('LOADING');
 }
-let loadLabel = '';
+function isEscort() { return mode === 'escort' || mode === 'daily' || mode === 'endless' || mode === 'custom'; }
+function mapList(m) { return (m || mode) === 'escort' ? ESCORT_MAPS : DEFEND_MAPS; }
+function progKind(m) { m = m || mode; return m === 'versus' ? 'defend' : m; }
+
+// ---- run upgrades, bought with bells earned during a run ----
+const UPGRADES = [
+  { id: 'ram', name: 'RAM POWER', desc: 'LONGER RAM CHARGE' },
+  { id: 'bark', name: 'BIG BARK', desc: 'WIDER BARK' },
+  { id: 'speed', name: 'SWIFT HOOVES', desc: 'FASTER SHEPHERDS' },
+  { id: 'cool', name: 'QUICK SKILLS', desc: 'SHORTER STOMP/WHISTLE' },
+  { id: 'pen', name: 'WIDE PEN', desc: 'BIGGER PEN (ESCORT)' }
+];
+const UPG_COST = [6, 12, 20];
+let upg = { ram: 0, bark: 0, speed: 0, cool: 0, pen: 0 };
+function resetUpgrades() { upg = { ram: 0, bark: 0, speed: 0, cool: 0, pen: 0 }; }
+function upgradeMul(id) {
+  const l = (upg && upg[id]) || 0;
+  if (id === 'cool') return 1 - 0.15 * l;
+  if (id === 'speed') return 1 + 0.08 * l;
+  return 1 + 0.15 * l;
+}
+function shopItems(backFn) {
+  const items = UPGRADES.map(u => {
+    const lvl = upg[u.id], cost = UPG_COST[lvl];
+    return { label: u.name + ' ' + lvl + '/3', value: lvl >= 3 ? 'MAX' : cost + ' BELLS', desc: u.desc,
+      select: () => {
+        if (lvl >= 3) return;
+        if (bells < cost) { SFX.back(); return; }
+        bells -= cost; upg[u.id]++; SFX.coin();
+        if (u.id === 'pen' && world && world.goal) world.goalR = 26 + 4 * upg.pen;
+      } };
+  });
+  items.push({ label: 'DONE', select: backFn });
+  return items;
+}
+
+// ---- medals and unlockable looks ----
+const MEDAL_NAMES = { escort: ['TIME', 'FLAWLESS', 'HUNTER'], defend: ['WAVE 5', 'WAVE 10', 'WAVE 15'] };
+function popcount(n) { let c = 0; while (n) { c += n & 1; n >>= 1; } return c; }
+function totalMedals() {
+  let t = 0;
+  for (const k of ['escort', 'defend']) for (const v of progress.medals[k]) t += popcount(v);
+  return t;
+}
+function awardMedals(kind, idx, bits) {
+  if (idx < 0 || idx > 9 || showcase.on) return 0;
+  const before = totalMedals(), old = progress.medals[kind][idx];
+  const nw = old | bits;
+  if (nw === old) return 0;
+  progress.medals[kind][idx] = nw;
+  saveProgress();
+  const after = totalMedals();
+  const unlocked = [GOAT_SKINS, DOG_SKINS, WOOL_SKINS].some(list => list.some(sk => sk.need > before && sk.need <= after));
+  if (unlocked) { banner = { t: 3, a: 'NEW LOOK!', b: 'UNLOCKED IN PLAYER SELECT' }; SFX.coin(); }
+  return nw & ~old;
+}
+const GOAT_SKINS = [{ name: 'BROWN', need: 0 }, { name: 'SNOW', need: 3, map: { n: 'w', b: 'l' } }, { name: 'GOLDEN', need: 8, map: { n: 'y', b: 'n' } }];
+const DOG_SKINS = [{ name: 'COLLIE', need: 0 }, { name: 'HUSKY', need: 5, map: { k: 'l' } }, { name: 'CORGI', need: 12, map: { k: 'n' } }];
+const WOOL_SKINS = [{ name: 'WHITE', need: 0 }, { name: 'CREAM', need: 2, map: { w: 'n', l: 'b' } }, { name: 'GREY', need: 6, map: { w: 'l', l: 'h' } }, { name: 'ROSE', need: 15, map: { w: 'r', l: 'n' } }];
+const WOOL_NAMES = WOOL_SKINS.map(x => x.name);
+const skinCache = {};
+function skinList(kind) { return kind === 'goat' ? GOAT_SKINS : (kind === 'dog' ? DOG_SKINS : [{ name: 'WOLF', need: 0 }]); }
+function skinUnlocked(kind, i) { const sk = skinList(kind)[i]; return !!sk && totalMedals() >= sk.need; }
+function skinSet(kind, i) {
+  if (kind === 'wolf') return SP.wolf;
+  const sk = skinList(kind)[i || 0];
+  if (!sk || !sk.map || !skinUnlocked(kind, i)) return SP[kind];
+  const key = kind + i;
+  if (!skinCache[key]) skinCache[key] = recolorSet(SP[kind], sk.map);
+  return skinCache[key];
+}
+function woolUnlocked(i) { return totalMedals() >= WOOL_SKINS[i].need; }
+function woolSet() {
+  const i = woolUnlocked(settings.wool) ? settings.wool : 0;
+  const sk = WOOL_SKINS[i];
+  if (!sk.map) return SP.sheep;
+  if (!skinCache['wool' + i]) skinCache['wool' + i] = recolorSet(SP.sheep, sk.map);
+  return skinCache['wool' + i];
+}
+function cycleWool(d) { const n = WOOL_SKINS.length; settings.wool = (settings.wool + (d || 1) + n) % n; saveSettings(); SFX.click(); }
+function cycleSkin(p, d) {
+  const list = skinList(p.kind);
+  for (let k = 1; k <= list.length; k++) {
+    const i = ((p.skin || 0) + (d || 1) * k + list.length * 4) % list.length;
+    if (skinUnlocked(p.kind, i)) { p.skin = i; SFX.move(); return; }
+  }
+}
+
+// ---- daily and endless routes ----
+function dailySeed() { const d = new Date(); return d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate(); }
+function randomEscortDef(seed, stage) {
+  const r = mulberry32(seed);
+  const pickR = (a) => a[Math.floor(r() * a.length)];
+  const rivers = [];
+  const nr = Math.floor(r() * 3);
+  for (let i = 0; i < nr; i++) rivers.push([0.25 + i * 0.25 + r() * 0.1, r() < 0.5 ? 'ford' : 'bridge']);
+  return {
+    name: 'ROUTE ' + (seed % 1000), info: 'RANDOM ROUTE',
+    w: 640 + Math.floor(r() * 4) * 40, h: Math.round(Math.min(2400, 1100 + r() * 700 + (stage || 0) * 60)),
+    step: 110 + r() * 60, swing: 110 + r() * 130, zigzag: r() < 0.25, rad: 34 + r() * 18, radVar: 6 + r() * 8,
+    glades: 6 + Math.floor(r() * 14), islands: 30 + Math.floor(r() * 60), isMin: 6, isMax: 12 + r() * 5,
+    lakes: Math.floor(r() * 4), lakeR: 22 + r() * 8, gateEvery: pickR([0, 60, 90, 120]), pillars: Math.floor(r() * 20),
+    rivers: rivers, brambles: Math.floor(r() * 10), weather: pickR(['', '', 'rain', 'wind', 'fog', 'storm']),
+    wolves: 1 + r() * 0.4, bats: 1 + r() * 0.6
+  };
+}
+const endless = { stage: 1, dist: 0, seed: 1 };
+function escortWorld(src) {
+  if (typeof src === 'number') return { wd: getMapWorld('escort', src), def: ESCORT_MAPS[src], name: ESCORT_MAPS[src].name };
+  if (src === 'daily') {
+    const seed = dailySeed(), key = 'daily' + seed;
+    const def = randomEscortDef(seed, 2);
+    def.name = 'DAILY ' + String(seed).slice(4, 6) + '/' + String(seed).slice(6);
+    if (!mapCache.has(key)) mapCache.set(key, makeEscortMap(def, seed));
+    return { wd: mapCache.get(key), def: def, name: def.name };
+  }
+  if (src === 'endless') {
+    const seed = endless.seed + endless.stage * 7919;
+    const def = randomEscortDef(seed, endless.stage);
+    return { wd: makeEscortMap(def, seed), def: def, name: 'STAGE ' + endless.stage };
+  }
+  const wd = buildCustomWorld();
+  return { wd: wd, def: { name: 'MY MAP' }, name: 'MY MAP' };
+}
+function useWorld(wd, def) {
+  world = wd;
+  if (!world.canvas) renderWorld(world);
+  mapMods = { wolves: def.wolves || 1, bats: def.bats || 1 };
+  setWeather(def.weather);
+  if (world.goal) world.goalR = 26 + 4 * (upg.pen || 0);
+}
+function useMap(kind, idx) {
+  useWorld(getMapWorld(kind, idx), mapList(kind)[idx]);
+}
+
 function startRun() {
   score = 0; rescued = 0; delivered = 0; lostCount = 0; newBest = false; gameOverDelay = 0;
-  enemies = []; particles = []; texts = []; fireflies = [];
-  paused = false;
-  // solo player? bring a CPU partner if the option is on
+  enemies = []; particles = []; texts = []; fireflies = []; decals = [];
+  paused = false; comboN = 0; bells = 0; resultsView = 'main';
+  resetUpgrades();
   players = players.filter(p => !p.auto);
+  if (mode !== 'versus') for (const p of players) if (p.kind === 'wolf') p.kind = 'goat';
   const humans = players.filter(p => !p.cpu);
-  if (settings.autoHelper && humans.length === 1 && !players.some(p => p.cpu)) {
+  if (mode === 'versus') {
+    // both sides need someone: add a CPU, or turn the last CPU (else the last player) when all slots are taken
+    const ensure = (isWolf, kind) => {
+      if (players.some(p => (p.kind === 'wolf') === isWolf)) return;
+      const c = joinCPU(true, kind);
+      if (c) { c.auto = true; return; }
+      const pool = players.filter(p => (p.kind === 'wolf') !== isWolf);
+      if (pool.length < 2) return;
+      const t = pool.slice().reverse().find(p => p.cpu) || pool[pool.length - 1];
+      t.kind = kind; t.skin = 0;
+    };
+    ensure(true, 'wolf');
+    ensure(false, 'dog');
+  } else if (settings.autoHelper && humans.length === 1 && !players.some(p => p.cpu)) {
     const cpu = joinCPU(true);
     if (cpu) cpu.auto = true;
   }
-  const idx = selMap[mode];
-  const name = (mode === 'escort' ? ESCORT_MAPS : DEFEND_MAPS)[idx].name;
+  let label = '';
+  if (mode === 'escort') label = ESCORT_MAPS[selMap.escort].name;
+  else if (mode === 'defend' || mode === 'versus') label = DEFEND_MAPS[selMap[mode]].name;
+  else if (mode === 'daily') label = 'DAILY CHALLENGE';
+  else if (mode === 'endless') label = 'ENDLESS ESCORT';
+  else label = 'MY MAP';
   requestLoad(() => {
     goScreen('PLAYING');
-    if (mode === 'escort') startMission(idx + 1, 12, idx);
-    else startDefend(idx);
-  }, name);
-}
-function useMap(kind, idx) {
-  world = getMapWorld(kind, idx);
-  if (!world.canvas) renderWorld(world);
-  const def = (kind === 'escort' ? ESCORT_MAPS : DEFEND_MAPS)[idx];
-  mapMods = { wolves: def.wolves || 1, bats: def.bats || 1 };
+    if (mode === 'escort') startMission(selMap.escort + 1, 12, selMap.escort);
+    else if (mode === 'daily') startMission(5, 12, 'daily');
+    else if (mode === 'endless') { endless.stage = 1; endless.dist = 0; endless.seed = Math.floor(Math.random() * 1e6); startMission(2, 12, 'endless'); }
+    else if (mode === 'custom') startMission(3, 12, 'custom');
+    else if (mode === 'versus') startVersus(selMap.versus);
+    else startDefend(selMap.defend);
+  }, label);
 }
 function startDefend(idx) {
   idx = idx || 0;
@@ -1972,22 +2730,28 @@ function startWave(n) {
   wave.spawnT = 0.3;
   banner = { t: 2.4, a: 'WAVE ' + n, b: n === 1 ? DEFEND_MAPS[wave.map || 0].name : 'THEY COME AGAIN' };
   dayTarget = clamp((n - 1) / 8, 0, 1);
+  if (n % 10 === 0 && !showcase.on) spawnEnemy(n, { type: 'wolf', boss: true });
   SFX.wave();
 }
-function startMission(n, herdN, idx) {
-  idx = idx || 0;
-  mission.map = idx;
-  useMap('escort', idx);
-  mission.n = n; mission.herdStart = herdN; mission.penned = 0; mission.time = 0; mission.kills = 0;
+function startMission(n, herdN, src) {
+  mission.src = src;
+  mission.map = typeof src === 'number' ? src : -1;
+  const ew = escortWorld(src);
+  useWorld(ew.wd, ew.def);
+  mission.name = ew.name;
+  mission.n = n; mission.herdStart = herdN; mission.penned = 0; mission.time = 0; mission.kills = 0; mission.lost = 0;
+  mission.bossSpawned = false; mission.medals = 0; mission.newMedals = 0;
   mission.interval = Math.max(1.6, 5.5 - n * 0.4) / mapMods.wolves;
   mission.cap = Math.min(9, 2 + Math.ceil(n * 0.8));
   mission.spawnT = 5;
+  mission.par = Math.round(world.path.length * 3 / 13 + 25);
   enemies = [];
   spawnHerd(world.start.x, world.start.y - 6, herdN);
   placePlayers(world.start.x, world.start.y);
   snapCam(world.start.x, world.start.y - 40);
-  banner = { t: 3, a: 'MISSION ' + n, b: ESCORT_MAPS[idx].name };
-  dayTarget = clamp((n - 1) / 9, 0, 1);
+  const head = mode === 'endless' ? 'STAGE ' + endless.stage : (mode === 'daily' ? 'DAILY ROUTE' : (mode === 'custom' ? 'MY MAP' : 'MISSION ' + n));
+  banner = { t: 3, a: head, b: mode === 'escort' ? ew.name : (weather.kind ? weather.kind.toUpperCase() + ' AHEAD' : 'HERD THEM TO THE RED PIN') };
+  dayTarget = mode === 'escort' ? clamp((n - 1) / 9, 0, 1) : (mode === 'endless' ? clamp((endless.stage - 1) / 8, 0, 1) : (mode === 'daily' ? 0.35 : 0.1));
   SFX.wave();
 }
 function updateDefend(dt) {
@@ -2003,19 +2767,24 @@ function updateDefend(dt) {
     } else if (enemies.length === 0) {
       wave.phase = 'clear'; wave.t = 2.6;
       let sub = 'THE FLOCK RESTS';
+      bells += 3;
       if (sheep.length > 0 && sheep.length < SHEEP_MAX) {
         const hc = herdCenter();
         const s = makeSheep(hc.x + rr(-10, 10), hc.y + rr(-10, 10));
         if (!blocked(s.x, s.y)) { sheep.push(s); s.flash = 1; sub = 'A LAMB RETURNS +1'; }
       }
-      banner = { t: 2.4, a: 'CLEAR!', b: sub };
+      const bits = (wave.n >= 5 ? 1 : 0) | (wave.n >= 10 ? 2 : 0) | (wave.n >= 15 ? 4 : 0);
+      const got = mode === 'defend' ? awardMedals('defend', wave.map || 0, bits) : 0;
+      if (got) sub = 'MEDAL: ' + MEDAL_NAMES.defend[Math.log2(got & -got)];
+      if (banner.a !== 'NEW LOOK!') banner = { t: 2.4, a: 'CLEAR!', b: sub };
+      if (mode === 'defend' && !showcase.on && wave.n > progress.defend[wave.map || 0]) { progress.defend[wave.map || 0] = wave.n; saveProgress(); }
       SFX.clear();
     }
   } else if (wave.phase === 'clear') { wave.t -= dt; if (wave.t <= 0) startWave(wave.n + 1); }
 }
 function updateEscort(dt) {
   mission.time += dt;
-  dayTarget = clamp((mission.n - 1) / 9 + Math.min(0.1, mission.time / 900), 0, 1);
+  if (mode === 'escort') dayTarget = clamp((mission.n - 1) / 9 + Math.min(0.1, mission.time / 900), 0, 1);
   const active = sheep.filter(s => !s.penned).length;
   if (active > 0) {
     mission.spawnT -= dt;
@@ -2027,23 +2796,54 @@ function updateEscort(dt) {
   }
   const carrying = enemies.some(e => e.carry);
   if (active === 0 && !carrying && mission.penned > 0) {
+    if (!mission.finishing) {
+      // slow-motion moment and a baa chorus as the last sheep is penned
+      mission.finishing = true;
+      timeScale = 0.3; slowMo = 1.2;
+      for (let k = 0; k < 4; k++) setTimeout(() => SFX.baa(false), 120 + k * 170);
+      return;
+    }
+    if (slowMo > 0) return;
+    mission.finishing = false;
     goScreen('RESULTS');
+    resultsView = 'main';
+    bells += 4;
     if (!showcase.on) {
       const total = mission.herdStart;
       const stars = mission.penned >= total ? 3 : (mission.penned >= total * 0.66 ? 2 : 1);
-      if (mission.map !== undefined && stars > progress.escort[mission.map]) { progress.escort[mission.map] = stars; saveProgress(); }
+      if (mission.map >= 0 && mode === 'escort') {
+        if (stars > progress.escort[mission.map]) { progress.escort[mission.map] = stars; saveProgress(); }
+        const bits = (mission.time <= mission.par ? 1 : 0) | (mission.penned >= total && mission.lost === 0 ? 2 : 0) | (mission.kills >= 6 + mission.map ? 4 : 0);
+        mission.medals = bits;
+        mission.newMedals = awardMedals('escort', mission.map, bits);
+      }
+      if (mode === 'endless') endless.dist += Math.round(world.path.length * 3 / 10);
+      if (mode === 'daily') {
+        const seed = dailySeed();
+        if (progress.daily.seed !== seed) progress.daily = { seed: seed, best: 0 };
+        if (score > progress.daily.best) { progress.daily.best = score; saveProgress(); }
+      }
     }
     for (const e of enemies) if (e.state !== 'launched') { e.state = 'flee'; e.exit = forestExit(e.x, e.y); }
     SFX.clear();
   }
 }
 function nextMission() {
+  if (mode === 'daily' || mode === 'custom') { startRun(); return; }
+  if (mode === 'endless') {
+    endless.stage++;
+    const herdN = Math.min(SHEEP_MAX, mission.penned + (endless.stage % 3 === 0 ? 1 : 0));
+    const n = endless.stage + 1;
+    requestLoad(() => { goScreen('PLAYING'); startMission(n, herdN, 'endless'); }, 'STAGE ' + endless.stage);
+    return;
+  }
   const herdN = Math.min(SHEEP_MAX, mission.penned + 2);
   const idx = ((mission.map || 0) + 1) % ESCORT_MAPS.length;
   const n = mission.n + 1;
   requestLoad(() => { goScreen('PLAYING'); startMission(n, herdN, idx); }, ESCORT_MAPS[idx].name);
 }
 function checkGameOver(dt) {
+  if (mode === 'versus') return;
   const carrying = enemies.some(e => e.carry);
   if (sheep.length === 0 && !carrying) {
     gameOverDelay += dt;
@@ -2051,10 +2851,143 @@ function checkGameOver(dt) {
       goScreen('GAMEOVER');
       newBest = saveBest();
       if (mode === 'defend' && !showcase.on && wave.n > progress.defend[wave.map || 0]) { progress.defend[wave.map || 0] = wave.n; saveProgress(); }
-      if (mode === 'escort') selMap.escort = mission.map || 0;    // retry from the map you fell on
+      if (mode === 'escort') selMap.escort = Math.max(0, mission.map);    // retry from the map you fell on
       SFX.gameover();
     }
   } else gameOverDelay = 0;
+}
+
+// ---------------------------------------------------------------------
+// Versus: wolf players against shepherds, defend arenas, 150 seconds
+// ---------------------------------------------------------------------
+const WOLF_P_SPEED = 88, HOWL_CD = 14;
+const versus = { t: 150, taken: 0, hits: 0, packT: 10, winner: '' };
+function startVersus(idx) {
+  idx = idx || 0;
+  wave.map = idx; wave.n = 0;
+  useMap('defend', idx);
+  spawnHerd(world.start.x, world.start.y, 12);
+  placePlayers(world.start.x, world.start.y);
+  for (const p of players) if (p.kind === 'wolf') {
+    const sp = forestSpawn(world.start.x, world.start.y, 80, 150);
+    p.x = sp.x; p.y = sp.y;
+  }
+  snapCam(world.start.x, world.start.y);
+  Object.assign(versus, { t: 150, taken: 0, hits: 0, packT: 12, winner: '' });
+  banner = { t: 3, a: 'VERSUS', b: 'WOLVES HUNT - SHEPHERDS GUARD' };
+  dayTarget = 0.45;
+  SFX.wave();
+}
+function updateVersus(dt) {
+  versus.t -= dt;
+  versus.packT -= dt;
+  if (versus.packT <= 0) { versus.packT = 11; if (enemies.length < 4) spawnEnemy(2, { type: 'wolf' }); }
+  const carrying = enemies.some(e => e.carry) || players.some(p => p.carry);
+  if (sheep.length === 0 && !carrying) endVersus('WOLVES');
+  else if (versus.t <= 0) endVersus('SHEPHERDS');
+}
+function endVersus(w) {
+  versus.winner = w;
+  goScreen('GAMEOVER');
+  if (w === 'WOLVES') SFX.howl(); else SFX.clear();
+}
+function wolfLunge(p) {
+  if (p.cd > 0) return;
+  p.cd = 1.1; p.cdMax = 1.1;
+  p.lungeT = 0.22;
+  const inp = readMove(p.dev);
+  if (len(inp.x, inp.y) > 0.3) { const l = len(inp.x, inp.y); p.fx = inp.x / l; p.fy = inp.y / l; }
+  dust(p.x, p.y, 6, 2, 30);
+  SFX.dash();
+}
+function howl(p) {
+  p.cd2 = HOWL_CD;
+  SFX.howl();
+  addParticle({ x: p.x, y: p.y - 4, life: 0.6, max: 0.6, r0: 6, r1: 50, col: 'r', kind: 'ring' });
+  addText(p.x, p.y - 14, 'AWOOO', 'r');
+  for (let k = 0; k < 2; k++) {
+    spawnEnemy(3, { type: 'wolf' });
+    const e = enemies[enemies.length - 1];
+    const sp = forestSpawn(p.x, p.y, 30, 110);
+    e.x = sp.x; e.y = sp.y; e.t = 0.5;
+  }
+}
+function stunWolfPlayer(q, t, by) {
+  if (q.stun > 0) return;
+  q.stun = t;
+  const dx = q.x - by.x, dy = q.y - by.y, l = len(dx, dy) || 1;
+  q.vx = dx / l * 120; q.vy = dy / l * 120;
+  q.lungeT = 0;
+  addText(q.x, q.y - 14, 'YELP!', 'y');
+  if (q.carry) {
+    const s = q.carry; q.carry = null;
+    s.x = q.x; s.y = q.y; s.vx = rr(-20, 20); s.vy = rr(-20, 20); s.panic = 1; s.flash = 0.6;
+    if (blocked(s.x, s.y)) { const hc = herdCenter(); s.x = hc.x; s.y = hc.y; }
+    sheep.push(s);
+    rescued++;
+    addText(s.x, s.y - 12, 'SAVED', 'y');
+    SFX.rescue();
+  }
+}
+// wolf-player movement (passes through the forest) and sheep grabbing
+function updateWolfPlayer(p, dt) {
+  if (p.lungeT > 0) {
+    p.lungeT -= dt;
+    p.vx = p.fx * 170; p.vy = p.fy * 170;
+  }
+  p.x = clamp(p.x + p.vx * dt, 4, world.w - 4);
+  p.y = clamp(p.y + p.vy * dt, 4, world.h - 4);
+  if (!p.carry) {
+    for (let i = 0; i < sheep.length; i++) {
+      const s = sheep[i];
+      if (s.penned || len(s.x - p.x, s.y - p.y) > 6) continue;
+      sheep.splice(i, 1);
+      p.carry = s;
+      woolPuff(s.x, s.y, 8); woolTuft(s.x, s.y);
+      SFX.capture();
+      addText(s.x, s.y - 12, 'HELP!', 'r');
+      break;
+    }
+  } else if (canopy(p.x, p.y) && canopy(p.x + 6, p.y) && canopy(p.x - 6, p.y) && canopy(p.x, p.y + 6) && canopy(p.x, p.y - 6)) {
+    p.carry = null;
+    versus.taken++; lostCount++;
+    addText(p.x, p.y - 14, 'TAKEN!', 'r');
+    SFX.lost();
+  }
+}
+function aiWolf(p, dt) {
+  if (p.carry) {
+    if (!p.exit) p.exit = forestExit(p.x, p.y);
+    const dx = p.exit.x - p.x, dy = p.exit.y - p.y, d = len(dx, dy) || 1;
+    aiVec[p.dev] = { x: dx / d, y: dy / d };
+    return;
+  }
+  p.exit = null;
+  const target = nearestSheep(p.x, p.y);
+  if (!target) { aiVec[p.dev] = { x: 0, y: 0 }; return; }
+  let dx = target.x - p.x, dy = target.y - p.y;
+  const d = len(dx, dy) || 1;
+  dx /= d; dy /= d;
+  for (const q of players) {
+    if (q.kind !== 'goat' || q.down > 0) continue;
+    const gd = len(q.x - p.x, q.y - p.y);
+    if (gd < 34) { dx -= (q.x - p.x) / gd * 0.9; dy -= (q.y - p.y) / gd * 0.9; }
+  }
+  const l = len(dx, dy) || 1;
+  aiVec[p.dev] = { x: dx / l, y: dy / l };
+  if (d < 26 && p.cd <= 0) { p.fx = dx / l; p.fy = dy / l; wolfLunge(p); }
+  if (p.cd2 <= 0 && rand() < dt * 0.15) howl(p);
+}
+// CPU orders: push the herd (default), follow the leader, guard the herd
+let cpuOrder = 'push';
+const CPU_ORDERS = ['push', 'follow', 'guard'];
+function cycleCpuOrder() {
+  if (!players.some(p => p.cpu)) return;
+  cpuOrder = CPU_ORDERS[(CPU_ORDERS.indexOf(cpuOrder) + 1) % CPU_ORDERS.length];
+  const label = { push: 'PUSH TO GOAL', follow: 'FOLLOW ME', guard: 'GUARD THE HERD' }[cpuOrder];
+  const lead = players.find(p => !p.cpu) || players[0];
+  if (lead) addText(lead.x, lead.y - 18, 'CPU: ' + label, 's');
+  SFX.click();
 }
 function updateFireflies(dt) {
   const want = dayProgress > 0.55 ? Math.floor((dayProgress - 0.55) * 40) : 0;
@@ -2078,7 +3011,8 @@ const aiVec = {};
 let lastInput = 0;
 const UNIT_TAGS = {
   goat: ['GOAT', 'y'], dog: ['HERDING DOG', 'y'], sheep: ['SHEEP', 'w'],
-  wolf: ['SHADOW WOLF', 'r'], alpha: ['ALPHA WOLF', 'y'], bat: ['BAT', 'r']
+  wolf: ['SHADOW WOLF', 'r'], alpha: ['ALPHA WOLF', 'y'], bat: ['BAT', 'r'],
+  fox: ['FOX', 'r'], hawk: ['HAWK', 'r'], boss: ['GREAT WOLF', 'y']
 };
 function tag(o, label, col, t) { o.tag = label; o.tagCol = col; o.tagT = t || 2.6; }
 function aiPlayers(kinds) {
@@ -2152,7 +3086,8 @@ const SCENES = [
       return [
         { at: 0.5, run: () => { spawnEnemy(8, { type: 'bat' }); spawnEnemy(8, { type: 'bat' }); } },
         { at: 1.5, run: () => { spawnEnemy(8, { type: 'wolf', alpha: true }); spawnEnemy(8, { type: 'wolf', alpha: true }); } },
-        { at: 4.0, run: () => { spawnEnemy(8, { type: 'wolf' }); spawnEnemy(8, { type: 'bat' }); } }
+        { at: 4.0, run: () => { spawnEnemy(8, { type: 'fox' }); spawnEnemy(8, { type: 'hawk' }); } },
+        { at: 9.0, run: () => spawnEnemy(8, { type: 'wolf', boss: true }) }
       ];
     }
   }
@@ -2196,7 +3131,7 @@ function updateShowcase(dt) {
   // label each unit type the first time it shows up in a scene
   for (const e of enemies) {
     if (e.tagged || e.state === 'emerge' || canopy(e.x, e.y)) continue;
-    const key = e.type === 'bat' ? 'bat' : (e.alpha ? 'alpha' : 'wolf');
+    const key = e.boss ? 'boss' : (e.type === 'bat' || e.type === 'fox' || e.type === 'hawk' ? e.type : (e.alpha ? 'alpha' : 'wolf'));
     e.tagged = true;
     if (!showcase.seen[key]) { showcase.seen[key] = true; tag(e, UNIT_TAGS[key][0], UNIT_TAGS[key][1], 2.8); }
   }
@@ -2264,9 +3199,26 @@ function updateAI(dt) {
     const d = len(sh.x - hc.x, sh.y - hc.y);
     if (d > farD) { farD = d; far = sh; }
   }
-  const threats = enemies.filter(e => (e.state === 'hunt' || e.state === 'carry' || e.state === 'stun') && !canopy(e.x, e.y));
+  const threats = enemies.filter(e => (e.state === 'hunt' || e.state === 'carry' || e.state === 'stun' || (e.state === 'dive' && e.alt < 24)) && !canopy(e.x, e.y))
+    .concat(players.filter(q => q.kind === 'wolf' && !q.dev.startsWith('ai') || (q.kind === 'wolf' && mode === 'versus')));
   for (const p of players) {
     if (!p.dev.startsWith('ai')) continue;
+    if (p.kind === 'wolf') { aiWolf(p, dt); continue; }
+    const leader = players.find(q => !q.dev.startsWith('ai') && q.kind !== 'wolf');
+    let closeThreat = null, ctd = 1e9;
+    for (const e of threats) { const dd = len(e.x - p.x, e.y - p.y); if (dd < ctd) { ctd = dd; closeThreat = e; } }
+    if (!showcase.on && cpuOrder === 'follow' && leader && ctd > 60) {
+      const side = p.slot % 2 ? 12 : -12;
+      aiVec[p.dev] = steerVec(p, leader.x - leader.fx * 16 - leader.fy * side, leader.y - leader.fy * 16 + leader.fx * side);
+      continue;
+    }
+    if (!showcase.on && cpuOrder === 'guard' && ctd > 90) {
+      const a = realTime * 0.9 + p.slot * 2.1;
+      aiVec[p.dev] = steerVec(p, hc.x + Math.cos(a) * 30, hc.y + Math.sin(a) * 22);
+      continue;
+    }
+    const downed = players.find(q => q !== p && q.down > 0);
+    if (downed && !threats.some(e => len(e.x - p.x, e.y - p.y) < 40)) { aiVec[p.dev] = steerVec(p, downed.x + 4, downed.y); continue; }
     let near = null, nd = 1e9;
     for (const e of threats) {
       const dh = Math.min(len(e.x - hc.x, e.y - hc.y), e.carry ? 0 : 1e9);
@@ -2331,6 +3283,349 @@ function updateAI(dt) {
 }
 
 // ---------------------------------------------------------------------
+// Map editor: paint a custom escort route, test it, share it as a code
+// ---------------------------------------------------------------------
+const ED_TOOLS = [
+  { v: 0, name: 'MEADOW', col: 'g' }, { v: 1, name: 'FOREST', col: 't' }, { v: 3, name: 'FORD', col: 's' },
+  { v: 4, name: 'WATER', col: 'i' }, { v: 5, name: 'BRAMBLE', col: 'h' }, { v: 'p', name: 'PILLAR', col: 'l' },
+  { v: 's', name: 'START PIN', col: 'w' }, { v: 'g', name: 'GOAL PIN', col: 'r' }
+];
+const ED = { w: 600, h: 1400, cs: 8, cols: 75, rows: 175, grid: null, pillars: [], start: null, goal: null,
+  cx: 300, cy: 1300, tool: 1, brush: 2, menu: false, msg: '', msgT: 0, down: false, camx: 0, camy: 0, padHeld: false };
+function edDefault() {
+  ED.grid = new Uint8Array(ED.cols * ED.rows).fill(1);
+  // a gentle winding meadow from bottom to top
+  for (let r = 2; r < ED.rows - 2; r++) {
+    const c = Math.round(ED.cols / 2 + Math.sin(r * 0.06) * 14);
+    for (let k = -5; k <= 5; k++) ED.grid[r * ED.cols + clamp(c + k, 1, ED.cols - 2)] = 0;
+  }
+  ED.pillars = [];
+  ED.start = { x: Math.round(ED.cols / 2 + Math.sin((ED.rows - 6) * 0.06) * 14) * ED.cs + 4, y: (ED.rows - 6) * ED.cs };
+  ED.goal = { x: Math.round(ED.cols / 2 + Math.sin(6 * 0.06) * 14) * ED.cs + 4, y: 6 * ED.cs };
+}
+function edEncode() {
+  let rle = '', i = 0;
+  const g = ED.grid;
+  while (i < g.length) {
+    let j = i;
+    while (j < g.length && g[j] === g[i] && j - i < 1295) j++;
+    rle += g[i] + (j - i).toString(36) + '.';
+    i = j;
+  }
+  const pil = ED.pillars.map(q => q.x + ',' + q.y).join(';');
+  return 'GG1|' + rle + '|' + pil + '|' + ED.start.x + ',' + ED.start.y + '|' + ED.goal.x + ',' + ED.goal.y;
+}
+function edDecode(code) {
+  const parts = String(code || '').trim().split('|');
+  if (parts[0] !== 'GG1' || parts.length < 5) return false;
+  const grid = new Uint8Array(ED.cols * ED.rows);
+  let i = 0;
+  for (const tok of parts[1].split('.')) {
+    if (!tok) continue;
+    const v = +tok[0], n = parseInt(tok.slice(1), 36);
+    if (![0, 1, 3, 4, 5].includes(v) || !(n > 0)) return false;
+    for (let k = 0; k < n && i < grid.length; k++) grid[i++] = v;
+  }
+  if (i !== grid.length) return false;
+  const pt = (t) => { const [x, y] = t.split(',').map(Number); return { x: clamp(x | 0, 8, ED.w - 8), y: clamp(y | 0, 8, ED.h - 8) }; };
+  ED.grid = grid;
+  ED.pillars = parts[2] ? parts[2].split(';').filter(Boolean).map(pt).slice(0, 80) : [];
+  ED.start = pt(parts[3]); ED.goal = pt(parts[4]);
+  return true;
+}
+function customMapExists() { try { return !!localStorage.getItem('goatGuardianCustom'); } catch (e) { return false; } }
+function edLoadSaved() {
+  try { const c = localStorage.getItem('goatGuardianCustom'); if (c && edDecode(c)) return true; } catch (e) { /* ignore */ }
+  return false;
+}
+function edSave() {
+  try { localStorage.setItem('goatGuardianCustom', edEncode()); edMsg('SAVED'); } catch (e) { edMsg('SAVE FAILED'); }
+}
+function edMsg(m) { ED.msg = m; ED.msgT = 2.5; }
+function edCellAt(x, y) { return ED.grid[clamp(Math.floor(y / ED.cs), 0, ED.rows - 1) * ED.cols + clamp(Math.floor(x / ED.cs), 0, ED.cols - 1)]; }
+// grid path from start to goal over walkable cells (also used as the AI route)
+function edRoute() {
+  const c0 = Math.floor(ED.start.x / ED.cs), r0 = Math.floor(ED.start.y / ED.cs);
+  const c1 = Math.floor(ED.goal.x / ED.cs), r1 = Math.floor(ED.goal.y / ED.cs);
+  const ok = (c, r) => c > 0 && r > 0 && c < ED.cols - 1 && r < ED.rows - 1 && ED.grid[r * ED.cols + c] !== 1 && ED.grid[r * ED.cols + c] !== 4;
+  const prev = new Int32Array(ED.cols * ED.rows).fill(-1);
+  const q = [r0 * ED.cols + c0];
+  prev[q[0]] = q[0];
+  let head = 0;
+  while (head < q.length) {
+    const i = q[head++];
+    const c = i % ED.cols, r = (i / ED.cols) | 0;
+    if (c === c1 && r === r1) {
+      const out = [];
+      let k = i;
+      while (k !== prev[k]) { out.push({ x: (k % ED.cols) * ED.cs + 4, y: ((k / ED.cols) | 0) * ED.cs + 4 }); k = prev[k]; }
+      out.push({ x: c0 * ED.cs + 4, y: r0 * ED.cs + 4 });
+      return out.reverse();
+    }
+    for (const [dc, dr] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const nc = c + dc, nr = r + dr, ni = nr * ED.cols + nc;
+      if (ok(nc, nr) && prev[ni] < 0) { prev[ni] = i; q.push(ni); }
+    }
+  }
+  return null;
+}
+function buildCustomWorld() {
+  if (!ED.grid) { if (!edLoadSaved()) edDefault(); }
+  const wd = newWorld(ED.w, ED.h, 777, 'escort');
+  const n = wd.noise;
+  for (let y = 0; y < ED.h; y++) for (let x = 0; x < ED.w; x++) {
+    const ox = (n(x * 0.12, y * 0.12) - 0.5) * 7, oy = (n(x * 0.12 + 40, y * 0.12 + 40) - 0.5) * 7;
+    let v = edCellAt(x + ox, y + oy);
+    if (v !== 0 && v !== 1) v = edCellAt(x, y);       // keep water and brambles crisp
+    wd.mask[y * ED.w + x] = v;
+  }
+  borderForest(wd, 6);
+  const route = edRoute() || [ED.start, ED.goal];
+  for (let i = 0; i < route.length - 1; i++) {
+    const a = route[i], b = route[i + 1];
+    for (let t = 0; t < 8; t += 3) wd.path.push({ x: lerp(a.x, b.x, t / 8), y: lerp(a.y, b.y, t / 8) });
+  }
+  wd.path.push(route[route.length - 1]);
+  for (const q of ED.pillars) addPillar(wd, q.x, q.y, false);
+  for (const pnt of [ED.start, ED.goal]) {
+    for (let y = pnt.y - 18; y <= pnt.y + 18; y++) for (let x = pnt.x - 22; x <= pnt.x + 22; x++) {
+      if (x < 6 || y < 6 || x >= ED.w - 6 || y >= ED.h - 6) continue;
+      if (Math.hypot(x - pnt.x, (y - pnt.y) * 1.2) < 20 && wd.mask[y * ED.w + x] !== 2) wd.mask[y * ED.w + x] = 0;
+    }
+  }
+  wd.start = { x: ED.start.x, y: ED.start.y };
+  wd.goal = { x: ED.goal.x, y: ED.goal.y };
+  return wd;
+}
+function openEditor() {
+  if (!ED.grid) { if (!edLoadSaved()) edDefault(); }
+  goScreen('EDITOR');
+  ED.menu = false; ED.down = false;
+  ED.cx = ED.start.x; ED.cy = ED.start.y - 40;
+  const z = edPx(), vw = W / z, vh = (H - edToolbarH() - 12) / z;
+  ED.camx = clamp(ED.cx - vw / 2, 0, Math.max(0, ED.w - vw)); ED.camy = clamp(ED.cy - vh / 2, 0, Math.max(0, ED.h - vh));
+  edMsg('PAINT A ROUTE FROM START TO GOAL');
+}
+function edPaint() {
+  const t = ED_TOOLS[ED.tool];
+  if (t.v === 's' || t.v === 'g') {
+    const pnt = { x: clamp(Math.round(ED.cx), 24, ED.w - 24), y: clamp(Math.round(ED.cy), 24, ED.h - 24) };
+    if (t.v === 's') ED.start = pnt; else ED.goal = pnt;
+    for (let r = -2; r <= 2; r++) for (let c = -2; c <= 2; c++) {
+      const cc = Math.floor(pnt.x / ED.cs) + c, rr2 = Math.floor(pnt.y / ED.cs) + r;
+      if (cc > 0 && rr2 > 0 && cc < ED.cols - 1 && rr2 < ED.rows - 1) ED.grid[rr2 * ED.cols + cc] = 0;
+    }
+    return;
+  }
+  if (t.v === 'p') {
+    const x = Math.round(ED.cx), y = Math.round(ED.cy);
+    const near = ED.pillars.findIndex(q => Math.hypot(q.x - x, q.y - y) < 8);
+    if (near >= 0) ED.pillars.splice(near, 1);
+    else if (ED.pillars.length < 80) ED.pillars.push({ x: x, y: y });
+    ED.down = false;
+    return;
+  }
+  const c0 = Math.floor(ED.cx / ED.cs), r0 = Math.floor(ED.cy / ED.cs), b = ED.brush - 1;
+  for (let r = -b; r <= b; r++) for (let c = -b; c <= b; c++) {
+    if (c * c + r * r > b * b + 1) continue;
+    const cc = c0 + c, rr2 = r0 + r;
+    if (cc < 1 || rr2 < 1 || cc >= ED.cols - 1 || rr2 >= ED.rows - 1) continue;
+    ED.grid[rr2 * ED.cols + cc] = t.v;
+  }
+}
+function edPx() { return (W >= 300 ? 4 : 3) / ED.cs; }   // screen pixels per world pixel
+function edToolbarH() { return 26; }
+function editorPointer(kind, x, y) {
+  if (kind === 'up') { ED.down = false; return; }
+  if (ED.menu) { if (kind === 'down') listEvent({ type: 'tap', x: x, y: y, dev: 'mouse' }); return; }
+  if (kind === 'down' && y < edToolbarH()) {
+    for (const h of hits) if (x >= h.x && x < h.x + h.w && y >= h.y && y < h.y + h.h) { h.fn(); return; }
+    return;
+  }
+  const z = edPx();
+  ED.cx = clamp(ED.camx + x / z, 0, ED.w - 1);
+  ED.cy = clamp(ED.camy + (y - edToolbarH()) / z, 0, ED.h - 1);
+  if (kind === 'down') { ED.down = true; edPaint(); }
+  else if (kind === 'move' && ED.down) edPaint();
+}
+function editorKey(k) {
+  if (k >= '1' && k <= '8') { ED.tool = +k - 1; SFX.move(); }
+  else if (k === '[') { ED.brush = Math.max(1, ED.brush - 1); SFX.move(); }
+  else if (k === ']') { ED.brush = Math.min(4, ED.brush + 1); SFX.move(); }
+}
+function editorBack() { ED.menu = !ED.menu; ui.cursor = 0; SFX.click(); }
+function editorItems() {
+  return [
+    { label: 'BACK TO PAINTING', select: () => { ED.menu = false; } },
+    { label: 'TEST PLAY', select: (dev) => {
+      if (!edRoute()) { edMsg('NO PATH FROM START TO GOAL'); ED.menu = false; return; }
+      edSave(); mode = 'custom'; enterPlayers(dev);
+    } },
+    { label: 'SAVE', select: () => { edSave(); ED.menu = false; } },
+    { label: 'COPY SHARE CODE', select: () => {
+      const code = edEncode();
+      ED.lastCode = code;
+      try {
+        navigator.clipboard.writeText(code).then(() => edMsg('CODE COPIED (' + code.length + ' CHARS)'), () => edMsg('COPY BLOCKED - CODE IS SAVED'));
+      } catch (e) { edMsg('COPY BLOCKED - CODE IS SAVED'); }
+      edSave(); ED.menu = false;
+    } },
+    { label: 'PASTE A CODE', select: () => { ED.waitPaste = true; edMsg('PRESS CTRL+V (OR PASTE) NOW'); ED.menu = false; } },
+    { label: 'CLEAR MAP', select: () => { edDefault(); edMsg('NEW MAP'); ED.menu = false; } },
+    { label: 'EXIT EDITOR', select: () => { edSave(); toTitle(); } }
+  ];
+}
+function editorEvent(ev) {
+  if (ED.menu) {
+    if (ev.type === 'back' || ev.type === 'pause') { ED.menu = false; SFX.back(); return; }
+    listEvent(ev);
+    return;
+  }
+  if (ev.type === 'pause' || ev.type === 'back') { editorBack(); return; }
+  if (ev.type === 'ability') { ED.tool = (ED.tool + 1) % ED_TOOLS.length; SFX.move(); return; }
+  if (ev.type === 'addcpu') { ED.brush = ED.brush % 4 + 1; SFX.move(); return; }
+  if (ev.type === 'action') { ED.down = true; ED.downDev = ev.dev; edPaint(); }
+}
+function updateEditor(dt) {
+  if (ED.msgT > 0) ED.msgT -= dt;
+  if (ED.menu) return;
+  let mx = 0, my = 0;
+  for (const d of ['kbL', 'kbR', 'pad0', 'pad1', 'pad2', 'pad3']) {
+    const v = readMove(d);
+    mx += v.x; my += v.y;
+  }
+  const l = len(mx, my);
+  if (l > 0.05) {
+    const sp = 150 / Math.max(1, l);
+    ED.cx = clamp(ED.cx + mx * sp * dt, 0, ED.w - 1);
+    ED.cy = clamp(ED.cy + my * sp * dt, 0, ED.h - 1);
+  }
+  // held paint button (keyboard / gamepad)
+  const held = keys[keymap.kbL.action] || keys[keymap.kbR.action] || getPads().some(pd => pd && pd.connected && pd.buttons[0] && pd.buttons[0].pressed);
+  if (ED.down && ED.downDev && ED.downDev !== 'mouse' && !held) ED.down = false;
+  if (ED.down && l > 0.05 && held) edPaint();
+  // camera keeps the cursor in view
+  const z = edPx(), vw = W / z, vh = (H - edToolbarH() - 12) / z;
+  const tx = clamp(ED.cx - vw / 2, 0, Math.max(0, ED.w - vw)), ty = clamp(ED.cy - vh / 2, 0, Math.max(0, ED.h - vh));
+  ED.camx += (tx - ED.camx) * damp(6, dt);
+  ED.camy += (ty - ED.camy) * damp(6, dt);
+}
+function drawEditor() {
+  G = hctx;
+  rect(0, 0, W, H, 'k');
+  const z = edPx(), top = edToolbarH();
+  const c0 = Math.max(0, Math.floor(ED.camx / ED.cs)), r0 = Math.max(0, Math.floor(ED.camy / ED.cs));
+  const c1 = Math.min(ED.cols, c0 + Math.ceil(W / z / ED.cs) + 2), r1 = Math.min(ED.rows, r0 + Math.ceil((H - top) / z / ED.cs) + 2);
+  const cellPx = Math.round(ED.cs * z);
+  const colOf = { 0: 'g', 1: 't', 3: 's', 4: 'i', 5: 'h' };
+  for (let r = r0; r < r1; r++) for (let c = c0; c < c1; c++) {
+    const v = ED.grid[r * ED.cols + c];
+    const sx = Math.round(c * cellPx - ED.camx * z), sy = Math.round(r * cellPx - ED.camy * z) + top;
+    rect(sx, sy, cellPx, cellPx, colOf[v] || 'g');
+    if (v === 1 && ((c + r) & 1)) rect(sx + 1, sy + 1, 2, 2, 'i');
+    if (v === 5) { rect(sx + 2, sy + 2, 1, 1, 'r'); }
+  }
+  const toS = (pt) => ({ x: Math.round(pt.x * z - ED.camx * z), y: Math.round(pt.y * z - ED.camy * z) + top });
+  for (const q of ED.pillars) { const sp = toS(q); G.drawImage(SP.pillar.r, sp.x - 3, sp.y - 12); }
+  const st = toS(ED.start), gl = toS(ED.goal);
+  G.drawImage(SP.pinStart.r, st.x - 2, st.y - 6); G.drawImage(SP.pinGoal.r, gl.x - 2, gl.y - 6);
+  // cursor + brush outline
+  const cu = toS({ x: ED.cx, y: ED.cy });
+  const t = ED_TOOLS[ED.tool];
+  const rad = (typeof t.v === 'number') ? (ED.brush - 0.5) * cellPx : 4;
+  for (let a = 0; a < 24; a++) px(cu.x + Math.cos(a / 24 * 6.28) * rad, cu.y + Math.sin(a / 24 * 6.28) * rad, 'y');
+  px(cu.x, cu.y, 'w');
+  // toolbar
+  rect(0, 0, W, top, 'k'); rect(0, top - 1, W, 1, 'i');
+  const tw = Math.min(16, Math.floor((W - 70) / ED_TOOLS.length));
+  ED_TOOLS.forEach((tool, i) => {
+    const x = 2 + i * (tw + 1);
+    rect(x, 2, tw, 10, tool.col);
+    if (i === ED.tool) frame(x - 1, 1, tw + 2, 12, 'y');
+    text(String(i + 1), x + 1, 4, tool.col === 'w' || tool.col === 'g' || tool.col === 'l' ? 'k' : 'w');
+    hits.push({ x: x, y: 0, w: tw, h: 14, fn: () => { ED.tool = i; SFX.move(); } });
+  });
+  const bx = 2 + ED_TOOLS.length * (tw + 1) + 3;
+  text('B' + ED.brush, bx, 4, 'w');
+  hits.push({ x: bx - 2, y: 0, w: 14, h: 14, fn: () => { ED.brush = ED.brush % 4 + 1; SFX.move(); } });
+  rect(W - 30, 2, 28, 10, 'i'); text('MENU', W - 16, 4, 'w', { align: 'center' });
+  hits.push({ x: W - 32, y: 0, w: 32, h: 14, fn: () => editorBack() });
+  text(t.name + '   1-8/E: TOOL   [ ]: BRUSH', 3, 16, 'l');
+  if (ED.msgT > 0) { rect(0, H - 12, W, 12, 'k'); text(ED.msg, W / 2, H - 9, 'y', { align: 'center' }); }
+  else text('MOVE  ACTION PAINT  ESC MENU', W / 2, H - 9, 's', { align: 'center', outline: 'k' });
+  if (ED.menu) {
+    ditherDim(true);
+    const items = editorItems();
+    const w = Math.min(W - 24, 140);
+    text('MAP EDITOR', W / 2, Math.round(H * 0.2), 'y', { s: 2, align: 'center', outline: 'k' });
+    drawList(items, W / 2, Math.round(H * 0.2) + 20, w, 14);
+  }
+}
+window.addEventListener('paste', (e) => {
+  if (state !== 'EDITOR') return;
+  const txt = (e.clipboardData && e.clipboardData.getData('text')) || '';
+  if (edDecode(txt)) { edMsg('MAP LOADED FROM CODE'); edSave(); } else if (ED.waitPaste) edMsg('THAT IS NOT A MAP CODE');
+  ED.waitPaste = false;
+});
+
+// ---------------------------------------------------------------------
+// Story intro (shown once before the first game, replay from How to Play)
+// ---------------------------------------------------------------------
+const STORY = [
+  ['THE HIGH MEADOWS WERE QUIET.', 'THE FLOCK GRAZED IN THE SUN.'],
+  ['BUT SHADOWS GATHERED IN THE WOODS,', 'AND HUNGRY EYES WATCHED THE FLOCK.'],
+  ['AN OLD GOAT KNEW EVERY TRAIL.', 'A YOUNG DOG KNEW EVERY SHEEP.'],
+  ['TOGETHER THEY WOULD BRING', 'EVERY SHEEP HOME BY NIGHTFALL.']
+];
+let storyPage = 0, storyThen = 'MODE';
+function startStory(then) { storyPage = 0; storyThen = then || 'TITLE'; goScreen('STORY'); }
+function storyEvent(ev) {
+  if (ev.type === 'back' || ev.type === 'pause') { endStory(); return; }
+  if (ev.type === 'action' || ev.type === 'tap' || ev.type === 'right') {
+    storyPage++; SFX.click();
+    if (storyPage >= STORY.length) endStory();
+  } else if (ev.type === 'left' && storyPage > 0) { storyPage--; SFX.move(); }
+}
+function endStory() { settings.storySeen = true; saveSettings(); goScreen(storyThen); }
+function drawStory() {
+  rect(0, 0, W, H, 'k');
+  const bw = Math.min(W - 20, 200), bh = Math.min(110, Math.round(H * 0.45));
+  const bx = Math.round(W / 2 - bw / 2), by = Math.round(H * 0.18);
+  frame(bx - 2, by - 2, bw + 4, bh + 4, 'i');
+  const k = 2;
+  const ground = (col) => { rect(bx, by, bw, bh, col); };
+  const put = (sp, x, y, left) => G.drawImage(left ? sp.l : sp.r, 0, 0, sp.w, sp.h, Math.round(x - sp.w * k / 2), Math.round(y - sp.h * k), sp.w * k, sp.h * k);
+  const gy = by + bh - 14;
+  if (storyPage === 0) {
+    ground('g');
+    for (let i = 0; i < 5; i++) put(SP.sheep.graze[Math.floor(realTime * 2 + i) % 2], bx + 24 + i * (bw - 48) / 4, gy - (i % 2) * 18, i % 2 === 1);
+  } else if (storyPage === 1) {
+    ground('t');
+    for (let x = bx; x < bx + bw; x += 3) for (let y = by; y < by + bh; y += 3) if (hash2(x, y) < 0.3) rect(x, y, 2, 1, 'i');
+    for (let i = 0; i < 5; i++) {
+      if (Math.floor(realTime * 2 + i * 1.7) % 4 === 0) continue;
+      const ex = bx + 20 + i * (bw - 40) / 4, ey = by + 20 + (i % 3) * 22;
+      rect(ex - 3, ey, 2, 2, 'r'); rect(ex + 2, ey, 2, 2, 'r');
+    }
+  } else if (storyPage === 2) {
+    ground('g');
+    put(SP.goat.SE[Math.floor(realTime * 3) % 2], bx + bw * 0.32, gy, false);
+    put(SP.dog.SE[Math.floor(realTime * 4) % 2], bx + bw * 0.68, gy, true);
+  } else {
+    ground('h');
+    put(SP.goat.SE[0], bx + bw * 0.2, gy, false);
+    put(SP.dog.SE[0], bx + bw * 0.38, gy, false);
+    for (let i = 0; i < 3; i++) put(SP.sheep.SE[Math.floor(realTime * 4 + i) % 2], bx + bw * 0.55 + i * 16, gy - (i % 2) * 6, false);
+    put(SP.pinGoal, bx + bw * 0.9, gy - 4 + Math.round(Math.sin(realTime * 3)), false);
+  }
+  const lines = STORY[storyPage];
+  text(lines[0], W / 2, by + bh + 14, 'w', { align: 'center' });
+  text(lines[1], W / 2, by + bh + 24, 'w', { align: 'center' });
+  for (let i = 0; i < STORY.length; i++) rect(W / 2 - STORY.length * 4 + i * 8, by + bh + 38, 5, 3, i === storyPage ? 'y' : 'i');
+  text('ACTION: NEXT    BACK: SKIP', W / 2, H - 12, 's', { align: 'center' });
+}
+
+// ---------------------------------------------------------------------
 // Screens & menus
 // ---------------------------------------------------------------------
 function goScreen(s) {
@@ -2369,12 +3664,18 @@ function joinPlayer(dev) {
   if (players.some(p => p.dev === dev)) return null;
   const slot = freeSlot();
   if (slot < 0) return null;
-  const p = { slot: slot, dev: dev, kind: slot % 2 === 0 ? 'goat' : 'dog', ready: false };
+  const p = { slot: slot, dev: dev, kind: slot % 2 === 0 ? 'goat' : 'dog', ready: false, skin: 0 };
+  if (mode === 'versus' && slot === 1 && !players.some(q => q.kind === 'wolf')) p.kind = 'wolf';
   makePlayerBody(p, 0, 0);
   players.push(p);
   players.sort((a, b) => a.slot - b.slot);
   SFX.join();
   return p;
+}
+function playersBack() {
+  if (mode === 'daily' || mode === 'endless') goScreen('MODE');
+  else if (mode === 'custom') { mode = 'escort'; goMaps(); }
+  else goMaps();
 }
 function goMaps() {
   goScreen('MAPS');
@@ -2384,15 +3685,17 @@ function enterPlayers(dev) {
   useMenuWorld();
   goScreen('PLAYERS');
   players = players.filter(p => !p.auto);
-  for (const p of players) p.ready = !!p.cpu;
+  for (const p of players) { p.ready = !!p.cpu; if (mode !== 'versus' && p.kind === 'wolf') p.kind = 'goat'; }
   if (!players.some(p => !p.cpu) && dev) joinPlayer(dev);
 }
 // CPU helpers: AI-driven goats/dogs that fill empty slots
-function joinCPU(silent) {
+function joinCPU(silent, kind) {
   const slot = freeSlot();
   if (slot < 0) return null;
-  const goats = players.filter(p => p.kind === 'goat').length, dogs = players.length - goats;
-  const p = { slot: slot, dev: 'ai' + slot, kind: goats > dogs ? 'dog' : 'goat', ready: true, cpu: true };
+  const goats = players.filter(p => p.kind === 'goat').length, dogs = players.filter(p => p.kind === 'dog').length;
+  let k = kind || (goats > dogs ? 'dog' : 'goat');
+  if (!kind && mode === 'versus' && !players.some(p => p.kind === 'wolf')) k = 'wolf';
+  const p = { slot: slot, dev: 'ai' + slot, kind: k, ready: true, cpu: true, skin: 0 };
   makePlayerBody(p, 0, 0);
   aiVec[p.dev] = { x: 0, y: 0 };
   players.push(p);
@@ -2406,51 +3709,99 @@ function removeCPU(p) {
   players.splice(players.indexOf(p), 1);
   SFX.back();
 }
+function kindsForMode() { return mode === 'versus' ? ['goat', 'dog', 'wolf'] : ['goat', 'dog']; }
+function cycleKind(p, d) {
+  const ks = kindsForMode();
+  const i = Math.max(0, ks.indexOf(p.kind));
+  p.kind = ks[(i + (d || 1) + ks.length) % ks.length];
+  p.skin = 0; p.ready = !!p.cpu;
+  SFX.move();
+}
 function hasCPU() { return players.some(p => p.dev.startsWith('ai')); }
 function onOff(v) { return v ? 'ON' : 'OFF'; }
+function toggleSetting(k) { settings[k] = !settings[k]; saveSettings(); SFX.click(); }
+function cycleSpeed(dir) {
+  const v = [1, 0.75, 0.5];
+  const i = v.indexOf(settings.speed);
+  settings.speed = v[(i + (dir || 1) + v.length) % v.length];
+  saveSettings(); SFX.click();
+}
 function optionItems() {
+  const inPause = state === 'PLAYING';
   return [
     { label: 'SOUND', value: onOff(settings.sound), select: () => { setSound(!settings.sound); SFX.click(); }, change: () => { setSound(!settings.sound); SFX.click(); } },
+    { label: 'MUSIC', value: onOff(settings.music), select: () => toggleSetting('music'), change: () => toggleSetting('music') },
     { label: 'SCREEN SHAKE', value: onOff(settings.shake), select: () => { settings.shake = !settings.shake; saveSettings(); SFX.click(); }, change: () => { settings.shake = !settings.shake; saveSettings(); SFX.click(); } },
     { label: 'FULLSCREEN', value: fsSupported() ? onOff(isFs()) : 'N/A', select: toggleFs, change: toggleFs },
-    { label: 'SOLO AI HELPER', value: settings.autoHelper ? 'AUTO' : 'OFF', select: () => { settings.autoHelper = !settings.autoHelper; saveSettings(); SFX.click(); }, change: () => { settings.autoHelper = !settings.autoHelper; saveSettings(); SFX.click(); } }
+    { label: 'SOLO AI HELPER', value: settings.autoHelper ? 'AUTO' : 'OFF', select: () => toggleSetting('autoHelper'), change: () => toggleSetting('autoHelper') },
+    { label: 'COLOURS', value: settings.cb ? 'COLOUR-SAFE' : 'STANDARD', select: () => toggleSetting('cb'), change: () => toggleSetting('cb') },
+    { label: 'FLASHING', value: settings.reduceFlash ? 'REDUCED' : 'ON', select: () => toggleSetting('reduceFlash'), change: () => toggleSetting('reduceFlash') },
+    { label: 'GAME SPEED', value: Math.round(settings.speed * 100) + '%', select: () => cycleSpeed(1), change: (d) => cycleSpeed(d) },
+    { label: 'WOOL', value: WOOL_NAMES[settings.wool] + (woolUnlocked(settings.wool) ? '' : ' (LOCKED)'), select: () => cycleWool(1), change: (d) => cycleWool(d) },
+    { label: 'REMAP KEYS', select: () => { if (inPause) setPauseView('keys'); else goScreen('KEYS'); } }
   ];
+}
+function keyItems(backFn) {
+  const items = [];
+  const acts = ['up', 'down', 'left', 'right', 'action', 'ability'];
+  for (const d of ['kbL', 'kbR']) for (const a of acts) {
+    const waiting = remapWaiting && remapWaiting.dev === d && remapWaiting.act === a;
+    items.push({ label: (d === 'kbL' ? 'P1 ' : 'P2 ') + a.toUpperCase(), value: waiting ? 'PRESS A KEY' : keyName(keymap[d][a]),
+      select: () => { remapWaiting = { dev: d, act: a }; } });
+  }
+  items.push({ label: 'RESET DEFAULTS', select: () => { keymap = JSON.parse(JSON.stringify(DEFAULT_KEYS)); saveKeys(); SFX.click(); } });
+  items.push({ label: 'BACK', select: backFn });
+  return items;
 }
 function screenItems() {
   switch (state) {
     case 'TITLE': return [
-      { label: 'PLAY', select: () => { autoFs(); goScreen('MODE'); } },
+      { label: 'PLAY', select: () => { autoFs(); if (!settings.storySeen) startStory('MODE'); else goScreen('MODE'); } },
       { label: 'WATCH DEMO', select: () => startShowcase() },
-      { label: 'HOW TO PLAY', select: () => goScreen('HOWTO') },
+      { label: 'HOW TO PLAY', select: () => { howPage = 0; goScreen('HOWTO'); } },
+      { label: 'MAP EDITOR', select: () => openEditor() },
       { label: 'OPTIONS', select: () => { optionsFrom = 'TITLE'; goScreen('OPTIONS'); } },
       { label: 'EXIT', select: exitGame }
     ];
-    case 'MODE': return [
-      { label: 'ESCORT', select: () => { mode = 'escort'; goMaps(); } },
-      { label: 'DEFEND', select: () => { mode = 'defend'; goMaps(); } },
-      { label: 'BACK', select: () => goScreen('TITLE') }
-    ];
+    case 'MODE': return MODES.map(m => ({ label: m.title, select: (dev) => {
+        mode = m.id;
+        if (m.id === 'daily' || m.id === 'endless') enterPlayers(dev); else goMaps();
+      } })).concat([{ label: 'BACK', select: () => goScreen('TITLE') }]);
     case 'MAPS': {
-      const defs = mode === 'escort' ? ESCORT_MAPS : DEFEND_MAPS;
+      const defs = mapList();
+      const pk = progKind();
       const items = defs.map((d, i) => {
-        const pv = progress[mode][i];
-        const value = mode === 'escort' ? (pv ? '*'.repeat(pv) : '') : (pv ? 'W' + pv : '');
+        const pv = progress[pk][i];
+        const md = popcount(progress.medals[pk][i]);
+        const value = (mode === 'escort' ? (pv ? '*'.repeat(pv) : '') : (pv ? 'W' + pv : '')) + (md ? ' ' + md + 'M' : '');
         return { label: (i + 1 < 10 ? ' ' : '') + (i + 1) + ' ' + d.name, value: value, select: (dev) => { selMap[mode] = i; enterPlayers(dev); } };
       });
+      if (mode === 'escort' && customMapExists()) items.push({ label: ' * MY MAP', value: 'EDITOR', select: (dev) => { mode = 'custom'; enterPlayers(dev); } });
       items.push({ label: 'BACK', select: () => goScreen('MODE') });
       return items;
     }
     case 'OPTIONS': return optionItems().concat([{ label: 'BACK', select: () => goScreen(optionsFrom) }]);
-    case 'HOWTO': return [{ label: 'BACK', select: () => goScreen('TITLE') }];
-    case 'BYE': return [{ label: 'BACK TO TITLE', select: () => goScreen('TITLE') }];
-    case 'PLAYING': return pauseItems();
-    case 'RESULTS': return [
-      { label: 'NEXT MISSION', select: nextMission },
-      { label: 'QUIT TO TITLE', select: toTitle }
+    case 'KEYS': return keyItems(() => { goScreen('OPTIONS'); ui.cursor = 9; });
+    case 'HOWTO': return [
+      { label: 'NEXT PAGE  ' + (howPage + 1) + '/4', select: () => { howPage = (howPage + 1) % 4; ui.cursor = 0; }, change: (d) => { howPage = (howPage + d + 4) % 4; } },
+      { label: 'WATCH STORY', select: () => startStory('HOWTO') },
+      { label: 'BACK', select: () => goScreen('TITLE') }
     ];
+    case 'BYE': return [{ label: 'BACK TO TITLE', select: () => goScreen('TITLE') }];
+    case 'EDITOR': return editorItems();
+    case 'PLAYING': return pauseItems();
+    case 'RESULTS':
+      if (resultsView === 'shop') return shopItems(() => { resultsView = 'main'; ui.cursor = 1; });
+      if (mode === 'daily') return [{ label: 'PLAY AGAIN', select: startRun }, { label: 'QUIT TO TITLE', select: toTitle }];
+      if (mode === 'custom') return [{ label: 'PLAY AGAIN', select: startRun }, { label: 'BACK TO EDITOR', select: () => { useMenuWorld(); openEditor(); } }, { label: 'QUIT TO TITLE', select: toTitle }];
+      return [
+        { label: mode === 'endless' ? 'NEXT STAGE' : 'NEXT MISSION', select: nextMission },
+        { label: 'UPGRADES (' + bells + ' BELLS)', select: () => { resultsView = 'shop'; ui.cursor = 0; } },
+        { label: 'QUIT TO TITLE', select: toTitle }
+      ];
     case 'GAMEOVER': return [
-      { label: 'RETRY', select: startRun },
-      { label: 'CHANGE MAP', select: () => { useMenuWorld(); goMaps(); } },
+      { label: mode === 'versus' ? 'REMATCH' : 'RETRY', select: startRun },
+      { label: 'CHANGE MAP', select: () => { useMenuWorld(); if (mode === 'daily' || mode === 'endless') goScreen('MODE'); else if (mode === 'custom') openEditor(); else goMaps(); } },
       { label: 'CHANGE PLAYERS', select: (dev) => enterPlayers(dev) },
       { label: 'TITLE', select: toTitle }
     ];
@@ -2459,6 +3810,7 @@ function screenItems() {
 }
 // Pause menu: main list, options, controls and confirmation sub-views
 let pauseView = 'main';
+let resultsView = 'main';
 function openPause() {
   if (state !== 'PLAYING' || paused) return;
   paused = true;
@@ -2477,19 +3829,22 @@ function pauseItems() {
     return optionItems().concat([{ label: 'BACK', select: () => setPauseView('main', 2) }]);
   }
   if (pauseView === 'controls') return [{ label: 'BACK', select: () => setPauseView('main', 3) }];
+  if (pauseView === 'shop') return shopItems(() => setPauseView('main', 4));
+  if (pauseView === 'keys') return keyItems(() => setPauseView('options', 9));
   if (pauseView === 'restart') return [
     { label: 'YES, RESTART', select: restartCurrent },
     { label: 'NO', select: () => setPauseView('main', 1) }
   ];
   if (pauseView === 'exit') return [
     { label: 'YES, EXIT', select: toTitle },
-    { label: 'NO', select: () => setPauseView('main', 4) }
+    { label: 'NO', select: () => setPauseView('main', 5) }
   ];
   return [
     { label: 'RESUME', select: () => { paused = false; } },
     { label: mode === 'escort' ? 'RESTART ROUTE' : 'RESTART ARENA', select: () => setPauseView('restart', 1) },
     { label: 'OPTIONS', select: () => setPauseView('options') },
     { label: 'CONTROLS', select: () => setPauseView('controls') },
+    { label: 'UPGRADES (' + bells + ')', select: () => setPauseView('shop') },
     { label: 'EXIT TO TITLE', select: () => setPauseView('exit', 1) }
   ];
 }
@@ -2501,12 +3856,15 @@ function exitGame() {
 }
 function screenBack() {
   if (state === 'PLAYING' && paused && pauseView !== 'main') {
-    const back = { options: 2, controls: 3, restart: 1, exit: 4 }[pauseView] || 0;
+    if (pauseView === 'keys') { if (remapWaiting) remapWaiting = null; else setPauseView('options', 9); SFX.back(); return; }
+    const back = { options: 2, controls: 3, restart: 1, shop: 4, exit: 5 }[pauseView] || 0;
     setPauseView('main', back); SFX.back(); return;
   }
   if (state === 'MODE' || state === 'HOWTO' || state === 'BYE') { goScreen('TITLE'); SFX.back(); }
+  else if (state === 'EDITOR') { editorBack(); }
   else if (state === 'MAPS') { goScreen('MODE'); SFX.back(); }
   else if (state === 'OPTIONS') { goScreen(optionsFrom); SFX.back(); }
+  else if (state === 'KEYS') { goScreen('OPTIONS'); ui.cursor = 9; SFX.back(); }
   else if (state === 'PLAYING' && paused) { paused = false; SFX.back(); }
 }
 function listEvent(ev) {
@@ -2544,7 +3902,7 @@ function playersEvent(ev) {
     if (ev.dev === 'kb') p = players.slice().reverse().find(q => q.dev === 'kbL' || q.dev === 'kbR');
     else p = players.find(q => q.dev === ev.dev);
     if (p) { players.splice(players.indexOf(p), 1); SFX.back(); }
-    if (!players.some(q => !q.cpu)) goMaps();
+    if (!players.some(q => !q.cpu)) playersBack();
     return;
   }
   const p = players.find(q => q.dev === ev.dev);
@@ -2552,7 +3910,9 @@ function playersEvent(ev) {
     if (!p) joinPlayer(ev.dev);
     else { p.ready = !p.ready; SFX.click(); }
   } else if ((ev.type === 'left' || ev.type === 'right') && p) {
-    p.kind = p.kind === 'goat' ? 'dog' : 'goat'; p.ready = false; SFX.move();
+    cycleKind(p, ev.type === 'left' ? -1 : 1);
+  } else if ((ev.type === 'up' || ev.type === 'down') && p) {
+    cycleSkin(p, ev.type === 'up' ? -1 : 1);
   }
 }
 // Single entry point for all input (called synchronously from DOM handlers,
@@ -2566,10 +3926,14 @@ function dispatch(ev) {
   if (state === 'LOADING') return;
   if (ev.type === 'fullscreen') { toggleFs(); return; }
   if (ev.type === 'mute') { setSound(!settings.sound); return; }
+  if (state === 'EDITOR') { editorEvent(ev); return; }
+  if (state === 'STORY') { storyEvent(ev); return; }
   if (state === 'PLAYERS') { playersEvent(ev); return; }
   if (state === 'PLAYING' && !paused) {
     if (ev.type === 'pause') openPause();
     else if (ev.type === 'action') { const p = playerForDev(ev.dev); if (p) playerAction(p); }
+    else if (ev.type === 'ability' || (ev.type === 'back' && ev.dev.startsWith('pad'))) { const p = playerForDev(ev.dev); if (p) playerAbility(p); }
+    else if (ev.type === 'command' || (ev.type === 'addcpu' && ev.dev.startsWith('pad'))) cycleCpuOrder();
     return;
   }
   if ((state === 'RESULTS' || state === 'GAMEOVER') && stateTime < 0.8) return;
@@ -2592,20 +3956,28 @@ window.addEventListener('keydown', (e) => {
   const k = e.key;
   if ([' ', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Tab', 'Backspace'].includes(k)) e.preventDefault();
   initAudio();
-  keys[k.toLowerCase()] = true;
-  if (e.repeat) return;
   const lk = k.toLowerCase();
+  if (remapWaiting) {
+    e.preventDefault();
+    if (k !== 'Escape') {
+      const { dev, act } = remapWaiting;
+      // swap with any slot already using this key
+      for (const d of ['kbL', 'kbR']) for (const a in keymap[d]) if (keymap[d][a] === lk) keymap[d][a] = keymap[dev][act];
+      keymap[dev][act] = lk;
+      saveKeys();
+      SFX.click();
+    }
+    remapWaiting = null;
+    return;
+  }
+  keys[lk] = true;
+  if (e.repeat) return;
+  if (state === 'EDITOR' && /^[1-8\[\]]$/.test(lk)) { editorKey(lk); return; }
   const ev = (dev, type) => dispatch({ dev: dev, type: type });
-  if (k === ' ') ev('kbL', 'action');
-  else if (k === 'Enter' || e.code === 'ShiftRight' || k === '/') ev('kbR', 'action');
-  else if (lk === 'w') ev('kbL', 'up');
-  else if (lk === 's') ev('kbL', 'down');
-  else if (lk === 'a') ev('kbL', 'left');
-  else if (lk === 'd') ev('kbL', 'right');
-  else if (k === 'ArrowUp') ev('kbR', 'up');
-  else if (k === 'ArrowDown') ev('kbR', 'down');
-  else if (k === 'ArrowLeft') ev('kbR', 'left');
-  else if (k === 'ArrowRight') ev('kbR', 'right');
+  let bound = false;
+  for (const d of ['kbL', 'kbR']) for (const a in keymap[d]) if (keymap[d][a] === lk) { ev(d, a); bound = true; }
+  if (bound) return;
+  if (e.code === 'ShiftRight' || k === '/') ev('kbR', 'action');
   else if (lk === 'p' || k === 'Escape') ev('kb', 'pause');
   else if (k === 'Backspace') ev('kb', 'back');
   else if (lk === 'r') ev('kb', 'restart');
@@ -2613,6 +3985,7 @@ window.addEventListener('keydown', (e) => {
   else if (lk === 'f') ev('kb', 'fullscreen');
   else if (lk === 'h') ev('kb', 'addcpu');
   else if (lk === 'n') ev('kb', 'removecpu');
+  else if (lk === 'c') ev('kb', 'command');
 });
 window.addEventListener('keyup', (e) => { keys[e.key.toLowerCase()] = false; });
 window.addEventListener('blur', () => {
@@ -2626,16 +3999,21 @@ function toGame(clientX, clientY) {
 view.addEventListener('mousedown', (e) => {
   initAudio();
   view.focus();
-  if (e.button !== 0) return;
   const p = toGame(e.clientX, e.clientY);
+  if (e.button === 2 && state === 'PLAYING' && !paused) { dispatch({ dev: 'kbL', type: 'ability' }); return; }
+  if (e.button !== 0) return;
+  if (state === 'EDITOR') { editorPointer('down', p.x, p.y); return; }
   if (state === 'PLAYING' && !paused) {
     if (p.x > W - 16 && p.y < 15) dispatch({ dev: 'mouse', type: 'pause' });
+    else if (hudHit(p.x, p.y)) { /* handled */ }
     else dispatch({ dev: 'kbL', type: 'action' });
     return;
   }
   dispatch({ dev: 'mouse', type: 'tap', x: p.x, y: p.y });
 });
 view.addEventListener('contextmenu', (e) => e.preventDefault());
+view.addEventListener('mousemove', (e) => { if (state === 'EDITOR') { const p = toGame(e.clientX, e.clientY); editorPointer('move', p.x, p.y); } });
+window.addEventListener('mouseup', () => { if (state === 'EDITOR') editorPointer('up'); });
 view.addEventListener('touchstart', (e) => {
   e.preventDefault();
   initAudio();
@@ -2644,11 +4022,15 @@ view.addEventListener('touchstart', (e) => {
     const p = toGame(t.clientX, t.clientY);
     if (state === 'PLAYING' && !paused) {
       if (p.x > W - 18 && p.y < 17) { dispatch({ dev: 'touch', type: 'pause' }); continue; }
+      if (hudHit(p.x, p.y)) continue;
+      if (p.x > W - 34 && p.y > H - 34) { dispatch({ dev: 'touch', type: 'ability' }); continue; }
       if (p.x < W * 0.55 && touch.stickId === null) {
         touch.stickId = t.identifier;
         touch.sx = p.x; touch.sy = p.y; touch.cx = p.x; touch.cy = p.y;
         touch.active = true;
       } else dispatch({ dev: 'touch', type: 'action' });
+    } else if (state === 'EDITOR') {
+      editorPointer('down', p.x, p.y);
     } else {
       dispatch({ dev: 'touch', type: 'tap', x: p.x, y: p.y });
     }
@@ -2661,10 +4043,12 @@ view.addEventListener('touchmove', (e) => {
       const p = toGame(t.clientX, t.clientY);
       touch.cx = p.x; touch.cy = p.y;
     }
+    if (state === 'EDITOR') { const p = toGame(t.clientX, t.clientY); editorPointer('move', p.x, p.y); }
   }
 }, { passive: false });
 function endTouch(e) {
   e.preventDefault();
+  if (state === 'EDITOR') editorPointer('up');
   for (const t of e.changedTouches) if (t.identifier === touch.stickId) { touch.stickId = null; touch.active = false; }
 }
 view.addEventListener('touchend', endTouch, { passive: false });
@@ -2682,7 +4066,7 @@ function pollPads() {
     const b = (n) => !!(p.buttons[n] && p.buttons[n].pressed);
     const ax = p.axes[0] || 0, ay = p.axes[1] || 0;
     const now = {
-      action: b(0) || b(2), back: b(1), pause: b(9), addcpu: b(3), removecpu: b(4),
+      action: b(0), ability: b(2), back: b(1), pause: b(9), addcpu: b(3), removecpu: b(4),
       up: b(12) || ay < -0.6, down: b(13) || ay > 0.6, left: b(14) || ax < -0.6, right: b(15) || ax > 0.6
     };
     const prev = padPrev[dev];
@@ -2696,8 +4080,9 @@ function kbOtherFree(dev) {
 }
 function readMove(dev) {
   let x = 0, y = 0;
-  const L = () => { if (keys['a']) x -= 1; if (keys['d']) x += 1; if (keys['w']) y -= 1; if (keys['s']) y += 1; };
-  const R = () => { if (keys['arrowleft']) x -= 1; if (keys['arrowright']) x += 1; if (keys['arrowup']) y -= 1; if (keys['arrowdown']) y += 1; };
+  const kd = (d) => { const m = keymap[d]; if (keys[m.left]) x -= 1; if (keys[m.right]) x += 1; if (keys[m.up]) y -= 1; if (keys[m.down]) y += 1; };
+  const L = () => kd('kbL');
+  const R = () => kd('kbR');
   if (dev.startsWith('ai')) return aiVec[dev] || { x: 0, y: 0 };
   if (dev === 'kbL') { L(); if (kbOtherFree('kbL')) R(); }
   else if (dev === 'kbR') { R(); if (kbOtherFree('kbR')) L(); }
@@ -2763,6 +4148,7 @@ function update(dt) {
     if (stateTime > 0.03 && pendingLoad) { const f = pendingLoad; pendingLoad = null; f(); }
     return;
   }
+  if (state === 'EDITOR') { updateEditor(dt); return; }
   if (state === 'PLAYING') {
     if (paused) return;
     if (hitStop > 0) { hitStop -= dt; updateParticles(dt * 0.25); return; }
@@ -2771,7 +4157,7 @@ function update(dt) {
     checkRamHits();
     updateSheep(dt);
     updateEnemies(dt);
-    if (mode === 'defend') updateDefend(dt); else updateEscort(dt);
+    if (mode === 'defend') updateDefend(dt); else if (mode === 'versus') updateVersus(dt); else updateEscort(dt);
     if (state === 'PLAYING') checkGameOver(dt);
     if (banner.t > 0) banner.t -= dt;
   } else {
@@ -2782,6 +4168,8 @@ function update(dt) {
   }
   updateParticles(dt);
   updateFireflies(dt);
+  updateWeather(dt);
+  updateDecals(dt);
   updateCamera(dt);
 }
 
@@ -2790,16 +4178,23 @@ function update(dt) {
 // ---------------------------------------------------------------------
 function wx(x) { return Math.round(x) - OX; }
 function wy(y) { return Math.round(y) - OY; }
+function sheepSet(s) {
+  if (s.type === 'lamb') return SP.lamb;
+  if (s.type === 'ram') return SP.ramSheep;
+  if (s.type === 'golden') return SP.goldSheep;
+  return woolSet();
+}
 function sheepSprite(s) {
+  const set = sheepSet(s);
   const moving = len(s.vx, s.vy) > 4;
-  if (s.grazing && !moving) return { spr: SP.sheep.graze[Math.floor(s.chew * 4) % 2], left: s.fx < 0 };
+  if (s.grazing && !moving && set.graze) return { spr: set.graze[Math.floor(s.chew * 4) % 2], left: s.fx < 0 };
   const dir = faceDir(s.fx, s.fy);
   const f = moving ? Math.floor(s.walk / 3) % 2 : 0;
-  return { spr: SP.sheep[dir][f], left: s.fx < 0 };
+  return { spr: set[dir][f], left: s.fx < 0 };
 }
 function actorSprite(p) {
   const dir = faceDir(p.fx, p.fy);
-  const set = SP[p.kind];
+  const set = skinSet(p.kind, p.skin);
   const moving = len(p.vx, p.vy) > 8;
   const f = moving ? Math.floor(p.walk / 5) % 2 : 0;
   if ((p.kind === 'goat' && p.ramT > 0) || (p.kind === 'dog' && p.actT > 0)) return { spr: set.act[dir], f: 0 };
@@ -2812,15 +4207,29 @@ function drawWorldScene() {
   bctx.drawImage(world.canvas, OX, OY, BW, BH, 0, 0, BW, BH);
   const actors = isMenu() ? demo : players;
 
-  for (const s of sheep) drawShadow(wx(s.x), wy(s.y), 7);
+  for (const d of decals) {
+    if (d.life < 1 && ((d.x + d.y) & 1)) continue;
+    px(wx(d.x), wy(d.y), d.col);
+  }
+  for (const s of sheep) drawShadow(wx(s.x), wy(s.y), s.type === 'lamb' ? 5 : 7);
   for (const p of actors) drawShadow(wx(p.x), wy(p.y), 8);
   for (const e of enemies) {
-    if (e.state === 'emerge' || canopy(e.x, e.y)) continue;
-    drawShadow(wx(e.x), wy(e.y), e.type === 'bat' ? 5 : 9);
+    if (e.state === 'emerge' || (canopy(e.x, e.y) && e.type !== 'hawk' && e.type !== 'bat')) continue;
+    if (e.type === 'hawk') drawShadow(wx(e.x), wy(e.y), Math.max(4, 11 - Math.round(e.alt / 6)));
+    else drawShadow(wx(e.x), wy(e.y), e.type === 'bat' ? 5 : (e.boss ? 18 : 9));
+  }
+  // hawk warning: a marker over the sheep it is circling
+  for (const e of enemies) {
+    if (e.type !== 'hawk' || !e.target || (e.state !== 'circle' && e.state !== 'dive')) continue;
+    const t = e.target;
+    if (e.state === 'dive' || Math.floor(realTime * 6) % 2 || settings.reduceFlash) {
+      const x = wx(t.x), y = wy(t.y) - 13;
+      px(x, y, 'r'); px(x, y + 1, 'r'); px(x, y + 3, 'r');
+    }
   }
   const list = [];
   for (const s of sheep) list.push({ y: s.y, k: 0, o: s });
-  for (const e of enemies) if (e.type === 'wolf') list.push({ y: e.y, k: 1, o: e });
+  for (const e of enemies) if (e.type === 'wolf' || e.type === 'fox') list.push({ y: e.y, k: 1, o: e });
   for (const p of actors) list.push({ y: p.y, k: 2, o: p });
   for (const pl of world.pillars) if (onScreen(pl.x, pl.y, 20)) list.push({ y: pl.y, k: 3, o: pl });
   list.sort((a, b) => a.y - b.y);
@@ -2830,6 +4239,7 @@ function drawWorldScene() {
       const fl = s.flash > 0 && Math.floor(s.flash * 12) % 2 === 0;
       const ss = sheepSprite(s);
       drawSpr(ss.spr, wx(s.x), wy(s.y), ss.left, { white: fl });
+      if (s.thorn > 0.4 && Math.floor(realTime * 8) % 2) px(wx(s.x), wy(s.y) - 9, 'r');
       if (s.panic > 0 && Math.floor(realTime * 6) % 2 === 0) px(wx(s.x) + (s.fx < 0 ? -3 : 3), wy(s.y) - 9, 'w');
     } else if (it.k === 1) drawEnemy(it.o);
     else if (it.k === 2) drawActor(it.o);
@@ -2841,15 +4251,16 @@ function drawWorldScene() {
   }
   if (world.kind === 'escort' && world.start) drawSpr(SP.pinStart, wx(world.start.x), wy(world.start.y) - 6, false);
   for (const e of enemies) {
-    if (e.state === 'emerge' || (e.type === 'wolf' && canopy(e.x, e.y) && e.state !== 'launched')) {
+    if (e.state === 'emerge' || ((e.type === 'wolf' || e.type === 'fox') && canopy(e.x, e.y) && e.state !== 'launched')) {
       if (Math.floor((e.anim + e.phase) * 3) % 5 === 0) continue;
+      if (isRain() && !players.some(p => len(p.x - e.x, p.y - e.y) < 46)) continue;
       const x = wx(e.x), y = wy(e.y) - 4;
       const col = e.alpha ? 'y' : 'r';
       px(x - 1, y, col); px(x + 1, y, col);
       if (e.carry) px(x + 3, y + 1, 'w');
     }
   }
-  for (const e of enemies) if (e.type === 'bat') drawEnemy(e);
+  for (const e of enemies) if (e.type === 'bat' || e.type === 'hawk') drawEnemy(e);
   for (const p of particles) {
     if (p.kind === 'ring') {
       const a = clamp(p.life / p.max, 0, 1);
@@ -2877,34 +4288,78 @@ function drawWorldScene() {
     text(t.str, wx(t.x), wy(t.y), t.col, { align: 'center', outline: 'k' });
   }
 }
+// glowing eyes of every predator show through the dark
+function drawNightEyes() {
+  if (nightAmount() < 0.5) return;
+  G = bctx;
+  for (const e of enemies) {
+    if (e.state === 'launched' || e.type === 'bat' || e.type === 'hawk') continue;
+    if (Math.floor((e.anim + e.phase) * 3) % 6 === 0) continue;
+    const x = wx(e.x), y = wy(e.y) - 4;
+    bctx.fillStyle = e.alpha || e.boss ? PAL_DUSK.y : PAL_DUSK.r;
+    bctx.fillRect(x - 1, y, 1, 1); bctx.fillRect(x + 1, y, 1, 1);
+  }
+  for (const p of players) if (p.kind === 'wolf') { bctx.fillStyle = PAL_DUSK.y; bctx.fillRect(wx(p.x) - 1, wy(p.y) - 4, 1, 1); bctx.fillRect(wx(p.x) + 1, wy(p.y) - 4, 1, 1); }
+}
 function drawActor(p) {
   const x = wx(p.x), y = wy(p.y);
   const a = actorSprite(p);
   const s = a.spr;
+  if (p.down > 0) {
+    drawSpr(s, x, y, p.fx < 0, { upside: true });
+    px(x, y - s.h - 4, 'r'); px(x, y - s.h - 3, 'r'); px(x, y - s.h - 1, 'r');
+    const f = clamp(p.revive / 1.2, 0, 1);
+    const n = 16;
+    for (let i = 0; i < n; i++) if (i / n <= f) px(x + Math.round(Math.cos(i / n * 6.28 - 1.57) * 9), y - 3 + Math.round(Math.sin(i / n * 6.28 - 1.57) * 6), 'y');
+    return;
+  }
+  if (p.stun > 0) for (let k = 0; k < 2; k++) { const an = realTime * 6 + k * Math.PI; px(x + Math.round(Math.cos(an) * 5), y - s.h - 2, 'y'); }
   const bob = a.f && p.ramT <= 0 ? -1 : 0;
   if (p.ramT > 0) for (let i = 1; i <= 3; i++) px(x - Math.round(p.fx * i * 5), y - 4 - Math.round(p.fy * i * 5) + (i % 2), 'w');
   drawSpr(s, x, y + bob, p.fx < 0);
+  if (p.carry) drawSpr(SP.sheep.panic, x + (p.fx < 0 ? -8 : 8), y + 1, p.fx < 0);
+  if (p.actT2 > 0 && p.kind === 'goat') dust(p.x, p.y, 1, 4, 20);
   if (players.length > 1 && !isMenu()) {
     const c = P_COL[p.slot];
     const my = y - s.h - 2 + bob;
     rect(x - 1, my, 3, 1, c); px(x, my + 1, c);
   }
   if (p.cd > 0 && state === 'PLAYING') {
-    const total = p.kind === 'goat' ? RAM_COOLDOWN : BARK_COOLDOWN;
+    const total = p.cdMax || (p.kind === 'goat' ? RAM_COOLDOWN : BARK_COOLDOWN);
     const w = 7, fl = Math.round(w * (1 - p.cd / total));
     rect(x - 3, y + 2, w, 1, 'k');
     if (fl > 0) rect(x - 3, y + 2, fl, 1, 'y');
   }
+  if (p.cd2 > 0 && state === 'PLAYING') {
+    const total = p.kind === 'goat' ? STOMP_CD : (p.kind === 'dog' ? WHISTLE_CD : HOWL_CD);
+    const w = 7, fl = Math.round(w * clamp(1 - p.cd2 / (total * upgradeMul('cool')), 0, 1));
+    rect(x - 3, y + 4, w, 1, 'k');
+    if (fl > 0) rect(x - 3, y + 4, fl, 1, 's');
+  }
+}
+function drawSprScaled(s, x, y, left, k, opts) {
+  const o = opts || {};
+  const img = o.white && !settings.reduceFlash ? (left ? s.wl : s.wr) : (left ? s.l : s.r);
+  G.drawImage(img, 0, 0, s.w, s.h, Math.round(x - s.w * k / 2), Math.round(y - s.h * k + 1), s.w * k, s.h * k);
 }
 function drawEnemy(e) {
   if (e.state === 'emerge') return;
-  if (e.type === 'wolf' && canopy(e.x, e.y) && e.state !== 'launched') return;
+  if ((e.type === 'wolf' || e.type === 'fox') && canopy(e.x, e.y) && e.state !== 'launched') return;
   let s;
   if (e.type === 'bat') s = (Math.floor(e.anim * 10) % 2) ? SP.batUp : SP.batDown;
+  else if (e.type === 'hawk') s = (Math.floor(e.anim * (e.state === 'dive' ? 4 : 8)) % 2) ? SP.hawkUp : SP.hawkDown;
   else {
     const fast = len(e.vx, e.vy) > 8 && e.state !== 'stun';
     const f = fast ? Math.floor(e.anim * 10) % 2 : 0;
-    s = (e.alpha ? SP.alpha : SP.wolf)[faceDir(e.fx, e.fy)][f];
+    const set = e.type === 'fox' ? SP.fox : (e.alpha ? SP.alpha : SP.wolf);
+    s = set[faceDir(e.fx, e.fy)][f];
+  }
+  if (e.boss && e.state !== 'launched') {
+    const left = e.fx < 0, x = wx(e.x), y = wy(e.y);
+    const wob = e.state === 'stun' ? Math.round(Math.sin(e.anim * 30)) : 0;
+    drawSprScaled(s, x + wob, y, left, 2, { white: e.flash > 0 });
+    if (e.carry) drawSpr(SP.sheep.panic, x + (left ? -14 : 14), y + 1, left);
+    return;
   }
   const left = e.fx < 0;
   const x = wx(e.x), y = wy(e.y - e.alt);
@@ -2913,10 +4368,10 @@ function drawEnemy(e) {
     drawSpr(s, x, y, left, { upside: tum, white: !tum && Math.floor(e.t * 30) % 2 === 0 });
     return;
   }
-  if (e.carry && e.type === 'bat') drawSpr(SP.sheep.panic, x, y + 6, left);
+  if (e.carry && (e.type === 'bat' || e.type === 'hawk')) drawSpr(SP.sheep.panic, x, y + 6, left);
   const wob = e.state === 'stun' ? Math.round(Math.sin(e.anim * 30)) : 0;
   drawSpr(s, x + wob, y, left, { white: e.flash > 0 });
-  if (e.carry && e.type === 'wolf') drawSpr(SP.sheep.panic, x + (left ? -8 : 8), y + 1, left);
+  if (e.carry && (e.type === 'wolf' || e.type === 'fox')) drawSpr(SP.sheep.panic, x + (left ? -8 : 8), y + 1, left);
   if (e.state === 'stun') {
     for (let k = 0; k < 2; k++) {
       const a = e.anim * 6 + k * Math.PI;
@@ -2935,7 +4390,7 @@ function ditherDim(full) {
 function edgeArrow(tx, ty, col, blink) {
   const sx = tx - cam.x, sy = ty - cam.y;
   if (sx > 2 && sx < W - 2 && sy > 12 && sy < H - 2) return;
-  if (blink && Math.floor(realTime * 4) % 2) return;
+  if (blink && !settings.reduceFlash && Math.floor(realTime * 4) % 2) return;
   const cx = W / 2, cy = H / 2;
   let dx = sx - cx, dy = sy - cy;
   const l = len(dx, dy) || 1;
@@ -2992,6 +4447,8 @@ function drawHUD() {
     else if (state === 'HOWTO') drawHowTo();
     else if (state === 'MAPS') drawMapSelect();
     else if (state === 'BYE') drawBye();
+    else if (state === 'KEYS') drawKeys();
+    else if (state === 'STORY') drawStory();
     return;
   }
   if (state === 'LOADING') {
@@ -3003,11 +4460,30 @@ function drawHUD() {
   const active = sheep.filter(s => !s.penned).length;
   G.drawImage(SP.sheep.SE[0].r, 3, 3);
   text(String(active), 12, 4, active <= 3 ? 'r' : 'w', { shadow: 'k' });
-  if (mode === 'escort') {
+  if (isEscort()) {
     text('PEN ' + mission.penned, 24, 4, 'y', { shadow: 'k' });
-    text('M' + mission.n, W - 16, 4, 'w', { align: 'right', shadow: 'k' });
+    const tag = mode === 'endless' ? 'S' + endless.stage : (mode === 'daily' ? 'DAILY' : (mode === 'custom' ? 'MY MAP' : 'M' + mission.n));
+    text(tag, W - 16, 4, 'w', { align: 'right', shadow: 'k' });
+  } else if (mode === 'versus') {
+    const t = Math.max(0, Math.ceil(versus.t));
+    text(Math.floor(t / 60) + ':' + String(t % 60).padStart(2, '0'), W - 16, 4, t <= 20 ? 'r' : 'w', { align: 'right', shadow: 'k' });
+    text('TAKEN ' + versus.taken, 24, 4, 'r', { shadow: 'k' });
   } else {
     text('W' + wave.n, W - 16, 4, 'w', { align: 'right', shadow: 'k' });
+  }
+  if (bells > 0 && mode !== 'versus') text(bells + 'B', 3, 12, 's', { shadow: 'k' });
+  hudCpu = null;
+  if (state === 'PLAYING' && !showcase.on && players.some(p => p.cpu)) {
+    const lbl = 'CPU:' + cpuOrder.toUpperCase();
+    hudCpu = { x: 2, y: H - 12, w: textWidth(lbl) + 6, h: 10 };
+    rect(hudCpu.x, hudCpu.y, hudCpu.w, hudCpu.h, 'k');
+    text(lbl, hudCpu.x + 3, hudCpu.y + 3, 's');
+  }
+  if (touch.used && state === 'PLAYING' && !paused) {
+    // on-screen ability button for touch players
+    const bx = W - 30, by = H - 30;
+    for (let a = 0; a < 20; a++) px(bx + 14 + Math.cos(a / 20 * 6.28) * 11, by + 14 + Math.sin(a / 20 * 6.28) * 11, 'w');
+    text('SKL', bx + 14, by + 12, 'w', { align: 'center' });
   }
   if (state === 'PLAYING' && !showcase.on) {
     // pause button (click / tap), also P, Esc or gamepad Start
@@ -3015,6 +4491,14 @@ function drawHUD() {
     frame(W - 13, 2, 11, 10, paused ? 'y' : 'i');
     rect(W - 10, 4, 2, 6, paused ? 'y' : 'w'); rect(W - 6, 4, 2, 6, paused ? 'y' : 'w');
   }
+  const boss = enemies.find(e => e.boss && e.state !== 'launched');
+  if (boss) {
+    const bw = Math.min(120, W - 60), bx = Math.round(W / 2 - bw / 2), by = 16;
+    text('GREAT WOLF', W / 2, by, 'y', { align: 'center', shadow: 'k' });
+    rect(bx - 1, by + 7, bw + 2, 5, 'k');
+    rect(bx, by + 8, Math.round(bw * boss.hp / boss.maxHp), 3, 'r');
+  }
+  if (comboN >= 2 && realTime - comboT < 2.5) text('COMBO x' + comboN, W / 2, 4, 'y', { align: 'center', shadow: 'k' });
   if (world.goal && state === 'PLAYING') edgeArrow(world.goal.x, world.goal.y, 'y', false);
   for (const e of enemies) if (e.carry) edgeArrow(e.x, e.y, 'r', true);
   if (banner.t > 0 && state === 'PLAYING' && !paused) {
@@ -3034,6 +4518,11 @@ function drawHUD() {
   if (showcase.on) drawShowcaseCaption();
   if (state === 'GAMEOVER') drawGameOver();
 }
+let hudCpu = null;
+function hudHit(x, y) {
+  if (hudCpu && x >= hudCpu.x && x < hudCpu.x + hudCpu.w && y >= hudCpu.y - 2 && y < hudCpu.y + hudCpu.h + 2) { cycleCpuOrder(); return true; }
+  return false;
+}
 function colW() { return Math.min(W - 16, 168); }
 function drawTitle() {
   const cy0 = Math.round(H * 0.1);
@@ -3042,57 +4531,63 @@ function drawTitle() {
   text('GUARDIAN', W / 2, cy0 + big * 5 + 6, 'y', { s: 2, align: 'center', outline: 'k' });
   text('A HERDING TALE', W / 2, cy0 + big * 5 + 22, 'l', { align: 'center', outline: 'k' });
   const w = Math.min(W - 24, 120);
-  const y = Math.max(cy0 + big * 5 + 32, Math.min(Math.round(H * 0.5), H - 92));
-  rect(Math.round(W / 2 - w / 2) - 2, y - 2, w + 4, 5 * 14 + 2, 'k');
+  const y = Math.max(cy0 + big * 5 + 28, Math.min(Math.round(H * 0.48), H - 104));
+  rect(Math.round(W / 2 - w / 2) - 2, y - 2, w + 4, 6 * 14 + 2, 'k');
   drawList(screenItems(), W / 2, y, w, 14);
   const fy = H - 10;
   rect(0, fy - 3, W, 13, 'k');
   if (best.escort || best.defend) text('BEST  ESCORT ' + best.escort + '  DEFEND ' + best.defend, W / 2, fy, 'y', { align: 'center' });
   else text('1-4 PLAYERS  GOATS AND DOGS', W / 2, fy, 's', { align: 'center' });
-  text('V0.5', W - 3, fy - 12, 'i', { align: 'right', outline: 'k' });
+  text('V0.7', W - 3, fy - 12, 'i', { align: 'right', outline: 'k' });
+}
+const MODES = [
+  { id: 'escort', title: 'ESCORT', l1: 'HERD THE FLOCK PIN TO PIN', icon: 'pinGoal' },
+  { id: 'defend', title: 'DEFEND', l1: 'HOLD AN ARENA, WAVE AFTER WAVE', icon: 'pillar' },
+  { id: 'daily', title: 'DAILY', l1: 'ONE NEW SEEDED ROUTE A DAY', icon: 'pinStart' },
+  { id: 'endless', title: 'ENDLESS', l1: 'HOW FAR CAN THE FLOCK GO?', icon: 'pillarBroken' },
+  { id: 'versus', title: 'VERSUS', l1: 'WOLVES AGAINST SHEPHERDS', icon: 'wolf' }
+];
+function modeBest(id) {
+  if (id === 'daily') return progress.daily.seed === dailySeed() ? 'TODAY ' + progress.daily.best : 'NOT PLAYED TODAY';
+  if (id === 'versus') return '1-4 PLAYERS + CPU';
+  return 'BEST ' + (best[id] || 0) + (id === 'escort' || id === 'defend' ? '  MEDALS ' + progress.medals[id].reduce((t, v) => t + popcount(v), 0) + '/30' : '');
 }
 function drawModeSelect() {
   screenBg();
   header('SELECT MODE');
   const w = colW(), x = Math.round(W / 2 - w / 2);
   const items = screenItems();
-  const cards = [
-    { title: 'ESCORT', l1: 'HERD THE FLOCK FROM PIN', l2: 'TO PIN ACROSS THE WOODS', best: best.escort, icon: SP.pinGoal },
-    { title: 'DEFEND', l1: 'HOLD THE STONE HENGE', l2: 'AGAINST ENDLESS WAVES', best: best.defend, icon: SP.pillar }
-  ];
-  const ch = Math.min(46, Math.floor((H - 100) / 2));
-  let y = Math.max(30, Math.round((H - 40 - (2 * ch + 6 + 16)) / 2) + 6);
-  cards.forEach((c, i) => {
+  ui.cursor = clamp(ui.cursor, 0, items.length - 1);
+  const ch = clamp(Math.floor((H - 74) / MODES.length) - 3, 22, 34);
+  let y = Math.max(26, Math.round((H - 36 - MODES.length * (ch + 3) - 14) / 2) + 4);
+  MODES.forEach((m, i) => {
     const sel = ui.cursor === i;
     rect(x, y, w, ch, sel ? 'i' : 'k');
     frame(x, y, w, ch, sel ? 'y' : 'i');
-    rect(x + 6, y + 6, 18, ch - 12, 'g');
-    rect(x + 6, y + ch - 8, 18, 2, 'h');
-    G.drawImage(c.icon.r, Math.round(x + 15 - c.icon.w / 2), y + ch - 7 - c.icon.h);
-    text((sel ? '> ' : '') + c.title, x + 30, y + 7, sel ? 'y' : 'w');
-    text(c.l1, x + 30, y + 16, 'l');
-    text(c.l2, x + 30, y + 23, 'l');
-    text('BEST ' + c.best, x + 30, y + ch - 10, 's');
+    rect(x + 4, y + 3, 16, ch - 6, 'g');
+    rect(x + 4, y + ch - 5, 16, 2, 'h');
+    const ic = m.icon === 'wolf' ? SP.wolf.SE[0] : SP[m.icon];
+    G.drawImage(ic.r, Math.round(x + 12 - ic.w / 2), y + ch - 4 - ic.h);
+    text((sel ? '> ' : '') + m.title, x + 25, y + 4, sel ? 'y' : 'w');
+    text(m.l1, x + 25, y + 11, 'l');
+    if (ch >= 26) text(modeBest(m.id), x + 25, y + 18, 's');
     hits.push({ x: x, y: y, w: w, h: ch, i: i });
-    y += ch + 6;
+    y += ch + 3;
   });
-  ui.cursor = clamp(ui.cursor, 0, items.length - 1);
-  const by = y + 4;
-  const bw = 60, bx = Math.round(W / 2 - bw / 2);
-  const sel = ui.cursor === 2;
+  const by = y + 2, bw = 60, bx = Math.round(W / 2 - bw / 2);
+  const sel = ui.cursor === MODES.length;
   rect(bx, by, bw, 12, sel ? 'i' : 'k');
   if (sel) rect(bx, by, 2, 12, 'y');
   text('BACK', W / 2, by + 4, sel ? 'y' : 'l', { align: 'center' });
-  hits.push({ x: bx, y: by, w: bw, h: 12, i: 2 });
-  text('UP/DOWN TO CHOOSE  ACTION TO PICK', W / 2, H - 32, 's', { align: 'center' });
+  hits.push({ x: bx, y: by, w: bw, h: 12, i: MODES.length });
 }
 function drawPlayerSelect() {
   screenBg();
-  header(mode === 'escort' ? 'ESCORT - PLAYERS' : 'DEFEND - PLAYERS');
+  header((MODES.find(m => m.id === mode) || { title: 'MY MAP' }).title + ' - PLAYERS');
   // back button
   rect(4, 5, 30, 11, 'i');
   text('<', 7, 8, 'l'); text('BACK', 14, 8, 'l');
-  hits.push({ x: 0, y: 0, w: 36, h: 20, fn: () => { goMaps(); SFX.back(); } });
+  hits.push({ x: 0, y: 0, w: 36, h: 20, fn: () => { playersBack(); SFX.back(); } });
   const w = colW(), x = Math.round(W / 2 - w / 2);
   const bottom = 70;
   const ch = clamp(Math.floor((H - 28 - bottom) / 4) - 4, 30, 42);
@@ -3114,17 +4609,19 @@ function drawPlayerSelect() {
       hits.push({ x: x, y: y, w: w, h: ch, fn: (dev) => joinPlayer(dev === 'touch' ? 'touch' : normDev(dev)) });
       continue;
     }
-    const sp = SP[p.kind].SE[Math.floor(realTime * 4) % 2];
+    const sp = skinSet(p.kind, p.skin).SE[Math.floor(realTime * 4) % 2];
     const bx = x + 8, by = y + 12, bw = 22, bh = ch - 16;
+    hits.push({ x: bx, y: by, w: bw, h: bh, fn: () => cycleSkin(p, 1) });
     rect(bx, by, bw, bh, 'g');
     rect(bx, by + bh - 3, bw, 3, 'h');
     G.drawImage(sp.r, 0, 0, sp.w, sp.h, Math.round(bx + bw / 2 - sp.w), by + bh - 2 - sp.h * 2, sp.w * 2, sp.h * 2);
     const tx = x + 36;
+    const kname = (p.kind === 'wolf' ? '' : skinList(p.kind)[p.skin || 0].name + ' ') + p.kind.toUpperCase();
     text('<', tx, y + 5, 'l');
-    text(p.kind === 'goat' ? 'GOAT' : 'DOG', tx + 8, y + 5, 'w');
-    text('>', tx + 8 + textWidth(p.kind === 'goat' ? 'GOAT' : 'DOG') + 4, y + 5, 'l');
-    hits.push({ x: tx - 2, y: y + 2, w: 46, h: 10, fn: () => { p.kind = p.kind === 'goat' ? 'dog' : 'goat'; p.ready = false; SFX.move(); } });
-    text(p.kind === 'goat' ? 'RAMS PREDATORS' : 'BARKS + HERDS', tx, y + 14, 'l');
+    text(kname, tx + 8, y + 5, p.kind === 'wolf' ? 'r' : 'w');
+    text('>', tx + 8 + textWidth(kname) + 4, y + 5, 'l');
+    hits.push({ x: tx - 2, y: y + 2, w: textWidth(kname) + 20, h: 10, fn: () => cycleKind(p, 1) });
+    text(p.kind === 'goat' ? 'RAM + STOMP' : (p.kind === 'dog' ? 'BARK + WHISTLE' : 'LUNGE + HOWL'), tx, y + 14, 'l');
     text(DEVICE_NAMES[p.dev] || p.dev, tx, y + 22, 's');
     const rw = 34, rx = x + w - rw - 5, ry = y + ch - 14;
     if (p.cpu) {
@@ -3145,7 +4642,7 @@ function drawPlayerSelect() {
     rect(Math.round(W / 2 - bw / 2), fy, Math.round(bw * (1 - startCountdown / 1.0)), 12, 'y');
     text('STARTING', W / 2, fy + 4, 'k', { align: 'center' });
   } else {
-    text('LEFT/RIGHT: GOAT OR DOG', W / 2, fy, 'l', { align: 'center' });
+    text(mode === 'versus' ? 'L/R: GOAT/DOG/WOLF  U/D: LOOK' : 'L/R: GOAT OR DOG   U/D: LOOK', W / 2, fy, 'l', { align: 'center' });
     text('ACTION: READY   BACK: LEAVE', W / 2, fy + 8, 'l', { align: 'center' });
     text('H / PAD Y: ADD CPU   N / LB: REMOVE', W / 2, fy + 16, 's', { align: 'center' });
   }
@@ -3153,8 +4650,8 @@ function drawPlayerSelect() {
 }
 function drawMapSelect() {
   screenBg();
-  header(mode === 'escort' ? 'ESCORT - CHOOSE A ROUTE' : 'DEFEND - CHOOSE AN ARENA');
-  const defs = mode === 'escort' ? ESCORT_MAPS : DEFEND_MAPS;
+  header(mode === 'escort' ? 'ESCORT - CHOOSE A ROUTE' : (mode === 'versus' ? 'VERSUS - CHOOSE AN ARENA' : 'DEFEND - CHOOSE AN ARENA'));
+  const defs = mapList();
   const items = screenItems();
   ui.cursor = clamp(ui.cursor, 0, items.length - 1);
   const wide = W >= 300;
@@ -3175,13 +4672,16 @@ function drawMapSelect() {
   text(sel.info, px0 + 5, py0 + 13, 'l');
   const wdDef = sel.legacy ? null : sel;
   const size = mode === 'escort' ? (wdDef ? wdDef.w + 'x' + wdDef.h : '600x1060') : '600x' + ((sel && sel.h) || (sel.legacy ? 460 : 480));
-  text('SIZE ' + size, px0 + 5, py0 + 21, 's');
+  text('SIZE ' + size + (sel.weather ? '  ' + sel.weather.toUpperCase() : ''), px0 + 5, py0 + 21, 's');
   const bw = pw - 10, bh = ph - 34;
   if (bh < 20) return;
   // build the preview after the cursor rests briefly (map generation takes a moment)
-  const key = mode + idx;
+  const mk = mode === 'escort' ? 'escort' : 'defend';
+  const key = mk + idx;
+  const md = progress.medals[progKind()][idx];
+  MEDAL_NAMES[mk].forEach((nm, b) => text((md >> b) & 1 ? nm : '-', px0 + pw - 5, py0 + 5 + b * 7, (md >> b) & 1 ? 'y' : 'i', { align: 'right' }));
   if (mapCache.has(key) || stateTime - (ui.movedAt || 0) > 0.18) {
-    const wd = getMapWorld(mode, idx);
+    const wd = getMapWorld(mk, idx);
     const pv = mapPreview(wd, bw, bh);
     G.drawImage(pv, Math.round(px0 + 5 + (bw - pv.width) / 2), Math.round(py0 + 29 + (bh - pv.height) / 2));
   } else {
@@ -3192,60 +4692,97 @@ function drawOptions() {
   screenBg();
   header('OPTIONS');
   const items = screenItems();
-  drawList(items, W / 2, 34, colW(), 16);
-  text('LEFT/RIGHT OR ACTION TO CHANGE', W / 2, 34 + items.length * 16 + 8, 's', { align: 'center' });
+  const rowH = H >= 260 ? 14 : 13;
+  drawList(items, W / 2, 26, colW(), rowH);
+  if (26 + items.length * rowH + 14 < H - 34) text('LEFT/RIGHT OR ACTION TO CHANGE', W / 2, 26 + items.length * rowH + 6, 's', { align: 'center' });
   text('F: FULLSCREEN   M: SOUND', W / 2, H - 32, 's', { align: 'center' });
 }
+function drawKeys() {
+  screenBg();
+  header('REMAP KEYS');
+  const items = screenItems();
+  const rowH = H >= 260 ? 13 : 12;
+  drawList(items, W / 2, 25, colW(), rowH);
+  text(remapWaiting ? 'PRESS A KEY  (ESC CANCELS)' : 'ACTION ON A ROW, THEN PRESS A KEY', W / 2, Math.min(H - 32, 25 + items.length * rowH + 4), 's', { align: 'center' });
+}
+let howPage = 0;
 function drawHowTo() {
   screenBg();
-  header('HOW TO PLAY');
+  header('HOW TO PLAY  ' + (howPage + 1) + '/4');
   const w = colW(), x = Math.round(W / 2 - w / 2);
-  let y = 28;
-  const line = (s, col) => { text(s, x + 4, y, col || 'l'); y += 8; };
+  let y = 26;
   const icon = (sp) => { rect(x, y, 20, 14, 'g'); rect(x, y + 12, 20, 2, 'h'); G.drawImage(sp.r, Math.round(x + 10 - sp.w / 2), y + 12 - sp.h); };
-  icon(SP.goat.SE[0]);
-  text('GOAT', x + 26, y + 1, 'y'); text('RAM CHARGE SMASHES FOES', x + 26, y + 8, 'l'); y += 20;
-  icon(SP.dog.SE[0]);
-  text('DOG', x + 26, y + 1, 'y'); text('BARK SHOVES SHEEP + SCARES', x + 26, y + 8, 'l'); y += 20;
-  icon(SP.sheep.SE[0]);
-  text('SHEEP', x + 26, y + 1, 'y'); text('FOLLOW GOATS, FLEE DOGS', x + 26, y + 8, 'l'); y += 22;
-  line('ESCORT: HERD THE FLOCK INTO', 'w');
-  line('THE PEN AT THE RED PIN.', 'w');
-  line('DEFEND: SURVIVE THE WAVES.', 'w');
-  line('HIT A THIEF TO SAVE ITS SHEEP.', 'w');
-  y += 4;
-  line('KEYS  WASD+SPACE / ARROWS+ENTER', 's');
-  line('PADS  STICK + A   START: PAUSE', 's');
-  line('TOUCH DRAG LEFT  TAP RIGHT', 's');
-  line('P PAUSE  M SOUND  F FULLSCREEN', 's');
-  const by = Math.min(H - 40, y + 6);
-  drawList(screenItems(), W / 2, by, 60, 14);
+  const entry = (sp, name, l1, l2) => { icon(sp); text(name, x + 25, y + 1, 'y'); text(l1, x + 25, y + 8, 'l'); if (l2) text(l2, x + 25, y + 15, 's'); y += l2 ? 23 : 18; };
+  const line = (str, col) => { text(str, x + 2, y, col || 'l'); y += 8; };
+  if (howPage === 0) {
+    entry(SP.goat.SE[0], 'GOAT', 'RAM: SMASH PREDATORS', 'STOMP: STUN ALL NEARBY');
+    entry(SP.dog.SE[0], 'DOG', 'BARK: SHOVE SHEEP, SCARE FOES', 'WHISTLE: CALL SHEEP TO GOAL');
+    entry(SP.sheep.SE[0], 'SHEEP', 'FOLLOW GOATS, FLEE DOGS');
+    entry(SP.ramSheep.SE[0], 'RAM SHEEP', 'STUBBORN: IGNORES DOGS');
+    entry(SP.lamb.SE[0], 'LAMB', 'QUICK AND JUMPY');
+    entry(SP.goldSheep.SE[0], 'GOLDEN SHEEP', 'PEN IT FOR +10 AND BELLS');
+  } else if (howPage === 1) {
+    entry(SP.wolf.SE[0], 'SHADOW WOLF', 'STEALS SHEEP INTO THE WOODS');
+    entry(SP.alpha.SE[0], 'ALPHA WOLF', 'TAKES 2 HITS, KNOCKS YOU DOWN');
+    entry(SP.fox.SE[0], 'FOX', 'SNEAKS ALONG THE TREES');
+    entry(SP.hawkUp, 'HAWK', 'CIRCLES, THEN DIVES. HIT IT LOW');
+    entry(SP.batUp, 'BAT', 'SWOOPS IN FROM THE SKY');
+    entry(SP.alpha.S[0], 'GREAT WOLF', 'BOSS: ROUTE 10, EVERY 10 WAVES');
+  } else if (howPage === 2) {
+    line('ESCORT: 10 ROUTES, PEN THE FLOCK', 'w');
+    line('  AT THE RED PIN. MEDALS: TIME,', 'l');
+    line('  FLAWLESS, HUNTER.', 'l');
+    line('DEFEND: 10 ARENAS, ENDLESS WAVES.', 'w');
+    line('DAILY: ONE SEEDED ROUTE PER DAY.', 'w');
+    line('ENDLESS: STAGE AFTER STAGE.', 'w');
+    line('VERSUS: WOLVES VS SHEPHERDS.', 'w');
+    y += 3;
+    line('FORD: SLOW   WATER: CROSS BY BRIDGE', 's');
+    line('BRAMBLES: SHEEP GET TANGLED', 's');
+    line('NIGHT: LANTERNS ONLY. FOG: STAY CLOSE', 's');
+    line('BELLS BUY UPGRADES. MEDALS UNLOCK', 's');
+    line('  NEW LOOKS FOR GOATS, DOGS, WOOL.', 's');
+  } else {
+    line('MOVE    WASD / ARROWS / STICK', 'w');
+    line('ACTION  SPACE / ENTER / A / TAP', 'w');
+    line('ABILITY E / . / X / RIGHT-CLICK', 'w');
+    line('CPU     C / PAD Y: CHANGE ORDERS', 'w');
+    line('PAUSE   P / ESC / START', 'w');
+    y += 3;
+    line('DOWN? A TEAMMATE STANDING NEXT', 's');
+    line('  TO YOU REVIVES YOU.', 's');
+    line('CHAIN TAKEDOWNS FOR COMBOS.', 's');
+    line('KEYS CAN BE REMAPPED IN OPTIONS.', 's');
+  }
+  drawList(screenItems(), W / 2, Math.min(H - 64, Math.max(y + 4, H - 80)), Math.min(w, 120), 13);
 }
 function drawPause() {
   ditherDim(true);
   const items = screenItems();
   const w = Math.min(W - 20, 150), x = Math.round(W / 2 - w / 2);
-  const titles = { main: 'PAUSED', options: 'OPTIONS', controls: 'CONTROLS', restart: 'RESTART?', exit: 'EXIT?' };
+  const titles = { main: 'PAUSED', options: 'OPTIONS', controls: 'CONTROLS', restart: 'RESTART?', exit: 'EXIT?', shop: 'UPGRADES', keys: 'REMAP KEYS' };
   const bodyH = pauseView === 'controls' ? 70 : (pauseView === 'restart' || pauseView === 'exit' ? 18 : 0);
-  const panelH = 34 + bodyH + items.length * 14 + 8;
+  const rowH = items.length > 9 ? 12 : 14;
+  const panelH = 34 + bodyH + items.length * rowH + 8;
   const y0 = Math.max(18, Math.round(H / 2 - panelH / 2));
   rect(x - 4, y0 - 4, w + 8, panelH, 'k');
   frame(x - 4, y0 - 4, w + 8, panelH, 'i');
   text(titles[pauseView], W / 2, y0 + 2, pauseView === 'main' ? 'w' : 'y', { s: 2, align: 'center' });
-  const where = mode === 'escort' ? 'M' + mission.n + ' ' + ESCORT_MAPS[mission.map || 0].name : 'W' + wave.n + ' ' + DEFEND_MAPS[wave.map || 0].name;
+  const where = isEscort() ? (mission.name || '') : (mode === 'versus' ? 'VERSUS ' : 'W' + wave.n + ' ') + DEFEND_MAPS[wave.map || 0].name;
   text(where, W / 2, y0 + 17, 'l', { align: 'center' });
-  text('SCORE ' + score, W / 2, y0 + 24, 's', { align: 'center' });
+  text('SCORE ' + score + '   BELLS ' + bells, W / 2, y0 + 24, 's', { align: 'center' });
   let y = y0 + 34;
   if (pauseView === 'controls') {
-    const lines = [['MOVE', 'WASD / ARROWS / STICK'], ['ACTION', 'SPACE / ENTER / A / TAP'], ['GOAT', 'RAM CHARGE'], ['DOG', 'BARK'],
-      ['PAUSE', 'P / ESC / START'], ['SOUND', 'M'], ['FULLSCREEN', 'F']];
+    const lines = [['MOVE', 'WASD / ARROWS / STICK'], ['ACTION', 'SPACE / ENTER / A / TAP'], ['ABILITY', 'E / . / X / R-CLICK'],
+      ['GOAT', 'RAM + STOMP'], ['DOG', 'BARK + WHISTLE'], ['CPU ORDER', 'C / PAD Y'], ['PAUSE', 'P / ESC / START']];
     for (const [a, b] of lines) { text(a, x + 2, y, 'y'); text(b, x + w - 2, y, 'l', { align: 'right' }); y += 10; }
   } else if (pauseView === 'restart') {
     text('PROGRESS ON THIS MAP IS LOST', W / 2, y + 2, 'l', { align: 'center' }); y += bodyH;
   } else if (pauseView === 'exit') {
     text('THE RUN WILL END', W / 2, y + 2, 'l', { align: 'center' }); y += bodyH;
   }
-  drawList(items, W / 2, y, w, 14);
+  drawList(items, W / 2, y, w, rowH);
+  if (pauseView === 'shop') { const it = items[clamp(ui.cursor, 0, items.length - 1)]; if (it && it.desc) text(it.desc, W / 2, y + items.length * rowH + 1, 'l', { align: 'center' }); }
 }
 function drawBye() {
   rect(0, 0, W, H, 'k');
@@ -3261,39 +4798,88 @@ function drawBye() {
 function drawResults() {
   ditherDim(stateTime > 0.3);
   const total = mission.herdStart;
-  const cx = W / 2, w = Math.min(W - 24, 130), x = Math.round(cx - w / 2);
-  let y = Math.round(H * 0.2);
-  text('MISSION ' + mission.n, cx, y, 'w', { s: 2, align: 'center', outline: 'k' }); y += 16;
-  text('COMPLETE', cx, y, 'y', { s: 2, align: 'center', outline: 'k' }); y += 18;
-  text(ESCORT_MAPS[mission.map || 0].name, cx, y, 'l', { align: 'center', outline: 'k' }); y += 12;
-  const row = (a, b, c) => { text(a, x + 4, y, 'l'); text(String(b), x + w - 4, y, c, { align: 'right' }); y += 10; };
+  const cx = W / 2, w = Math.min(W - 20, 150), x = Math.round(cx - w / 2);
+  if (resultsView === 'shop') { drawShop(cx, w, x); return; }
+  let y = Math.max(8, Math.round(H * 0.12));
+  const head = mode === 'endless' ? 'STAGE ' + endless.stage : (mode === 'daily' ? 'DAILY' : (mode === 'custom' ? 'MY MAP' : 'MISSION ' + mission.n));
+  text(head, cx, y, 'w', { s: 2, align: 'center', outline: 'k' }); y += 16;
+  text('COMPLETE', cx, y, 'y', { s: 2, align: 'center', outline: 'k' }); y += 16;
+  text(mission.name || '', cx, y, 'l', { align: 'center', outline: 'k' }); y += 11;
+  const row = (a, b, c) => { text(a, x + 4, y, 'l'); text(String(b), x + w - 4, y, c, { align: 'right' }); y += 9; };
   row('DELIVERED', mission.penned + '/' + total, 'w');
   row('PREDATORS', mission.kills, 'w');
+  row('TIME', Math.floor(mission.time) + 'S  PAR ' + mission.par + 'S', mission.time <= mission.par ? 'y' : 'w');
+  if (mode === 'endless') row('DISTANCE', endless.dist + 'M', 'w');
   row('SCORE', score, 'y');
+  row('BELLS', bells, 's');
+  if (mode === 'escort') {
+    const names = MEDAL_NAMES.escort;
+    let mx = x + 4;
+    for (let b = 0; b < 3; b++) {
+      const got = (mission.medals >> b) & 1, isNew = (mission.newMedals >> b) & 1;
+      text(names[b] + (isNew ? '!' : ''), mx, y, got ? 'y' : 'i');
+      mx += textWidth(names[b] + (isNew ? '!' : '')) + 8;
+    }
+    y += 10;
+  }
   const stars = mission.penned >= total ? 3 : (mission.penned >= total * 0.66 ? 2 : 1);
-  for (let i = 0; i < 3; i++) text('*', cx - 14 + i * 10, y + 2, i < stars ? 'y' : 'i', { s: 2 });
-  y += 20;
-  drawList(screenItems(), cx, y, w, 14, stateTime >= 0.8);
+  for (let i = 0; i < 3; i++) text('*', cx - 14 + i * 10, y, i < stars ? 'y' : 'i', { s: 2 });
+  y += 14;
+  drawList(screenItems(), cx, y, w, 13, stateTime >= 0.8);
+}
+function drawShop(cx, w, x) {
+  const items = screenItems();
+  const panelH = 40 + items.length * 13 + 14;
+  let y = Math.max(10, Math.round(H / 2 - panelH / 2));
+  rect(x - 4, y - 4, w + 8, panelH, 'k');
+  frame(x - 4, y - 4, w + 8, panelH, 'i');
+  text('UPGRADES', cx, y, 'y', { s: 2, align: 'center' });
+  text('BELLS: ' + bells, cx, y + 14, 'w', { align: 'center' });
+  text('LAST FOR THIS RUN', cx, y + 22, 's', { align: 'center' });
+  drawList(items, cx, y + 32, w, 13);
+  const it = items[clamp(ui.cursor, 0, items.length - 1)];
+  if (it && it.desc) text(it.desc, cx, y + 34 + items.length * 13, 'l', { align: 'center' });
 }
 function drawGameOver() {
   ditherDim(stateTime > 0.3);
   if (stateTime < 0.3) return;
   const cx = W / 2, w = Math.min(W - 24, 130), x = Math.round(cx - w / 2);
   let y = Math.round(H * 0.16);
+  const row = (a, b, c) => { text(a, x + 4, y, 'l'); text(String(b), x + w - 4, y, c, { align: 'right' }); y += 10; };
+  if (mode === 'versus') {
+    text(versus.winner, cx, y, versus.winner === 'WOLVES' ? 'r' : 'y', { s: 2, align: 'center', outline: 'k' }); y += 16;
+    text('WIN!', cx, y, 'w', { s: 2, align: 'center', outline: 'k' }); y += 22;
+    row('SHEEP LEFT', sheep.length, 'w');
+    row('SHEEP TAKEN', versus.taken, 'r');
+    row('WOLF HITS', versus.hits, 'y');
+    row('TIME LEFT', Math.max(0, Math.ceil(versus.t)) + 'S', 'w');
+    y += 8;
+    drawList(screenItems(), cx, y, w, 14, stateTime >= 0.8);
+    return;
+  }
   text('THE FLOCK', cx, y, 'w', { s: 2, align: 'center', outline: 'k' }); y += 16;
   text('IS LOST', cx, y, 'r', { s: 2, align: 'center', outline: 'k' }); y += 22;
-  const row = (a, b, c) => { text(a, x + 4, y, 'l'); text(String(b), x + w - 4, y, c, { align: 'right' }); y += 10; };
   row('SCORE', score, 'y');
-  if (mode === 'escort') { row('MISSION', mission.n, 'w'); row('DELIVERED', delivered, 'w'); }
+  if (mode === 'endless') { row('STAGE', endless.stage, 'w'); row('DISTANCE', endless.dist + 'M', 'w'); }
+  else if (isEscort()) { row('MISSION', mission.n, 'w'); row('DELIVERED', delivered, 'w'); }
   else row('WAVE', wave.n, 'w');
   row('RESCUED', rescued, 'w');
-  row('BEST', best[mode], 'y');
+  if (mode === 'daily') row('TODAY BEST', progress.daily.seed === dailySeed() ? progress.daily.best : 0, 'y');
+  else if (best[mode] !== undefined) row('BEST', best[mode], 'y');
   if (newBest) { text('NEW BEST!', cx, y + 2, 'y', { align: 'center', outline: 'k' }); y += 10; }
   y += 8;
   drawList(screenItems(), cx, y, w, 14, stateTime >= 0.8);
 }
 
+function renderEditor() {
+  hits = [];
+  drawEditor();
+  vctx.setTransform(1, 0, 0, 1, 0, 0);
+  vctx.imageSmoothingEnabled = false;
+  vctx.drawImage(hud, 0, 0, W, H, 0, 0, W * PIX, H * PIX);
+}
 function render() {
+  if (state === 'EDITOR') { renderEditor(); return; }
   const sx = shake > 0 ? rr(-shake, shake) : 0;
   const sy = shake > 0 ? rr(-shake, shake) : 0;
   const camX = cam.x + sx, camY = cam.y + sy;
@@ -3301,8 +4887,12 @@ function render() {
   camFracX = camX - ix; camFracY = camY - iy;
   OX = ix - 1; OY = iy - 1;
   drawWorldScene();
+  G = bctx;
+  drawWeather();
   buildRemap(dayProgress);
   applyRemap();
+  drawNightEyes();
+  if (weather.flash > 0) { bctx.fillStyle = PAL_DAY.w; for (let y = 0; y < BH; y += 2) for (let x = (y >> 1) & 1; x < BW; x += 2) bctx.fillRect(x, y, 1, 1); }
   bctx.fillStyle = PAL_DUSK.y;
   for (const f of fireflies) if (Math.sin(f.ph) > -0.2) bctx.fillRect(wx(f.x), wy(f.y), 1, 1);
   drawHUD();
@@ -3323,16 +4913,26 @@ spawnHerd(world.start.x, world.start.y, 10);
 makeDemo();
 snapCam(world.start.x, world.start.y);
 let lastTs = null;
+let timeScale = 1, slowMo = 0;
 function tick(ts) {
   if (lastTs === null) lastTs = ts;
-  const dt = Math.min(0.05, Math.max(0, (ts - lastTs) / 1000));
+  let dt = Math.min(0.05, Math.max(0, (ts - lastTs) / 1000));
   lastTs = ts;
-  update(dt);
+  if (state === 'PLAYING' && !showcase.on) dt *= settings.speed;
+  update(dt * timeScale);
+  if (slowMo > 0) { slowMo -= dt; if (slowMo <= 0) timeScale = 1; }
+  try { updateMusic(); } catch (e) { /* audio not ready */ }
   render();
   requestAnimationFrame(tick);
 }
 requestAnimationFrame(tick);
 view.focus();
+// installable app: register the service worker when served over http(s)
+try {
+  if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol) && !window.claude && document.querySelector('link[rel="manifest"]')) {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  }
+} catch (e) { /* not available here */ }
 </script>
 </body>
 </html>

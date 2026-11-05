@@ -1,12 +1,20 @@
 # State — Goat Guardian
 
-**Version:** 0.6.0 · **Status:** Playable. v0.6.0 adds a full pause menu (options, controls, restart, exit) and a title Exit.
+**Version:** 0.7.0 · **Status:** Playable. v0.7.0 adds all 20 items from the feature list (see CHANGELOG). `index.html` is about 5,000 lines.
 
 ## Snapshot
 - The whole game is in `index.html`. Its sections are: canvases, palette and remap, sprites, font, audio, world generation and rendering, camera, input devices, state, particles, collision, players, herd boids, enemies, modes, lobby, update, render, and boot.
 - **Resolution:** `resize()` picks an integer pixel scale `PIX` and sizes the buffer `W×H` (W 120–560, H 180–420) to fill the screen. The world buffer has a 1px margin for sub-pixel camera presentation. The HUD is a separate canvas that is never palette-swapped. All layout must use `W`/`H`, never fixed numbers.
 - **Screens:** `TITLE → MODE → PLAYERS → PLAYING → RESULTS / GAMEOVER`, plus `OPTIONS` and `HOWTO`. List screens are built by `screenItems()` and handled by `listEvent()`. The player-select screen uses `playersEvent()`. Taps hit-test against `hits`, which is rebuilt every frame.
 - **Sprites:** `SP[kind][dir][frame]`, where dir is N, S, SE or NE; NW and SW are mirrored. `SP[kind].act[dir]` holds the ram and bark poses. `faceDir(fx, fy)` picks the direction.
+- **Modes:** `escort`, `defend`, `daily`, `endless`, `versus` and `custom` (an editor map). `isEscort()` covers every escort-like mode. `escortWorld(src)` builds the world for a map index, `'daily'`, `'endless'` or `'custom'`.
+- **Mask values:** 0 meadow, 1 forest, 2 pillar, 3 ford (slow), 4 deep water (blocked), 5 brambles (slow; tangles sheep). `blocked()` and `terrainSlow()` read these. Hazards come from `addHazards(def)`, using `def.rivers` and `def.brambles`.
+- **Weather:** `def.weather` is `rain`, `wind`, `fog` or `storm`. `applyRemap()` also does the fog and night dithering using a vision grid built by `buildVisGrid()`.
+- **Creatures:** enemy types are wolf (with alpha and boss variants), bat, fox and hawk. Sheep types are normal, ram, lamb and golden. Player kinds are goat, dog and wolf (Versus only).
+- **Progression:** `bells` and `upg` reset each run. `progress.medals` and `progress.daily` are saved in `goatGuardianMaps`. Looks are defined in `GOAT_SKINS`, `DOG_SKINS` and `WOOL_SKINS`, unlocked by `totalMedals()`.
+- **Editor:** the `ED` object holds a 75x175 grid of 8px cells. Share codes look like `GG1|rle|pillars|start|goal` and are saved under `goatGuardianCustom`.
+- **Music:** `updateMusic()` schedules the `THEMES` loops on `musicBus` every frame.
+- **PWA:** the service worker registers only when the page is served over http(s), has the manifest link, and isn't running inside an artifact.
 - **Pause menu:** while `paused` is true, `pauseView` selects the sub-view: main, options, controls, restart or exit. `pauseItems()` builds each list and `openPause()` opens the menu. The title Exit goes to the `BYE` menu state.
 - **Maps:** `ESCORT_MAPS` and `DEFEND_MAPS` each hold 10 definitions. Map 0 in each is the legacy generator (`makeEscortWorld(2, 7777)` and `makeDefendWorld(4242)`). The other maps use `makeEscortMap(def, seed)` and `makeDefendMap(def, seed)` with fixed seeds. `getMapWorld()` keeps a cache of up to 5 maps and `mapPreview()` draws the minimaps. Best results are stored in `localStorage` under `goatGuardianMaps`. Loading goes through `requestLoad()` and the `LOADING` state.
 - **CPU helpers:** players with `cpu: true` and `dev` set to `ai<slot>`. `joinCPU()` and `removeCPU()` add and remove them, and `updateAI()` drives them whenever `hasCPU()` is true. Auto helpers are flagged `auto` and removed when you return to Player Select.
@@ -20,6 +28,10 @@
 - **Assets:** no Universal Assets are used. Everything is procedural.
 
 ## Verified
+- v0.7.0: the smoke test also covers the story intro, Versus (both sides filled, timeout win), Daily and Endless starts, stomp, whistle, buying an upgrade, medals and unlocks, the editor route and share-code round trip, and the colour-safe remap.
+- A runtime sweep of every mode, the editor, the story, How to Play, the pause shop and key remap, night and fog had no page errors.
+- Over a local http server, the service worker registers and the game reloads offline.
+- The full attract demo was re-recorded: the escort pens 10/10 and all scenes complete.
 - All 20 maps were checked with a BFS from start to goal using 2px clearance: every route is connected. The largest map takes about 0.7 seconds to generate and render.
 - `node tests/smoke.js` prints SMOKE OK. It also covers the pause button, pause Options, Controls, the exit confirmation, title Exit, map select, adding and removing a CPU, Defend on Ruined Plaza with a moving CPU helper, and Next Mission loading map 2. It covers title → mode → players, the 2-player keyboard lobby, the 6-direction check, ram, bark, pause and resume, penning, mission advance, 4-player defend, game over → title, starting and exiting the demo, fullscreen on Play, and filling a 1280×720 window.
 - The full demo was recorded twice at 1280×720. Both runs penned all 10 sheep in the escort scene, and all three scenes completed with no errors.

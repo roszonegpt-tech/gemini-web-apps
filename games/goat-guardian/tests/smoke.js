@@ -1,4 +1,4 @@
-// Headless smoke test for Goat Guardian v0.6: node tests/smoke.js (needs Playwright + Chromium).
+// Headless smoke test for Goat Guardian v0.7: node tests/smoke.js (needs Playwright + Chromium).
 // Title -> Mode -> Players (2 keyboard players) -> escort, forces a ram and a bark, pens the herd,
 // advances a mission, runs 4-player defend, triggers game over, checks 6-direction facing and
 // adaptive resolution, starts and exits the attract-mode demo, and reports page errors.
@@ -15,8 +15,11 @@ const { chromium } = require('playwright');
   await p.waitForTimeout(800);
   let st = await p.evaluate(() => ({ state, W, H, PIX }));
   if (st.state !== 'TITLE') fail('not on title');
-  await p.keyboard.press('Space');                 // PLAY
-  st = await p.evaluate(() => state); if (st !== 'MODE') fail('mode screen ' + st);
+  await p.keyboard.press('Space');                 // PLAY -> story intro the first time
+  st = await p.evaluate(() => state); if (st !== 'STORY') fail('story ' + st);
+  await p.keyboard.press('Space');
+  await p.keyboard.press('Backspace');             // skip
+  st = await p.evaluate(() => ({ state, seen: settings.storySeen })); if (st.state !== 'MODE' || !st.seen) fail('story skip ' + JSON.stringify(st));
   await p.keyboard.press('Space');                 // ESCORT -> map select
   st = await p.evaluate(() => ({ state, n: screenItems().length })); if (st.state !== 'MAPS' || st.n !== 11) fail('maps ' + JSON.stringify(st));
   await p.keyboard.press('Space');                 // map 1 (joins P1 = kbL)
@@ -54,24 +57,24 @@ const { chromium } = require('playwright');
   await p.mouse.click(box.x, box.y);               // on-screen pause button
   st = await p.evaluate(() => ({ paused, pauseView })); if (!st.paused || st.pauseView !== 'main') fail('pause button ' + JSON.stringify(st));
   await p.keyboard.press('s'); await p.keyboard.press('s'); await p.keyboard.press('Space');
-  st = await p.evaluate(() => ({ pauseView, n: screenItems().length })); if (st.pauseView !== 'options' || st.n !== 5) fail('pause options ' + JSON.stringify(st));
-  const shake0 = await p.evaluate(() => settings.shake);
+  st = await p.evaluate(() => ({ pauseView, n: screenItems().length })); if (st.pauseView !== 'options' || st.n !== 11) fail('pause options ' + JSON.stringify(st));
+  const music0 = await p.evaluate(() => settings.music);
   await p.keyboard.press('s'); await p.keyboard.press('d');
-  st = await p.evaluate(() => settings.shake); if (st === shake0) fail('options toggle');
+  st = await p.evaluate(() => settings.music); if (st === music0) fail('options toggle');
   await p.keyboard.press('a');
   await p.keyboard.press('Escape');
   st = await p.evaluate(() => ({ paused, pauseView, c: ui.cursor })); if (!st.paused || st.pauseView !== 'main' || st.c !== 2) fail('options back ' + JSON.stringify(st));
   await p.keyboard.press('s'); await p.keyboard.press('Space');
   st = await p.evaluate(() => pauseView); if (st !== 'controls') fail('controls ' + st);
   await p.keyboard.press('Escape');
-  await p.keyboard.press('s'); await p.keyboard.press('Space');   // EXIT TO TITLE -> confirm
+  await p.keyboard.press('s'); await p.keyboard.press('s'); await p.keyboard.press('Space');   // EXIT TO TITLE -> confirm
   st = await p.evaluate(() => ({ pauseView, c: ui.cursor })); if (st.pauseView !== 'exit' || st.c !== 1) fail('exit confirm ' + JSON.stringify(st));
   await p.keyboard.press('Space');                                 // NO
   st = await p.evaluate(() => ({ state, paused, pauseView })); if (st.state !== 'PLAYING' || st.pauseView !== 'main') fail('exit cancel ' + JSON.stringify(st));
   await p.keyboard.press('Escape');                                // resume
   st = await p.evaluate(() => paused); if (st) fail('esc resume');
   await p.evaluate(() => { for (const s of sheep) { s.x = world.goal.x; s.y = world.goal.y; } enemies.length = 0; });
-  await p.waitForTimeout(1200);
+  await p.waitForTimeout(2600);                    // includes the slow-motion finish
   st = await p.evaluate(() => state); if (st !== 'RESULTS') fail('results ' + st);
   await p.keyboard.press('Space');                 // NEXT MISSION (loads map 2)
   await p.waitForTimeout(1200);
@@ -88,7 +91,7 @@ const { chromium } = require('playwright');
   st = await p.evaluate(() => state); if (st !== 'GAMEOVER') fail('game over ' + st);
   await p.keyboard.press('s'); await p.keyboard.press('s'); await p.keyboard.press('s'); await p.keyboard.press('Space'); // TITLE
   st = await p.evaluate(() => state); if (st !== 'TITLE') fail('back to title ' + st);
-  await p.evaluate(() => { ui.cursor = 4; });
+  await p.evaluate(() => { ui.cursor = 5; });
   await p.keyboard.press('Space');                 // EXIT
   st = await p.evaluate(() => state); if (st !== 'BYE') fail('exit screen ' + st);
   await p.keyboard.press('Space');
@@ -102,6 +105,37 @@ const { chromium } = require('playwright');
   await p.keyboard.press('Space');
   st = await p.evaluate(() => ({ on: showcase.on, state, real: players.every(q => q.cpu || !q.dev.startsWith('ai')) }));
   if (st.on || st.state !== 'TITLE' || !st.real) fail('demo exit ' + JSON.stringify(st));
+  // v0.7 features: abilities, upgrades, medals, every mode, editor, accessibility
+  const feat = await p.evaluate(async () => {
+    const out = {};
+    const go = async (m, extra) => { mode = m; if (extra) extra(); enterPlayers('kbL'); players.forEach(q => q.ready = true); await new Promise(r => setTimeout(r, 2600)); return state; };
+    out.versus = await go('versus', () => { selMap.versus = 1; });
+    out.versusSides = players.some(q => q.kind === 'wolf') && players.some(q => q.kind !== 'wolf');
+    versus.t = 0.05; await new Promise(r => setTimeout(r, 400));
+    out.versusOver = state + ':' + versus.winner;
+    toTitle();
+    out.daily = await go('daily'); out.dailyName = mission.name;
+    const g = players.find(q => q.kind === 'goat') || players[0];
+    g.kind = 'goat'; g.cd2 = 0; spawnEnemy(4, { type: 'fox' }); const fx = enemies[enemies.length - 1]; fx.state = 'hunt'; fx.x = g.x + 10; fx.y = g.y;
+    stomp(g); out.stomp = fx.state;
+    const d = players.find(q => q !== g); if (d) { d.kind = 'dog'; d.cd2 = 0; whistle(d); out.whistle = sheep.some(sh => sh.call); }
+    bells = 20; const before = upg.ram; shopItems(() => {})[0].select(); out.upgrade = upg.ram - before; out.bellsLeft = bells;
+    toTitle();
+    out.endless = await go('endless'); out.stage = endless.stage;
+    toTitle();
+    out.medal = awardMedals('escort', 0, 7); out.total = totalMedals();
+    out.unlocked = skinUnlocked('goat', 1);
+    openEditor(); out.editor = state; out.route = !!edRoute();
+    const code = edEncode(); out.codeOk = edDecode(code); out.codeLen = code.length;
+    toTitle();
+    settings.cb = true; buildRemap(0); out.cbRemap = !!remapTable; settings.cb = false; remapQ = -1;
+    return out;
+  });
+  if (feat.versus !== 'PLAYING' || !feat.versusSides || feat.versusOver !== 'GAMEOVER:SHEPHERDS') fail('versus ' + JSON.stringify(feat));
+  if (feat.daily !== 'PLAYING' || feat.endless !== 'PLAYING' || feat.stage !== 1) fail('daily/endless ' + JSON.stringify(feat));
+  if (feat.stomp !== 'stun' || feat.whistle === false || feat.upgrade !== 1 || feat.bellsLeft !== 14) fail('abilities/shop ' + JSON.stringify(feat));
+  if (!feat.medal || feat.total < 3 || !feat.unlocked) fail('medals ' + JSON.stringify(feat));
+  if (feat.editor !== 'EDITOR' || !feat.route || !feat.codeOk || !feat.cbRemap) fail('editor/cb ' + JSON.stringify(feat));
   const wasFs = await p.evaluate(() => isFs());
   await p.evaluate(() => exitFs());
   await p.waitForTimeout(300);

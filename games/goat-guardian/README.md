@@ -8,6 +8,18 @@ All art is drawn from pixel matrices in code, and all sound is synthesized with 
 - Open `index.html` in any modern browser (desktop, iPad, or iPhone). No build step or server needed.
 - GitHub Pages: works as a static site and includes `.nojekyll`.
 
+## What's in the game
+- **5 modes:** Escort (10 routes), Defend (10 arenas), Daily Challenge, Endless, and Versus (wolves against shepherds).
+- **Shepherds:** the goat (ram, plus stomp) and the dog (bark, plus whistle). In Versus, players can also be wolves (lunge, plus howl).
+- **Sheep:** normal, stubborn ram, quick lamb, and golden.
+- **Predators:** shadow wolf, alpha wolf, fox, hawk, bat, and the Great Wolf boss.
+- **World:** fords, rivers with bridges, and brambles. Weather can be rain, wind, fog or storm, and nights are lit only by lanterns.
+- **Progression:** medals per map, unlockable goat, dog and wool looks, and bells to spend on upgrades during a run.
+- **Map editor** with share codes; saved maps can be played as "MY MAP".
+- **Story intro**, synthesized chiptune music, and an attract-mode demo.
+- **Accessibility:** remappable keys, a colour-safe palette, reduced flashing, and game speed.
+- **Installable app:** when served from GitHub Pages it installs to a home screen and works offline.
+
 ## Maps
 - **Escort routes:** 1 Meadow Run (the original), 2 Birch Bend, 3 Switchbacks, 4 Twin Trails, 5 Stone Road, 6 Wolf Hollow, 7 Open Moor, 8 Lake of Pines, 9 The Long March, 10 Sunset Summit. Routes 2–10 get longer and wider.
 - **Defend arenas:** The Henge, Twin Glades, Ring Road, Crossroads, Ruined Plaza, Crescent, Grove Isles, Long Valley, Clover, Great Circle.
@@ -35,10 +47,10 @@ Ram or bark a predator that is carrying a sheep and the sheep is saved.
 ## Controls
 | Device | Move | Action | Notes |
 |---|---|---|---|
-| Keyboard left | WASD | Space or left-click | With only one keyboard player, the arrows and Enter also work |
-| Keyboard right | Arrow keys | Enter or Right Shift | |
-| Gamepads 1–4 | Left stick or D-pad | A or X | B leaves the lobby, Start pauses |
-| Touch | Drag on the left side | Tap on the right side | Pause button in the top-right corner |
+| Keyboard left | WASD | Space or left-click; ability E or right-click | With only one keyboard player, the arrows and Enter also work. Keys can be remapped in Options |
+| Keyboard right | Arrow keys | Enter or Right Shift; ability `.` | |
+| Gamepads 1–4 | Left stick or D-pad | A; ability X or B | Y changes CPU orders, Start pauses |
+| Touch | Drag on the left side | Tap on the right side; ability button in the bottom-right | Pause button in the top-right corner |
 
 **Menus:** Title → Mode → Players. In menus, Up/Down moves the cursor, Action selects, and Back (Esc, Backspace or B) goes back. On the Players screen, any new device presses Action to join. Left/Right switches between goat and dog, and Action readies up. The game starts when everyone is ready. Options covers sound, screen shake and fullscreen.
 
@@ -55,7 +67,10 @@ Ram or bark a predator that is carrying a sheep and the sheep is saved.
 ## Structure
 ```
 goat-guardian/
-├─ index.html      # entire game (HTML/CSS/JS)
+├─ index.html              # entire game (HTML/CSS/JS)
+├─ manifest.webmanifest    # installable app manifest
+├─ sw.js                   # service worker (offline cache)
+├─ assets/icons/           # app icons (192, 512, maskable 512)
 ├─ .nojekyll
 ├─ README.md
 ├─ CHANGELOG.md

@@ -2,6 +2,34 @@
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-11-05
+### Added
+1. Weather per map: rain (hides lurking eyes), wind (slows bats and hawks, blows leaves), fog (sight shrinks around players), and storm (rain, wind and lightning).
+2. Hazards: shallow fords (slow), deep rivers crossed by narrow bridges, and brambles (slow; a sheep tangled for 3 s is lost).
+3. Predators: the fox (sneaks along tree lines, then dashes), the hawk (circles with a warning marker, then dives; hit it while it's low), and the Great Wolf boss (8 HP; on route 10, every 5th endless stage and every 10th defend wave).
+4. Sheep types: the stubborn ram ignores the dog, the lamb is quick and jumpy, and the golden sheep is worth +10 and 5 bells when penned.
+5. Second ability: the goat stomps (stuns everything nearby) and the dog whistles (sends nearby sheep to the goal). Use E or `.`, gamepad X or B, right-click, or the on-screen button on touch.
+6. Upgrades: bells earned in a run buy Ram Power, Big Bark, Swift Hooves, Quick Skills and Wide Pen (3 levels each). Buy them from the pause menu or the results screen.
+7. Daily Challenge mode: one seeded random route per day, with today's best saved.
+8. Endless mode: chained random stages, scored by distance and score.
+9. Medals: escort routes award Time, Flawless and Hunter; defend arenas award Wave 5, 10 and 15. They show on Map Select and Results.
+10. Unlockable looks earned with medals: Snow and Golden goats, Husky and Corgi dogs, and Cream, Grey and Rose wool.
+11. Map editor: paint meadow, forest, ford, water and brambles; place pillars and start/goal pins. Test play, save, and copy or paste a share code. Saved maps appear as "MY MAP" in escort Map Select.
+12. Versus mode: wolf players lunge, grab sheep and howl for help, against goat and dog players or CPUs, in a 150 s match on any arena.
+13. Knockdowns and revives (alphas and the Great Wolf can knock a shepherd down; a teammate standing close revives them), plus team combos for chained takedowns.
+14. CPU orders: Push to Goal, Follow Me or Guard the Herd (C, gamepad Y, or tap the CPU label).
+15. Music: a synthesized chiptune loop that changes from day to dusk to night (Music option).
+16. Effects: footprints in the grass, wool tufts where sheep are grabbed, a slow-motion finish with a baa chorus when the last sheep is penned.
+17. Night lanterns: after dusk only the area around each player, fireflies and the pen is lit, and predators' eyes glow in the dark.
+18. Story intro: 4 illustrated panels before the first game, replayable from How to Play.
+19. Accessibility: remappable keys for both keyboard players, a colour-safe palette, reduced flashing (no shake, flashes or blinking), and game speed of 100%, 75% or 50%.
+20. Installable app: `manifest.webmanifest`, service worker `sw.js` (works offline) and icons in `assets/icons/`. These apply only to the GitHub Pages copy.
+
+### Changed
+- Mode select now offers Escort, Defend, Daily, Endless and Versus.
+- How to Play has 4 pages: shepherds and sheep, predators, modes and hazards, controls.
+- The pause menu gains Upgrades and a key remapping sub-view. The Nightfall demo scene now includes the fox, the hawk and the Great Wolf.
+
 ## [0.6.0] - 2026-11-05
 ### Added
 - On-screen pause button (top-right) for mouse and touch, alongside P, Esc and gamepad Start.
