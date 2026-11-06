@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## [0.18.2] - 2026-11-06
+### Changed
+- **Billy and Farm Dogs trailers re-recorded with the new goat and dogs** (`tools/trailer/make.sh billy`, `... dogs`; 55 s and about 60 s, 1080p, same soundtracks). The close-up trailer camera (`resize()`, used by both) now films closer (90 rows tall instead of 135) because the farm animals are drawn smaller since 0.18.1, so Billy and the dogs fill the frame as before. The full-game trailer is unchanged and was not re-recorded.
+
 ## [0.18.1] - 2026-11-06
 ### Fixed
 - **The goat and dogs were giant next to the sheep.** They are smaller (`FARM_SCALE` goat 0.5, dogs 0.42): the goat is about 16x15 visible pixels and the dogs about 14x12, roughly twice a sheep (7x6), with the goat still the biggest.
