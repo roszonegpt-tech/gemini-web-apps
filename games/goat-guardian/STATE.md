@@ -1,6 +1,6 @@
 # State — Get em Billy (formerly Goat Guardian)
 
-**Version:** 0.14.0 · **Status:** Playable. v0.14.0 adds online play and a demo build.
+**Version:** 0.14.1 · **Status:** Playable. v0.14.1 adds `tools/build_offline.js` (a one-file offline build: it removes the manifest link and the service worker block and inlines the icon; `--demo` flips the demo flag) and `tests/offline.js`. v0.14.0 added online play and a demo build.
 
 Online (`net`, the "Online play" block before Boot):
 - Roles are `off`, `host` and `client`. The host runs everything (`update()` is unchanged) and streams `netSnapshot()` 20 times a second (compact arrays: `sh` sheep, `en` enemies, `p` players with `NET_PF`, `h` HUD numbers) over an unreliable channel; events (sounds, text, shake, particles, splats) are recorded by wrappers (`netHookEffects`) and sent on the reliable channel.

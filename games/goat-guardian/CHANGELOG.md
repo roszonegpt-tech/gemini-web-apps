@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+## [0.14.1] - 2026-11-06
+### Added
+- **One-file offline build**: `node tools/build_offline.js` writes `build/get-em-billy.html` (and `--demo` writes `build/get-em-billy-demo.html`), about 545 KB each. The file holds the whole game (page, code, icons as data URIs; all art and sound are generated in code), makes no network requests, and needs no other file, manifest or service worker. Double-click it, open it from a phone's Files app, or host it anywhere. Online play still needs a connection between the players.
+- `node tests/offline.js` builds both files, copies each ALONE into an empty folder, opens it from `file://` with the network switched off, and checks that nothing is requested or fails, the game plays (a Defend round with input), a trailer and the editor open, and there are no errors.
+
 ## [0.14.0] - 2026-11-06
 ### Added
 - **Online play** (title screen: PLAY ONLINE). One player hosts and up to 3 friends join; hosts can mix in CPU helpers. It needs no account and no server: the host makes an invite code, the friend pastes it and makes a reply code, and the host pastes that back (codes are about 570 characters and can be sent in any chat; line breaks are ignored). The connection is a WebRTC data channel, and only a public STUN server is used to find each other.

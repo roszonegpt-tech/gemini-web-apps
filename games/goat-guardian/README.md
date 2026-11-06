@@ -33,6 +33,9 @@ Title screen, PLAY ONLINE. One player hosts (up to 3 friends join); there is no 
 The host's device runs the game, so a good connection for the host matters most. Everyone needs the same game version. Players on the same Wi-Fi connect directly; across the internet a public STUN server (Google's) is used to find each other, and a few strict networks that block direct connections may not be able to connect (there is no relay server). Each player gets their own camera. The browser's own copy/paste works on phones.
 Run `node tests/online.js` to test it with two browsers.
 
+## One-file offline build
+`node tools/build_offline.js` writes **`build/get-em-billy.html`**: the whole game in a single file (about 545 KB) that works with no internet and no other files. Double-click it, send it to a phone, or host it anywhere. `node tools/build_offline.js --demo` writes the demo as one file too. Run `node tests/offline.js` to check that each file works alone, offline, from `file://`. (Online play still needs a connection between the players, and a single file can't be installed as an app; use the hosted version for that.)
+
 ## Demo build
 `tools/build_demo.sh` writes a free demo to `build/demo/` (set `FULL_URL=https://...` to add a "GET THE FULL GAME" button). The demo has 3 escort routes, 3 defend arenas, 8 defend waves and the first 3 breeds of each animal; the other modes and the map editor show an upgrade screen. It keeps its own saves and cache name. Run `node tests/demo.js` to check the limits.
 
