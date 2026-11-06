@@ -1,6 +1,17 @@
 # State — Get em Billy (formerly Goat Guardian)
 
-**Version:** 0.13.0 · **Status:** Playable. v0.13.0 adds `DOGS_TRAILER` (`startTrailer('dogs')`, with `dogArena()`, `dogSkill()` and `ringFoes()`) and `THEMES.dogs`. The trailer tools take `main`, `billy` or `dogs`, and `__trailerMark('bark')` and `('skill')` time the woofs and chimes.
+**Version:** 0.14.0 · **Status:** Playable. v0.14.0 adds online play and a demo build.
+
+Online (`net`, the "Online play" block before Boot):
+- Roles are `off`, `host` and `client`. The host runs everything (`update()` is unchanged) and streams `netSnapshot()` 20 times a second (compact arrays: `sh` sheep, `en` enemies, `p` players with `NET_PF`, `h` HUD numbers) over an unreliable channel; events (sounds, text, shake, particles, splats) are recorded by wrappers (`netHookEffects`) and sent on the reliable channel.
+- Guests build the world from a `world` message (`netClientWorld`, same seeds, `net.forceSeed` for the daily route), skip the simulation (`netClientUpdate`: apply the snapshot, then dead-reckon) and send `in` (move vector, 30 Hz) and `act` (action or ability).
+- Remote players on the host have `dev` `net<id>` and `p.net`; `readMove` and `netRemoteEvent` serve them. `isMine(p)` picks whose camera and attack meter to use. `skinOk` is permissive online so a guest's unlocked breed is used.
+- Signalling is manual: `netHostInvite`, `netGuestAccept`, `netHostAccept`, with codes packed by `netPack` (deflate + base64url, prefix `GEB1.`). The copy/paste box is HTML (`#netbox`, `netOpenBox`).
+- States `NET` (menu), `NETWAIT` (guest lobby); screens `drawNet`, `drawNetWait`, `drawNetOverlay`. `NET_VER` must match between players.
+
+Demo: `DEMO`, `DEMO_MAPS`, `DEMO_WAVES`, `DEMO_BREEDS`, `DEMO_LOCKED_MODES`; the `DEMOEND` screen is `demoEnd(reason)`. `tools/build_demo.sh` flips the flag and renames save keys.
+
+v0.13.0 added v0.13.0 adds `DOGS_TRAILER` (`startTrailer('dogs')`, with `dogArena()`, `dogSkill()` and `ringFoes()`) and `THEMES.dogs`. The trailer tools take `main`, `billy` or `dogs`, and `__trailerMark('bark')` and `('skill')` time the woofs and chimes.
 
 v0.12.0 adds:
 - the screen smash: `trySplat()`, `drawSplats()` and `makeCracks()`; the `splats` array is drawn on the HUD canvas
@@ -53,6 +64,7 @@ v0.11.0 renamed the game to **Get em Billy**; the folder, localStorage keys (`go
 - **Assets:** no Universal Assets are used. Everything is procedural.
 
 ## Verified
+- v0.14.0: `tests/online.js` (two browsers, real code box, Defend, Escort and Versus rounds, late joiner, leave, host dropping) and `tests/demo.js` pass. Not verified: play across real internet connections and strict NATs (no relay), phones as guests, and many minutes of play on a slow connection.
 - v0.10.0: the smoke test checks:
   - every lab set (12 goat breeds, 10 dogs, wolf, fox, boss, bat, hawk) has full idle, walk, run, jump and attack frames in 5 views
   - the drawn west-facing art

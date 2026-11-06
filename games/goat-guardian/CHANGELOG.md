@@ -2,6 +2,19 @@
 
 ## [Unreleased]
 
+## [0.14.0] - 2026-11-06
+### Added
+- **Online play** (title screen: PLAY ONLINE). One player hosts and up to 3 friends join; hosts can mix in CPU helpers. It needs no account and no server: the host makes an invite code, the friend pastes it and makes a reply code, and the host pastes that back (codes are about 570 characters and can be sent in any chat; line breaks are ignored). The connection is a WebRTC data channel, and only a public STUN server is used to find each other.
+  - The **host runs the whole game**; guests send their controls and draw the host's 20-per-second snapshots, smoothed between updates. Sounds, text, shake, particles and the screen smash are replayed on every guest, so a guest hears and sees what the host does.
+  - Every player has **their own camera** following their own animal, so there is no shared-screen leash online. Every Escort route, Defend arena, Daily, Endless and Versus work (a guest can be a wolf). Guests pick their goat or dog, breed and STYLE in an online lobby; the host sees them on the Player Select screen and can kick.
+  - A host pause is shown to guests; results and game over appear as an overlay; a leave prompt, a ping readout and "YOU" markers are included. Disconnects, a silent player (15 s), a different game version, a full room and joining mid-game are handled with a clear message.
+  - Guests who open the box can also type and paste in it on phones: it is real HTML, so system paste works.
+  - Tests: `node tests/online.js` links two separate browsers through the real box and plays Defend, Escort and Versus rounds, covering movement, ram, effects, pause, results, a late joiner, leaving and the host dropping.
+- **Demo build** (`tools/build_demo.sh`, optionally `FULL_URL=https://... tools/build_demo.sh`): a static site in `build/demo/` with 3 escort routes, 3 defend arenas, 8 defend waves and the first 3 breeds of each animal. Daily, Endless, Versus and the map editor lead to an upgrade screen that lists what the full game has (and a "GET THE FULL GAME" button when a URL is given). The demo saves under its own keys and cache name, so it can sit beside the full game. Online play is included; a demo host and full-game guests are held to the demo limits. `node tests/demo.js` builds it and checks every limit.
+### Changed
+- The title item "WATCH DEMO" is now "WATCH PREVIEW" (the attract-mode showcase), so it can't be confused with the demo build.
+- Online sessions let players use any breed their own game has unlocked.
+
 ## [0.13.0] - 2026-11-05
 ### Added
 - **Farm Dogs trailer** (`tools/trailer/make.sh dogs` writes `build/trailer-dogs/dogs-trailer.mp4`, about 62 s), in the style of the Billy trailer:

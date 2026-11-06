@@ -91,13 +91,13 @@ const { chromium } = require('playwright');
   st = await p.evaluate(() => state); if (st !== 'GAMEOVER') fail('game over ' + st);
   await p.keyboard.press('s'); await p.keyboard.press('s'); await p.keyboard.press('s'); await p.keyboard.press('Space'); // TITLE
   st = await p.evaluate(() => state); if (st !== 'TITLE') fail('back to title ' + st);
-  await p.evaluate(() => { ui.cursor = 5; });
+  await p.evaluate(() => { ui.cursor = 6; });
   await p.keyboard.press('Space');                 // EXIT
   st = await p.evaluate(() => state); if (st !== 'BYE') fail('exit screen ' + st);
   await p.keyboard.press('Space');
   st = await p.evaluate(() => state); if (st !== 'TITLE') fail('bye -> title ' + st);
   // attract-mode demo: plays itself with AI shepherds, any key returns to the title
-  await p.evaluate(() => { ui.cursor = 1; });
+  await p.evaluate(() => { ui.cursor = 2; });
   await p.keyboard.press('Space');                 // WATCH DEMO
   await p.waitForTimeout(3000);
   st = await p.evaluate(() => ({ on: showcase.on, state, n: players.length, ai: players.every(q => q.dev.startsWith('ai')) }));

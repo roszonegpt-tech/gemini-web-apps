@@ -1,5 +1,5 @@
 # Version
 
-- **Version:** 0.13.0
-- **Build:** 16
-- **Last updated:** 2026-11-05
+- **Version:** 0.14.0
+- **Build:** 17
+- **Last updated:** 2026-11-06

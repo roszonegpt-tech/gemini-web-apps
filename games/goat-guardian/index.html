@@ -37,10 +37,38 @@
     cursor: crosshair;
     outline: none;
   }
+  #netbox[hidden] { display: none; }
+  #netbox { position: fixed; inset: 0; background: rgba(12, 8, 22, .9); display: flex; align-items: center; justify-content: center; z-index: 10; padding: 12px; box-sizing: border-box; }
+  #netbox, #netbox * { -webkit-user-select: text; user-select: text; touch-action: manipulation; }
+  .nbp { width: min(100%, 440px); max-height: 100%; overflow: auto; background: #160c26; border: 2px solid #34204e; border-radius: 6px; padding: 14px; font: 13px/1.4 ui-monospace, Menlo, Consolas, monospace; color: #ece6d2; box-sizing: border-box; }
+  .nbp h2 { margin: 0 0 6px; font-size: 16px; letter-spacing: .12em; color: #f4d860; }
+  .nbp p { margin: 0 0 8px; color: #b9b2a2; }
+  .nbp label { display: block; margin: 10px 0 4px; color: #f4d860; font-size: 12px; letter-spacing: .06em; }
+  .nbp textarea { width: 100%; box-sizing: border-box; height: 76px; resize: none; background: #0c0816; color: #ece6d2; border: 2px solid #34204e; border-radius: 4px; font: 12px ui-monospace, Menlo, Consolas, monospace; padding: 6px; word-break: break-all; }
+  .nbp button { font: inherit; background: #34204e; color: #ece6d2; border: 2px solid #4e8f80; border-radius: 4px; padding: 10px 14px; min-height: 44px; margin: 6px 6px 0 0; cursor: pointer; }
+  .nbp button:hover:not(:disabled) { background: #4e8f80; color: #160c26; }
+  .nbp button:disabled { opacity: .5; }
+  #nbStatus { min-height: 34px; margin: 10px 0 0; color: #f4d860; font-size: 12px; }
 </style>
 </head>
 <body>
 <div id="stage"><canvas id="game" tabindex="0" aria-label="Get em Billy game. Use arrows or WASD and Space or Enter to choose menu options."></canvas></div>
+<div id="netbox" hidden role="dialog" aria-label="Play online">
+  <div class="nbp">
+    <h2 id="nbTitle">ONLINE</h2>
+    <p id="nbHelp"></p>
+    <label id="nbL1" for="nbOut"></label>
+    <textarea id="nbOut" readonly spellcheck="false" autocomplete="off" autocapitalize="off"></textarea>
+    <button id="nbCopy" type="button">COPY</button>
+    <button id="nbMake" type="button">MAKE INVITE CODE</button>
+    <label id="nbL2" for="nbIn"></label>
+    <textarea id="nbIn" spellcheck="false" autocomplete="off" autocapitalize="off" placeholder="PASTE HERE"></textarea>
+    <button id="nbPaste" type="button">PASTE</button>
+    <button id="nbGo" type="button">CONNECT</button>
+    <p id="nbStatus" role="status"></p>
+    <button id="nbClose" type="button">CLOSE</button>
+  </div>
+</div>
 <script>
 'use strict';
 
@@ -862,9 +890,18 @@ function text(str, x, y, key, opts) {
 // ---------------------------------------------------------------------
 // Settings (persisted per viewer)
 // ---------------------------------------------------------------------
+// Demo build: tools/build_demo.sh turns DEMO on and sets the link to the full game.
+// The demo has 3 escort routes, 3 defend arenas, 8 defend waves and the first 3 breeds of each animal.
+const DEMO = false;
+const FULL_GAME_URL = '';
+const DEMO_MAPS = 3, DEMO_WAVES = 8, DEMO_BREEDS = 3, DEMO_LOCKED_MODES = ['daily', 'endless', 'versus'];
+const NET_VER = '0.14';
+const net = { role: 'off', peers: [], idc: 0, idc2: 0, pending: null, guest: null, slot: -1, me: null, roster: null, ev: [], recDepth: 0, snapT: 0, inT: 0, pingT: 0,
+  rosterT: 0, t0: 0, forceSeed: 0, status: '', note: '', noteT: 0, leaveAsk: false, over: null, hostPaused: false, snap: null, ping: 0, need: false,
+  boxKind: 'host', shownStatus: '', sheepById: new Map(), enemyById: new Map() };
 const settings = {
   sound: true, music: true, shake: true, fullscreen: true, autoHelper: true,
-  cb: false, reduceFlash: false, speed: 1, wool: 0, storySeen: false, goatBreed: 0, dogBreed: 0, looks: {}
+  cb: false, reduceFlash: false, speed: 1, wool: 0, storySeen: false, goatBreed: 0, dogBreed: 0, looks: {}, netKind: 'goat'
 };
 try {
   const s = JSON.parse(localStorage.getItem('goatGuardianSettings') || '{}');
@@ -2074,7 +2111,7 @@ function onScreen(x, y, m) {
   return x > cam.x - m && x < cam.x + W + m && y > cam.y - m && y < cam.y + H + m;
 }
 function updateCamera(dt) {
-  const humans = players.filter(p => !p.dev.startsWith('ai'));
+  const humans = players.filter(p => !p.dev.startsWith('ai') && isMine(p));
   const actors = isMenu() ? demo : (humans.length ? humans : players);
   let tx = cam.cx, ty = cam.cy;
   if (actors.length) {
@@ -2143,7 +2180,7 @@ const DOG_SPEED = 96;
 const PANIC_RADIUS = 40;
 const SHEEP_MAX = 14;
 const P_COL = ['y', 'r', 's', 'w'];
-const MENU_STATES = ['TITLE', 'MODE', 'MAPS', 'PLAYERS', 'OPTIONS', 'HOWTO', 'BYE', 'KEYS', 'STORY', 'STYLE'];
+const MENU_STATES = ['TITLE', 'MODE', 'MAPS', 'PLAYERS', 'OPTIONS', 'HOWTO', 'BYE', 'KEYS', 'STORY', 'STYLE', 'NET', 'NETWAIT', 'DEMOEND'];
 
 let state = 'TITLE';
 let mode = 'escort';
@@ -2707,7 +2744,7 @@ function updatePlayers(dt) {
     }
   }
   // shared camera leash: keep everyone on screen
-  if (players.length > 1) {
+  if (players.length > 1 && net.role === 'off') {
     for (const p of players) {
       const nx = clamp(p.x, cam.x + 6, cam.x + W - 6), ny = clamp(p.y, cam.y + 16, cam.y + H - 4);
       if (!blocked(nx, ny)) { p.x = nx; p.y = ny; }
@@ -3183,12 +3220,18 @@ const SPLAT_CHANCE = 0.2;
 function trySplat(e) {
   if (splats.length) return false;
   if (!(e.boss || (showcase.on && showcase.forceCrack) || rand() < SPLAT_CHANCE)) return false;
-  const set = e.boss ? SP.boss : (e.type === 'bat' ? SP.bat : (e.type === 'hawk' ? SP.hawk : (e.type === 'fox' ? SP.fox : (e.alpha ? SP.alpha : SP.wolf))));
-  const sx = e.x - cam.x, sy = e.y - cam.y - 6 - (e.alt || 0);
-  splats.push({ spr: set.S[0], sx: sx, sy: sy, tx: clamp(sx + rr(-W * 0.15, W * 0.15), W * 0.22, W * 0.78), ty: rr(H * 0.25, H * 0.4),
-    t: 0, hit: false, seed: Math.floor(rand() * 1e9), boss: !!e.boss });
+  const info = { b: e.boss ? 1 : 0, ty: e.type, al: e.alpha ? 1 : 0, x: Math.round(e.x), y: Math.round(e.y), alt: Math.round(e.alt || 0), seed: Math.floor(rand() * 1e9) };
+  startSplat(info);
+  if (net.role === 'host' && net.peers.length && net.ev.length < 300) net.ev.push(['sp', info]);
   addText(e.x, e.y - 18, e.boss ? 'TO THE MOON!' : 'YEET!', 'y');
   return true;
+}
+function startSplat(i) {
+  if (splats.length) return;
+  const set = i.b ? SP.boss : (i.ty === 'bat' ? SP.bat : (i.ty === 'hawk' ? SP.hawk : (i.ty === 'fox' ? SP.fox : (i.al ? SP.alpha : SP.wolf))));
+  const sx = i.x - cam.x, sy = i.y - cam.y - 6 - i.alt;
+  splats.push({ spr: set.S[0], sx: sx, sy: sy, tx: clamp(sx + rr(-W * 0.15, W * 0.15), W * 0.22, W * 0.78), ty: rr(H * 0.25, H * 0.4),
+    t: 0, hit: false, seed: i.seed, boss: !!i.b });
 }
 function makeCracks(cx, cy, seed) {
   const r = mulberry32(seed), lines = [], R = Math.min(W, H) * (0.22 + r() * 0.08), rays = 9 + Math.floor(r() * 4);
@@ -3241,7 +3284,7 @@ function drawSplats() {
     } else {
       if (!s.hit) {
         s.hit = true; s.lines = makeCracks(s.tx, s.ty, s.seed);
-        SFX.glass(); addShake(7); hitStop = Math.max(hitStop, 0.08); s.flash = 0.07;
+        net.recDepth++; SFX.glass(); addShake(7); net.recDepth--; hitStop = Math.max(hitStop, 0.08); s.flash = 0.07;
         if (showcase.trailer && typeof window.__trailerMark === 'function') window.__trailerMark('crack');
       }
       k = K;
@@ -3349,8 +3392,8 @@ const WOOL_SKINS = [{ name: 'WHITE', need: 0 }, { name: 'CREAM', need: 2, map: {
 const WOOL_NAMES = WOOL_SKINS.map(x => x.name);
 const skinCache = {};
 function skinList(kind) { return kind === 'goat' ? GOAT_SKINS : (kind === 'dog' ? DOG_SKINS : [{ name: 'WOLF', need: 0 }]); }
-function skinUnlocked(kind, i) { const sk = skinList(kind)[i]; return !!sk && totalMedals() >= sk.need; }
-function skinOk(kind, i) { return showcase.on || skinUnlocked(kind, i); }
+function skinUnlocked(kind, i) { const sk = skinList(kind)[i]; if (DEMO && kind !== 'wolf' && i >= DEMO_BREEDS) return false; return !!sk && totalMedals() >= sk.need; }
+function skinOk(kind, i) { return showcase.on || net.role !== 'off' || skinUnlocked(kind, i); }
 // sprite set for a shepherd: breed (medal-locked) + the player's look (coat, eyes, items)
 function skinSet(kind, i, look) {
   const k = kind === 'wolf' ? 0 : (skinOk(kind, i || 0) ? (i || 0) : 0);
@@ -3409,7 +3452,7 @@ function cycleSkin(p, d) {
 }
 
 // ---- daily and endless routes ----
-function dailySeed() { const d = new Date(); return d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate(); }
+function dailySeed() { if (net.forceSeed) return net.forceSeed; const d = new Date(); return d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate(); }
 function randomEscortDef(seed, stage) {
   const r = mulberry32(seed);
   const pickR = (a) => a[Math.floor(r() * a.length)];
@@ -3504,8 +3547,10 @@ function startDefend(idx) {
   placePlayers(world.start.x, world.start.y);
   snapCam(world.start.x, world.start.y);
   startWave(1);
+  netHostWorld();
 }
 function startWave(n) {
+  if (DEMO && n > DEMO_WAVES && !showcase.on) { demoEnd('WAVES'); return; }
   wave.n = n; wave.phase = 'intro'; wave.t = 2.2;
   wave.toSpawn = 2 + n * 2;
   wave.interval = Math.max(0.6, 2.4 - n * 0.15);
@@ -3534,6 +3579,7 @@ function startMission(n, herdN, src) {
   const head = mode === 'endless' ? 'STAGE ' + endless.stage : (mode === 'daily' ? 'DAILY ROUTE' : (mode === 'custom' ? 'MY MAP' : 'MISSION ' + n));
   banner = { t: 3, a: head, b: mode === 'escort' ? ew.name : (weather.kind ? weather.kind.toUpperCase() + ' AHEAD' : 'HERD THEM TO THE RED PIN') };
   dayTarget = mode === 'escort' ? clamp((n - 1) / 9, 0, 1) : (mode === 'endless' ? clamp((endless.stage - 1) / 8, 0, 1) : (mode === 'daily' ? 0.35 : 0.1));
+  netHostWorld();
   SFX.wave();
 }
 function updateDefend(dt) {
@@ -3621,6 +3667,7 @@ function nextMission() {
   }
   const herdN = Math.min(SHEEP_MAX, mission.penned + 2);
   const idx = ((mission.map || 0) + 1) % ESCORT_MAPS.length;
+  if (DEMO && idx >= DEMO_MAPS) { demoEnd('ROUTES'); return; }
   const n = mission.n + 1;
   requestLoad(() => { goScreen('PLAYING'); startMission(n, herdN, idx); }, ESCORT_MAPS[idx].name);
 }
@@ -3658,6 +3705,7 @@ function startVersus(idx) {
   Object.assign(versus, { t: 150, taken: 0, hits: 0, packT: 12, winner: '' });
   banner = { t: 3, a: 'VERSUS', b: 'WOLVES HUNT - SHEPHERDS GUARD' };
   dayTarget = 0.45;
+  netHostWorld();
   SFX.wave();
 }
 function updateVersus(dt) {
@@ -4906,8 +4954,8 @@ function enterPlayers(dev) {
   useMenuWorld();
   goScreen('PLAYERS');
   players = players.filter(p => !p.auto);
-  for (const p of players) { p.ready = !!p.cpu; if (mode !== 'versus' && p.kind === 'wolf') p.kind = 'goat'; }
-  if (!players.some(p => !p.cpu) && dev) joinPlayer(dev);
+  for (const p of players) { p.ready = !!p.cpu || !!p.net; if (mode !== 'versus' && p.kind === 'wolf') p.kind = 'goat'; }
+  if (!players.some(p => !p.cpu && !p.net) && dev) joinPlayer(dev);
 }
 // CPU helpers: AI-driven goats/dogs that fill empty slots
 function joinCPU(silent, kind) {
@@ -4935,7 +4983,7 @@ function cycleKind(p, d) {
   const ks = kindsForMode();
   const i = Math.max(0, ks.indexOf(p.kind));
   p.kind = ks[(i + (d || 1) + ks.length) % ks.length];
-  p.skin = p.cpu ? cpuSkin(p.kind, p.slot) : rememberedSkin(p.kind); p.ready = !!p.cpu;
+  p.skin = p.cpu ? cpuSkin(p.kind, p.slot) : rememberedSkin(p.kind); p.ready = !!p.cpu || !!p.net;
   p.look = p.cpu ? cpuLook(p.kind, p.slot) : rememberedLook(p.kind);
   SFX.move();
 }
@@ -4979,13 +5027,15 @@ function screenItems() {
   switch (state) {
     case 'TITLE': return [
       { label: 'PLAY', select: () => { autoFs(); if (!settings.storySeen) startStory('MODE'); else goScreen('MODE'); } },
-      { label: 'WATCH DEMO', select: () => startShowcase() },
+      { label: 'PLAY ONLINE', value: net.role === 'host' && net.peers.length ? String(net.peers.length) : '', select: () => { net.note = ''; goScreen('NET'); } },
+      { label: 'WATCH PREVIEW', select: () => startShowcase() },
       { label: 'HOW TO PLAY', select: () => { howPage = 0; goScreen('HOWTO'); } },
-      { label: 'MAP EDITOR', select: () => openEditor() },
+      { label: 'MAP EDITOR', value: DEMO ? 'FULL' : '', select: () => { if (DEMO) demoEnd('EDITOR'); else openEditor(); } },
       { label: 'OPTIONS', select: () => { optionsFrom = 'TITLE'; goScreen('OPTIONS'); } },
       { label: 'EXIT', select: exitGame }
     ];
     case 'MODE': return MODES.map(m => ({ label: m.title, select: (dev) => {
+        if (DEMO && DEMO_LOCKED_MODES.indexOf(m.id) >= 0) { demoEnd('MODE'); return; }
         mode = m.id;
         if (m.id === 'daily' || m.id === 'endless') enterPlayers(dev); else goMaps();
       } })).concat([{ label: 'BACK', select: () => goScreen('TITLE') }]);
@@ -4996,6 +5046,7 @@ function screenItems() {
         const pv = progress[pk][i];
         const md = popcount(progress.medals[pk][i]);
         const value = (mode === 'escort' ? (pv ? '*'.repeat(pv) : '') : (pv ? 'W' + pv : '')) + (md ? ' ' + md + 'M' : '');
+        if (DEMO && i >= DEMO_MAPS) return { label: (i + 1 < 10 ? ' ' : '') + (i + 1) + ' ' + d.name, value: 'FULL GAME', select: () => demoEnd('MAP') };
         return { label: (i + 1 < 10 ? ' ' : '') + (i + 1) + ' ' + d.name, value: value, select: (dev) => { selMap[mode] = i; enterPlayers(dev); } };
       });
       if (mode === 'escort' && customMapExists()) items.push({ label: ' * MY MAP', value: 'EDITOR', select: (dev) => { mode = 'custom'; enterPlayers(dev); } });
@@ -5012,6 +5063,9 @@ function screenItems() {
     case 'BYE': return [{ label: 'BACK TO TITLE', select: () => goScreen('TITLE') }];
     case 'STYLE': return styleItems();
     case 'EDITOR': return editorItems();
+    case 'NET': return netItems();
+    case 'DEMOEND': return demoItems();
+    case 'NETWAIT': return [{ label: 'LEAVE ONLINE GAME', select: () => netLeave() }];
     case 'PLAYING': return pauseItems();
     case 'RESULTS':
       if (resultsView === 'shop') return shopItems(() => { resultsView = 'main'; ui.cursor = 1; });
@@ -5031,6 +5085,37 @@ function screenItems() {
   }
   return [];
 }
+// The demo ends here, or when something from the full game is picked
+let demoInfo = { reason: 'END', back: 'TITLE' };
+function demoEnd(reason) {
+  demoInfo = { reason: reason, back: isMenu() ? state : 'TITLE' };
+  goScreen('DEMOEND');
+  if (reason === 'ROUTES' || reason === 'WAVES') SFX.clear(); else SFX.back();
+}
+function demoBack() {
+  const end = demoInfo.reason === 'ROUTES' || demoInfo.reason === 'WAVES';
+  if (end || demoInfo.back === 'DEMOEND') { useMenuWorld(); goScreen('TITLE'); } else goScreen(demoInfo.back);
+}
+function demoItems() {
+  const items = [];
+  if (/^https?:\/\//.test(FULL_GAME_URL)) items.push({ label: 'GET THE FULL GAME', select: () => { try { window.open(FULL_GAME_URL, '_blank', 'noopener'); } catch (e) { /* blocked */ } } });
+  items.push({ label: demoInfo.reason === 'ROUTES' || demoInfo.reason === 'WAVES' ? 'BACK TO TITLE' : 'BACK', select: demoBack });
+  return items;
+}
+function drawDemoEnd() {
+  screenBg();
+  header('THE DEMO');
+  const cx = W / 2, w = colW();
+  let y = 28;
+  const head = { ROUTES: ['YOU FINISHED', 'THE DEMO ROUTES!'], WAVES: ['YOU HELD THE HENGE', DEMO_WAVES + ' WAVES!'], MODE: ['THAT MODE IS IN', 'THE FULL GAME'], MAP: ['THAT MAP IS IN', 'THE FULL GAME'], EDITOR: ['THE MAP EDITOR IS IN', 'THE FULL GAME'] }[demoInfo.reason] || ['THANKS FOR', 'PLAYING!'];
+  text(head[0], cx, y, 'w', { align: 'center' }); y += 10;
+  text(head[1], cx, y, 'y', { s: 1, align: 'center' }); y += 16;
+  text('THE FULL GAME HAS', cx, y, 'l', { align: 'center' }); y += 11;
+  for (const l of ['10 ESCORT ROUTES', '10 DEFEND ARENAS', 'DAILY, ENDLESS, VERSUS', 'MAP EDITOR AND SHARE CODES', '10 FARM DOGS, 12 GOATS', 'STYLE: HATS AND OUTFITS']) { text('+ ' + l, cx, y, 'w', { align: 'center' }); y += 9; }
+  y += 6;
+  drawList(screenItems(), cx, y, Math.min(w, 140), 14);
+  text('YOUR DEMO PROGRESS IS SAVED', cx, H - 32, 's', { align: 'center' });
+}
 // Style screen: per-player animal customization (Rusty Lab colourways and items)
 let styleP = null;
 function styleUnit(p) { return p.kind === 'goat' ? 'goat' : (p.kind === 'dog' ? dogBreed(p).unit : 'wolf'); }
@@ -5039,12 +5124,13 @@ function openStyle(p) {
   styleP = p; p.look = normLabLook(p.look); p.ready = !!p.cpu;
   goScreen('STYLE'); SFX.click();
 }
-function closeStyle() { styleP = null; goScreen('PLAYERS'); SFX.back(); }
+function closeStyle() { const me = styleP === net.me; styleP = null; goScreen(me ? 'NETWAIT' : 'PLAYERS'); SFX.back(); }
 function saveStyle() {
   const p = styleP;
   if (!p || p.cpu) return;
   settings.looks = Object.assign({}, settings.looks, { [p.kind]: normLabLook(p.look) });
   saveSettings();
+  if (p === net.me) netSendPick();
 }
 const labName = (s) => String(s).toUpperCase().replace(/&/g, '+');
 function styleItems() {
@@ -5175,6 +5261,8 @@ function screenBack() {
   }
   if (state === 'MODE' || state === 'HOWTO' || state === 'BYE') { goScreen('TITLE'); SFX.back(); }
   else if (state === 'EDITOR') { editorBack(); }
+  else if (state === 'NET') { goScreen('TITLE'); SFX.back(); }
+  else if (state === 'DEMOEND') { demoBack(); SFX.back(); }
   else if (state === 'MAPS') { goScreen('MODE'); SFX.back(); }
   else if (state === 'OPTIONS') { goScreen(optionsFrom); SFX.back(); }
   else if (state === 'KEYS') { goScreen('OPTIONS'); ui.cursor = 9; SFX.back(); }
@@ -5216,7 +5304,7 @@ function playersEvent(ev) {
     if (ev.dev === 'kb') p = players.slice().reverse().find(q => q.dev === 'kbL' || q.dev === 'kbR');
     else p = players.find(q => q.dev === ev.dev);
     if (p) { players.splice(players.indexOf(p), 1); SFX.back(); }
-    if (!players.some(q => !q.cpu)) playersBack();
+    if (!players.some(q => !q.cpu && !q.net)) playersBack();
     return;
   }
   const p = players.find(q => q.dev === ev.dev);
@@ -5233,6 +5321,7 @@ function playersEvent(ev) {
 // so fullscreen requests count as user gestures).
 function dispatch(ev) {
   lastInput = realTime;
+  if (ev.dev && ev.dev.startsWith('net') && ev.dev !== 'netme') { netRemoteEvent(ev); return; }
   if (showcase.on) {
     if (['action', 'back', 'pause', 'tap', 'restart'].includes(ev.type)) endShowcase();
     return;
@@ -5243,6 +5332,8 @@ function dispatch(ev) {
   if (state === 'EDITOR') { editorEvent(ev); return; }
   if (state === 'STORY') { storyEvent(ev); return; }
   if (state === 'PLAYERS') { playersEvent(ev); return; }
+  if (net.role === 'client' && state === 'PLAYING') { netClientEvent(ev); return; }
+  if (state === 'NETWAIT') { netWaitEvent(ev); return; }
   if (state === 'PLAYING' && !paused) {
     if (ev.type === 'pause') openPause();
     else if (ev.type === 'action') { const p = playerForDev(ev.dev); if (p) playerAction(p); }
@@ -5264,9 +5355,11 @@ const padPrev = {};
 const DEVICE_NAMES = {
   ai0: 'CPU HELPER', ai1: 'CPU HELPER', ai2: 'CPU HELPER', ai3: 'CPU HELPER',
   kbL: 'WASD + SPACE', kbR: 'ARROWS + ENTER', touch: 'TOUCH',
-  pad0: 'GAMEPAD 1', pad1: 'GAMEPAD 2', pad2: 'GAMEPAD 3', pad3: 'GAMEPAD 4'
+  pad0: 'GAMEPAD 1', pad1: 'GAMEPAD 2', pad2: 'GAMEPAD 3', pad3: 'GAMEPAD 4',
+  net1: 'ONLINE FRIEND', net2: 'ONLINE FRIEND', net3: 'ONLINE FRIEND', net4: 'ONLINE FRIEND', net5: 'ONLINE FRIEND', net6: 'ONLINE FRIEND', net7: 'ONLINE FRIEND', net8: 'ONLINE FRIEND'
 };
 window.addEventListener('keydown', (e) => {
+  if (e.target && e.target.closest && e.target.closest('#netbox')) return;     // typing or pasting a code
   const k = e.key;
   if ([' ', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Tab', 'Backspace'].includes(k)) e.preventDefault();
   initAudio();
@@ -5301,10 +5394,10 @@ window.addEventListener('keydown', (e) => {
   else if (lk === 'n') ev('kb', 'removecpu');
   else if (lk === 'c') ev('kb', 'command');
 });
-window.addEventListener('keyup', (e) => { keys[e.key.toLowerCase()] = false; });
+window.addEventListener('keyup', (e) => { if (e.target && e.target.closest && e.target.closest('#netbox')) return; keys[e.key.toLowerCase()] = false; });
 window.addEventListener('blur', () => {
   for (const k in keys) keys[k] = false;
-  if (state === 'PLAYING' && !paused) { openPause(); }
+  if (state === 'PLAYING' && !paused && net.role === 'off') { openPause(); }
 });
 function toGame(clientX, clientY) {
   const r = view.getBoundingClientRect();
@@ -5398,6 +5491,7 @@ function readMove(dev) {
   const L = () => kd('kbL');
   const R = () => kd('kbR');
   if (dev.startsWith('ai')) return aiVec[dev] || { x: 0, y: 0 };
+  if (dev.startsWith('net')) { const pr = net.peers.find(q => 'net' + q.id === dev); return pr && realTime - pr.lastIn < 0.7 ? pr.input : { x: 0, y: 0 }; }
   if (dev === 'kbL') { L(); if (kbOtherFree('kbL')) R(); }
   else if (dev === 'kbR') { R(); if (kbOtherFree('kbR')) L(); }
   else if (dev === 'touch') {
@@ -5439,6 +5533,7 @@ function playerForDev(dev) {
 function update(dt) {
   realTime += dt;
   stateTime += dt;
+  if (net.role !== 'off') netTick(dt);
   pollPads();
   if (state === 'TITLE' && !showcase.on && realTime - lastInput > 30 && stateTime > 30) { attractN = (attractN || 0) + 1; if (attractN % 4 === 1) startShowcase(); else startTrailer(['dogs', '', 'billy'][attractN % 4 - (attractN % 4 > 1 ? 1 : 0)] || ''); }
   if (showcase.on) updateShowcase(dt);
@@ -5465,6 +5560,7 @@ function update(dt) {
   }
   if (state === 'EDITOR') { updateEditor(dt); return; }
   if (state === 'PLAYING') {
+    if (net.role === 'client') { netClientUpdate(dt); return; }
     if (paused) return;
     if (hitStop > 0) { hitStop -= dt; updateParticles(dt * 0.25); return; }
     if (showcase.on || hasCPU()) updateAI(dt);
@@ -5665,6 +5761,7 @@ function drawActor(p) {
     }
   }
   if (p.actT2 > 0 && p.kind === 'goat') dust(p.x, p.y, 1, 4, 20);
+  if (net.role !== 'off' && isMine(p) && realTime - net.t0 < 6 && Math.floor(realTime * 3) % 2) text('YOU', x, y - s.h - 9 + bob, P_COL[p.slot], { align: 'center', outline: 'k' });
   if (players.length > 1 && !isMenu()) {
     const c = P_COL[p.slot];
     const my = y - s.h - 2 + bob;
@@ -5800,6 +5897,9 @@ function drawHUD() {
     else if (state === 'KEYS') drawKeys();
     else if (state === 'STORY') drawStory();
     else if (state === 'STYLE') drawStyle();
+    else if (state === 'NET') drawNet();
+    else if (state === 'DEMOEND') drawDemoEnd();
+    else if (state === 'NETWAIT') drawNetWait();
     if (showcase.on && showcase.trailer) drawShowcaseCaption();
     return;
   }
@@ -5827,7 +5927,7 @@ function drawHUD() {
   }
   if (bells > 0 && mode !== 'versus') text(bells + 'B', 3, 12, 's', { shadow: 'k' });
   hudCpu = null;
-  if (state === 'PLAYING' && !showcase.on && players.some(p => p.cpu)) {
+  if (state === 'PLAYING' && !showcase.on && net.role !== 'client' && players.some(p => p.cpu)) {
     const lbl = 'CPU:' + cpuOrder.toUpperCase();
     hudCpu = { x: 2, y: H - 12, w: textWidth(lbl) + 6, h: 10 };
     rect(hudCpu.x, hudCpu.y, hudCpu.w, hudCpu.h, 'k');
@@ -5847,7 +5947,7 @@ function drawHUD() {
   }
   // attack meters for the human players (bottom right): is the ram / bark ready?
   if (state === 'PLAYING') {
-    const hum = players.filter(q => !q.dev.startsWith('ai'));
+    const hum = players.filter(q => !q.dev.startsWith('ai') && isMine(q));
     hum.forEach((q, i) => {
       const total = q.cdMax || (q.kind === 'goat' ? RAM_COOLDOWN : BARK_COOLDOWN);
       const ready = q.cd <= 0 && q.ramT <= 0 && q.down <= 0, k = ready ? 1 : clamp(1 - q.cd / total, 0, 1);
@@ -5884,6 +5984,7 @@ function drawHUD() {
     rect(touch.sx + dx - 2, touch.sy + dy - 2, 4, 4, 'w');
   }
   if (state === 'PLAYING' && paused) drawPause();
+  if (net.role === 'client') drawNetOverlay();
   if (state === 'RESULTS') drawResults();
   if (showcase.on) drawShowcaseCaption();
   if (state === 'GAMEOVER') drawGameOver();
@@ -5899,17 +6000,19 @@ function drawTitle() {
   const big = W >= 200 ? 5 : 4;
   text('GET EM', W / 2, cy0, 'y', { s: 2, align: 'center', outline: 'k' });
   text('BILLY', W / 2, cy0 + 16, 'w', { s: big, align: 'center', outline: 'k' });
+  if (DEMO) text('FREE DEMO', W / 2, cy0 + big * 5 + 36, 'r', { align: 'center', outline: 'k' });
   text('A HERDING TALE', W / 2, cy0 + big * 5 + 26, 'l', { align: 'center', outline: 'k' });
   const w = Math.min(W - 24, 120);
-  const y = Math.max(cy0 + big * 5 + 38, Math.min(Math.round(H * 0.48), H - 104));
+  const y = Math.max(cy0 + big * 5 + 38, Math.min(Math.round(H * 0.46), H - 118));
   if (showcase.on && showcase.trailer) return;
-  rect(Math.round(W / 2 - w / 2) - 2, y - 2, w + 4, 6 * 14 + 2, 'k');
+  const nItems = screenItems().length;
+  rect(Math.round(W / 2 - w / 2) - 2, y - 2, w + 4, nItems * 14 + 2, 'k');
   drawList(screenItems(), W / 2, y, w, 14);
   const fy = H - 10;
   rect(0, fy - 3, W, 13, 'k');
   if (best.escort || best.defend) text('BEST  ESCORT ' + best.escort + '  DEFEND ' + best.defend, W / 2, fy, 'y', { align: 'center' });
   else text('1-4 PLAYERS  GOATS AND DOGS', W / 2, fy, 's', { align: 'center' });
-  text('V0.13', W - 3, fy - 12, 'i', { align: 'right', outline: 'k' });
+  text(DEMO ? 'DEMO V0.14' : 'V0.14', W - 3, fy - 12, 'i', { align: 'right', outline: 'k' });
 }
 const MODES = [
   { id: 'escort', title: 'ESCORT', l1: 'HERD THE FLOCK PIN TO PIN', icon: 'pinGoal' },
@@ -5941,7 +6044,7 @@ function drawModeSelect() {
     G.drawImage(ic.r, Math.round(x + 12 - ic.w / 2), y + ch - 4 - ic.h);
     text((sel ? '> ' : '') + m.title, x + 25, y + 4, sel ? 'y' : 'w');
     text(m.l1, x + 25, y + 11, 'l');
-    if (ch >= 26) text(modeBest(m.id), x + 25, y + 18, 's');
+    if (ch >= 26) text(DEMO && DEMO_LOCKED_MODES.indexOf(m.id) >= 0 ? 'IN THE FULL GAME' : modeBest(m.id), x + 25, y + 18, DEMO && DEMO_LOCKED_MODES.indexOf(m.id) >= 0 ? 'r' : 's');
     hits.push({ x: x, y: y, w: w, h: ch, i: i });
     y += ch + 3;
   });
@@ -5954,7 +6057,7 @@ function drawModeSelect() {
 }
 function drawPlayerSelect() {
   screenBg();
-  header((MODES.find(m => m.id === mode) || { title: 'MY MAP' }).title + ' - PLAYERS');
+  header((MODES.find(m => m.id === mode) || { title: 'MY MAP' }).title + (net.role === 'host' ? '' : ' - PLAYERS'));
   // back button
   rect(4, 5, 30, 11, 'i');
   text('<', 7, 8, 'l'); text('BACK', 14, 8, 'l');
@@ -5984,7 +6087,7 @@ function drawPlayerSelect() {
     const ph = Math.floor(realTime / 2.5) % 4, cyc = [pset.idle.E, pset.E, pset.run.E, pset.attack.E][ph];
     const sp = cyc[Math.floor(realTime * (ph === 0 ? 2 : 8)) % cyc.length];
     const bx = x + 7, by = y + 12, bw = 40, bh = ch - 16;
-    hits.push({ x: bx, y: by, w: bw, h: bh, fn: () => cycleSkin(p, 1) });
+    if (!p.net) hits.push({ x: bx, y: by, w: bw, h: bh, fn: () => cycleSkin(p, 1) });
     rect(bx, by, bw, bh, 'g');
     rect(bx, by + bh - 3, bw, 3, 'h');
     G.save(); G.beginPath(); G.rect(bx, by, bw, bh); G.clip();
@@ -5996,15 +6099,21 @@ function drawPlayerSelect() {
     text('<', tx, y + 5, 'l');
     text(kname, tx + 8, y + 5, p.kind === 'wolf' ? 'r' : 'w');
     text('>', tx + 8 + textWidth(kname) + 4, y + 5, 'l');
-    hits.push({ x: tx - 2, y: y + 2, w: textWidth(kname) + 20, h: 10, fn: () => cycleKind(p, 1) });
+    if (!p.net) hits.push({ x: tx - 2, y: y + 2, w: textWidth(kname) + 20, h: 10, fn: () => cycleKind(p, 1) });
     text(p.kind === 'goat' ? 'RAM (STOMP: UPGRADE)' : (p.kind === 'dog' ? 'BARK + ' + dogBreed(p).short : 'LUNGE + HOWL'), tx, y + 14, 'l');
     text(DEVICE_NAMES[p.dev] || p.dev, tx, y + 22, 's');
-    if (p.kind !== 'wolf') {
+    if (p.kind !== 'wolf' && !p.net) {
       const list = skinList(p.kind), got = list.filter((_, i) => skinUnlocked(p.kind, i)).length;
       text(got + '/' + list.length, x + w - 6, y + 22, got === list.length ? 'y' : 'i', { align: 'right' });
     }
     const rw = 34, rx = x + w - rw - 5, ry = y + ch - 14;
     const sw = 30, sx = rx - sw - 4;
+    if (p.net) {
+      rect(rx, ry, rw, 10, 'i');
+      text('KICK', rx + rw / 2, ry + 3, 'r', { align: 'center' });
+      hits.push({ x: rx - 2, y: ry - 2, w: rw + 4, h: 14, fn: () => { const pr = net.peers.find(q => q.id === p.net); if (pr) { netSendCh(pr.rel, 'bye', 'THE HOST REMOVED YOU'); netPeerGone(pr); } SFX.back(); } });
+      text('ONLINE', x + w - 6, y + 14, 'y', { align: 'right' });
+    } else {
     rect(sx, ry, sw, 10, 'i');
     text('STYLE', sx + sw / 2, ry + 3, 's', { align: 'center' });
     hits.push({ x: sx - 2, y: ry - 2, w: sw + 4, h: 14, fn: () => openStyle(p) });
@@ -6018,6 +6127,13 @@ function drawPlayerSelect() {
       text(p.ready ? 'READY' : 'READY?', rx + rw / 2, ry + 3, p.ready ? 'k' : 'l', { align: 'center' });
       hits.push({ x: rx - 2, y: ry - 2, w: rw + 4, h: 14, fn: () => { p.ready = !p.ready; SFX.click(); } });
     }
+    }
+  }
+  if (net.role === 'host') {
+    const iw = 44, ix = W - iw - 4;
+    rect(ix, 5, iw, 11, 'y');
+    text('INVITE', ix + iw / 2, 8, 'k', { align: 'center' });
+    hits.push({ x: ix - 2, y: 0, w: iw + 6, h: 20, fn: () => netOpenBox('host') });
   }
   const fy = H - bottom + 4;
   if (startCountdown >= 0) {
@@ -6114,7 +6230,7 @@ function drawHowTo() {
     // farm dogs, five per page; locked ones show the medals needed
     const t = totalMedals();
     DOG_BREEDS.slice((howPage - 1) * 5, howPage * 5).forEach((b, k) => {
-      const i = (howPage - 1) * 5 + k, ok = t >= b.need;
+      const i = (howPage - 1) * 5 + k, ok = t >= b.need && (!DEMO || i < DEMO_BREEDS);
       icon(skinSet('dog', ok ? i : 0).E[0]);
       if (!ok) { G.fillStyle = PAL_DAY.k; G.fillRect(x + 2, y + 2, 16, 10); text('?', x + 10, y + 4, 'i', { align: 'center' }); }
       text(b.name, x + 25, y + 1, ok ? 'y' : 'i');
@@ -6129,7 +6245,7 @@ function drawHowTo() {
     const t = totalMedals(), cw = Math.floor(w / 3);
     GOAT_BREEDS.forEach((b, i) => {
       const cx = x + (i % 3) * cw + cw / 2, cy = y + Math.floor(i / 3) * 30;
-      const ok = t >= b.need, sp = (ok ? goatSetCached(i) : SP.goat).E[Math.floor(realTime * 3 + i) % 4];
+      const ok = t >= b.need && (!DEMO || i < DEMO_BREEDS), sp = (ok ? goatSetCached(i) : SP.goat).E[Math.floor(realTime * 3 + i) % 4];
       rect(cx - 12, cy, 24, 18, 'g'); rect(cx - 12, cy + 16, 24, 2, 'h');
       if (ok) G.drawImage(sp.r, Math.round(cx - sp.w / 2), cy + 16 - sp.h);
       else text('?', cx, cy + 6, 'i', { align: 'center' });
@@ -6323,6 +6439,702 @@ function render() {
 }
 
 // ---------------------------------------------------------------------
+// Online play: one player hosts, friends join. The host runs the whole
+// game; guests send their controls and draw the state the host sends
+// (about 20 snapshots a second). Connections are WebRTC data channels.
+// There is no server: the two players swap short codes (copy and paste)
+// to link up, and a public STUN server only helps them find each other.
+// ---------------------------------------------------------------------
+const NET_ICE = { iceServers: [{ urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] }] };
+const NET_PF = ['x', 'y', 'vx', 'vy', 'fx', 'fy', 'ramT', 'actT', 'actT2', 'dashT', 'lungeT', 'down', 'revive', 'stun', 'carry', 'cd', 'cdMax', 'cd2', 'cd2Max'];
+const NET_R = (v, n) => { const k = n === 2 ? 100 : 10; return Math.round((v || 0) * k) / k; };
+const netNum = (v) => (typeof v === 'number' && isFinite(v) ? v : 0);
+function isMine(p) {
+  if (net.role === 'off') return !p.dev.startsWith('ai');
+  if (net.role === 'host') return !p.net && !p.dev.startsWith('ai');
+  return p.slot === net.slot;
+}
+
+// ---- codes: the session description, deflated and made URL-safe
+async function netPack(desc) {
+  const raw = new TextEncoder().encode(JSON.stringify({ t: desc.type === 'offer' ? 'o' : 'a', s: desc.sdp, v: NET_VER }));
+  let bytes = raw, tag = 'GEB0.';
+  if (typeof CompressionStream !== 'undefined') {
+    try {
+      const cs = new CompressionStream('deflate-raw'), w = cs.writable.getWriter();
+      w.write(raw); w.close();
+      bytes = new Uint8Array(await new Response(cs.readable).arrayBuffer());
+      tag = 'GEB1.';
+    } catch (e) { bytes = raw; tag = 'GEB0.'; }
+  }
+  let bin = '';
+  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+  return tag + btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+async function netUnpack(code) {
+  code = String(code || '').replace(/\s+/g, '');
+  const m = /^GEB([01])\.([A-Za-z0-9_-]+)$/.exec(code);
+  if (!m) throw new Error('THAT IS NOT A GAME CODE');
+  const b64 = m[2].replace(/-/g, '+').replace(/_/g, '/');
+  const bin = atob(b64 + '='.repeat((4 - b64.length % 4) % 4));
+  let bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  if (m[1] === '1') {
+    const ds = new DecompressionStream('deflate-raw'), w = ds.writable.getWriter();
+    w.write(bytes); w.close();
+    bytes = new Uint8Array(await new Response(ds.readable).arrayBuffer());
+  }
+  const o = JSON.parse(new TextDecoder().decode(bytes));
+  if (!o || typeof o.s !== 'string') throw new Error('THAT CODE IS DAMAGED');
+  if (o.v !== NET_VER) throw new Error('DIFFERENT GAME VERSION (V' + o.v + ')');
+  return o;
+}
+function netGather(pc, ms) {
+  return new Promise((res) => {
+    if (pc.iceGatheringState === 'complete') { res(); return; }
+    let done = false;
+    const fin = () => { if (!done) { done = true; res(); } };
+    pc.addEventListener('icegatheringstatechange', () => { if (pc.iceGatheringState === 'complete') fin(); });
+    setTimeout(fin, ms || 3000);
+  });
+}
+function netSendCh(ch, type, data) {
+  if (!ch || ch.readyState !== 'open') return;
+  try { ch.send(JSON.stringify({ t: type, d: data })); } catch (e) { /* closed */ }
+}
+function netBroadcast(type, data, unreliable) {
+  for (const p of net.peers) netSendCh(unreliable ? p.uns : p.rel, type, data);
+}
+
+// ---- host: invite a friend (offer) and accept their reply (answer)
+function netStartHost() {
+  if (net.role === 'client') return;
+  net.role = 'host';
+}
+async function netHostInvite() {
+  netStartHost();
+  if (net.pending) { try { net.pending.pc.close(); } catch (e) { /* ignore */ } net.pending = null; }
+  if (net.peers.length >= 3) throw new Error('THE ROOM IS FULL (4 PLAYERS)');
+  const pc = new RTCPeerConnection(NET_ICE);
+  const peer = { id: ++net.idc, pc: pc, rel: pc.createDataChannel('r', { ordered: true }), uns: pc.createDataChannel('u', { ordered: false, maxRetransmits: 0 }),
+    joined: false, input: { x: 0, y: 0 }, lastIn: 0, slot: -1 };
+  net.pending = peer;
+  const onMsg = (ev) => { let m = null; try { m = JSON.parse(ev.data); } catch (e) { return; } netHostMsg(peer, m); };
+  peer.rel.onmessage = onMsg; peer.uns.onmessage = onMsg;
+  peer.rel.onclose = () => netPeerGone(peer);
+  pc.onconnectionstatechange = () => { const s = pc.connectionState; if (s === 'failed' || s === 'closed') netPeerGone(peer); };
+  await pc.setLocalDescription(await pc.createOffer());
+  await netGather(pc, 3000);
+  return netPack(pc.localDescription);
+}
+async function netHostAccept(code) {
+  const d = await netUnpack(code);
+  if (d.t !== 'a') throw new Error('THAT IS AN INVITE, PASTE THE REPLY');
+  const peer = net.pending;
+  if (!peer) throw new Error('MAKE AN INVITE CODE FIRST');
+  await peer.pc.setRemoteDescription({ type: 'answer', sdp: d.s });
+}
+function netHostHello(peer, d) {
+  const bye = (why) => { netSendCh(peer.rel, 'bye', why); setTimeout(() => { try { peer.pc.close(); } catch (e) { /* ignore */ } }, 400); if (net.pending === peer) net.pending = null; };
+  if (!d || d.v !== NET_VER) { bye('DIFFERENT VERSION (HOST V' + NET_VER + ')'); return; }
+  if (state !== 'PLAYERS' && state !== 'NET' && state !== 'MODE' && state !== 'MAPS' && state !== 'TITLE' && state !== 'STYLE') { bye('A GAME IS IN PROGRESS, TRY AGAIN WHEN IT ENDS'); return; }
+  let slot = freeSlot();
+  if (slot === 0 && !players.some(p => !p.cpu && !p.net)) slot = [1, 2, 3].find(k => !players.some(q => q.slot === k)) ?? -1;   // P1 is kept for the host
+  if (slot < 0) { bye('THE ROOM IS FULL'); return; }
+  const goats = players.filter(p => p.kind === 'goat').length, dogs = players.filter(p => p.kind === 'dog').length;
+  const kinds = kindsForMode();
+  const kind = kinds.indexOf(d.kind) >= 0 ? d.kind : (goats > dogs ? 'dog' : 'goat');
+  const p = { slot: slot, dev: 'net' + peer.id, kind: kind, ready: true, net: peer.id, skin: netSkin(kind, d.skin), look: normLabLook(d.look) };
+  makePlayerBody(p, 0, 0);
+  players.push(p);
+  players.sort((a, b) => a.slot - b.slot);
+  peer.joined = true; peer.slot = slot; peer.lastIn = realTime;
+  net.peers.push(peer);
+  if (net.pending === peer) net.pending = null;
+  netSendCh(peer.rel, 'welcome', { slot: slot });
+  netSendRoster();
+  net.status = 'FRIEND CONNECTED (P' + (slot + 1) + ')';
+  SFX.join();
+}
+function netSkin(kind, i) { return Number.isInteger(i) && i >= 0 && i < (DEMO && kind !== 'wolf' ? Math.min(DEMO_BREEDS, skinList(kind).length) : skinList(kind).length) ? i : 0; }
+function netHostPick(peer, d) {
+  const p = players.find(q => q.net === peer.id);
+  if (!p || !d || state === 'PLAYING' || state === 'LOADING') return;
+  if (kindsForMode().indexOf(d.kind) >= 0 && d.kind !== p.kind) p.kind = d.kind;
+  p.skin = netSkin(p.kind, d.skin);
+  p.look = normLabLook(d.look);
+  netSendRoster();
+}
+function netHostMsg(peer, m) {
+  if (!m || typeof m.t !== 'string') return;
+  if (m.t === 'hello') { if (!peer.joined) netHostHello(peer, m.d); return; }
+  if (!peer.joined) return;
+  if (m.t === 'in') { const d = m.d || {}; peer.input.x = clamp(netNum(d.x), -1, 1); peer.input.y = clamp(netNum(d.y), -1, 1); peer.lastIn = realTime; }
+  else if (m.t === 'act') { if (m.d === 'action' || m.d === 'ability') netRemoteEvent({ dev: 'net' + peer.id, type: m.d }); }
+  else if (m.t === 'pick') netHostPick(peer, m.d);
+  else if (m.t === 'ping') { peer.lastIn = realTime; netSendCh(peer.rel, 'pong', m.d); }
+}
+function netRemoteEvent(ev) {
+  if (state !== 'PLAYING' || paused) return;
+  const p = playerForDev(ev.dev);
+  if (!p) return;
+  if (ev.type === 'action') playerAction(p); else if (ev.type === 'ability') playerAbility(p);
+}
+function netPeerGone(peer) {
+  if (peer.gone) return;
+  peer.gone = true;
+  const i = net.peers.indexOf(peer);
+  if (i >= 0) net.peers.splice(i, 1);
+  if (net.pending === peer) net.pending = null;
+  const pi = players.findIndex(q => q.net === peer.id);
+  if (pi >= 0) {
+    const p = players[pi];
+    if (state === 'PLAYING') addText(p.x, p.y - 14, 'P' + (p.slot + 1) + ' LEFT', 'r');
+    if (p.carry) { sheep.push(p.carry); p.carry = null; }
+    players.splice(pi, 1);
+    net.status = 'P' + (p.slot + 1) + ' LEFT THE GAME';
+  }
+  try { peer.pc.close(); } catch (e) { /* ignore */ }
+  netSendRoster();
+}
+function netEnd(why) {
+  if (net.role === 'host') {
+    netBroadcast('bye', why || 'THE HOST CLOSED THE ROOM');
+    const gone = net.peers.slice();
+    if (net.pending) gone.push(net.pending);
+    setTimeout(() => { for (const p of gone) { try { p.pc.close(); } catch (e) { /* ignore */ } } }, 400);
+    players = players.filter(p => !p.net);
+    for (const p of gone) p.gone = true;
+  } else if (net.role === 'client' && net.guest) {
+    try { net.guest.pc.close(); } catch (e) { /* ignore */ }
+  }
+  net.role = 'off'; net.peers = []; net.pending = null; net.guest = null; net.slot = -1; net.me = null; net.over = null; net.leaveAsk = false; net.snap = null;
+  net.sheepById.clear(); net.enemyById.clear(); net.ev = []; net.lastPong = 0; net.ping = 0;
+}
+function netRoster() {
+  return { mode: mode, players: players.map(p => ({ s: p.slot, k: p.kind, sk: p.skin || 0, l: p.look || null, c: p.cpu ? 1 : 0, n: p.net ? 1 : 0 })) };
+}
+function netSendRoster() { if (net.role === 'host' && net.peers.length) netBroadcast('roster', netRoster()); }
+
+// ---- guest: take an invite, make a reply
+async function netGuestAccept(code) {
+  const d = await netUnpack(code);
+  if (d.t !== 'o') throw new Error('THAT IS A REPLY, PASTE THE INVITE');
+  if (net.role === 'host') throw new Error('YOU ARE HOSTING RIGHT NOW');
+  if (net.guest) { try { net.guest.pc.close(); } catch (e) { /* ignore */ } }
+  const pc = new RTCPeerConnection(NET_ICE);
+  const g = { pc: pc, rel: null, uns: null };
+  net.guest = g; net.role = 'client'; net.slot = -1;
+  pc.ondatachannel = (ev) => {
+    const ch = ev.channel;
+    if (ch.label === 'r') g.rel = ch; else g.uns = ch;
+    ch.onmessage = (e) => { let m = null; try { m = JSON.parse(e.data); } catch (er) { return; } netClientMsg(m); };
+    if (ch.label === 'r') {
+      ch.onclose = () => netClientLost('THE HOST DISCONNECTED');
+      const hello = () => netSendCh(ch, 'hello', { v: NET_VER, kind: settings.netKind || 'goat', skin: rememberedSkin(settings.netKind || 'goat'), look: rememberedLook(settings.netKind || 'goat') });
+      if (ch.readyState === 'open') hello(); else ch.onopen = hello;
+    }
+  };
+  pc.onconnectionstatechange = () => { const s = pc.connectionState; if (s === 'failed' || s === 'closed') netClientLost('THE CONNECTION FAILED'); };
+  await pc.setRemoteDescription({ type: 'offer', sdp: d.s });
+  await pc.setLocalDescription(await pc.createAnswer());
+  await netGather(pc, 3000);
+  return netPack(pc.localDescription);
+}
+function netClientLost(why) {
+  if (net.role !== 'client') return;
+  const was = net.guest;
+  netEnd();
+  netNote(why || 'DISCONNECTED');
+  if (!isMenu() || state === 'NETWAIT' || state === 'NET' || state === 'STYLE') { useMenuWorld(); goScreen('NET'); }
+  void was;
+}
+function netLeave(why) {
+  const wasClient = net.role === 'client';
+  if (wasClient && net.guest) netSendCh(net.guest.rel, 'bye', 'LEFT');
+  netEnd();
+  netNote(why || 'YOU LEFT THE ONLINE GAME');
+  netCloseBox();
+  useMenuWorld();
+  goScreen('TITLE');
+}
+function netNote(s) { net.note = s; net.noteT = realTime; }
+
+// ---- guest: messages from the host
+function netClientMsg(m) {
+  if (!m || typeof m.t !== 'string') return;
+  const d = m.d;
+  switch (m.t) {
+    case 'welcome': {
+      net.slot = d.slot;
+      const kind = settings.netKind || 'goat';
+      net.me = { slot: d.slot, dev: 'netme', kind: kind, skin: rememberedSkin(kind), look: rememberedLook(kind), cpu: false, ready: true };
+      netCloseBox();
+      players = [];
+      goScreen('NETWAIT');
+      SFX.join();
+      break;
+    }
+    case 'roster': net.roster = d; mode = d.mode || mode; if (state === 'PLAYING') netBuildPlayers(d.players); break;
+    case 'world': netClientWorld(d); break;
+    case 'snap': net.snap = d; break;
+    case 'ev': for (const e of d) netPlayEvent(e); break;
+    case 'over': net.over = d; break;
+    case 'lobby': if (state === 'PLAYING' || state === 'LOADING') { net.over = null; net.snap = null; players = []; useMenuWorld(); goScreen('NETWAIT'); } break;
+    case 'bye': netClientLost(String(d || 'THE HOST LEFT')); break;
+    case 'pong': net.ping = Math.round(performance.now() - netNum(d)); net.lastPong = realTime; break;
+  }
+}
+function netSendPick() {
+  const me = net.me;
+  if (!me || !net.guest) return;
+  settings.netKind = me.kind; saveSettings();
+  netSendCh(net.guest.rel, 'pick', { kind: me.kind, skin: me.skin || 0, look: me.look });
+}
+function netBuildPlayers(list) {
+  const old = players;
+  players = list.map(r => {
+    let p = old.find(q => q.slot === r.s);
+    if (!p) { p = { slot: r.s, init: false }; makePlayerBody(p, 0, 0); }
+    p.kind = r.k; p.skin = r.sk; p.look = normLabLook(r.l); p.cpu = !!r.c; p.ready = true;
+    p.dev = r.c ? 'ai' + r.s : (r.s === net.slot ? 'netme' : 'net' + r.s);
+    p.net = r.n ? 1 : 0;
+    return p;
+  });
+}
+function netClientWorld(w) {
+  mode = w.mode;
+  if (DEMO && (DEMO_LOCKED_MODES.indexOf(mode) >= 0 || mode === 'custom' || (typeof w.src === 'number' && w.src >= DEMO_MAPS) || (w.idx || 0) >= DEMO_MAPS)) { netLeave('THAT MAP IS IN THE FULL GAME'); return; }
+  net.over = null; net.snap = null; net.leaveAsk = false;
+  const label = (w.name || (mode === 'defend' ? 'DEFEND' : 'ONLINE')).toUpperCase();
+  requestLoad(() => {
+    enemies = []; particles = []; texts = []; fireflies = []; decals = []; splats = []; sheep = [];
+    net.sheepById.clear(); net.enemyById.clear();
+    score = 0; rescued = 0; delivered = 0; lostCount = 0; comboN = 0; bells = 0; paused = false; banner = { t: 0, a: '', b: '' };
+    resetUpgrades();
+    players = [];
+    netBuildPlayers(w.roster.players);
+    if (isEscort()) {
+      if (w.src === 'daily') net.forceSeed = w.seed;
+      if (w.src === 'endless') { endless.seed = w.seed; endless.stage = w.stage; }
+      if (w.src === 'custom') edDecode(w.code);
+      const ew = escortWorld(w.src);
+      net.forceSeed = 0;
+      useWorld(ew.wd, ew.def);
+      mission.src = w.src; mission.map = typeof w.src === 'number' ? w.src : -1; mission.name = ew.name;
+      mission.n = w.n; mission.herdStart = w.herd; mission.penned = 0; mission.kills = 0; mission.time = 0;
+    } else {
+      wave.map = w.idx; wave.n = w.wn;
+      useMap('defend', w.idx);
+      Object.assign(versus, { t: 150, taken: 0, hits: 0, winner: '' });
+    }
+    goScreen('PLAYING');
+    net.t0 = realTime;
+    net.need = true;           // snap the camera to our player on the first snapshot
+    SFX.wave();
+  }, label);
+}
+function netPlayEvent(e) {
+  if (!Array.isArray(e)) return;
+  try {
+    switch (e[0]) {
+      case 's': if (typeof SFX[e[1]] === 'function') SFX[e[1]].apply(SFX, e.slice(2)); break;
+      case 't': addText(e[1], e[2], e[3], e[4]); break;
+      case 'k': addShake(e[1]); break;
+      case 'd': dust(e[1], e[2], e[3], e[4], e[5]); break;
+      case 'i': impactBurst(e[1], e[2]); break;
+      case 'o': popBurst(e[1], e[2], e[3]); break;
+      case 'w': woolPuff(e[1], e[2], e[3]); break;
+      case 'l': leafBurst(e[1], e[2]); break;
+      case 'u': woolTuft(e[1], e[2]); break;
+      case 'p': addParticle(e[1]); break;
+      case 'sp': startSplat(e[1]); break;
+    }
+  } catch (er) { /* a bad effect must not stop the game */ }
+}
+// host-side recording of effects, so guests see and hear the same moments
+(function netHookEffects() {
+  const live = () => net.role === 'host' && net.peers.length > 0 && net.ev.length < 300;
+  const rec = (name, code) => {
+    const orig = window[name];
+    window[name] = function () {
+      const top = net.recDepth === 0;
+      net.recDepth++;
+      try { return orig.apply(this, arguments); } finally {
+        net.recDepth--;
+        if (top && live()) net.ev.push([code].concat(Array.prototype.slice.call(arguments)));
+      }
+    };
+  };
+  rec('addText', 't'); rec('addShake', 'k'); rec('dust', 'd'); rec('impactBurst', 'i'); rec('popBurst', 'o');
+  rec('woolPuff', 'w'); rec('leafBurst', 'l'); rec('woolTuft', 'u');
+  const ap = window.addParticle;
+  window.addParticle = function (p) {
+    if (net.recDepth === 0 && p && p.kind === 'ring' && live()) net.ev.push(['p', p]);
+    return ap.apply(this, arguments);
+  };
+  for (const k of Object.keys(SFX)) {
+    const f = SFX[k];
+    if (typeof f !== 'function') continue;
+    SFX[k] = function () {
+      if (net.recDepth === 0 && live()) net.ev.push(['s', k].concat(Array.prototype.slice.call(arguments)));
+      return f.apply(SFX, arguments);
+    };
+  }
+  const gs = window.goScreen;
+  window.goScreen = function (s) {
+    gs(s);
+    if (net.role !== 'host' || !net.peers.length) return;
+    if (s === 'RESULTS' || s === 'GAMEOVER') setTimeout(() => netBroadcast('over', netOverData(s)), 80);
+    else if (MENU_STATES.indexOf(s) >= 0) netBroadcast('lobby', {});
+  };
+})();
+function netOverData(s) {
+  const rows = [];
+  let head;
+  if (s === 'RESULTS') {
+    head = [mode === 'endless' ? 'STAGE ' + endless.stage : (mode === 'daily' ? 'DAILY' : 'MISSION ' + mission.n), 'COMPLETE'];
+    rows.push(['DELIVERED', mission.penned + '/' + mission.herdStart], ['PREDATORS', mission.kills], ['SCORE', score], ['BELLS', bells]);
+  } else if (mode === 'versus') {
+    head = [versus.winner, 'WIN!'];
+    rows.push(['SHEEP LEFT', sheep.length], ['SHEEP TAKEN', versus.taken]);
+  } else {
+    head = ['THE FLOCK', 'IS LOST'];
+    rows.push(['SCORE', score], [isEscort() ? 'MISSION' : 'WAVE', isEscort() ? mission.n : wave.n], ['RESCUED', rescued]);
+  }
+  return { head: head, rows: rows };
+}
+// the host tells everyone about a new mission or wave set
+function netHostWorld() {
+  if (net.role !== 'host' || !net.peers.length) return;
+  const w = { mode: mode, roster: netRoster(), name: mission.name || '' };
+  if (isEscort()) {
+    w.src = mission.src; w.n = mission.n; w.herd = mission.herdStart; w.name = mission.name;
+    if (mission.src === 'daily') w.seed = dailySeed();
+    else if (mission.src === 'endless') { w.seed = endless.seed; w.stage = endless.stage; }
+    else if (mission.src === 'custom') w.code = edEncode();
+  } else { w.idx = wave.map || 0; w.wn = wave.n; w.name = (DEFEND_MAPS[wave.map || 0] || {}).name || ''; }
+  netBroadcast('world', w);
+  net.snapT = 0.05;
+}
+
+// ---- host: snapshots
+function netSnapshot() {
+  const sh = [], en = [], pl = [];
+  for (const s of sheep) {
+    if (!s.nid) s.nid = ++net.idc2;
+    sh.push([s.nid, NET_R(s.x), NET_R(s.y), NET_R(s.vx), NET_R(s.vy), NET_R(s.fx, 2), NET_R(s.fy, 2), s.type === 'normal' ? 0 : s.type,
+      (s.grazing ? 1 : 0) | (s.panic > 0 ? 2 : 0) | (s.penned ? 4 : 0) | (s.thorn > 0.4 ? 8 : 0) | (s.flash > 0 ? 16 : 0)]);
+  }
+  for (const e of enemies) {
+    if (!e.nid) e.nid = ++net.idc2;
+    if (e.target && !e.target.nid) e.target.nid = ++net.idc2;
+    en.push([e.nid, NET_R(e.x), NET_R(e.y), NET_R(e.vx), NET_R(e.vy), NET_R(e.fx, 2), NET_R(e.fy, 2), e.type, e.state, NET_R(e.alt), e.hp, e.maxHp || 0,
+      (e.alpha ? 1 : 0) | (e.boss ? 2 : 0) | (e.carry ? 4 : 0) | (e.flash > 0 ? 8 : 0), NET_R(e.phase, 2), NET_R(e.t, 2), e.target ? e.target.nid : 0]);
+  }
+  for (const p of players) {
+    const r = [p.slot];
+    for (const f of NET_PF) r.push(f === 'carry' ? (p.carry ? 1 : 0) : (f === 'fx' || f === 'fy' ? NET_R(p[f], 2) : NET_R(p[f], f === 'x' || f === 'y' || f === 'vx' || f === 'vy' ? 1 : 2)));
+    pl.push(r);
+  }
+  return { sh: sh, en: en, p: pl, h: {
+    sc: score, pn: mission.penned, bl: bells, wn: wave.n, ph: wave.phase, cn: comboN, ca: NET_R(realTime - comboT), vt: NET_R(versus.t), vk: versus.taken,
+    mn: mission.n, es: endless.stage, gr: world.goalR || 0, pz: paused ? 1 : 0, dt: NET_R(dayTarget, 2), dp: NET_R(dayProgress, 2), tt: mission.herdStart, kl: mission.kills,
+    bn: banner.t > 0 ? [banner.a, banner.b, NET_R(banner.t)] : 0 } };
+}
+// ---- guest: apply a snapshot, then smooth between snapshots
+function netApplySnap(s) {
+  const h = s.h || {};
+  score = h.sc; mission.penned = h.pn; bells = h.bl; wave.n = h.wn; wave.phase = h.ph; comboN = h.cn; comboT = realTime - (h.ca || 0);
+  versus.t = h.vt; versus.taken = h.vk; mission.n = h.mn; endless.stage = h.es; mission.herdStart = h.tt; mission.kills = h.kl;
+  if (world && world.goal && h.gr) world.goalR = h.gr;
+  net.hostPaused = !!h.pz; dayTarget = h.dt;
+  if (Math.abs(dayProgress - h.dp) > 0.3) dayProgress = h.dp;
+  if (h.bn) { banner.a = h.bn[0]; banner.b = h.bn[1]; banner.t = h.bn[2]; } else if (banner.t > 0.5) banner.t = 0;
+  for (const r of s.p) {
+    const p = players.find(q => q.slot === r[0]);
+    if (!p) continue;
+    NET_PF.forEach((f, i) => {
+      const v = r[i + 1];
+      if (f === 'x') p.tx = v; else if (f === 'y') p.ty = v; else if (f === 'carry') p.carry = v ? true : null; else p[f] = v;
+    });
+    if (!p.init) { p.x = p.tx; p.y = p.ty; p.init = true; }
+  }
+  const seen = new Set();
+  for (const r of s.sh) {
+    let o = net.sheepById.get(r[0]);
+    if (!o) { o = makeSheep(r[1], r[2]); o.nid = r[0]; o.tx = r[1]; o.ty = r[2]; net.sheepById.set(r[0], o); sheep.push(o); }
+    seen.add(r[0]);
+    o.tx = r[1]; o.ty = r[2]; o.vx = r[3]; o.vy = r[4]; o.fx = r[5]; o.fy = r[6]; o.type = r[7] || 'normal';
+    const f = r[8];
+    o.grazing = !!(f & 1); o.panic = f & 2 ? 0.5 : 0; o.penned = !!(f & 4); o.thorn = f & 8 ? 1 : 0; if (f & 16) o.flash = 0.3;
+  }
+  if (seen.size !== sheep.length) { sheep = sheep.filter(o => seen.has(o.nid)); for (const k of [...net.sheepById.keys()]) if (!seen.has(k)) net.sheepById.delete(k); }
+  const seenE = new Set();
+  for (const r of s.en) {
+    let o = net.enemyById.get(r[0]);
+    if (!o) {
+      o = { nid: r[0], x: r[1], y: r[2], tx: r[1], ty: r[2], vx: 0, vy: 0, fx: 1, fy: 0.3, t: 0, fear: 0, anim: Math.random() * 6, hits: {}, carry: null, flash: 0, phase: 0, downCd: 0, hp: 1, maxHp: 1, alt: 0, state: 'hunt', type: 'wolf' };
+      net.enemyById.set(r[0], o); enemies.push(o);
+    }
+    seenE.add(r[0]);
+    o.tx = r[1]; o.ty = r[2]; o.vx = r[3]; o.vy = r[4]; o.fx = r[5]; o.fy = r[6]; o.type = r[7]; o.state = r[8]; o.alt = r[9]; o.hp = r[10]; o.maxHp = r[11];
+    const f = r[12];
+    o.alpha = !!(f & 1); o.boss = !!(f & 2); o.carry = f & 4 ? true : null; if (f & 8) o.flash = 0.15;
+    o.phase = r[13]; o.t = r[14]; o.target = r[15] ? net.sheepById.get(r[15]) || null : null;
+  }
+  if (seenE.size !== enemies.length) { enemies = enemies.filter(o => seenE.has(o.nid)); for (const k of [...net.enemyById.keys()]) if (!seenE.has(k)) net.enemyById.delete(k); }
+  if (net.need) { const me = players.find(q => q.slot === net.slot); if (me && me.init) { snapCam(me.x, me.y); net.need = false; } }
+}
+function netLocalMove() {
+  let m = readMove('kbL');
+  if (len(m.x, m.y) < 0.05) m = readMove('pad0');
+  if (len(m.x, m.y) < 0.05 && touch.active) m = readMove('touch');
+  return m;
+}
+function netClientUpdate(dt) {
+  if (net.snap) { netApplySnap(net.snap); net.snap = null; }
+  net.inT += dt;
+  if (net.inT >= 1 / 30 && net.guest) {
+    net.inT = 0;
+    const m = netLocalMove();
+    netSendCh(net.guest.uns, 'in', { x: NET_R(m.x, 2), y: NET_R(m.y, 2) });
+  }
+  const k = 1 - Math.exp(-14 * dt);
+  const adv = (o) => {
+    if (o.tx === undefined) return;
+    o.tx += o.vx * dt; o.ty += o.vy * dt;
+    const dx = o.tx - o.x, dy = o.ty - o.y;
+    if (dx * dx + dy * dy > 1600) { o.x = o.tx; o.y = o.ty; } else { o.x += dx * k; o.y += dy * k; }
+  };
+  for (const s of sheep) { adv(s); s.walk += len(s.vx, s.vy) * dt; s.chew += dt; if (s.flash > 0) s.flash -= dt; }
+  for (const e of enemies) { adv(e); e.anim += dt; stepGait(e, dt, 48, 34); if (e.flash > 0) e.flash -= dt; if (e.state === 'launched' && e.t > 0) e.t -= dt; }
+  for (const p of players) {
+    adv(p);
+    p.walk += len(p.vx, p.vy) * dt;
+    stepGait(p, dt, 58, 42);
+    const sp = len(p.vx, p.vy);
+    if (sp < 4 && !(p.actT > 0) && !(p.dashT > 0)) p.idleT = (p.idleT || 0) + dt; else p.idleT = 0;
+    if (sp > 4 && sp < 16) p.slowT = (p.slowT || 0) + dt; else p.slowT = 0;
+    for (const t of ['ramT', 'actT', 'actT2', 'dashT', 'lungeT', 'stun', 'cd', 'cd2']) if (p[t] > 0) p[t] = Math.max(0, p[t] - dt);
+  }
+  updateParticles(dt); updateFireflies(dt); updateWeather(dt); updateBirds(dt); updateDecals(dt); updateCamera(dt);
+  if (banner.t > 0) banner.t -= dt;
+}
+// host: stream the game to the guests, drop guests that went silent
+function netTick(dt) {
+  if (net.role === 'client' && net.guest) {
+    net.pingT += dt;
+    if (net.pingT >= 2) { net.pingT = 0; netSendCh(net.guest.rel, 'ping', performance.now()); }
+    if (!net.lastPong) net.lastPong = realTime;
+    if (realTime - net.lastPong > 15) netClientLost('LOST CONTACT WITH THE HOST');
+    return;
+  }
+  if (net.role === 'host') {
+    if (!net.peers.length) return;
+    for (const p of net.peers.slice()) if (realTime - p.lastIn > 15) netPeerGone(p);
+    if (state === 'PLAYING') {
+      net.snapT += dt;
+      if (net.snapT >= 0.05) { net.snapT = 0; netBroadcast('snap', netSnapshot(), true); }
+      if (net.ev.length) { netBroadcast('ev', net.ev); net.ev = []; }
+    } else {
+      net.rosterT += dt;
+      if (net.rosterT >= 1) { net.rosterT = 0; netSendRoster(); }
+      net.ev = [];
+    }
+  }
+}
+// guest: controls while the game is running
+function netClientEvent(ev) {
+  if (net.leaveAsk) {
+    if (ev.type === 'action') netLeave('YOU LEFT THE ONLINE GAME');
+    else if (ev.type === 'back' || ev.type === 'pause') net.leaveAsk = false;
+    return;
+  }
+  if (ev.type === 'action') netSendCh(net.guest && net.guest.rel, 'act', 'action');
+  else if (ev.type === 'ability' || (ev.type === 'back' && ev.dev.startsWith('pad'))) netSendCh(net.guest && net.guest.rel, 'act', 'ability');
+  else if (ev.type === 'pause') net.leaveAsk = true;
+}
+function netWaitEvent(ev) {
+  const me = net.me;
+  if (!me) return;
+  if (ev.type === 'left' || ev.type === 'right') { cycleKind(me, ev.type === 'left' ? -1 : 1); netSendPick(); }
+  else if (ev.type === 'up' || ev.type === 'down') { cycleSkin(me, ev.type === 'up' ? -1 : 1); netSendPick(); }
+  else if (ev.type === 'ability') openStyle(me);
+  else if (ev.type === 'back' || ev.type === 'pause') netLeave();
+  else if (ev.type === 'tap') { for (const h of hits) if (ev.x >= h.x && ev.x < h.x + h.w && ev.y >= h.y && ev.y < h.y + h.h) { h.fn(); return; } }
+}
+
+// ---- screens
+function netItems() {
+  if (net.role === 'host') return [
+    { label: 'PICK A MODE', value: net.peers.length + ' FRIEND' + (net.peers.length === 1 ? '' : 'S'), select: () => goScreen('MODE') },
+    { label: 'INVITE A FRIEND', select: () => netOpenBox('host') },
+    { label: 'LEAVE ONLINE', select: () => netLeave('ROOM CLOSED') },
+    { label: 'BACK', select: () => goScreen('TITLE') }
+  ];
+  return [
+    { label: 'HOST A GAME', select: () => { netStartHost(); netOpenBox('host'); } },
+    { label: 'JOIN A GAME', select: () => netOpenBox('join') },
+    { label: 'BACK', select: () => goScreen('TITLE') }
+  ];
+}
+function drawNet() {
+  screenBg();
+  header('PLAY ONLINE');
+  const w = colW(), x = Math.round(W / 2 - w / 2);
+  let y = 28;
+  const line = (s, c) => { text(s, W / 2, y, c || 'l', { align: 'center' }); y += 8; };
+  if (net.role === 'host') {
+    line('YOU ARE THE HOST', 'y');
+    line('THE GAME RUNS ON YOUR DEVICE', 's');
+    y += 4;
+    net.peers.forEach(p => { const pl = players.find(q => q.net === p.id); line('P' + (p.slot + 1) + ' ' + (pl ? pl.kind.toUpperCase() : '') + ' CONNECTED', 'w'); });
+    if (!net.peers.length) line('NO FRIENDS YET', 'i');
+    y += 6;
+  } else {
+    line('PLAY WITH FRIENDS ONLINE', 'w');
+    y += 2;
+    line('ONE PLAYER HOSTS, UP TO 3', 'l'); line('FRIENDS JOIN WITH A SHORT CODE', 'l');
+    line('(NO ACCOUNT, NO SERVER)', 's');
+    y += 6;
+  }
+  if (net.note && realTime - net.noteT < 8) { text(net.note, W / 2, y, 'r', { align: 'center' }); y += 10; }
+  drawList(screenItems(), W / 2, y + 2, w, 14);
+  void x;
+  text('SAME GAME VERSION REQUIRED (V' + NET_VER + ')', W / 2, H - 32, 's', { align: 'center' });
+}
+function drawNetWait() {
+  screenBg();
+  header('ONLINE LOBBY');
+  const me = net.me;
+  if (!me) return;
+  const w = colW(), x = Math.round(W / 2 - w / 2), y = 28, ch = 44;
+  rect(x, y, w, ch, 'k'); frame(x, y, w, ch, 'y'); rect(x, y, 3, ch, P_COL[me.slot]);
+  text('P' + (me.slot + 1) + '  YOU', x + 7, y + 4, P_COL[me.slot]);
+  const set = skinSet(me.kind, me.skin, me.look);
+  const ph = Math.floor(realTime / 2.5) % 4, cyc = [set.idle.E, set.E, set.run.E, set.attack.E][ph];
+  const sp = cyc[Math.floor(realTime * (ph === 0 ? 2 : 8)) % cyc.length];
+  const bx = x + 7, by = y + 14, bw = 40, bh = ch - 18;
+  rect(bx, by, bw, bh, 'g'); rect(bx, by + bh - 3, bw, 3, 'h');
+  G.save(); G.beginPath(); G.rect(bx, by, bw, bh); G.clip();
+  const spb = sprBox(set.idle.E[0]);
+  G.drawImage(sp.r, 0, 0, sp.w, sp.h, Math.round(bx + bw / 2 - (spb.x + spb.w / 2) * 2), by + bh - 2 - sp.h * 2, sp.w * 2, sp.h * 2);
+  G.restore();
+  hits.push({ x: bx, y: by, w: bw, h: bh, fn: () => { cycleSkin(me, 1); netSendPick(); } });
+  const tx = x + 52;
+  const nm = me.kind === 'wolf' ? 'WOLF' : (me.kind === 'dog' ? dogBreed(me).name : GOAT_BREEDS[me.skin || 0].name + ' GOAT');
+  text('<', tx, y + 14, 'l'); text(nm, tx + 8, y + 14, 'w'); text('>', tx + 8 + textWidth(nm) + 4, y + 14, 'l');
+  hits.push({ x: tx - 2, y: y + 11, w: textWidth(nm) + 20, h: 10, fn: () => { cycleKind(me, 1); netSendPick(); } });
+  text(me.kind === 'goat' ? 'RAM (STOMP: UPGRADE)' : (me.kind === 'dog' ? 'BARK + ' + dogBreed(me).short : 'LUNGE + HOWL'), tx, y + 24, 'l');
+  const sw = 30, sx = x + w - sw - 5, sy = y + ch - 14;
+  rect(sx, sy, sw, 10, 'i'); text('STYLE', sx + sw / 2, sy + 3, 's', { align: 'center' });
+  hits.push({ x: sx - 2, y: sy - 2, w: sw + 4, h: 14, fn: () => openStyle(me) });
+  let yy = y + ch + 8;
+  text('IN THE ROOM', W / 2, yy, 'y', { align: 'center' }); yy += 10;
+  const r = net.roster && net.roster.players || [];
+  for (const q of r) {
+    const nm2 = q.k === 'wolf' ? 'WOLF' : (q.k === 'dog' ? dogBreed({ skin: q.sk }).name : GOAT_BREEDS[q.sk || 0].name + ' GOAT');
+    text('P' + (q.s + 1) + (q.s === me.slot ? ' (YOU)' : (q.c ? ' CPU' : (q.s === hostSlot() ? ' HOST' : ''))), x + 4, yy, P_COL[q.s]);
+    text(nm2, x + w - 4, yy, 'l', { align: 'right' }); yy += 9;
+  }
+  yy += 6;
+  const dots = '.'.repeat(1 + Math.floor(realTime * 2) % 3);
+  text('WAITING FOR THE HOST' + dots, W / 2, yy, 'w', { align: 'center' }); yy += 12;
+  drawList(screenItems(), W / 2, Math.min(H - 60, yy), Math.min(w, 120), 13);
+  text('L/R: GOAT OR DOG  U/D: BREED', W / 2, H - 40, 'l', { align: 'center' });
+  text('ABILITY: STYLE   BACK: LEAVE', W / 2, H - 32, 's', { align: 'center' });
+}
+function hostSlot() { const r = net.roster && net.roster.players || []; const c = r.filter(q => !q.n && !q.c); return c.length ? c[0].s : -1; }
+// guest overlays while the game runs: host messages, leave prompt, results
+function drawNetOverlay() {
+  const cx = W / 2;
+  if (net.over) {
+    ditherDim(true);
+    const w = Math.min(W - 24, 130), x = Math.round(cx - w / 2);
+    let y = Math.round(H * 0.18);
+    text(net.over.head[0], cx, y, 'w', { s: 2, align: 'center', outline: 'k' }); y += 16;
+    text(net.over.head[1], cx, y, 'y', { s: 2, align: 'center', outline: 'k' }); y += 22;
+    for (const r of net.over.rows) { text(r[0], x + 4, y, 'l'); text(String(r[1]), x + w - 4, y, 'w', { align: 'right' }); y += 10; }
+    y += 10;
+    text('WAITING FOR THE HOST', cx, y, 'y', { align: 'center', outline: 'k' });
+  } else if (net.hostPaused) {
+    ditherDim(false);
+    text('PAUSED BY THE HOST', cx, Math.round(H * 0.4), 'w', { s: 2, align: 'center', outline: 'k' });
+  }
+  if (net.leaveAsk) {
+    const w = Math.min(W - 20, 150), h = 44, x = Math.round(cx - w / 2), y = Math.round(H / 2 - h / 2);
+    rect(x, y, w, h, 'k'); frame(x, y, w, h, 'y');
+    text('LEAVE THE GAME?', cx, y + 8, 'w', { align: 'center' });
+    text('ACTION: LEAVE', cx, y + 20, 'l', { align: 'center' });
+    text('PAUSE / BACK: STAY', cx, y + 29, 's', { align: 'center' });
+  }
+  if (net.role === 'client') text(net.ping ? net.ping + 'MS' : 'ONLINE', 3, H - 10, 's', { shadow: 'k' });
+}
+
+// ---- the copy-and-paste box (real HTML, so pasting works on every device)
+const NB = {};
+function netBoxInit() {
+  const q = (id) => document.getElementById(id);
+  for (const id of ['netbox', 'nbTitle', 'nbHelp', 'nbL1', 'nbOut', 'nbCopy', 'nbMake', 'nbL2', 'nbIn', 'nbPaste', 'nbGo', 'nbStatus', 'nbClose']) NB[id] = q(id);
+  NB.nbCopy.onclick = () => {
+    const t = NB.nbOut.value;
+    if (!t) return;
+    const ok = () => { NB.nbStatus.textContent = 'COPIED. NOW SEND IT TO YOUR FRIEND.'; };
+    try { navigator.clipboard.writeText(t).then(ok, () => { NB.nbOut.select(); document.execCommand('copy'); ok(); }); } catch (e) { NB.nbOut.select(); try { document.execCommand('copy'); ok(); } catch (er) { /* manual copy */ } }
+  };
+  NB.nbPaste.onclick = () => { try { navigator.clipboard.readText().then(t => { NB.nbIn.value = t; }, () => { NB.nbStatus.textContent = 'LONG-PRESS THE BOX BELOW AND PASTE'; }); } catch (e) { NB.nbStatus.textContent = 'LONG-PRESS THE BOX BELOW AND PASTE'; } };
+  NB.nbClose.onclick = () => netCloseBox();
+  NB.nbMake.onclick = async () => {
+    NB.nbMake.disabled = true; NB.nbStatus.textContent = 'MAKING A CODE...';
+    try {
+      if (net.boxKind === 'host') { NB.nbOut.value = await netHostInvite(); NB.nbStatus.textContent = 'SEND THIS CODE TO YOUR FRIEND, THEN PASTE THEIR REPLY BELOW.'; }
+    } catch (e) { NB.nbStatus.textContent = String(e.message || e).toUpperCase(); }
+    NB.nbMake.disabled = false;
+  };
+  NB.nbGo.onclick = async () => {
+    NB.nbGo.disabled = true;
+    try {
+      if (net.boxKind === 'host') {
+        NB.nbStatus.textContent = 'CONNECTING...';
+        await netHostAccept(NB.nbIn.value);
+        NB.nbIn.value = '';
+        NB.nbStatus.textContent = 'WAITING FOR YOUR FRIEND TO CONNECT...';
+      } else {
+        NB.nbStatus.textContent = 'MAKING A REPLY CODE...';
+        NB.nbOut.value = await netGuestAccept(NB.nbIn.value);
+        NB.nbStatus.textContent = 'SEND THIS REPLY BACK TO THE HOST AND KEEP THIS PAGE OPEN.';
+      }
+    } catch (e) { NB.nbStatus.textContent = String(e.message || e).toUpperCase(); }
+    NB.nbGo.disabled = false;
+  };
+  // keep the box in step with what is happening
+  setInterval(() => {
+    if (NB.netbox.hidden) return;
+    if (net.boxKind === 'host' && net.status && net.status !== net.shownStatus) { net.shownStatus = net.status; NB.nbStatus.textContent = net.status + '. MAKE ANOTHER INVITE FOR MORE FRIENDS.'; NB.nbOut.value = ''; NB.nbIn.value = ''; }
+  }, 300);
+}
+function netOpenBox(kind) {
+  if (!NB.netbox) return;
+  net.boxKind = kind; net.shownStatus = net.status;
+  const host = kind === 'host';
+  NB.nbTitle.textContent = host ? 'INVITE A FRIEND' : 'JOIN A FRIEND';
+  NB.nbHelp.textContent = host ? 'Pick a mode first or after. Each friend needs their own invite code.' : 'Ask the host for their invite code, then send your reply code back.';
+  NB.nbL1.textContent = host ? '1. YOUR INVITE CODE' : '2. YOUR REPLY CODE (SEND THIS TO THE HOST)';
+  NB.nbL2.textContent = host ? '2. PASTE YOUR FRIEND\'S REPLY CODE' : '1. PASTE THE HOST\'S INVITE CODE';
+  NB.nbMake.style.display = host ? '' : 'none';
+  NB.nbMake.textContent = 'MAKE INVITE CODE';
+  NB.nbGo.textContent = host ? 'CONNECT' : 'MAKE MY REPLY CODE';
+  NB.nbOut.value = ''; NB.nbIn.value = ''; NB.nbStatus.textContent = '';
+  NB.netbox.hidden = false;
+  // the guest sees the paste box first
+  const order = host ? ['nbL1', 'nbOut', 'nbCopy', 'nbMake', 'nbL2', 'nbIn', 'nbPaste', 'nbGo'] : ['nbL2', 'nbIn', 'nbPaste', 'nbGo', 'nbL1', 'nbOut', 'nbCopy'];
+  const panel = NB.netbox.querySelector('.nbp'), anchor = NB.nbStatus;
+  order.forEach(id => panel.insertBefore(NB[id], anchor));
+}
+function netCloseBox() { if (NB.netbox) NB.netbox.hidden = true; }
+
+// ---------------------------------------------------------------------
 // Boot
 // ---------------------------------------------------------------------
 world = renderWorld(makeDefendWorld(4242));
@@ -6344,6 +7156,7 @@ function tick(ts) {
   render();
   requestAnimationFrame(tick);
 }
+netBoxInit();
 requestAnimationFrame(tick);
 view.focus();
 // installable app: register the service worker when served over http(s)

@@ -1,5 +1,5 @@
 // Get em Billy service worker: cache the game so it installs and plays offline.
-const CACHE = 'get-em-billy-v0.13.0';
+const CACHE = 'get-em-billy-v0.14.0';
 const FILES = [
   './',
   './index.html',

@@ -12,6 +12,7 @@ All art is drawn from pixel matrices in code, and all sound is synthesized with 
 
 ## What's in the game
 - **5 modes:** Escort (10 routes), Defend (10 arenas), Daily Challenge, Endless, and Versus (wolves against shepherds).
+- **Online play:** one player hosts and up to 3 friends join with a copy-and-paste code (no server).
 - **Shepherds:** Billy the goat (ram charge; the stomp is an upgrade bought with bells; rammed foes can smash into the screen) and the dog (bark, plus a skill that depends on the breed). In Versus, players can also be wolves (lunge, plus howl).
 - **Breeds:** 9 goat breeds and 10 farm dogs, unlocked with medals. Each dog has its own speed, herding push and skill (see Farm dogs below).
 - **Sheep:** normal, stubborn ram, quick lamb, and golden.
@@ -22,6 +23,18 @@ All art is drawn from pixel matrices in code, and all sound is synthesized with 
 - **Story intro**, synthesized chiptune music, and an attract-mode demo.
 - **Accessibility:** remappable keys, a colour-safe palette, reduced flashing, and game speed.
 - **Installable app:** when served from GitHub Pages it installs to a home screen and works offline.
+
+## Play online
+Title screen, PLAY ONLINE. One player hosts (up to 3 friends join); there is no account and no server.
+1. **Host:** HOST A GAME, then MAKE INVITE CODE, COPY it and send it to a friend in any chat.
+2. **Friend:** JOIN A GAME, paste the invite, MAKE MY REPLY CODE, COPY it and send it back.
+3. **Host:** paste the reply and press CONNECT. Repeat with a new invite code for each friend. The host picks a mode as usual; friends choose their animal, breed and STYLE in the online lobby.
+
+The host's device runs the game, so a good connection for the host matters most. Everyone needs the same game version. Players on the same Wi-Fi connect directly; across the internet a public STUN server (Google's) is used to find each other, and a few strict networks that block direct connections may not be able to connect (there is no relay server). Each player gets their own camera. The browser's own copy/paste works on phones.
+Run `node tests/online.js` to test it with two browsers.
+
+## Demo build
+`tools/build_demo.sh` writes a free demo to `build/demo/` (set `FULL_URL=https://...` to add a "GET THE FULL GAME" button). The demo has 3 escort routes, 3 defend arenas, 8 defend waves and the first 3 breeds of each animal; the other modes and the map editor show an upgrade screen. It keeps its own saves and cache name. Run `node tests/demo.js` to check the limits.
 
 ## Trailer
 - **Farm Dogs trailer:** `tools/trailer/make.sh dogs` writes `build/trailer-dogs/dogs-trailer.mp4`, about 62 s, scored with the dogs' theme.
@@ -41,8 +54,8 @@ On Player Select, press H (keyboard), Y (gamepad) or tap "+ CPU" to add an AI go
 - **Escort**: drive the herd from the start pin (bottom) through the woods to the pen at the red pin (top). Sheep that enter the pen are safe. A mission is complete when every remaining sheep is penned. The next mission is longer and harder, and its herd is the sheep you delivered plus 2 lambs.
 - **Defend**: endless waves around a stone henge. Clearing a wave returns 1 lamb.
 
-## Demo
-Choose **Watch Demo** on the title screen, or leave the title screen idle for 30 seconds. AI goats and dogs then play Escort, 4-player Defend, Nightfall and Farm Dogs, with on-screen labels for every unit. Farm Dogs cycles through all 10 breeds using their skills. Press any button to exit.
+## Preview
+Choose **Watch Preview** on the title screen, or leave the title screen idle for 30 seconds. AI goats and dogs then play Escort, 4-player Defend, Nightfall and Farm Dogs, with on-screen labels for every unit. Farm Dogs cycles through all 10 breeds using their skills. Press any button to exit.
 
 ## Characters
 | | Goat | Dog |
