@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## [0.18.4] - 2026-11-06
+### Added
+- **TikTok versions of the trailers.** `tools/trailer/make.sh billy tiktok` and `dogs tiktok` record the game in a 1080x1920 window and write `build/trailer-billy-tiktok/billy-trailer-tiktok.mp4` (55 s) and `build/trailer-dogs-tiktok/dogs-trailer-tiktok.mp4` (62 s): portrait 9:16, 30 fps, H.264 high profile + AAC, same soundtracks. In a portrait trailer window the game sizes the picture by its width (about 120 world pixels across, so the animals stay big), drops the letterbox bars, wraps the story cards onto more lines at a readable size (`drawTrailerOverlay`; cards also never exceed the screen width now), puts the captions about two-thirds down (clear of TikTok's bottom buttons and caption) and stacks the finale text. Widescreen output is unchanged.
+
 ## [0.18.3] - 2026-11-06
 ### Fixed
 - **Trailer captions covered the action.** In the close-up trailers (Billy, the dogs) the caption and the ability line were drawn at double size on a picture only 90 rows tall, so they filled a big part of the lower frame. They are now small corner tags (1x text when filming close up), slide in, stay about 2.6 seconds and slide away again (`drawTrailerOverlay`). The Billy and Farm Dogs trailers are re-recorded. The full-game trailer keeps its 2x captions (they also slide away now).

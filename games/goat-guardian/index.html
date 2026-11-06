@@ -2472,9 +2472,14 @@ function resize() {
   const dh = Math.max(1, Math.floor((stage.clientHeight || window.innerHeight) * dpr));
   const tr = typeof showcase !== 'undefined' && showcase.trailer, close = tr && showcase.close;   // the Billy trailer films close up
   // the close-up trailers (Billy, the dogs) film closer since the farm animals are drawn smaller (0.18.1)
+  // a trailer recorded in a portrait frame (TikTok 1080x1920) is sized by its width: about 120 world pixels across
+  const portrait = tr && dh > dw;
   let k = Math.max(1, Math.round(dh / (close ? 90 : (tr ? 180 : 288))));
-  if (Math.floor(dw / k) < 144) k = Math.max(1, Math.floor(dw / 144));
-  if (!close && Math.floor(dh / k) < 210) k = Math.max(1, Math.floor(dh / 210));
+  if (portrait) k = Math.max(1, Math.floor(dw / (close ? 120 : 144)));
+  else {
+    if (Math.floor(dw / k) < 144) k = Math.max(1, Math.floor(dw / 144));
+    if (!close && Math.floor(dh / k) < 210) k = Math.max(1, Math.floor(dh / 210));
+  }
   W = clamp(Math.floor(dw / k), 120, 560);
   H = clamp(Math.floor(dh / k), close ? 80 : 180, 420);
   PIX = k;
@@ -4579,12 +4584,23 @@ function trailerPaint(dt) {
 function drawTrailerOverlay() {
   const sc = showcase.scenes[showcase.i];
   if (!sc) return;
-  const bar = Math.round(H * 0.07);
+  const portrait = W < H;               // TikTok: full-bleed, with the text kept out of the app's buttons and caption area
+  const bar = portrait ? 0 : Math.round(H * 0.07);
   const t = showcase.t;
   if (sc.card) {
     rect(0, 0, W, H, 'k');
-    const lines = sc.card;
-    const s = (W >= 400 ? 4 : (W >= 260 ? 3 : 2)) * (sc.big ? 2 : 1);
+    // text size by screen width, never wider than the screen: a line that is too long at that size is wrapped at its spaces
+    const base = (W >= 400 ? 4 : (W >= 260 ? 3 : 2)) * (sc.big ? 2 : 1);
+    const wordW = Math.max(...sc.card.join(' ').split(' ').map(w => textWidth(w, 1)));
+    const s = Math.max(1, Math.min(base, Math.floor((W - 8) / wordW)));
+    const lines = [];
+    for (const ln of sc.card) {
+      let cur = '';
+      for (const w of ln.split(' ')) {
+        if (cur && textWidth(cur + ' ' + w, s) > W - 8) { lines.push(cur); cur = w; } else cur = cur ? cur + ' ' + w : w;
+      }
+      lines.push(cur);
+    }
     const reveal = clamp(t / 0.35, 0, 1);
     let y = Math.round(H / 2 - (lines.length * (s * 5 + 8)) / 2);
     lines.forEach((ln, i) => {
@@ -4607,8 +4623,10 @@ function drawTrailerOverlay() {
   if (sc.finale) {
     const k = clamp((t - 1.2) / 0.6, 0, 1);
     if (k > 0) {
-      text('PLAY NOW', W / 2, H - bar - 30, 'w', { s: 2, align: 'center', outline: 'k' });
-      text('FREE IN YOUR BROWSER  -  1-4 PLAYERS', W / 2, H - bar - 12, 'y', { align: 'center', outline: 'k' });
+      const fy = portrait ? Math.round(H * 0.62) : H - bar - 30;
+      text('PLAY NOW', W / 2, fy, 'w', { s: 2, align: 'center', outline: 'k' });
+      if (portrait) { text('FREE IN YOUR BROWSER', W / 2, fy + 18, 'y', { align: 'center', outline: 'k' }); text('1-4 PLAYERS', W / 2, fy + 28, 'y', { align: 'center', outline: 'k' }); }
+      else text('FREE IN YOUR BROWSER  -  1-4 PLAYERS', W / 2, fy + 18, 'y', { align: 'center', outline: 'k' });
     }
     return;
   }
@@ -4618,7 +4636,7 @@ function drawTrailerOverlay() {
     const cs = showcase.close ? 1 : 2, ch = cs * 5 + 8, pad = cs * 3 + 4;
     const slide = Math.round(Math.max(clamp(1 - t / 0.25, 0, 1), clamp((t - 2.6) / 0.25, 0, 1)) * 60);
     if (slide < 60) {
-      const w = textWidth(sc.cap, cs) + pad * 2 - 2, by = H - bar - ch - 4;
+      const w = textWidth(sc.cap, cs) + pad * 2 - 2, by = portrait ? Math.round(H * 0.66) : H - bar - ch - 4;
       rect(4 - slide, by, w, ch, 'k');
       rect(4 - slide, by, 2, ch, 'y');
       text(sc.cap, 4 + pad - slide, by + 4, 'w', { s: cs });
@@ -6350,7 +6368,7 @@ function drawTitle() {
   rect(0, fy - 3, W, 13, 'k');
   if (best.escort || best.defend) text('BEST  ESCORT ' + best.escort + '  DEFEND ' + best.defend, W / 2, fy, 'y', { align: 'center' });
   else text('1-4 PLAYERS  GOATS AND DOGS', W / 2, fy, 's', { align: 'center' });
-  text(DEMO ? 'DEMO V0.18.3' : 'V0.18.3', W - 3, fy - 12, 'i', { align: 'right', outline: 'k' });
+  text(DEMO ? 'DEMO V0.18.4' : 'V0.18.4', W - 3, fy - 12, 'i', { align: 'right', outline: 'k' });
 }
 const MODES = [
   { id: 'escort', title: 'ESCORT', l1: 'HERD THE FLOCK PIN TO PIN', icon: 'pinGoal' },

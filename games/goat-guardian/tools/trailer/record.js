@@ -1,14 +1,15 @@
 // Records the in-game trailer (startTrailer) at 1920x1080 and logs real scene-cut times.
-// Usage: node tools/trailer/record.js [outDir] [main|billy|dogs]
+// Usage: node tools/trailer/record.js [outDir] [main|billy|dogs] [tiktok]   (tiktok = 1080x1920 portrait)
 const { chromium } = require('playwright');
 const fs = require('fs');
 const path = require('path');
 const OUT = path.resolve(process.argv[2] || 'build/trailer');
 const WHICH = process.argv[3] || 'main';
+const VW = process.argv[4] === 'tiktok' ? 1080 : 1920, VH = process.argv[4] === 'tiktok' ? 1920 : 1080;
 fs.mkdirSync(OUT, { recursive: true });
 (async () => {
   const b = await chromium.launch();
-  const ctx = await b.newContext({ viewport: { width: 1920, height: 1080 }, recordVideo: { dir: OUT, size: { width: 1920, height: 1080 } } });
+  const ctx = await b.newContext({ viewport: { width: VW, height: VH }, recordVideo: { dir: OUT, size: { width: VW, height: VH } } });
   const p = await ctx.newPage();
   const t0 = Date.now();
   const marks = [];

@@ -53,6 +53,7 @@ Tests: `node tests/online.js` (long codes) and `node tests/rooms.js` (6-digit co
 - **Farm Dogs trailer:** `tools/trailer/make.sh dogs` writes `build/trailer-dogs/dogs-trailer.mp4`, about 62 s, scored with the dogs' theme.
 - **Billy trailer:** `tools/trailer/make.sh billy` writes `build/trailer-billy/billy-trailer.mp4`, about 55 s, scored with Billy's own theme.
 - In the game, the title screen alternates between the gameplay demo and the trailer when left idle.
+- **TikTok / Reels / Shorts versions:** add `tiktok`, e.g. `tools/trailer/make.sh billy tiktok` or `dogs tiktok`. They write `build/trailer-billy-tiktok/billy-trailer-tiktok.mp4` and `build/trailer-dogs-tiktok/dogs-trailer-tiktok.mp4`: 1080x1920 (9:16), 30 fps, H.264 + AAC. The game is recorded in a portrait window, so the picture is laid out for a phone (about 120 world pixels across, full-bleed, story cards wrapped, captions kept in the middle of the screen above the app's buttons), not cropped from the wide version.
 - To build the video file, run `tools/trailer/make.sh` (needs Node, Playwright and ffmpeg). It writes `build/trailer/get-em-billy-trailer.mp4`: 1080p, about 65 s, with a soundtrack synthesized from the game's music.
 
 ## Maps
