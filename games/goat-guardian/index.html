@@ -396,7 +396,11 @@ const LAB = {"units":{"goat":{"name":"Goat","pal":[["Cream","#f2e2d4","#bcb0a6",
 // the lab's own rules (per-frame offsets keep them on the head).
 // ---------------------------------------------------------------------
 const LAB_GW = 24, LAB_GH = 18, LAB_GOY = 3;
-const LAB_PAIRS = [['E', 'E', 'W'], ['SE', 'SE', 'SW'], ['NE', 'NE', 'NW'], ['S', 'S', 'S'], ['N', 'N', 'N']];
+// Going up or down the screen the animals are shown in three-quarter view (like the side-view reference sheets), not as
+// straight-on fronts and backs. LAB_TRUE_BACK = true brings the straight views back (with the widened backs, see LAB_BACK).
+const LAB_TRUE_BACK = false;
+const LAB_PAIRS_34 = [['E', 'E', 'W'], ['SE', 'SE', 'SW'], ['NE', 'NE', 'NW'], ['S', 'SE', 'SW'], ['N', 'NE', 'NW']];
+const LAB_PAIRS_TRUE = [['E', 'E', 'W'], ['SE', 'SE', 'SW'], ['NE', 'NE', 'NW'], ['S', 'S', 'S'], ['N', 'N', 'N']];
 const LAB_FRONT = { E: 1, SE: 1, NE: 1, W: -1, SW: -1, NW: -1, S: 0, N: 0 };
 var labColDirty = false;
 const LAB_EXTRA = new Map();        // off-palette colours used by lab art -> [r, g, b, nearest palette key]
@@ -552,6 +556,19 @@ function normLabLook(l) {
   if (l.col) for (const s of LAB.sets) if (ok(l.col[s.id], s.o.length - 1)) o.col[s.id] = l.col[s.id];
   return o;
 }
+// a sharp dark outline (one pixel, four-neighbour) around the whole silhouette, hats and all
+function labOutline(g) {
+  const h = g.length, w = g[0].length, out = labGrid(w + 2, h + 2);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (g[y][x] !== '.') out[y + 1][x + 1] = g[y][x];
+  for (let y = 0; y < h + 2; y++) for (let x = 0; x < w + 2; x++) {
+    if (out[y][x] !== '.') continue;
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const c = out[y + dy] && out[y + dy][x + dx];
+      if (c && c !== '.' && c !== 'K') { out[y][x] = 'K'; break; }
+    }
+  }
+  return out;
+}
 function labColors(u, look) {
   const m = Object.assign({}, LAB.fixed);
   const pal = u.pal[look.coat % u.pal.length];
@@ -561,7 +578,7 @@ function labColors(u, look) {
     const o = s.o[(look.col[s.id] || 0) % s.o.length];
     for (let i = 0; i < s.keys.length; i++) m[s.keys[i]] = o[i + 1];
   }
-  m.d = m.R; m.H = m.S;
+  m.d = m.R; m.H = m.S; m.K = PAL_DAY.k;
   return m;
 }
 function labCanvas(g, m) {
@@ -697,9 +714,10 @@ function labSet(id, look) {
   for (const k in m) if (typeof m[k] === 'string' && m[k][0] === '#') labRegister(m[k]);
   const grid = (d, a, i) => labCompose(u, u.art[d][a][i], u.off && u.off[d] && u.off[d][a] && u.off[d][a][i], d, look);
   const sc = u.scale === undefined ? LAB_SCALE : u.scale;
-  const pair = (dR, dL, gR, gL) => new LabSpr(labCanvas(labScale(gR, sc), m), labCanvas(labScale(gL, sc), m));
+  const ol = u.noOutline ? (g) => g : labOutline;
+  const pair = (dR, dL, gR, gL) => { const sp = new LabSpr(labCanvas(ol(labScale(gR, sc)), m), labCanvas(ol(labScale(gL, sc)), m)); sp.pad = u.noOutline ? 0 : 1; return sp; };
   set = { run: {}, idle: {}, jump: {}, attack: {}, act: {}, pose: { sit: {}, lie: {}, alert: {}, sniff: {}, bite: {} }, unit: id };
-  for (const [k, dR, dL] of LAB_PAIRS) {
+  for (const [k, dR, dL] of (LAB_TRUE_BACK || u.keepViews ? LAB_PAIRS_TRUE : LAB_PAIRS_34)) {
     const acts = {};
     for (const a of ['idle', 'walk', 'run', 'jump', 'attack']) {
       const n = u.art[dR][a].length;
@@ -787,7 +805,8 @@ function labFixedUnit(name, pal, eyes, views, acts, W) {
     });
   }
   const gh = Math.max(...Object.values(views).flat().map(f => f.length));
-  return { name, pal, eyes, art, noItems: true, gw: W, gh, bottom: true, scale: name === 'Great Wolf' ? 1 : LAB_SCALE };
+  return { name, pal, eyes, art, noItems: true, gw: W, gh, bottom: true, scale: name === 'Great Wolf' ? 1 : LAB_SCALE,
+    noOutline: name === 'Great Wolf', keepViews: name === 'Great Wolf' };      // the boss has its own dark body and its own front and back
 }
 {
   // the Great Wolf: the hand-drawn boss in lab letters (S coat, s shade, L silver mane, e eyes, m mouth, E fangs, N paws)
@@ -876,7 +895,7 @@ function drawSpr(s, x, y, left, opts) {
   if (o.white && !settings.reduceFlash) img = left ? s.wl : s.wr;
   else if (o.upside) img = left ? s.lu : s.ru;
   else img = left ? s.l : s.r;
-  G.drawImage(img, Math.round(x - s.w / 2), Math.round(y - s.h + 1));
+  G.drawImage(img, Math.round(x - s.w / 2), Math.round(y - s.h + 1 + (s.pad || 0)));
 }
 function px(x, y, key) {
   G.fillStyle = PAL_DAY[key];
@@ -4925,7 +4944,7 @@ function drawStory() {
   frame(bx - 2, by - 2, bw + 4, bh + 4, 'i');
   const k = 2;
   const ground = (col) => { rect(bx, by, bw, bh, col); };
-  const put = (sp, x, y, left) => G.drawImage(left ? sp.l : sp.r, 0, 0, sp.w, sp.h, Math.round(x - sp.w * k / 2), Math.round(y - sp.h * k), sp.w * k, sp.h * k);
+  const put = (sp, x, y, left) => G.drawImage(left ? sp.l : sp.r, 0, 0, sp.w, sp.h, Math.round(x - sp.w * k / 2), Math.round(y - sp.h * k + (sp.pad || 0) * k), sp.w * k, sp.h * k);
   const gy = by + bh - 14;
   if (storyPage === 0) {
     ground('g');
@@ -5249,7 +5268,7 @@ function drawStyle() {
   const [dk, left] = DIR8[Math.floor(realTime / 1.1) % 8];
   const ph4 = Math.floor(realTime / 2.2) % 4, cyc = [set.idle, set, set.run, set.attack][ph4][dk];
   const sp = cyc[Math.floor(realTime * (ph4 === 0 ? 2 : 8)) % cyc.length], img = left ? sp.l : sp.r;
-  G.drawImage(img, 0, 0, sp.w, sp.h, Math.round(W / 2 - sp.w * k / 2), py0 + ph - 3 - sp.h * k, sp.w * k, sp.h * k);
+  G.drawImage(img, 0, 0, sp.w, sp.h, Math.round(W / 2 - sp.w * k / 2), py0 + ph - 3 - sp.h * k + (sp.pad || 0) * k, sp.w * k, sp.h * k);
   text(['IDLE', 'WALK', 'RUN', 'ATTACK'][ph4], px0 + 4, py0 + 3, 'k');
   const nameStr = p.kind === 'wolf' ? 'WOLF' : (p.kind === 'dog' ? dogBreed(p).name : GOAT_BREEDS[skinOk('goat', p.skin || 0) ? p.skin || 0 : 0].name + ' GOAT');
   text(nameStr, W / 2, py0 + ph + 3, 'y', { align: 'center' });
@@ -6076,7 +6095,7 @@ function drawTitle() {
   rect(0, fy - 3, W, 13, 'k');
   if (best.escort || best.defend) text('BEST  ESCORT ' + best.escort + '  DEFEND ' + best.defend, W / 2, fy, 'y', { align: 'center' });
   else text('1-4 PLAYERS  GOATS AND DOGS', W / 2, fy, 's', { align: 'center' });
-  text(DEMO ? 'DEMO V0.16' : 'V0.16', W - 3, fy - 12, 'i', { align: 'right', outline: 'k' });
+  text(DEMO ? 'DEMO V0.17' : 'V0.17', W - 3, fy - 12, 'i', { align: 'right', outline: 'k' });
 }
 const MODES = [
   { id: 'escort', title: 'ESCORT', l1: 'HERD THE FLOCK PIN TO PIN', icon: 'pinGoal' },
@@ -6156,7 +6175,7 @@ function drawPlayerSelect() {
     rect(bx, by + bh - 3, bw, 3, 'h');
     G.save(); G.beginPath(); G.rect(bx, by, bw, bh); G.clip();
     const spb = sprBox(pset.idle.E[0]);
-    G.drawImage(sp.r, 0, 0, sp.w, sp.h, Math.round(bx + bw / 2 - (spb.x + spb.w / 2) * 2), by + bh - 2 - sp.h * 2, sp.w * 2, sp.h * 2);
+    G.drawImage(sp.r, 0, 0, sp.w, sp.h, Math.round(bx + bw / 2 - (spb.x + spb.w / 2) * 2), by + bh - 2 - sp.h * 2 + (sp.pad || 0) * 2, sp.w * 2, sp.h * 2);
     G.restore();
     const tx = x + 52;
     const kname = p.kind === 'wolf' ? 'WOLF' : (p.kind === 'dog' ? dogBreed(p).name : skinList('goat')[skinOk('goat', p.skin || 0) ? p.skin || 0 : 0].name + ' GOAT');
@@ -6387,7 +6406,7 @@ function drawBye() {
   const cy = Math.round(H / 2) - 30;
   const sp = SP.goat.SE[0], dg = SP.dog.SE[Math.floor(realTime * 3) % 2];
   rect(W / 2 - 30, cy - 6, 60, 24, 'g'); rect(W / 2 - 30, cy + 15, 60, 3, 'h');
-  G.drawImage(sp.r, 0, 0, sp.w, sp.h, Math.round(W / 2 - 24), cy + 16 - sp.h * 2, sp.w * 2, sp.h * 2);
+  G.drawImage(sp.r, 0, 0, sp.w, sp.h, Math.round(W / 2 - 24), cy + 16 - sp.h * 2 + (sp.pad || 0) * 2, sp.w * 2, sp.h * 2);
   G.drawImage(dg.l, 0, 0, dg.w, dg.h, Math.round(W / 2 + 4), cy + 16 - dg.h * 2, dg.w * 2, dg.h * 2);
   text('THANKS FOR PLAYING', W / 2, cy + 28, 'w', { align: 'center' });
   text('YOU CAN CLOSE THIS TAB NOW', W / 2, cy + 38, 'l', { align: 'center' });
@@ -7219,7 +7238,7 @@ function drawNetWait() {
   rect(bx, by, bw, bh, 'g'); rect(bx, by + bh - 3, bw, 3, 'h');
   G.save(); G.beginPath(); G.rect(bx, by, bw, bh); G.clip();
   const spb = sprBox(set.idle.E[0]);
-  G.drawImage(sp.r, 0, 0, sp.w, sp.h, Math.round(bx + bw / 2 - (spb.x + spb.w / 2) * 2), by + bh - 2 - sp.h * 2, sp.w * 2, sp.h * 2);
+  G.drawImage(sp.r, 0, 0, sp.w, sp.h, Math.round(bx + bw / 2 - (spb.x + spb.w / 2) * 2), by + bh - 2 - sp.h * 2 + (sp.pad || 0) * 2, sp.w * 2, sp.h * 2);
   G.restore();
   hits.push({ x: bx, y: by, w: bw, h: bh, fn: () => { cycleSkin(me, 1); netSendPick(); } });
   const tx = x + 52;

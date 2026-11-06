@@ -9,6 +9,7 @@ All 20 items from the feature list were added in v0.7.0. What remains is playtes
 - [ ] Check night lanterns and fog on long routes for readability.
 - [ ] Install the GitHub Pages build on a phone and test offline play.
 - [ ] Test 6-digit rooms through the real PeerJS cloud broker across two real networks (and mobile data). If the free broker proves unreliable, run your own PeerServer (see README) and build with `PEER_URL`.
+- [ ] Art: check the 1px outlines and three-quarter up/down views on a real phone; say if you want straight-on front/back views back (`LAB_TRUE_BACK`), a thicker outline for goats, or a 32x32 re-draw of any animal.
 - [ ] Decide whether to delete `tools/relay/` and `tests/relay_core.js` (the custom relay is no longer used).
 - [ ] Online: client-side prediction, guest reconnect, spectators.
 - [ ] Demo: add a Steam/itch link via `FULL_URL`, and decide whether to limit STYLE in the demo.

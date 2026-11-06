@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+## [0.17.0] - 2026-11-06
+### Changed
+- **Pixel-art direction: outlined sprites and three-quarter views** (from the new reference sheets and art prompt). Every lab animal (goats, farm dogs, fox, wolf, bat, hawk) now has a crisp 1px dark outline around its whole silhouette (`labOutline`, the palette's near-black), so they read against any ground. Sprites carry a 1px margin (`pad`) and are anchored so feet and shadows stay where they were.
+- **Up and down are three-quarter views, not top-down.** Moving up draws the north-east art and moving down draws the south-east art (mirrored for west), so animals show a side-profile or three-quarter face in all directions (`LAB_PAIRS_34`). The old straight-on front/back art is kept behind `LAB_TRUE_BACK` (set it to `true` to restore it; the 0.16.0 back-view widening in `LAB_BACK` is only used then).
+- The Great Wolf boss keeps its own art, with no outline and its own front and back views.
+- Sheep, the palette, sprite proportions and animation timing are unchanged.
+- The smoke test checks that every silhouette-edge pixel is the outline colour, that `pad` is set, that up/down match the three-quarter views, and that the Great Wolf is unchanged.
+
 ## [0.16.0] - 2026-11-06
 ### Changed
 - **Online play now runs on PeerJS + WebRTC.** The 6-digit room code is the host's PeerJS id (`getembilly-123456`): HOST A GAME opens a room on the PeerJS broker (the free cloud one by default, or your own PeerServer), and friends type the code to connect directly. No relay to deploy any more. PeerJS 1.5.5 is bundled (`vendor/peerjs.min.js`, MIT) and is inlined into the one-file offline build, copied by the site and demo builds, and cached by the service worker.
