@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+## [0.18.1] - 2026-11-06
+### Fixed
+- **The goat and dogs were giant next to the sheep.** They are smaller (`FARM_SCALE` goat 0.5, dogs 0.42): the goat is about 16x15 visible pixels and the dogs about 14x12, roughly twice a sheep (7x6), with the goat still the biggest.
+- **They floated.** Shrinking left an empty row under the hooves, so the feet stood a row above the shadow and the outline hid it. Farm sprites are now cut at the ground row, so the hooves sit on the shadow in every frame. The smoke test checks the sizes against the sheep and that every idle, walk, gallop, front and back frame ends at the feet.
+
 ## [0.18.0] - 2026-11-06
 ### Changed
 - **New goat and farm dogs, from the shapes in the offline edit you liked** (`Get_Em_Billy_Offline.html`, an edit of 0.14 with `nativeAnimalRows`). The goat and all ten dogs are drawn from shapes on a 30x30 grid (level back from a rounded rump, a neck rising into the head, swept horns, side-set eye, beard), then shrunk to the game's sprite size (`FARM_SCALE`: goat 0.7, dogs 0.56) and given a dark outline. The goat is about the size it was (roughly 20x20 visible pixels, still bigger than every dog) and the dogs are back near their old size (about 15x14).

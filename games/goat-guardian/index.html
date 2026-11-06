@@ -766,7 +766,7 @@ function labScale(g, k) {
 // 0.14 (REFERENCE_ANIMALS / nativeAnimalRows) and are reworked here.
 // ---------------------------------------------------------------------
 const FARM_UNITS = new Set(['goat', 'bcollie', 'corgi', 'sheltie', 'acd', 'oes', 'gsd', 'jrt', 'bernese', 'komondor', 'pyrenees']);
-const FARM_SCALE = { goat: 0.7, dog: 0.56 };
+const FARM_SCALE = { goat: 0.5, dog: 0.42 };
 const FARM_OUTLINE = true;
 const FARM_N = 30, FARM_GROUND = 28;
 function farmRows(id, direction, action, frame, coat) {
@@ -957,7 +957,9 @@ function labSet(id, look) {
   const grid = farm ? (d, a, i) => farmGrid(u, id, d, a, i, look) : (d, a, i) => labCompose(u, u.art[d][a][i], u.off && u.off[d] && u.off[d][a] && u.off[d][a][i], d, look);
   const sc = farm ? FARM_SCALE[id === 'goat' ? 'goat' : 'dog'] : u.scale === undefined ? LAB_SCALE : u.scale;
   const outl = farm ? FARM_OUTLINE : LAB_OUTLINE && !u.noOutline, ol = outl ? labOutline : (g) => g;
-  const pair = (dR, dL, gR, gL) => { const sp = new LabSpr(labCanvas(ol(labScale(gR, sc)), m), labCanvas(ol(labScale(gL, sc)), m)); sp.pad = outl ? 1 : 0; return sp; };
+  // farm grids are cut at the ground row after shrinking, so the hooves are the sprite's last row and stand on the shadow
+  const shrink = farm ? (g) => labScale(g, sc).slice(0, Math.floor(FARM_GROUND * sc) + 1) : (g) => labScale(g, sc);
+  const pair = (dR, dL, gR, gL) => { const sp = new LabSpr(labCanvas(ol(shrink(gR)), m), labCanvas(ol(shrink(gL)), m)); sp.pad = outl ? 1 : 0; return sp; };
   set = { run: {}, idle: {}, jump: {}, attack: {}, act: {}, pose: { sit: {}, lie: {}, alert: {}, sniff: {}, bite: {} }, unit: id };
   for (const [k, dR, dL] of (LAB_TRUE_BACK || u.keepViews ? LAB_PAIRS_TRUE : LAB_SIDE_ONLY ? LAB_PAIRS_SIDE : LAB_PAIRS_34)) {
     const acts = {};
@@ -6342,7 +6344,7 @@ function drawTitle() {
   rect(0, fy - 3, W, 13, 'k');
   if (best.escort || best.defend) text('BEST  ESCORT ' + best.escort + '  DEFEND ' + best.defend, W / 2, fy, 'y', { align: 'center' });
   else text('1-4 PLAYERS  GOATS AND DOGS', W / 2, fy, 's', { align: 'center' });
-  text(DEMO ? 'DEMO V0.18' : 'V0.18', W - 3, fy - 12, 'i', { align: 'right', outline: 'k' });
+  text(DEMO ? 'DEMO V0.18.1' : 'V0.18.1', W - 3, fy - 12, 'i', { align: 'right', outline: 'k' });
 }
 const MODES = [
   { id: 'escort', title: 'ESCORT', l1: 'HERD THE FLOCK PIN TO PIN', icon: 'pinGoal' },

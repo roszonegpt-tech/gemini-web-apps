@@ -190,7 +190,11 @@ const { chromium } = require('playwright');
     out.gait = [SP.goat, SP.dog, labSet('corgi', {})].every(st => [st.E, st.run.E].every(fr => new Set(fr.map(px)).size === 4 && new Set(fr.map(feet)).size >= 3 && vbox(fr[1]).top < vbox(fr[0]).top && fr.every(f => vbox(f).bot === vbox(fr[0]).bot)));
     // sizes stay close to the old sprites: goats about as big as before and bigger than the dogs
     const gv = vbox(SP.goat.E[0]), dv = vbox(SP.dog.E[0]);
-    out.sizes = gv.w <= 24 && gv.h <= 22 && dv.w <= 18 && dv.h <= 17 && gv.h > dv.h && gv.w > dv.w;
+    // 0.18.1: not giant next to the 7x6 sheep, and standing on the ground: the last canvas row is the outline under the
+    // feet (drawn one row below the anchor, on the shadow), in every walk, gallop and idle frame
+    const sv = vbox(SP.sheep.E ? SP.sheep.E[0] : SP.sheep.SE[0]);
+    out.sizes = gv.w <= 17 && gv.h <= 16 && dv.w <= 15 && dv.h <= 13 && gv.h > dv.h && gv.w > sv.w * 1.8 && dv.w > sv.w * 1.4;
+    out.grounded = [SP.goat, SP.dog, labSet('corgi', {}), labSet('bernese', { hat: 1 })].every(st => [st.idle.E, st.E, st.run.E, st.SE, st.S, st.N].every(fr => fr.every(f => vbox(f).bot === f.h - 1 && f.pad === 1)));
     out.views34 = px(SP.dog.N[0]) !== px(SP.dog.NE[0]) && px(SP.goat.S[0]) !== px(SP.goat.SE[0]);
     const gu = labUnit('goat');
     out.goatBack = Object.keys(gu.art.E).every(a => gu.art.E[a].every(rows => {
@@ -244,7 +248,7 @@ const { chromium } = require('playwright');
   });
   if (!v9.ram || !v9.billyTheme || !v9.stompLocked || !v9.stompBought || !v9.splat || !v9.cracked) fail('billy ' + JSON.stringify(v9));
   if (v9.styleState !== 'STYLE' || !v9.styleSaved || v9.styleRows < 12 || v9.styleBack !== 'PLAYERS') fail('style ' + JSON.stringify(v9));
-  if (v9.goats !== 12 || v9.dogs !== 10 || !v9.sets || !v9.leftArt || !v9.items || !v9.sanitize || !v9.remap || !v9.backs || !v9.outline || !v9.views34 || !v9.goatBack || !v9.gait || !v9.sizes || !v9.peerjs || v9.locked || !v9.taller || !v9.boss || v9.gaitFlips) fail('breeds ' + JSON.stringify(v9));
+  if (v9.goats !== 12 || v9.dogs !== 10 || !v9.sets || !v9.leftArt || !v9.items || !v9.sanitize || !v9.remap || !v9.backs || !v9.outline || !v9.views34 || !v9.goatBack || !v9.gait || !v9.sizes || !v9.grounded || !v9.peerjs || v9.locked || !v9.taller || !v9.boss || v9.gaitFlips) fail('breeds ' + JSON.stringify(v9));
   if (v9.corgi !== 'stun' || v9.pyrenees !== 'flee' || !v9.carry || !v9.drop || v9.ratter !== 'launched' || !v9.sit) fail('dog skills ' + JSON.stringify(v9));
   const wasFs = await p.evaluate(() => isFs());
   await p.evaluate(() => exitFs());
