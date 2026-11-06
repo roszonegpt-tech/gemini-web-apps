@@ -48,6 +48,9 @@
   .nbp button { font: inherit; background: #34204e; color: #ece6d2; border: 2px solid #4e8f80; border-radius: 4px; padding: 10px 14px; min-height: 44px; margin: 6px 6px 0 0; cursor: pointer; }
   .nbp button:hover:not(:disabled) { background: #4e8f80; color: #160c26; }
   .nbp button:disabled { opacity: .5; }
+  .nbp [hidden] { display: none !important; }
+  #nbCode { font-size: 46px; letter-spacing: .16em; color: #f4d860; text-align: center; background: #0c0816; border: 2px solid #34204e; border-radius: 4px; padding: 10px 0; margin: 4px 0 8px; font-variant-numeric: tabular-nums; }
+  .nbp input { width: 100%; box-sizing: border-box; font: 30px ui-monospace, Menlo, Consolas, monospace; letter-spacing: .2em; text-align: center; background: #0c0816; color: #ece6d2; border: 2px solid #34204e; border-radius: 4px; padding: 10px; }
   #nbStatus { min-height: 34px; margin: 10px 0 0; color: #f4d860; font-size: 12px; }
 </style>
 </head>
@@ -57,15 +60,28 @@
   <div class="nbp">
     <h2 id="nbTitle">ONLINE</h2>
     <p id="nbHelp"></p>
-    <label id="nbL1" for="nbOut"></label>
-    <textarea id="nbOut" readonly spellcheck="false" autocomplete="off" autocapitalize="off"></textarea>
-    <button id="nbCopy" type="button">COPY</button>
-    <button id="nbMake" type="button">MAKE INVITE CODE</button>
-    <label id="nbL2" for="nbIn"></label>
-    <textarea id="nbIn" spellcheck="false" autocomplete="off" autocapitalize="off" placeholder="PASTE HERE"></textarea>
-    <button id="nbPaste" type="button">PASTE</button>
-    <button id="nbGo" type="button">CONNECT</button>
+    <div id="nbRoom" hidden>
+      <label>YOUR ROOM CODE</label>
+      <div id="nbCode" aria-live="polite">------</div>
+      <button id="nbCopyCode" type="button">COPY CODE</button>
+    </div>
+    <div id="nbJoin" hidden>
+      <label for="nbNum">ENTER THE 6-DIGIT ROOM CODE</label>
+      <input id="nbNum" inputmode="numeric" pattern="[0-9 ]*" maxlength="7" autocomplete="off" placeholder="000 000">
+      <button id="nbJoinGo" type="button">JOIN</button>
+    </div>
+    <div id="nbManual" hidden>
+      <label id="nbL1" for="nbOut"></label>
+      <textarea id="nbOut" readonly spellcheck="false" autocomplete="off" autocapitalize="off"></textarea>
+      <button id="nbCopy" type="button">COPY</button>
+      <button id="nbMake" type="button">MAKE INVITE CODE</button>
+      <label id="nbL2" for="nbIn"></label>
+      <textarea id="nbIn" spellcheck="false" autocomplete="off" autocapitalize="off" placeholder="PASTE HERE"></textarea>
+      <button id="nbPaste" type="button">PASTE</button>
+      <button id="nbGo" type="button">CONNECT</button>
+    </div>
     <p id="nbStatus" role="status"></p>
+    <button id="nbMode" type="button">USE LONG CODES INSTEAD</button>
     <button id="nbClose" type="button">CLOSE</button>
   </div>
 </div>
@@ -895,13 +911,15 @@ function text(str, x, y, key, opts) {
 const DEMO = false;
 const FULL_GAME_URL = '';
 const DEMO_MAPS = 3, DEMO_WAVES = 8, DEMO_BREEDS = 3, DEMO_LOCKED_MODES = ['daily', 'endless', 'versus'];
-const NET_VER = '0.14';
+const NET_VER = '0.15';
+// The relay turns 6-digit room codes into connections (see tools/relay/README.md). Empty = long copy-and-paste codes only.
+const NET_RELAY = '';
 const net = { role: 'off', peers: [], idc: 0, idc2: 0, pending: null, guest: null, slot: -1, me: null, roster: null, ev: [], recDepth: 0, snapT: 0, inT: 0, pingT: 0,
   rosterT: 0, t0: 0, forceSeed: 0, status: '', note: '', noteT: 0, leaveAsk: false, over: null, hostPaused: false, snap: null, ping: 0, need: false,
-  boxKind: 'host', shownStatus: '', sheepById: new Map(), enemyById: new Map() };
+  log: [], boxKind: 'host', boxRoom: false, room: null, roomTimer: 0, joinTok: 0, shownStatus: '', sheepById: new Map(), enemyById: new Map() };
 const settings = {
   sound: true, music: true, shake: true, fullscreen: true, autoHelper: true,
-  cb: false, reduceFlash: false, speed: 1, wool: 0, storySeen: false, goatBreed: 0, dogBreed: 0, looks: {}, netKind: 'goat'
+  cb: false, reduceFlash: false, speed: 1, wool: 0, storySeen: false, goatBreed: 0, dogBreed: 0, looks: {}, netKind: 'goat', relay: ''
 };
 try {
   const s = JSON.parse(localStorage.getItem('goatGuardianSettings') || '{}');
@@ -6012,7 +6030,7 @@ function drawTitle() {
   rect(0, fy - 3, W, 13, 'k');
   if (best.escort || best.defend) text('BEST  ESCORT ' + best.escort + '  DEFEND ' + best.defend, W / 2, fy, 'y', { align: 'center' });
   else text('1-4 PLAYERS  GOATS AND DOGS', W / 2, fy, 's', { align: 'center' });
-  text(DEMO ? 'DEMO V0.14' : 'V0.14', W - 3, fy - 12, 'i', { align: 'right', outline: 'k' });
+  text(DEMO ? 'DEMO V0.15' : 'V0.15', W - 3, fy - 12, 'i', { align: 'right', outline: 'k' });
 }
 const MODES = [
   { id: 'escort', title: 'ESCORT', l1: 'HERD THE FLOCK PIN TO PIN', icon: 'pinGoal' },
@@ -6112,7 +6130,6 @@ function drawPlayerSelect() {
       rect(rx, ry, rw, 10, 'i');
       text('KICK', rx + rw / 2, ry + 3, 'r', { align: 'center' });
       hits.push({ x: rx - 2, y: ry - 2, w: rw + 4, h: 14, fn: () => { const pr = net.peers.find(q => q.id === p.net); if (pr) { netSendCh(pr.rel, 'bye', 'THE HOST REMOVED YOU'); netPeerGone(pr); } SFX.back(); } });
-      text('ONLINE', x + w - 6, y + 14, 'y', { align: 'right' });
     } else {
     rect(sx, ry, sw, 10, 'i');
     text('STYLE', sx + sw / 2, ry + 3, 's', { align: 'center' });
@@ -6146,7 +6163,8 @@ function drawPlayerSelect() {
     text('ACTION: READY   ABILITY: STYLE', W / 2, fy + 8, 'l', { align: 'center' });
     text('H / PAD Y: ADD CPU   N / LB: REMOVE', W / 2, fy + 16, 's', { align: 'center' });
   }
-  text(settings.autoHelper && players.filter(q => !q.cpu).length === 1 && !players.some(q => q.cpu) ? 'SOLO: A CPU HELPER WILL JOIN' : 'GAME STARTS WHEN ALL ARE READY', W / 2, H - 32, 's', { align: 'center' });
+  if (net.room && net.room.open) text('ROOM CODE ' + netFmtCode(net.room.code), W / 2, H - 32, 'y', { align: 'center' });
+  else text(settings.autoHelper && players.filter(q => !q.cpu).length === 1 && !players.some(q => q.cpu) ? 'SOLO: A CPU HELPER WILL JOIN' : 'GAME STARTS WHEN ALL ARE READY', W / 2, H - 32, 's', { align: 'center' });
 }
 function drawMapSelect() {
   screenBg();
@@ -6447,6 +6465,7 @@ function render() {
 // ---------------------------------------------------------------------
 const NET_ICE = { iceServers: [{ urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] }] };
 const NET_PF = ['x', 'y', 'vx', 'vy', 'fx', 'fy', 'ramT', 'actT', 'actT2', 'dashT', 'lungeT', 'down', 'revive', 'stun', 'carry', 'cd', 'cdMax', 'cd2', 'cd2Max'];
+const netLog = (s) => { net.log.push((performance.now() / 1000).toFixed(2) + ' ' + s); if (net.log.length > 60) net.log.shift(); };
 const NET_R = (v, n) => { const k = n === 2 ? 100 : 10; return Math.round((v || 0) * k) / k; };
 const netNum = (v) => (typeof v === 'number' && isFinite(v) ? v : 0);
 function isMine(p) {
@@ -6511,21 +6530,27 @@ function netStartHost() {
   if (net.role === 'client') return;
   net.role = 'host';
 }
+// one connection offer for one friend (each friend needs their own)
+async function netMakeOffer() {
+  const pc = new RTCPeerConnection(NET_ICE);
+  const peer = { id: ++net.idc, pc: pc, rel: pc.createDataChannel('r', { ordered: true }), uns: pc.createDataChannel('u', { ordered: false, maxRetransmits: 0 }),
+    joined: false, input: { x: 0, y: 0 }, lastIn: 0, slot: -1, t0: realTime };
+  const onMsg = (ev) => { let m = null; try { m = JSON.parse(ev.data); } catch (e) { return; } netHostMsg(peer, m); };
+  peer.rel.onmessage = onMsg; peer.uns.onmessage = onMsg;
+  peer.rel.onopen = () => netLog('host peer ' + peer.id + ' channel open');
+  peer.rel.onclose = () => { netLog('host peer ' + peer.id + ' channel closed'); netPeerGone(peer); };
+  pc.onconnectionstatechange = () => { const st = pc.connectionState; netLog('host peer ' + peer.id + ' ' + st); if (st === 'failed' || st === 'closed') netPeerGone(peer); };
+  await pc.setLocalDescription(await pc.createOffer());
+  await netGather(pc, 3000);
+  return { peer: peer, code: await netPack(pc.localDescription) };
+}
 async function netHostInvite() {
   netStartHost();
   if (net.pending) { try { net.pending.pc.close(); } catch (e) { /* ignore */ } net.pending = null; }
   if (net.peers.length >= 3) throw new Error('THE ROOM IS FULL (4 PLAYERS)');
-  const pc = new RTCPeerConnection(NET_ICE);
-  const peer = { id: ++net.idc, pc: pc, rel: pc.createDataChannel('r', { ordered: true }), uns: pc.createDataChannel('u', { ordered: false, maxRetransmits: 0 }),
-    joined: false, input: { x: 0, y: 0 }, lastIn: 0, slot: -1 };
-  net.pending = peer;
-  const onMsg = (ev) => { let m = null; try { m = JSON.parse(ev.data); } catch (e) { return; } netHostMsg(peer, m); };
-  peer.rel.onmessage = onMsg; peer.uns.onmessage = onMsg;
-  peer.rel.onclose = () => netPeerGone(peer);
-  pc.onconnectionstatechange = () => { const s = pc.connectionState; if (s === 'failed' || s === 'closed') netPeerGone(peer); };
-  await pc.setLocalDescription(await pc.createOffer());
-  await netGather(pc, 3000);
-  return netPack(pc.localDescription);
+  const o = await netMakeOffer();
+  net.pending = o.peer;
+  return o.code;
 }
 async function netHostAccept(code) {
   const d = await netUnpack(code);
@@ -6533,6 +6558,98 @@ async function netHostAccept(code) {
   const peer = net.pending;
   if (!peer) throw new Error('MAKE AN INVITE CODE FIRST');
   await peer.pc.setRemoteDescription({ type: 'answer', sdp: d.s });
+}
+// ---- 6-digit room codes through the relay
+function netRelayBase() { return String(settings.relay || NET_RELAY || '').replace(/\/+$/, ''); }
+async function netRelayCall(method, path, body) {
+  const ctl = new AbortController(), to = setTimeout(() => ctl.abort(), 8000);
+  let r;
+  try {
+    r = await fetch(netRelayBase() + path, { method: method, body: body ? JSON.stringify(body) : undefined, headers: body ? { 'content-type': 'text/plain' } : undefined, signal: ctl.signal, cache: 'no-store' });
+  } catch (e) { throw new Error('CANNOT REACH THE ROOM SERVER'); } finally { clearTimeout(to); }
+  let j = {};
+  try { j = await r.json(); } catch (e) { /* no body */ }
+  if (!r.ok) throw new Error(j.error || 'ROOM SERVER ERROR');
+  return j;
+}
+const netFmtCode = (c) => c.slice(0, 3) + ' ' + c.slice(3);
+async function netRoomEnsure() {
+  netStartHost();
+  if (net.room && net.room.open) return net.room;
+  const r = await netRelayCall('POST', '/room');
+  net.room = { code: r.code, key: r.key, open: true, peers: new Map(), busy: false, fails: 0, tick: 0 };
+  clearInterval(net.roomTimer);
+  net.roomTimer = setInterval(netRoomPoll, 1000);
+  return net.room;
+}
+function netRoomClose(del) {
+  const R = net.room;
+  clearInterval(net.roomTimer); net.roomTimer = 0;
+  if (!R) return;
+  R.open = false;
+  for (const p of R.peers.values()) if (!p.joined) { try { p.pc.close(); } catch (e) { /* ignore */ } }
+  R.peers.clear();
+  if (del) netRelayCall('DELETE', `/room/${R.code}?key=${R.key}`).catch(() => {});
+  net.room = null;
+}
+async function netRoomPoll() {
+  const R = net.room;
+  if (!R || !R.open || R.busy) return;
+  const inGame = state === 'PLAYING' || state === 'LOADING';
+  R.tick++;
+  if (inGame && R.tick % 15 !== 0) return;            // in a game just keep the room alive, nobody can join
+  R.busy = true;
+  try {
+    const j = await netRelayCall('GET', `/room/${R.code}/host?key=${R.key}`);
+    R.fails = 0;
+    if (!inGame) for (const m of j.msgs) { if (m.t === 'join') netRoomOffer(m.gid); else if (m.t === 'answer') netRoomAnswer(m.gid, m.answer); }
+    for (const [gid, p] of [...R.peers]) if (p.joined || p.gone || realTime - p.t0 > 60) { if (!p.joined) { try { p.pc.close(); } catch (e) { /* ignore */ } } R.peers.delete(gid); }
+  } catch (e) {
+    if (++R.fails >= 6) { net.status = 'LOST THE ROOM SERVER. USE LONG CODES.'; netRoomClose(false); }
+  }
+  R.busy = false;
+}
+async function netRoomOffer(gid) {
+  const R = net.room;
+  if (!R || R.peers.has(gid)) return;
+  try {
+    if (net.peers.length + R.peers.size >= 3) { await netRelayCall('POST', `/room/${R.code}/to/${gid}?key=${R.key}`, { offer: 'FULL' }); return; }
+    R.peers.set(gid, { pending: true, t0: realTime, pc: { close() { /* placeholder until the offer exists */ } } });
+    const o = await netMakeOffer();
+    o.peer.gid = gid;
+    R.peers.set(gid, o.peer);
+    await netRelayCall('POST', `/room/${R.code}/to/${gid}?key=${R.key}`, { offer: o.code });
+  } catch (e) { R.peers.delete(gid); }
+}
+async function netRoomAnswer(gid, code) {
+  const R = net.room, peer = R && R.peers.get(gid);
+  if (!peer || !peer.rel) return;
+  try {
+    const d = await netUnpack(code);
+    if (d.t === 'a') await peer.pc.setRemoteDescription({ type: 'answer', sdp: d.s });
+  } catch (e) { /* a bad reply: the friend can try again */ }
+}
+async function netRoomJoin(text) {
+  const code = String(text || '').replace(/\D/g, '');
+  if (code.length !== 6) throw new Error('TYPE ALL 6 DIGITS');
+  const tok = ++net.joinTok;
+  const gid = Array.from(crypto.getRandomValues(new Uint8Array(8)), (b) => b.toString(16).padStart(2, '0')).join('');
+  await netRelayCall('POST', `/room/${code}/join`, { gid: gid });
+  const t0 = Date.now();
+  while (Date.now() - t0 < 25000) {
+    await new Promise((r) => setTimeout(r, 700));
+    if (tok !== net.joinTok) return;
+    const j = await netRelayCall('GET', `/room/${code}/guest/${gid}`);
+    const m = (j.msgs || []).find((x) => x.t === 'offer');
+    if (m) {
+      if (m.offer === 'FULL') throw new Error('THE ROOM IS FULL');
+      const reply = await netGuestAccept(m.offer);
+      if (tok !== net.joinTok) return;
+      await netRelayCall('POST', `/room/${code}/answer`, { gid: gid, answer: reply });
+      return;
+    }
+  }
+  throw new Error('THE HOST DID NOT ANSWER. IS THE CODE RIGHT?');
 }
 function netHostHello(peer, d) {
   const bye = (why) => { netSendCh(peer.rel, 'bye', why); setTimeout(() => { try { peer.pc.close(); } catch (e) { /* ignore */ } }, 400); if (net.pending === peer) net.pending = null; };
@@ -6567,7 +6684,7 @@ function netHostPick(peer, d) {
 }
 function netHostMsg(peer, m) {
   if (!m || typeof m.t !== 'string') return;
-  if (m.t === 'hello') { if (!peer.joined) netHostHello(peer, m.d); return; }
+  if (m.t === 'hello') { netLog('host got hello from ' + peer.id); if (!peer.joined) netHostHello(peer, m.d); return; }
   if (!peer.joined) return;
   if (m.t === 'in') { const d = m.d || {}; peer.input.x = clamp(netNum(d.x), -1, 1); peer.input.y = clamp(netNum(d.y), -1, 1); peer.lastIn = realTime; }
   else if (m.t === 'act') { if (m.d === 'action' || m.d === 'ability') netRemoteEvent({ dev: 'net' + peer.id, type: m.d }); }
@@ -6608,6 +6725,7 @@ function netEnd(why) {
   } else if (net.role === 'client' && net.guest) {
     try { net.guest.pc.close(); } catch (e) { /* ignore */ }
   }
+  netRoomClose(true);
   net.role = 'off'; net.peers = []; net.pending = null; net.guest = null; net.slot = -1; net.me = null; net.over = null; net.leaveAsk = false; net.snap = null;
   net.sheepById.clear(); net.enemyById.clear(); net.ev = []; net.lastPong = 0; net.ping = 0;
 }
@@ -6623,15 +6741,17 @@ async function netGuestAccept(code) {
   if (net.role === 'host') throw new Error('YOU ARE HOSTING RIGHT NOW');
   if (net.guest) { try { net.guest.pc.close(); } catch (e) { /* ignore */ } }
   const pc = new RTCPeerConnection(NET_ICE);
-  const g = { pc: pc, rel: null, uns: null };
+  const g = { pc: pc, rel: null, uns: null, t0: realTime, helloT: 0, hello: null };
   net.guest = g; net.role = 'client'; net.slot = -1;
   pc.ondatachannel = (ev) => {
     const ch = ev.channel;
+    netLog('guest channel ' + ch.label + ' ' + ch.readyState);
     if (ch.label === 'r') g.rel = ch; else g.uns = ch;
     ch.onmessage = (e) => { let m = null; try { m = JSON.parse(e.data); } catch (er) { return; } netClientMsg(m); };
     if (ch.label === 'r') {
       ch.onclose = () => netClientLost('THE HOST DISCONNECTED');
-      const hello = () => netSendCh(ch, 'hello', { v: NET_VER, kind: settings.netKind || 'goat', skin: rememberedSkin(settings.netKind || 'goat'), look: rememberedLook(settings.netKind || 'goat') });
+      const hello = () => netLog('guest hello sent ' + ch.readyState) || netSendCh(ch, 'hello', { v: NET_VER, kind: settings.netKind || 'goat', skin: rememberedSkin(settings.netKind || 'goat'), look: rememberedLook(settings.netKind || 'goat') });
+      g.hello = hello;
       if (ch.readyState === 'open') hello(); else ch.onopen = hello;
     }
   };
@@ -6643,6 +6763,7 @@ async function netGuestAccept(code) {
 }
 function netClientLost(why) {
   if (net.role !== 'client') return;
+  if (NB.netbox && !NB.netbox.hidden && net.boxKind === 'join') NB.nbStatus.textContent = String(why || 'DISCONNECTED').toUpperCase();
   const was = net.guest;
   netEnd();
   netNote(why || 'DISCONNECTED');
@@ -6924,6 +7045,13 @@ function netClientUpdate(dt) {
 // host: stream the game to the guests, drop guests that went silent
 function netTick(dt) {
   if (net.role === 'client' && net.guest) {
+    if (net.slot < 0) {
+      // not welcomed yet: say hello again now and then, and give up with a clear message if it never works
+      const g = net.guest;
+      g.helloT += dt;
+      if (g.hello && g.rel && g.rel.readyState === 'open' && g.helloT > 1.5) { g.helloT = 0; g.hello(); }
+      if (realTime - g.t0 > 30) { netLog('guest gave up'); netClientLost('COULD NOT FINISH CONNECTING. TRY AGAIN.'); return; }
+    }
     net.pingT += dt;
     if (net.pingT >= 2) { net.pingT = 0; netSendCh(net.guest.rel, 'ping', performance.now()); }
     if (!net.lastPong) net.lastPong = realTime;
@@ -6987,7 +7115,8 @@ function drawNet() {
   const line = (s, c) => { text(s, W / 2, y, c || 'l', { align: 'center' }); y += 8; };
   if (net.role === 'host') {
     line('YOU ARE THE HOST', 'y');
-    line('THE GAME RUNS ON YOUR DEVICE', 's');
+    if (net.room && net.room.open) { text('ROOM ' + netFmtCode(net.room.code), W / 2, y, 'y', { s: 2, align: 'center' }); y += 16; }
+    else line('THE GAME RUNS ON YOUR DEVICE', 's');
     y += 4;
     net.peers.forEach(p => { const pl = players.find(q => q.net === p.id); line('P' + (p.slot + 1) + ' ' + (pl ? pl.kind.toUpperCase() : '') + ' CONNECTED', 'w'); });
     if (!net.peers.length) line('NO FRIENDS YET', 'i');
@@ -7075,16 +7204,23 @@ function drawNetOverlay() {
 // ---- the copy-and-paste box (real HTML, so pasting works on every device)
 const NB = {};
 function netBoxInit() {
+  try {
+    const u = new URLSearchParams(location.search).get('relay');
+    if (u === 'off') { settings.relay = ''; saveSettings(); }
+    else if (u && /^https?:\/\/[^\s'"]+$/.test(u)) { settings.relay = u.replace(/\/+$/, ''); saveSettings(); }
+  } catch (e) { /* no address bar */ }
   const q = (id) => document.getElementById(id);
-  for (const id of ['netbox', 'nbTitle', 'nbHelp', 'nbL1', 'nbOut', 'nbCopy', 'nbMake', 'nbL2', 'nbIn', 'nbPaste', 'nbGo', 'nbStatus', 'nbClose']) NB[id] = q(id);
-  NB.nbCopy.onclick = () => {
-    const t = NB.nbOut.value;
+  for (const id of ['netbox', 'nbTitle', 'nbHelp', 'nbRoom', 'nbCode', 'nbCopyCode', 'nbJoin', 'nbNum', 'nbJoinGo', 'nbManual', 'nbL1', 'nbOut', 'nbCopy', 'nbMake', 'nbL2', 'nbIn', 'nbPaste', 'nbGo', 'nbStatus', 'nbMode', 'nbClose']) NB[id] = q(id);
+  const copyText = (t) => {
     if (!t) return;
-    const ok = () => { NB.nbStatus.textContent = 'COPIED. NOW SEND IT TO YOUR FRIEND.'; };
-    try { navigator.clipboard.writeText(t).then(ok, () => { NB.nbOut.select(); document.execCommand('copy'); ok(); }); } catch (e) { NB.nbOut.select(); try { document.execCommand('copy'); ok(); } catch (er) { /* manual copy */ } }
+    const ok = () => { NB.nbStatus.textContent = 'COPIED.'; };
+    try { navigator.clipboard.writeText(t).then(ok, () => { NB.nbOut.select(); document.execCommand('copy'); ok(); }); } catch (e) { try { document.execCommand('copy'); ok(); } catch (er) { /* manual copy */ } }
   };
+  NB.nbCopy.onclick = () => { copyText(NB.nbOut.value); NB.nbStatus.textContent = 'COPIED. NOW SEND IT TO YOUR FRIEND.'; };
+  NB.nbCopyCode.onclick = () => copyText(net.room ? net.room.code : '');
   NB.nbPaste.onclick = () => { try { navigator.clipboard.readText().then(t => { NB.nbIn.value = t; }, () => { NB.nbStatus.textContent = 'LONG-PRESS THE BOX BELOW AND PASTE'; }); } catch (e) { NB.nbStatus.textContent = 'LONG-PRESS THE BOX BELOW AND PASTE'; } };
   NB.nbClose.onclick = () => netCloseBox();
+  NB.nbMode.onclick = () => netOpenBox(net.boxKind, net.boxRoom);
   NB.nbMake.onclick = async () => {
     NB.nbMake.disabled = true; NB.nbStatus.textContent = 'MAKING A CODE...';
     try {
@@ -7108,31 +7244,62 @@ function netBoxInit() {
     } catch (e) { NB.nbStatus.textContent = String(e.message || e).toUpperCase(); }
     NB.nbGo.disabled = false;
   };
+  NB.nbJoinGo.onclick = async () => {
+    NB.nbJoinGo.disabled = true; NB.nbStatus.textContent = 'LOOKING FOR THE ROOM...';
+    try {
+      const run = netRoomJoin(NB.nbNum.value);
+      setTimeout(() => { if (NB.nbStatus.textContent === 'LOOKING FOR THE ROOM...') NB.nbStatus.textContent = 'ASKING THE HOST...'; }, 1500);
+      await run;
+      if (net.guest) NB.nbStatus.textContent = 'CONNECTING...';
+    } catch (e) { NB.nbStatus.textContent = String(e.message || e).toUpperCase(); }
+    NB.nbJoinGo.disabled = false;
+  };
+  NB.nbNum.addEventListener('keydown', (e) => { if (e.key === 'Enter') NB.nbJoinGo.click(); });
+  NB.nbNum.addEventListener('input', () => { const d = NB.nbNum.value.replace(/\D/g, '').slice(0, 6); NB.nbNum.value = d.length > 3 ? d.slice(0, 3) + ' ' + d.slice(3) : d; });
   // keep the box in step with what is happening
   setInterval(() => {
     if (NB.netbox.hidden) return;
-    if (net.boxKind === 'host' && net.status && net.status !== net.shownStatus) { net.shownStatus = net.status; NB.nbStatus.textContent = net.status + '. MAKE ANOTHER INVITE FOR MORE FRIENDS.'; NB.nbOut.value = ''; NB.nbIn.value = ''; }
+    if (net.boxKind === 'host' && net.status && net.status !== net.shownStatus) {
+      net.shownStatus = net.status;
+      NB.nbStatus.textContent = net.status + (net.boxRoom ? '. ROOM STAYS OPEN FOR MORE FRIENDS.' : '. MAKE ANOTHER INVITE FOR MORE FRIENDS.');
+      if (!net.boxRoom) { NB.nbOut.value = ''; NB.nbIn.value = ''; }
+    }
   }, 300);
 }
-function netOpenBox(kind) {
+function netOpenBox(kind, manual) {
   if (!NB.netbox) return;
   net.boxKind = kind; net.shownStatus = net.status;
-  const host = kind === 'host';
+  const host = kind === 'host', room = !!netRelayBase() && !manual;
+  net.boxRoom = room;
+  NB.nbMode.style.display = netRelayBase() ? '' : 'none';
+  NB.nbMode.textContent = room ? 'USE LONG CODES INSTEAD' : 'USE A 6-DIGIT ROOM CODE';
+  NB.nbRoom.hidden = !(room && host); NB.nbJoin.hidden = !(room && !host); NB.nbManual.hidden = room;
+  NB.nbOut.value = ''; NB.nbIn.value = ''; NB.nbStatus.textContent = '';
+  NB.netbox.hidden = false;
+  if (room) {
+    NB.nbTitle.textContent = host ? 'YOUR ROOM' : 'JOIN A GAME';
+    NB.nbHelp.textContent = host ? 'Tell your friends to choose JOIN A GAME and type this code. You can pick a mode while they join.' : 'Ask the host for their 6-digit room code.';
+    if (host) {
+      NB.nbCode.textContent = net.room && net.room.open ? netFmtCode(net.room.code) : '------';
+      if (!net.room || !net.room.open) {
+        NB.nbStatus.textContent = 'OPENING A ROOM...';
+        netRoomEnsure().then(r => { NB.nbCode.textContent = netFmtCode(r.code); NB.nbStatus.textContent = 'WAITING FOR FRIENDS...'; },
+          e => { NB.nbStatus.textContent = String(e.message || e).toUpperCase() + '. TRYING LONG CODES.'; setTimeout(() => netOpenBox('host', true), 1800); });
+      } else NB.nbStatus.textContent = net.status || 'WAITING FOR FRIENDS...';
+    } else { NB.nbNum.value = ''; try { NB.nbNum.focus(); } catch (e) { /* ignore */ } }
+    return;
+  }
   NB.nbTitle.textContent = host ? 'INVITE A FRIEND' : 'JOIN A FRIEND';
   NB.nbHelp.textContent = host ? 'Pick a mode first or after. Each friend needs their own invite code.' : 'Ask the host for their invite code, then send your reply code back.';
   NB.nbL1.textContent = host ? '1. YOUR INVITE CODE' : '2. YOUR REPLY CODE (SEND THIS TO THE HOST)';
   NB.nbL2.textContent = host ? '2. PASTE YOUR FRIEND\'S REPLY CODE' : '1. PASTE THE HOST\'S INVITE CODE';
   NB.nbMake.style.display = host ? '' : 'none';
-  NB.nbMake.textContent = 'MAKE INVITE CODE';
   NB.nbGo.textContent = host ? 'CONNECT' : 'MAKE MY REPLY CODE';
-  NB.nbOut.value = ''; NB.nbIn.value = ''; NB.nbStatus.textContent = '';
-  NB.netbox.hidden = false;
   // the guest sees the paste box first
   const order = host ? ['nbL1', 'nbOut', 'nbCopy', 'nbMake', 'nbL2', 'nbIn', 'nbPaste', 'nbGo'] : ['nbL2', 'nbIn', 'nbPaste', 'nbGo', 'nbL1', 'nbOut', 'nbCopy'];
-  const panel = NB.netbox.querySelector('.nbp'), anchor = NB.nbStatus;
-  order.forEach(id => panel.insertBefore(NB[id], anchor));
+  order.forEach(id => NB.nbManual.appendChild(NB[id]));
 }
-function netCloseBox() { if (NB.netbox) NB.netbox.hidden = true; }
+function netCloseBox() { net.joinTok++; if (NB.netbox) NB.netbox.hidden = true; }
 
 // ---------------------------------------------------------------------
 // Boot

@@ -1,6 +1,6 @@
 # State — Get em Billy (formerly Goat Guardian)
 
-**Version:** 0.14.1 · **Status:** Playable. v0.14.1 adds `tools/build_offline.js` (a one-file offline build: it removes the manifest link and the service worker block and inlines the icon; `--demo` flips the demo flag) and `tests/offline.js`. v0.14.0 added online play and a demo build.
+**Version:** 0.15.0 · **Status:** Playable. v0.15.0 adds 6-digit room codes through a relay: `NET_RELAY` (baked by the build scripts from `RELAY_URL`, or `settings.relay` from `?relay=`) enables `netRoomEnsure` / `netRoomPoll` / `netRoomOffer` / `netRoomAnswer` on the host and `netRoomJoin` on the guest; the box has a room mode and a manual mode (`netOpenBox(kind, manual)`). The relay is in `tools/relay/` (`core.mjs` shared by `node-server.mjs` and `worker.mjs`). Guests resend `hello` until welcomed (`net.slot < 0` in `netTick`). `tools/build_site.js` builds the folder for a domain. v0.14.1 added v0.14.1 adds `tools/build_offline.js` (a one-file offline build: it removes the manifest link and the service worker block and inlines the icon; `--demo` flips the demo flag) and `tests/offline.js`. v0.14.0 added online play and a demo build.
 
 Online (`net`, the "Online play" block before Boot):
 - Roles are `off`, `host` and `client`. The host runs everything (`update()` is unchanged) and streams `netSnapshot()` 20 times a second (compact arrays: `sh` sheep, `en` enemies, `p` players with `NET_PF`, `h` HUD numbers) over an unreliable channel; events (sounds, text, shake, particles, splats) are recorded by wrappers (`netHookEffects`) and sent on the reliable channel.
@@ -64,6 +64,7 @@ v0.11.0 renamed the game to **Get em Billy**; the folder, localStorage keys (`go
 - **Assets:** no Universal Assets are used. Everything is procedural.
 
 ## Verified
+- v0.15.0: `tests/relay_core.js`, `tests/rooms.js` (local relay, four players), `tests/online.js` (long codes), `tests/demo.js`, `tests/offline.js` and `tests/smoke.js` pass. Not verified: the Cloudflare Worker on real Cloudflare (it shares the tested core but has not been deployed from here), and play across real networks.
 - v0.14.0: `tests/online.js` (two browsers, real code box, Defend, Escort and Versus rounds, late joiner, leave, host dropping) and `tests/demo.js` pass. Not verified: play across real internet connections and strict NATs (no relay), phones as guests, and many minutes of play on a slow connection.
 - v0.10.0: the smoke test checks:
   - every lab set (12 goat breeds, 10 dogs, wolf, fox, boss, bat, hawk) has full idle, walk, run, jump and attack frames in 5 views

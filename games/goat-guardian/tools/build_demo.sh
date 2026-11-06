@@ -15,10 +15,18 @@ case "$URL" in
 esac
 case "$URL" in *"'"* | *'\'* | *'"'*) echo "FULL_URL must not contain quotes or backslashes" >&2; exit 1 ;; esac
 ESC=$(printf '%s' "$URL" | sed -e 's/[&|]/\\&/g')
+RELAY="${RELAY_URL:-}"
+case "$RELAY" in
+  "" | http://* | https://*) ;;
+  *) echo "RELAY_URL must start with http:// or https://" >&2; exit 1 ;;
+esac
+case "$RELAY" in *"'"* | *'\\'* | *'"'* | *' '*) echo "RELAY_URL must not contain quotes, spaces or backslashes" >&2; exit 1 ;; esac
+RESC=$(printf '%s' "${RELAY%/}" | sed -e 's/[&|]/\\&/g')
 rm -rf "$OUT"
 mkdir -p "$OUT/assets/icons"
 sed -e "s/^const DEMO = false;/const DEMO = true;/" \
     -e "s|^const FULL_GAME_URL = '';|const FULL_GAME_URL = '${ESC}';|" \
+    -e "s|^const NET_RELAY = '';|const NET_RELAY = '${RESC}';|" \
     -e "s/goatGuardian/goatGuardianDemo/g" \
     -e "s|<title>Get em Billy</title>|<title>Get em Billy (Demo)</title>|" \
     -e 's|content="Get em Billy">|content="Get em Billy Demo">|' \

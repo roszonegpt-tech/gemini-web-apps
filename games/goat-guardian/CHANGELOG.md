@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+## [0.15.0] - 2026-11-06
+### Added
+- **6-digit room codes.** When a relay is set up (see `tools/relay/README.md`), HOST A GAME shows a big 6-digit code (it is also shown in the lobby and on the online screen), friends choose JOIN A GAME, type the code (a space is fine) and connect on their own, with no copy and paste. A full room, a wrong code, a short code, an unreachable relay and a host who doesn't answer each get a clear message. The host's room stays open while the game is played and closes when the host leaves. The long copy-and-paste codes stay as a fallback ("USE LONG CODES INSTEAD", and automatic when the relay can't be reached) and as the mode when no relay is set.
+- **The relay** (`tools/relay/`): a tiny matchmaking service that only passes the two handshake messages between a host and a friend; no game data goes through it. One logic core (`core.mjs`) runs in Node (`node-server.mjs`) and as a Cloudflare Worker with a Durable Object (`worker.mjs`, `wrangler.toml`, free plan). Rooms last 20 minutes, are limited in size and tries, and can be locked to your own site with `ALLOWED_ORIGINS`. `node tests/relay_core.js` tests the logic.
+- **Putting the game on a domain:** `RELAY_URL=https://relay.yourdomain.com node tools/build_site.js` writes `build/site/` (page with the relay address baked in, manifest, service worker, icons), ready to upload; `--demo` builds the demo site. `RELAY_URL` also works for `tools/build_offline.js` and `tools/build_demo.sh`. A relay can also be set by opening the game once with `?relay=https://...` (remembered; `?relay=off` clears it).
+- `node tests/rooms.js`: a host, three friends typing the code, a fourth told the room is full, a wrong code, a 4-player Defend round, closing the room, and the relay going down (the host falls back to long codes).
+### Fixed
+- A friend could occasionally connect but never be welcomed by the host. They now say hello again every 1.5 s until welcomed, and give up with a clear message after 30 s. Connection events are kept in a short log (`net.log`) for diagnosing problems.
+
 ## [0.14.1] - 2026-11-06
 ### Added
 - **One-file offline build**: `node tools/build_offline.js` writes `build/get-em-billy.html` (and `--demo` writes `build/get-em-billy-demo.html`), about 545 KB each. The file holds the whole game (page, code, icons as data URIs; all art and sound are generated in code), makes no network requests, and needs no other file, manifest or service worker. Double-click it, open it from a phone's Files app, or host it anywhere. Online play still needs a connection between the players.

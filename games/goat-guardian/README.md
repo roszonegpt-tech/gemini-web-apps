@@ -25,13 +25,20 @@ All art is drawn from pixel matrices in code, and all sound is synthesized with 
 - **Installable app:** when served from GitHub Pages it installs to a home screen and works offline.
 
 ## Play online
-Title screen, PLAY ONLINE. One player hosts (up to 3 friends join); there is no account and no server.
+Title screen, PLAY ONLINE. One player hosts (up to 3 friends join).
+
+**With a relay (6-digit room codes):** the host chooses HOST A GAME and reads out the 6-digit code; friends choose JOIN A GAME and type it. That's all. The relay only introduces the players; set one up in a few minutes with `tools/relay/README.md` (free on Cloudflare), then build with `RELAY_URL=https://relay.yourdomain.com`.
+
+**Without a relay (long codes):** there is no account and no server, but you swap longer codes by copy and paste:
 1. **Host:** HOST A GAME, then MAKE INVITE CODE, COPY it and send it to a friend in any chat.
 2. **Friend:** JOIN A GAME, paste the invite, MAKE MY REPLY CODE, COPY it and send it back.
 3. **Host:** paste the reply and press CONNECT. Repeat with a new invite code for each friend. The host picks a mode as usual; friends choose their animal, breed and STYLE in the online lobby.
 
 The host's device runs the game, so a good connection for the host matters most. Everyone needs the same game version. Players on the same Wi-Fi connect directly; across the internet a public STUN server (Google's) is used to find each other, and a few strict networks that block direct connections may not be able to connect (there is no relay server). Each player gets their own camera. The browser's own copy/paste works on phones.
-Run `node tests/online.js` to test it with two browsers.
+Run `node tests/online.js` (long codes) and `node tests/rooms.js` (6-digit codes, with a local relay) to test it.
+
+## Putting it on your own domain
+`RELAY_URL=https://relay.yourdomain.com node tools/build_site.js` writes `build/site/`; upload it to any static host over https (a free GitHub Pages or Cloudflare Pages site is enough). It installs as an app and plays offline after the first visit. Deploy the relay first (`tools/relay/README.md`) and lock it to your site with `ALLOWED_ORIGINS`.
 
 ## One-file offline build
 `node tools/build_offline.js` writes **`build/get-em-billy.html`**: the whole game in a single file (about 545 KB) that works with no internet and no other files. Double-click it, send it to a phone, or host it anywhere. `node tools/build_offline.js --demo` writes the demo as one file too. Run `node tests/offline.js` to check that each file works alone, offline, from `file://`. (Online play still needs a connection between the players, and a single file can't be installed as an app; use the hosted version for that.)

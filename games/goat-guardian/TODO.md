@@ -8,6 +8,7 @@ All 20 items from the feature list were added in v0.7.0. What remains is playtes
 - [ ] Listen-test the music loops and the new sound effects; tune the mix.
 - [ ] Check night lanterns and fog on long routes for readability.
 - [ ] Install the GitHub Pages build on a phone and test offline play.
+- [ ] Deploy the relay (`tools/relay/README.md`) and put its address in the build; test 6-digit codes across two real networks.
 - [ ] Online: test across the real internet (two homes, mobile data) and on strict NATs; consider an optional relay (a tiny signalling worker) for one-step room codes and a TURN server for networks that block direct connections.
 - [ ] Online: client-side prediction for the guest's own animal (it is currently one round trip behind), guest reconnect, and spectators.
 - [ ] Demo: add a Steam/itch link via `FULL_URL`, and decide whether to limit STYLE in the demo.

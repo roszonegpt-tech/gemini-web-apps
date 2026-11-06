@@ -3,14 +3,15 @@
 //   build/get-em-billy-demo.html   with --demo (3 routes, 3 arenas, 8 waves; see tools/build_demo.sh)
 // Open it by double-clicking (file://), from a phone's Files app, or host it anywhere. Everything is inside
 // the file: the page, the code, the icons (as data URIs) and all art and sound (made in code). It needs no
-// other file and makes no network requests. Online play still needs a connection between the players.
+// other file and makes no network requests. RELAY_URL=https://... bakes in the 6-digit room code server. Online play still needs a connection between the players.
 const fs = require('fs');
+const bakeRelay = require('./relay_url.js');
 const path = require('path');
 const root = path.resolve(__dirname, '..');
 const args = process.argv.slice(2);
 const demo = args.includes('--demo');
 const outDir = path.resolve(root, args.find(a => !a.startsWith('--')) || 'build');
-let html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
+let html = bakeRelay(fs.readFileSync(path.join(root, 'index.html'), 'utf8'));
 const must = (cond, what) => { if (!cond) { console.error('build_offline: could not find ' + what); process.exit(1); } };
 const icon = 'data:image/png;base64,' + fs.readFileSync(path.join(root, 'assets/icons/icon-192.png')).toString('base64');
 // no manifest or service worker: a lone file can't carry them

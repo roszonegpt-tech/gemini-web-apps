@@ -11,6 +11,14 @@ const { chromium } = require('playwright');
   const fail = (m) => { console.log('FAIL', m); process.exitCode = 1; };
   execSync('node tools/build_offline.js', { cwd: root, stdio: 'pipe' });
   execSync('node tools/build_offline.js --demo', { cwd: root, stdio: 'pipe' });
+  // the relay address can be baked in, and a bad one is refused
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'billy-relay-'));
+  execSync('node tools/build_offline.js ' + tmp, { cwd: root, stdio: 'pipe', env: Object.assign({}, process.env, { RELAY_URL: 'https://relay.example.com/' }) });
+  if (!fs.readFileSync(path.join(tmp, 'get-em-billy.html'), 'utf8').includes("const NET_RELAY = 'https://relay.example.com';")) fail('relay address not baked in');
+  try { execSync('node tools/build_offline.js ' + tmp, { cwd: root, stdio: 'pipe', env: Object.assign({}, process.env, { RELAY_URL: "x' + alert(1) + '" }) }); fail('a bad relay address was accepted'); } catch (e) { /* refused, as it should be */ }
+  execSync('node tools/build_site.js', { cwd: root, stdio: 'pipe' });
+  for (const f of ['index.html', 'manifest.webmanifest', 'sw.js', 'assets/icons/icon-192.png', '.nojekyll']) if (!fs.existsSync(path.join(root, 'build/site', f))) fail('site build is missing ' + f);
+  fs.rmSync(tmp, { recursive: true, force: true });
   const b = await chromium.launch();
   for (const [name, demo] of [['get-em-billy.html', false], ['get-em-billy-demo.html', true]]) {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'billy-'));
