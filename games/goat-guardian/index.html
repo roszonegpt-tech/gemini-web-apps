@@ -4613,15 +4613,20 @@ function drawTrailerOverlay() {
     return;
   }
   if (sc.cap) {
-    const slide = Math.round(clamp(1 - t / 0.25, 0, 1) * 40);
-    const w = textWidth(sc.cap, 2) + 14;
-    rect(8 - slide, H - bar - 24, w, 18, 'k');
-    rect(8 - slide, H - bar - 24, 3, 18, 'y');
-    text(sc.cap, 16 - slide, H - bar - 20, 'w', { s: 2 });
-    if (sc.sub) {
-      const sw = textWidth(sc.sub) + 10;
-      rect(8 - slide, H - bar - 35, sw, 11, 'k');
-      text(sc.sub, 13 - slide, H - bar - 33, 'y');
+    // the caption is a small tag in the corner (1x text when filming close up, where the picture is only ~90 rows tall) that
+    // slides in, stays about 2.6 s and slides away again, so it never sits on the action for long
+    const cs = showcase.close ? 1 : 2, ch = cs * 5 + 8, pad = cs * 3 + 4;
+    const slide = Math.round(Math.max(clamp(1 - t / 0.25, 0, 1), clamp((t - 2.6) / 0.25, 0, 1)) * 60);
+    if (slide < 60) {
+      const w = textWidth(sc.cap, cs) + pad * 2 - 2, by = H - bar - ch - 4;
+      rect(4 - slide, by, w, ch, 'k');
+      rect(4 - slide, by, 2, ch, 'y');
+      text(sc.cap, 4 + pad - slide, by + 4, 'w', { s: cs });
+      if (sc.sub) {
+        const sw = textWidth(sc.sub) + 8;
+        rect(4 - slide, by - 9, sw, 9, 'k');
+        text(sc.sub, 8 - slide, by - 7, 'y');
+      }
     }
   }
 }
@@ -6345,7 +6350,7 @@ function drawTitle() {
   rect(0, fy - 3, W, 13, 'k');
   if (best.escort || best.defend) text('BEST  ESCORT ' + best.escort + '  DEFEND ' + best.defend, W / 2, fy, 'y', { align: 'center' });
   else text('1-4 PLAYERS  GOATS AND DOGS', W / 2, fy, 's', { align: 'center' });
-  text(DEMO ? 'DEMO V0.18.2' : 'V0.18.2', W - 3, fy - 12, 'i', { align: 'right', outline: 'k' });
+  text(DEMO ? 'DEMO V0.18.3' : 'V0.18.3', W - 3, fy - 12, 'i', { align: 'right', outline: 'k' });
 }
 const MODES = [
   { id: 'escort', title: 'ESCORT', l1: 'HERD THE FLOCK PIN TO PIN', icon: 'pinGoal' },

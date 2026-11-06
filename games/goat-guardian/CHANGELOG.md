@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## [0.18.3] - 2026-11-06
+### Fixed
+- **Trailer captions covered the action.** In the close-up trailers (Billy, the dogs) the caption and the ability line were drawn at double size on a picture only 90 rows tall, so they filled a big part of the lower frame. They are now small corner tags (1x text when filming close up), slide in, stay about 2.6 seconds and slide away again (`drawTrailerOverlay`). The Billy and Farm Dogs trailers are re-recorded. The full-game trailer keeps its 2x captions (they also slide away now).
+
 ## [0.18.2] - 2026-11-06
 ### Changed
 - **Billy and Farm Dogs trailers re-recorded with the new goat and dogs** (`tools/trailer/make.sh billy`, `... dogs`; 55 s and about 60 s, 1080p, same soundtracks). The close-up trailer camera (`resize()`, used by both) now films closer (90 rows tall instead of 135) because the farm animals are drawn smaller since 0.18.1, so Billy and the dogs fill the frame as before. The full-game trailer is unchanged and was not re-recorded.
