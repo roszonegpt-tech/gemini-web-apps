@@ -396,12 +396,14 @@ const LAB = {"units":{"goat":{"name":"Goat","pal":[["Cream","#f2e2d4","#bcb0a6",
 // the lab's own rules (per-frame offsets keep them on the head).
 // ---------------------------------------------------------------------
 const LAB_GW = 24, LAB_GH = 18, LAB_GOY = 3;
-// Going up or down the screen the animals are shown in three-quarter view (like the side-view reference sheets), not as
-// straight-on fronts and backs. LAB_TRUE_BACK = true brings the straight views back (with the widened backs, see LAB_BACK).
-const LAB_TRUE_BACK = false;
+// Views: LAB_TRUE_BACK = true (the default again since 0.17.2) draws the lab's own straight front and back views (with the
+// widened backs, see LAB_BACK). false switches to the three-quarter views (LAB_PAIRS_34) or, with LAB_SIDE_ONLY, the side
+// profile for every direction (both tried in 0.17.0 / 0.17.1). LAB_OUTLINE adds the 0.17.0 dark outline (off by default).
+const LAB_TRUE_BACK = true;
+const LAB_OUTLINE = false;
 const LAB_PAIRS_34 = [['E', 'E', 'W'], ['SE', 'SE', 'SW'], ['NE', 'NE', 'NW'], ['S', 'SE', 'SW'], ['N', 'NE', 'NW']];
 // side view for every direction (0.17.1, like the reference sheets: a pure side profile, no front or back at all)
-const LAB_SIDE_ONLY = true;
+const LAB_SIDE_ONLY = false;
 const LAB_PAIRS_SIDE = [['E', 'E', 'W'], ['SE', 'E', 'W'], ['NE', 'E', 'W'], ['S', 'E', 'W'], ['N', 'E', 'W']];
 const LAB_PAIRS_TRUE = [['E', 'E', 'W'], ['SE', 'SE', 'SW'], ['NE', 'NE', 'NW'], ['S', 'S', 'S'], ['N', 'N', 'N']];
 const LAB_FRONT = { E: 1, SE: 1, NE: 1, W: -1, SW: -1, NW: -1, S: 0, N: 0 };
@@ -467,6 +469,47 @@ function labBackFix(rows, sp, delta) {
   if (sp.tail) for (const [dx, dy, c] of sp.tail) { const y = ls + dy; if (y >= 0 && y < out.length) { const x = 11 + dx; out[y] = out[y].slice(0, x) + c + out[y].slice(x + 1); } }
   return out;
 }
+// The goat's side view (0.17.2): the lab art sat a big head on the middle of a short, flat back, which left a notch and a
+// crease under it. Like the reference sheets, the body, tail and legs move back (GOAT_SIDE_SHIFT columns) so the head
+// stands at the front, the body is lifted a row with a level back from a rounded rump, the legs are a pixel longer, and the shoulders rise into the
+// head as a neck (the gap under the head is filled). The head stays where it was, so hats, hair and collars still fit. Works on every
+// frame (the head bobs, gallops and dips to ram); the west view is mirrored.
+const GOAT_SIDE_SHIFT = 3;
+function labGoatNeck(rows, west) {
+  const flip = (r) => r.split('').reverse().join('');
+  const src = (west ? rows.map(flip) : rows.slice()).map(r => r.split(''));
+  const H = src.length, W = src[0].length, body = 'SsL';
+  // the back: the top row holding a run of 3+ body pixels (the tail is a single column); the belly: the last such row
+  let bt = -1, bb = -1;
+  for (let y = 0; y < H; y++) { const m = /[SsL]{3,}/.exec(src[y].join('')); if (m && m.index >= 5) { if (bt < 0) bt = y; bb = y; } }
+  if (bt < 2) return rows;
+  const x0 = /[SsL]{3,}/.exec(src[bt].join('')).index - GOAT_SIDE_SHIFT;
+  const isHead = (ch, y, x) => 'ipe'.includes(ch) || (ch === 'N' && y <= bb && x >= 12);
+  const g = src.map(r => r.map(() => '.'));
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { const ch = src[y][x]; if (ch !== '.' && !isHead(ch, y, x) && x - GOAT_SIDE_SHIFT >= 0) g[y][x - GOAT_SIDE_SHIFT] = ch; }
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { const ch = src[y][x]; if (ch !== '.' && isHead(ch, y, x)) g[y][x] = ch; }
+  // close the gaps the move opened between the body and the head (chest and throat)
+  for (let y = bt; y <= bb; y++) {
+    const r = g[y], L = r.findIndex(c => c !== '.'), R = W - 1 - [...r].reverse().findIndex(c => c !== '.');
+    if (L >= 0) for (let x = Math.max(L, 3); x < R; x++) if (r[x] === '.') r[x] = 'S';
+  }
+  // the neck: fill under the head, rising from the back
+  for (const [dy, from, ch] of [[1, x0 + 1, 'S'], [2, x0 + 6, 'S']]) {
+    const y = bt - dy;
+    if (y < 0) continue;
+    const row = g[y];
+    let hx = -1;
+    for (let x = from; x < W; x++) if ('ipe'.includes(row[x])) { hx = x; break; }
+    if (hx < 0) continue;
+    for (let x = from; x < hx; x++) if (row[x] === '.' && g[y + 1][x] !== '.') row[x] = ch;
+  }
+  // the body sits a row higher: the belly row becomes the tops of the legs, so the legs are a pixel longer
+  if (bb + 1 < H) g[bb] = g[bb].map((c, x) => 'ipe'.includes(c) || (c === 'N' && x >= 12) ? c : g[bb + 1][x] === '.' ? '.' : 'NH'.includes(g[bb + 1][x]) ? 'S' : g[bb + 1][x]);
+  // single-pixel holes left between the neck and the head
+  for (let y = Math.max(1, bt - 3); y < bt; y++) for (let x = 1; x < W - 1; x++) if (g[y][x] === '.' && g[y][x - 1] !== '.' && g[y][x + 1] !== '.') g[y][x] = 'S';
+  const out = g.map(r => r.join(''));
+  return west ? out.map(flip) : out;
+}
 function labUnit(id) {
   const u = LAB.units[id];
   if (u.art) return u;
@@ -483,6 +526,12 @@ function labUnit(id) {
     const top = (rows) => rows.findIndex(r => /[^.]/.test(r));
     const t0 = top(u.art.N.idle[0]);
     for (const a in u.art.N) u.art.N[a] = u.art.N[a].map(rows => labBackFix(rows, sp, Math.max(0, top(rows) - t0)));
+  }
+  if (id === 'goat' && GOAT_SIDE_SHIFT) {
+    for (const d of ['E', 'W']) if (u.art[d]) for (const a in u.art[d]) u.art[d][a] = u.art[d][a].map(rows => labGoatNeck(rows, d === 'W'));
+    // outfits cover the moved body: further back, and a row higher
+    u.rg = Object.assign({}, u.rg, { E: [u.rg.E[0] - GOAT_SIDE_SHIFT - 1, u.rg.E[1]], W: [u.rg.W[0], u.rg.W[1] + GOAT_SIDE_SHIFT + 1] });
+    u.rgDy = { E: -1, W: -1 };
   }
   return u;
 }
@@ -532,7 +581,7 @@ function labCompose(u, rows, off, d, look) {
   if (!u.noItems) for (const k of look.acc) { const a = it.acc[k]; if (a && a.U && a.U[d]) labPaint(g, a.U[d], dx, dy, 'under'); }
   for (let r = 0; r < rows.length; r++) for (let c = 0; c < W; c++) { const ch = rows[r][c]; if (ch && ch !== '.') g[r + oy][c] = ch === 'd' ? 'S' : ch; }
   if (u.noItems) return g;
-  if (look.outfit > 0) labOutfit(g, it.outfit[look.outfit - 1], u.rg && u.rg[d], dx, dy);
+  if (look.outfit > 0) labOutfit(g, it.outfit[look.outfit - 1], u.rg && u.rg[d], dx, dy + ((u.rgDy && u.rgDy[d]) || 0));
   if (look.hair > 0) {
     const V = it.hair[look.hair - 1].V[d];
     labPaint(g, look.hat > 0 && V ? [V[0], V[1].map((r, i) => V[0] + i < 4 ? '.'.repeat(14) : r)] : V, dx, dy, 'over');
@@ -717,8 +766,8 @@ function labSet(id, look) {
   for (const k in m) if (typeof m[k] === 'string' && m[k][0] === '#') labRegister(m[k]);
   const grid = (d, a, i) => labCompose(u, u.art[d][a][i], u.off && u.off[d] && u.off[d][a] && u.off[d][a][i], d, look);
   const sc = u.scale === undefined ? LAB_SCALE : u.scale;
-  const ol = u.noOutline ? (g) => g : labOutline;
-  const pair = (dR, dL, gR, gL) => { const sp = new LabSpr(labCanvas(ol(labScale(gR, sc)), m), labCanvas(ol(labScale(gL, sc)), m)); sp.pad = u.noOutline ? 0 : 1; return sp; };
+  const outl = LAB_OUTLINE && !u.noOutline, ol = outl ? labOutline : (g) => g;
+  const pair = (dR, dL, gR, gL) => { const sp = new LabSpr(labCanvas(ol(labScale(gR, sc)), m), labCanvas(ol(labScale(gL, sc)), m)); sp.pad = outl ? 1 : 0; return sp; };
   set = { run: {}, idle: {}, jump: {}, attack: {}, act: {}, pose: { sit: {}, lie: {}, alert: {}, sniff: {}, bite: {} }, unit: id };
   for (const [k, dR, dL] of (LAB_TRUE_BACK || u.keepViews ? LAB_PAIRS_TRUE : LAB_SIDE_ONLY ? LAB_PAIRS_SIDE : LAB_PAIRS_34)) {
     const acts = {};
@@ -6098,7 +6147,7 @@ function drawTitle() {
   rect(0, fy - 3, W, 13, 'k');
   if (best.escort || best.defend) text('BEST  ESCORT ' + best.escort + '  DEFEND ' + best.defend, W / 2, fy, 'y', { align: 'center' });
   else text('1-4 PLAYERS  GOATS AND DOGS', W / 2, fy, 's', { align: 'center' });
-  text(DEMO ? 'DEMO V0.17.1' : 'V0.17.1', W - 3, fy - 12, 'i', { align: 'right', outline: 'k' });
+  text(DEMO ? 'DEMO V0.17.2' : 'V0.17.2', W - 3, fy - 12, 'i', { align: 'right', outline: 'k' });
 }
 const MODES = [
   { id: 'escort', title: 'ESCORT', l1: 'HERD THE FLOCK PIN TO PIN', icon: 'pinGoal' },

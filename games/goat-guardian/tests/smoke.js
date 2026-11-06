@@ -180,9 +180,17 @@ const { chromium } = require('playwright');
       }
       return true;
     };
-    out.outline = [SP.goat.E[0], SP.goat.S[0], SP.dog.N[0], SP.dog.run.E[1], SP.dog.pose.sit.E, SP.wolf.NE[0], SP.fox.E[0], SP.bat.E[0], SP.hawk.E[0], labSet('bcollie', { hat: 3 }).E[0]].every(edgeDark)
-      && SP.dog.E[0].pad === 1 && SP.boss.E[0].pad === 0;
-    out.views34 = ['N', 'NE', 'SE', 'S'].every(d => px(SP.dog[d][0]) === px(SP.dog.E[0]) && px(SP.goat[d][0]) === px(SP.goat.E[0])) && px(SP.boss.N[0]) !== px(SP.boss.NE[0]);
+    // 0.17.2: no outline by default; the lab's own front and back views; the goat's side view has a level back that runs
+    // into the neck with no notch or gap between the body and the head, in every frame
+    out.outline = !LAB_OUTLINE && SP.dog.E[0].pad === 0 && !edgeDark(SP.goat.E[0]);
+    out.views34 = px(SP.dog.N[0]) !== px(SP.dog.NE[0]) && px(SP.goat.S[0]) !== px(SP.goat.SE[0]);
+    const gu = labUnit('goat');
+    out.goatBack = Object.keys(gu.art.E).every(a => gu.art.E[a].every(rows => {
+      let bt = rows.findIndex(r => /[SsL]{3,}/.test(r.slice(4)));
+      const bb = rows.length - 1 - [...rows].reverse().findIndex(r => /[SsL]{3,}/.test(r.slice(4)));
+      for (let y = bt; y <= bb; y++) if (/[^.]\.+[^.]/.test(rows[y].slice(4).replace(/\.+$/, ''))) return false;
+      return /S{3,}i/.test(rows[bt]);
+    })) && /S{4,}i/.test(gu.art.E.idle[0][7]) && gu.art.W.idle[0][7] === [...gu.art.E.idle[0][7]].reverse().join('');
     out.sanitize = JSON.stringify(normLabLook({ hat: 99, acc: [7, 'x', 1, 1], col: { hat: -2 }, coat: 'z' })) === JSON.stringify(normLabLook({ acc: [1] }));
     remapQ = -1; buildRemap(0.8); out.remap = LAB_EXTRA.size > 20 && [...LAB_EXTRA.keys()].every(k => remapTable.has(k)); remapQ = -1; buildRemap(dayProgress);
     const vis = (sp) => sprBox(sp).h;
@@ -228,7 +236,7 @@ const { chromium } = require('playwright');
   });
   if (!v9.ram || !v9.billyTheme || !v9.stompLocked || !v9.stompBought || !v9.splat || !v9.cracked) fail('billy ' + JSON.stringify(v9));
   if (v9.styleState !== 'STYLE' || !v9.styleSaved || v9.styleRows < 12 || v9.styleBack !== 'PLAYERS') fail('style ' + JSON.stringify(v9));
-  if (v9.goats !== 12 || v9.dogs !== 10 || !v9.sets || !v9.leftArt || !v9.items || !v9.sanitize || !v9.remap || !v9.backs || !v9.outline || !v9.views34 || !v9.peerjs || v9.locked || !v9.taller || !v9.boss || v9.gaitFlips) fail('breeds ' + JSON.stringify(v9));
+  if (v9.goats !== 12 || v9.dogs !== 10 || !v9.sets || !v9.leftArt || !v9.items || !v9.sanitize || !v9.remap || !v9.backs || !v9.outline || !v9.views34 || !v9.goatBack || !v9.peerjs || v9.locked || !v9.taller || !v9.boss || v9.gaitFlips) fail('breeds ' + JSON.stringify(v9));
   if (v9.corgi !== 'stun' || v9.pyrenees !== 'flee' || !v9.carry || !v9.drop || v9.ratter !== 'launched' || !v9.sit) fail('dog skills ' + JSON.stringify(v9));
   const wasFs = await p.evaluate(() => isFs());
   await p.evaluate(() => exitFs());

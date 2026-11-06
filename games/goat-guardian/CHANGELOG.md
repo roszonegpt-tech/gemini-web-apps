@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [0.17.2] - 2026-11-06
+### Changed
+- **Back to the original look:** no outlines, and the lab's own front and back views (with the 0.16.0 widened backs) for every animal. The 0.17.0 outline and the 0.17.1 side-only views are still in the code, switched off (`LAB_OUTLINE`, `LAB_TRUE_BACK`, `LAB_SIDE_ONLY`).
+### Fixed
+- **The goat's back in side view.** The head sat on the middle of a short, flat back, leaving a notch and a dead-straight crease under it. Like the reference sheets, the goat's body, tail and legs now sit further back so the head stands at the front, the back is level from a rounded rump and rises through the shoulders into a neck that joins the head, and the legs are a pixel longer (`labGoatNeck`, applied to every east and west frame: walk, gallop, jump and the ram dip). The head is where it was, so hats, hair and collars still fit; outfits follow the moved body. The smoke test checks every frame for a gap between body and head.
+
 ## [0.17.1] - 2026-11-06
 ### Fixed
 - **No more straight-on front or back views.** Up/down (and the diagonals) now use the pure side profile for every animal, like the reference sheets: the goats and all dogs, the fox and the wolf always show their side, facing left or right (the last horizontal direction is kept while moving straight up or down). The 0.17.0 three-quarter art, which still read as a blob facing the camera, is behind `LAB_SIDE_ONLY = false`; `LAB_TRUE_BACK = true` restores the original straight views. The Great Wolf boss is unchanged.
