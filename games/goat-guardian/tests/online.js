@@ -99,7 +99,7 @@ const { chromium } = require('playwright');
   await H.evaluate(() => { paused = false; });
   // ---- screenshot of the guest's view
   await G.waitForTimeout(500);
-  await G.screenshot({ path: process.env.NET_SHOT || 'online_guest.png' });
+  await G.screenshot({ path: process.env.NET_SHOT || require('path').join(require('os').tmpdir(), 'online_guest.png') });
   // ---- game over reaches the guest as a results overlay
   await H.evaluate(() => { sheep = []; });
   await until(G, () => net.over && net.over.head[0] === 'THE FLOCK', 6000, 'game over reaches the guest');
