@@ -182,7 +182,7 @@ const { chromium } = require('playwright');
     };
     out.outline = [SP.goat.E[0], SP.goat.S[0], SP.dog.N[0], SP.dog.run.E[1], SP.dog.pose.sit.E, SP.wolf.NE[0], SP.fox.E[0], SP.bat.E[0], SP.hawk.E[0], labSet('bcollie', { hat: 3 }).E[0]].every(edgeDark)
       && SP.dog.E[0].pad === 1 && SP.boss.E[0].pad === 0;
-    out.views34 = px(SP.dog.N[0]) === px(SP.dog.NE[0]) && px(SP.dog.S[0]) === px(SP.dog.SE[0]) && px(SP.boss.N[0]) !== px(SP.boss.NE[0]);
+    out.views34 = ['N', 'NE', 'SE', 'S'].every(d => px(SP.dog[d][0]) === px(SP.dog.E[0]) && px(SP.goat[d][0]) === px(SP.goat.E[0])) && px(SP.boss.N[0]) !== px(SP.boss.NE[0]);
     out.sanitize = JSON.stringify(normLabLook({ hat: 99, acc: [7, 'x', 1, 1], col: { hat: -2 }, coat: 'z' })) === JSON.stringify(normLabLook({ acc: [1] }));
     remapQ = -1; buildRemap(0.8); out.remap = LAB_EXTRA.size > 20 && [...LAB_EXTRA.keys()].every(k => remapTable.has(k)); remapQ = -1; buildRemap(dayProgress);
     const vis = (sp) => sprBox(sp).h;

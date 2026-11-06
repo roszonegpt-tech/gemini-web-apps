@@ -400,6 +400,9 @@ const LAB_GW = 24, LAB_GH = 18, LAB_GOY = 3;
 // straight-on fronts and backs. LAB_TRUE_BACK = true brings the straight views back (with the widened backs, see LAB_BACK).
 const LAB_TRUE_BACK = false;
 const LAB_PAIRS_34 = [['E', 'E', 'W'], ['SE', 'SE', 'SW'], ['NE', 'NE', 'NW'], ['S', 'SE', 'SW'], ['N', 'NE', 'NW']];
+// side view for every direction (0.17.1, like the reference sheets: a pure side profile, no front or back at all)
+const LAB_SIDE_ONLY = true;
+const LAB_PAIRS_SIDE = [['E', 'E', 'W'], ['SE', 'E', 'W'], ['NE', 'E', 'W'], ['S', 'E', 'W'], ['N', 'E', 'W']];
 const LAB_PAIRS_TRUE = [['E', 'E', 'W'], ['SE', 'SE', 'SW'], ['NE', 'NE', 'NW'], ['S', 'S', 'S'], ['N', 'N', 'N']];
 const LAB_FRONT = { E: 1, SE: 1, NE: 1, W: -1, SW: -1, NW: -1, S: 0, N: 0 };
 var labColDirty = false;
@@ -717,7 +720,7 @@ function labSet(id, look) {
   const ol = u.noOutline ? (g) => g : labOutline;
   const pair = (dR, dL, gR, gL) => { const sp = new LabSpr(labCanvas(ol(labScale(gR, sc)), m), labCanvas(ol(labScale(gL, sc)), m)); sp.pad = u.noOutline ? 0 : 1; return sp; };
   set = { run: {}, idle: {}, jump: {}, attack: {}, act: {}, pose: { sit: {}, lie: {}, alert: {}, sniff: {}, bite: {} }, unit: id };
-  for (const [k, dR, dL] of (LAB_TRUE_BACK || u.keepViews ? LAB_PAIRS_TRUE : LAB_PAIRS_34)) {
+  for (const [k, dR, dL] of (LAB_TRUE_BACK || u.keepViews ? LAB_PAIRS_TRUE : LAB_SIDE_ONLY ? LAB_PAIRS_SIDE : LAB_PAIRS_34)) {
     const acts = {};
     for (const a of ['idle', 'walk', 'run', 'jump', 'attack']) {
       const n = u.art[dR][a].length;
@@ -6095,7 +6098,7 @@ function drawTitle() {
   rect(0, fy - 3, W, 13, 'k');
   if (best.escort || best.defend) text('BEST  ESCORT ' + best.escort + '  DEFEND ' + best.defend, W / 2, fy, 'y', { align: 'center' });
   else text('1-4 PLAYERS  GOATS AND DOGS', W / 2, fy, 's', { align: 'center' });
-  text(DEMO ? 'DEMO V0.17' : 'V0.17', W - 3, fy - 12, 'i', { align: 'right', outline: 'k' });
+  text(DEMO ? 'DEMO V0.17.1' : 'V0.17.1', W - 3, fy - 12, 'i', { align: 'right', outline: 'k' });
 }
 const MODES = [
   { id: 'escort', title: 'ESCORT', l1: 'HERD THE FLOCK PIN TO PIN', icon: 'pinGoal' },

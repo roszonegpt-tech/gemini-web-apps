@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## [0.17.1] - 2026-11-06
+### Fixed
+- **No more straight-on front or back views.** Up/down (and the diagonals) now use the pure side profile for every animal, like the reference sheets: the goats and all dogs, the fox and the wolf always show their side, facing left or right (the last horizontal direction is kept while moving straight up or down). The 0.17.0 three-quarter art, which still read as a blob facing the camera, is behind `LAB_SIDE_ONLY = false`; `LAB_TRUE_BACK = true` restores the original straight views. The Great Wolf boss is unchanged.
+
 ## [0.17.0] - 2026-11-06
 ### Changed
 - **Pixel-art direction: outlined sprites and three-quarter views** (from the new reference sheets and art prompt). Every lab animal (goats, farm dogs, fox, wolf, bat, hawk) now has a crisp 1px dark outline around its whole silhouette (`labOutline`, the palette's near-black), so they read against any ground. Sprites carry a 1px margin (`pad`) and are anchored so feet and shadows stay where they were.
