@@ -1,0 +1,5 @@
+{
+  "private": true,
+  "description": "Test-only dependency: the official PeerJS server, run locally by tests/rooms.js. Install with: cd tests && npm install",
+  "devDependencies": { "peer": "1.0.2" }
+}

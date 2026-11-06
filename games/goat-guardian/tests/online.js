@@ -24,11 +24,11 @@ const { chromium } = require('playwright');
     fail('timeout: ' + label); return false;
   };
   // ---- link up through the real box
-  await H.evaluate(() => { goScreen('NET'); netStartHost(); netOpenBox('host'); });
+  await H.evaluate(() => { goScreen('NET'); netStartHost(); netOpenBox('host', true); });
   await H.click('#nbMake');
   await until(H, () => document.getElementById('nbOut').value.startsWith('GEB'), 15000, 'invite code');
   const invite = await H.inputValue('#nbOut');
-  await G.evaluate(() => { goScreen('NET'); netOpenBox('join'); });
+  await G.evaluate(() => { goScreen('NET'); netOpenBox('join', true); });
   await G.fill('#nbIn', '  ' + invite.slice(0, 40) + '\n' + invite.slice(40) + '  ');          // pasted with a line break
   await G.click('#nbGo');
   await until(G, () => document.getElementById('nbOut').value.startsWith('GEB'), 15000, 'reply code');
@@ -41,7 +41,7 @@ const { chromium } = require('playwright');
   const boxHidden = await G.evaluate(() => document.getElementById('netbox').hidden);
   if (!boxHidden) fail('guest box still open');
   // wrong-code errors are friendly
-  await H.evaluate(() => netOpenBox('host'));
+  await H.evaluate(() => netOpenBox('host', true));
   await H.fill('#nbIn', 'hello');
   await H.click('#nbGo');
   const bad = await H.evaluate(() => document.getElementById('nbStatus').textContent);

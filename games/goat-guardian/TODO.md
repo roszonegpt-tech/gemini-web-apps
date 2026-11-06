@@ -8,9 +8,9 @@ All 20 items from the feature list were added in v0.7.0. What remains is playtes
 - [ ] Listen-test the music loops and the new sound effects; tune the mix.
 - [ ] Check night lanterns and fog on long routes for readability.
 - [ ] Install the GitHub Pages build on a phone and test offline play.
-- [ ] Deploy the relay (`tools/relay/README.md`) and put its address in the build; test 6-digit codes across two real networks.
-- [ ] Online: test across the real internet (two homes, mobile data) and on strict NATs; consider an optional relay (a tiny signalling worker) for one-step room codes and a TURN server for networks that block direct connections.
-- [ ] Online: client-side prediction for the guest's own animal (it is currently one round trip behind), guest reconnect, and spectators.
+- [ ] Test 6-digit rooms through the real PeerJS cloud broker across two real networks (and mobile data). If the free broker proves unreliable, run your own PeerServer (see README) and build with `PEER_URL`.
+- [ ] Decide whether to delete `tools/relay/` and `tests/relay_core.js` (the custom relay is no longer used).
+- [ ] Online: client-side prediction, guest reconnect, spectators.
 - [ ] Demo: add a Steam/itch link via `FULL_URL`, and decide whether to limit STYLE in the demo.
 - [ ] Optional: more editor map sizes, several custom map slots.
 - [ ] Balance the farm dog skills (Komondor hiding and the Pyrenees roar may be strong; the Corgi push may be weak).

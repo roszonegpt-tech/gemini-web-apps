@@ -158,6 +158,17 @@ const { chromium } = require('playwright');
     const px = (sp) => { const d = sp.r.getContext('2d').getImageData(0, 0, sp.w, sp.h).data; let h = 0; for (let i = 0; i < d.length; i += 4) h = (h * 31 + d[i] + d[i + 1] * 3 + d[i + 2] * 7 + d[i + 3]) >>> 0; return h; };
     out.items = ['hat', 'hair', 'outfit'].every(k => px(labSet('bcollie', { [k]: 1 }).E[0]) !== px(SP.dog.E[0])) && px(labSet('bcollie', { acc: [2] }).S[0]) !== px(SP.dog.S[0])
       && px(labSet('bcollie', { coat: 1 }).E[0]) !== px(SP.dog.E[0]);
+    // back views: wider than the lab's bobblehead bodies below the head, same size and frame count
+    const filled = (rows) => rows.map(r => (r.match(/[^.]/g) || []).length);
+    out.backs = Object.keys(LAB_BACK).every(id => {
+      const u = labUnit(id), raw = LAB.units[id], rr = raw.F.N.idle[0].map(i => raw.R[i]), nw = u.art.N.idle[0], sp = LAB_BACK[id];
+      const nf = filled(nw), of = filled(rr), body = (a) => a.slice(sp.hb, sp.ls).reduce((x, y) => x + y, 0);
+      return nw.length === rr.length && nw.every(r => r.length === 24) && Math.max(...nf) >= Math.max(...of) && body(nf) >= body(of) + 6;
+    }) && Object.keys(LAB_BACK).every(id => LAB.units[id].F.N.run.length === labUnit(id).art.N.run.length);
+    // PeerJS: the library is there, and an own-server address is understood
+    const keep = settings.peer; settings.peer = 'https://p.example.com:8443/billy';
+    const po = netPeerOpts(); settings.peer = keep;
+    out.peerjs = typeof Peer === 'function' && netRoomsAvailable() && po.host === 'p.example.com' && po.port === 8443 && po.secure === true && po.path === '/billy' && netFmtCode('123456') === '123 456';
     out.sanitize = JSON.stringify(normLabLook({ hat: 99, acc: [7, 'x', 1, 1], col: { hat: -2 }, coat: 'z' })) === JSON.stringify(normLabLook({ acc: [1] }));
     remapQ = -1; buildRemap(0.8); out.remap = LAB_EXTRA.size > 20 && [...LAB_EXTRA.keys()].every(k => remapTable.has(k)); remapQ = -1; buildRemap(dayProgress);
     const vis = (sp) => sprBox(sp).h;
@@ -203,7 +214,7 @@ const { chromium } = require('playwright');
   });
   if (!v9.ram || !v9.billyTheme || !v9.stompLocked || !v9.stompBought || !v9.splat || !v9.cracked) fail('billy ' + JSON.stringify(v9));
   if (v9.styleState !== 'STYLE' || !v9.styleSaved || v9.styleRows < 12 || v9.styleBack !== 'PLAYERS') fail('style ' + JSON.stringify(v9));
-  if (v9.goats !== 12 || v9.dogs !== 10 || !v9.sets || !v9.leftArt || !v9.items || !v9.sanitize || !v9.remap || v9.locked || !v9.taller || !v9.boss || v9.gaitFlips) fail('breeds ' + JSON.stringify(v9));
+  if (v9.goats !== 12 || v9.dogs !== 10 || !v9.sets || !v9.leftArt || !v9.items || !v9.sanitize || !v9.remap || !v9.backs || !v9.peerjs || v9.locked || !v9.taller || !v9.boss || v9.gaitFlips) fail('breeds ' + JSON.stringify(v9));
   if (v9.corgi !== 'stun' || v9.pyrenees !== 'flee' || !v9.carry || !v9.drop || v9.ratter !== 'launched' || !v9.sit) fail('dog skills ' + JSON.stringify(v9));
   const wasFs = await p.evaluate(() => isFs());
   await p.evaluate(() => exitFs());

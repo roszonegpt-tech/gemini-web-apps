@@ -85,6 +85,7 @@
     <button id="nbClose" type="button">CLOSE</button>
   </div>
 </div>
+<script src="vendor/peerjs.min.js"></script>
 <script>
 'use strict';
 
@@ -422,6 +423,43 @@ function labRemapInto(m, p) {
   }
   settings.cb = cb;
 }
+// Back views (north). The lab draws the head wider than the body, so from behind the animals looked like
+// bobbleheads on thin bodies. Below the head the body is widened to shoulders and haunches and the hind legs are
+// split apart, following each frame's own crouch (the lab moves the whole upper body down in its odd frames).
+// hb = first body row, ls = first leg row, k = widening on each side, kl = how far the hind legs move apart.
+const LAB_BACK = {
+  goat: { hb: 8, ls: 12, k: 2, kl: 1, thick: true, tail: [[0, -3, 's'], [0, -2, 's'], [1, -2, 's']], untail: true }, bcollie: { hb: 7, ls: 12, k: 2, kl: 1 }, corgi: { hb: 8, ls: 13, k: 2, kl: 1 },
+  sheltie: { hb: 7, ls: 12, k: 1, kl: 1 }, acd: { hb: 8, ls: 12, k: 2, kl: 1 }, oes: { hb: 7, ls: 14, k: 1, kl: 1 },
+  gsd: { hb: 7, ls: 12, k: 2, kl: 1 }, jrt: { hb: 10, ls: 13, k: 2, kl: 1 }, bernese: { hb: 7, ls: 12, k: 1, kl: 1 },
+  komondor: { hb: 7, ls: 14, k: 1, kl: 1 }, pyrenees: { hb: 6, ls: 12, k: 1, kl: 1 }, wolf: { hb: 6, ls: 11, k: 1, kl: 1 },
+  fox: { hb: 7, ls: 12, k: 2, kl: 1 }
+};
+function labBackFix(rows, sp, delta) {
+  const W = rows[0].length, hb = sp.hb + delta, ls = sp.ls + delta, cx = 11;
+  const out = rows.map((row, y) => {
+    if (y < hb || !/[^.]/.test(row)) return row;
+    const body = y < ls;
+    // a tail drawn off to one side looks like an arm from behind: drop it (a centred tail is added below)
+    if (body && sp.untail) {
+      const m = /^(\.*)([^.]+)(\.+)([^.]+)(\.*)$/.exec(row);
+      if (m && m[3].length <= 2 && m[4].length <= 2) row = m[1] + m[2] + '.'.repeat(m[3].length + m[4].length) + m[5];
+    }
+    // goats stand on thicker legs than the lab draws
+    if (!body && sp.thick) row = row.replace(/(\.)([^.])(\.)/g, (all, a, c, b2, off) => (off < cx ? a + c + c : c + c + b2));
+
+    // rounder shoulders and rump: the first and last body row get a little less than the middle
+    const k = body ? Math.max(0, sp.k - (y === hb || y === ls - 1 ? 1 : 0)) : sp.kl;
+    if (!k) return row;
+    // insert copies of the centre column (the body stretches without breaking its pattern); on a leg row that is
+    // one solid block, insert gaps instead so it splits into two legs
+    const single = !body && row[cx] !== '.' && !/\.[^.]+\.[^.]+\./.test(row.slice(5, 19));
+    const ins = (!body && single) ? '.' : row[cx];
+    return (row.slice(0, cx) + ins.repeat(2 * k) + row.slice(cx)).slice(k, k + W);
+  });
+  // a short tail over the middle of the rump
+  if (sp.tail) for (const [dx, dy, c] of sp.tail) { const y = ls + dy; if (y >= 0 && y < out.length) { const x = 11 + dx; out[y] = out[y].slice(0, x) + c + out[y].slice(x + 1); } }
+  return out;
+}
 function labUnit(id) {
   const u = LAB.units[id];
   if (u.art) return u;
@@ -432,6 +470,12 @@ function labUnit(id) {
       u.art[d][a] = u.F[d][a].map(f => f.map(i => u.R[i]));
       u.off[d][a] = u.O[d][a].map(y => [(u.X && u.X[d]) || 0, y]);
     }
+  }
+  const sp = LAB_BACK[id];
+  if (sp && u.art.N) {
+    const top = (rows) => rows.findIndex(r => /[^.]/.test(r));
+    const t0 = top(u.art.N.idle[0]);
+    for (const a in u.art.N) u.art.N[a] = u.art.N[a].map(rows => labBackFix(rows, sp, Math.max(0, top(rows) - t0)));
   }
   return u;
 }
@@ -911,15 +955,17 @@ function text(str, x, y, key, opts) {
 const DEMO = false;
 const FULL_GAME_URL = '';
 const DEMO_MAPS = 3, DEMO_WAVES = 8, DEMO_BREEDS = 3, DEMO_LOCKED_MODES = ['daily', 'endless', 'versus'];
-const NET_VER = '0.15';
-// The relay turns 6-digit room codes into connections (see tools/relay/README.md). Empty = long copy-and-paste codes only.
-const NET_RELAY = '';
+const NET_VER = '0.16';
+// Online rooms use PeerJS (WebRTC with a free public broker, bundled in vendor/peerjs.min.js). The 6-digit room code is the
+// host's PeerJS id. NET_PEER can point at your own PeerServer, for example 'https://peer.yourdomain.com/billy' (see README).
+const NET_PEER = '';
+const NET_PREFIX = 'getembilly-';
 const net = { role: 'off', peers: [], idc: 0, idc2: 0, pending: null, guest: null, slot: -1, me: null, roster: null, ev: [], recDepth: 0, snapT: 0, inT: 0, pingT: 0,
   rosterT: 0, t0: 0, forceSeed: 0, status: '', note: '', noteT: 0, leaveAsk: false, over: null, hostPaused: false, snap: null, ping: 0, need: false,
-  log: [], boxKind: 'host', boxRoom: false, room: null, roomTimer: 0, joinTok: 0, shownStatus: '', sheepById: new Map(), enemyById: new Map() };
+  log: [], boxKind: 'host', boxRoom: false, room: null, snapQ: 0, lastQ: 0, outQ: 0, joinTok: 0, shownStatus: '', sheepById: new Map(), enemyById: new Map() };
 const settings = {
   sound: true, music: true, shake: true, fullscreen: true, autoHelper: true,
-  cb: false, reduceFlash: false, speed: 1, wool: 0, storySeen: false, goatBreed: 0, dogBreed: 0, looks: {}, netKind: 'goat', relay: ''
+  cb: false, reduceFlash: false, speed: 1, wool: 0, storySeen: false, goatBreed: 0, dogBreed: 0, looks: {}, netKind: 'goat', peer: ''
 };
 try {
   const s = JSON.parse(localStorage.getItem('goatGuardianSettings') || '{}');
@@ -6030,7 +6076,7 @@ function drawTitle() {
   rect(0, fy - 3, W, 13, 'k');
   if (best.escort || best.defend) text('BEST  ESCORT ' + best.escort + '  DEFEND ' + best.defend, W / 2, fy, 'y', { align: 'center' });
   else text('1-4 PLAYERS  GOATS AND DOGS', W / 2, fy, 's', { align: 'center' });
-  text(DEMO ? 'DEMO V0.15' : 'V0.15', W - 3, fy - 12, 'i', { align: 'right', outline: 'k' });
+  text(DEMO ? 'DEMO V0.16' : 'V0.16', W - 3, fy - 12, 'i', { align: 'right', outline: 'k' });
 }
 const MODES = [
   { id: 'escort', title: 'ESCORT', l1: 'HERD THE FLOCK PIN TO PIN', icon: 'pinGoal' },
@@ -6534,7 +6580,7 @@ function netStartHost() {
 async function netMakeOffer() {
   const pc = new RTCPeerConnection(NET_ICE);
   const peer = { id: ++net.idc, pc: pc, rel: pc.createDataChannel('r', { ordered: true }), uns: pc.createDataChannel('u', { ordered: false, maxRetransmits: 0 }),
-    joined: false, input: { x: 0, y: 0 }, lastIn: 0, slot: -1, t0: realTime };
+    joined: false, input: { x: 0, y: 0 }, lastIn: 0, slot: -1, t0: realTime, inQ: -1 };
   const onMsg = (ev) => { let m = null; try { m = JSON.parse(ev.data); } catch (e) { return; } netHostMsg(peer, m); };
   peer.rel.onmessage = onMsg; peer.uns.onmessage = onMsg;
   peer.rel.onopen = () => netLog('host peer ' + peer.id + ' channel open');
@@ -6559,97 +6605,121 @@ async function netHostAccept(code) {
   if (!peer) throw new Error('MAKE AN INVITE CODE FIRST');
   await peer.pc.setRemoteDescription({ type: 'answer', sdp: d.s });
 }
-// ---- 6-digit room codes through the relay
-function netRelayBase() { return String(settings.relay || NET_RELAY || '').replace(/\/+$/, ''); }
-async function netRelayCall(method, path, body) {
-  const ctl = new AbortController(), to = setTimeout(() => ctl.abort(), 8000);
-  let r;
-  try {
-    r = await fetch(netRelayBase() + path, { method: method, body: body ? JSON.stringify(body) : undefined, headers: body ? { 'content-type': 'text/plain' } : undefined, signal: ctl.signal, cache: 'no-store' });
-  } catch (e) { throw new Error('CANNOT REACH THE ROOM SERVER'); } finally { clearTimeout(to); }
-  let j = {};
-  try { j = await r.json(); } catch (e) { /* no body */ }
-  if (!r.ok) throw new Error(j.error || 'ROOM SERVER ERROR');
-  return j;
-}
+// ---- 6-digit room codes through PeerJS: the code is the host's PeerJS id, friends connect to it directly
+function netRoomsAvailable() { return typeof Peer !== 'undefined'; }
 const netFmtCode = (c) => c.slice(0, 3) + ' ' + c.slice(3);
+function netPeerOpts() {
+  const o = { debug: 0, pingInterval: 4000 };         // default: the free PeerJS cloud broker (with its STUN and TURN servers)
+  const u = String(settings.peer || NET_PEER || '').trim();
+  if (u) {
+    try {
+      const x = new URL(u);
+      o.host = x.hostname; o.secure = x.protocol === 'https:'; o.port = +x.port || (o.secure ? 443 : 80); o.path = x.pathname || '/';
+    } catch (e) { /* a bad address: use the default broker */ }
+  }
+  return o;
+}
+function netPeerError(e) {
+  const t = e && e.type;
+  if (t === 'peer-unavailable') return new Error('NO ROOM WITH THAT CODE');
+  if (t === 'browser-incompatible') return new Error('THIS BROWSER CANNOT PLAY ONLINE');
+  if (t === 'webrtc') return new Error('THE CONNECTION FAILED');
+  if (t === 'unavailable-id') return new Error('THAT ROOM CODE IS TAKEN');
+  if (t === 'timeout' || t === 'network' || t === 'server-error' || t === 'socket-error' || t === 'socket-closed' || t === 'invalid-key') return new Error('CANNOT REACH THE ROOM SERVER');
+  return e instanceof Error ? e : new Error('ONLINE ERROR');
+}
+// a PeerJS connection wearing the same few methods as a WebRTC data channel, so the game's messages don't care which is used
+class NetCh {
+  constructor(conn) {
+    this.conn = conn; this.label = conn.metadata && conn.metadata.ch || ''; this.closed = false;
+    this.onmessage = null; this.onopen = null; this.onclose = null;
+    conn.on('data', (d) => { if (this.onmessage && typeof d === 'string') this.onmessage({ data: d }); });
+    conn.on('open', () => { if (this.onopen) this.onopen(); });
+    conn.on('close', () => { this.closed = true; if (this.onclose) this.onclose(); });
+    conn.on('error', (e) => netLog('connection error ' + (e && e.type)));
+  }
+  get readyState() { return this.closed ? 'closed' : (this.conn.open ? 'open' : 'connecting'); }
+  send(t) { this.conn.send(t); }
+  close() { this.closed = true; try { this.conn.close(); } catch (e) { /* closed */ } }
+}
+// open a PeerJS peer (with an id for a room, without one for a guest) and wait until the broker accepts it
+function netOpenPeer(id) {
+  return new Promise((res, rej) => {
+    let done = false, p;
+    try { p = id ? new Peer(id, netPeerOpts()) : new Peer(netPeerOpts()); } catch (e) { rej(netPeerError({ type: 'browser-incompatible' })); return; }
+    const to = setTimeout(() => { if (!done) { done = true; try { p.destroy(); } catch (e) { /* ignore */ } rej(netPeerError({ type: 'timeout' })); } }, 10000);
+    p.on('open', () => { if (!done) { done = true; clearTimeout(to); res(p); } });
+    p.on('error', (e) => { netLog('peer error ' + (e && e.type)); if (!done) { done = true; clearTimeout(to); try { p.destroy(); } catch (er) { /* ignore */ } rej(e); } });
+  });
+}
 async function netRoomEnsure() {
   netStartHost();
   if (net.room && net.room.open) return net.room;
-  const r = await netRelayCall('POST', '/room');
-  net.room = { code: r.code, key: r.key, open: true, peers: new Map(), busy: false, fails: 0, tick: 0 };
-  clearInterval(net.roomTimer);
-  net.roomTimer = setInterval(netRoomPoll, 1000);
-  return net.room;
+  if (!netRoomsAvailable()) throw new Error('THE ONLINE LIBRARY DID NOT LOAD');
+  let lastErr = null;
+  for (let i = 0; i < 8; i++) {
+    const code = String(100000 + Math.floor(Math.random() * 900000));
+    let peer;
+    try { peer = await netOpenPeer(NET_PREFIX + code); } catch (e) { lastErr = e; if (e && e.type === 'unavailable-id') continue; throw netPeerError(e); }
+    const R = { code: code, peer: peer, open: true, peers: new Map() };
+    net.room = R;
+    peer.on('connection', (conn) => netRoomConn(R, conn));
+    peer.on('disconnected', () => { if (R.open) { try { peer.reconnect(); } catch (e) { /* retry on the next tick */ } } });
+    peer.on('error', (e) => netLog('room error ' + (e && e.type)));
+    netLog('room ' + code + ' open');
+    return R;
+  }
+  throw netPeerError(lastErr || {});
 }
-function netRoomClose(del) {
+function netRoomClose() {
   const R = net.room;
-  clearInterval(net.roomTimer); net.roomTimer = 0;
+  net.room = null;
   if (!R) return;
   R.open = false;
-  for (const p of R.peers.values()) if (!p.joined) { try { p.pc.close(); } catch (e) { /* ignore */ } }
+  for (const po of R.peers.values()) { try { po.pc.close(); } catch (e) { /* ignore */ } }
   R.peers.clear();
-  if (del) netRelayCall('DELETE', `/room/${R.code}?key=${R.key}`).catch(() => {});
-  net.room = null;
+  try { R.peer.destroy(); } catch (e) { /* ignore */ }
 }
-async function netRoomPoll() {
-  const R = net.room;
-  if (!R || !R.open || R.busy) return;
-  const inGame = state === 'PLAYING' || state === 'LOADING';
-  R.tick++;
-  if (inGame && R.tick % 15 !== 0) return;            // in a game just keep the room alive, nobody can join
-  R.busy = true;
-  try {
-    const j = await netRelayCall('GET', `/room/${R.code}/host?key=${R.key}`);
-    R.fails = 0;
-    if (!inGame) for (const m of j.msgs) { if (m.t === 'join') netRoomOffer(m.gid); else if (m.t === 'answer') netRoomAnswer(m.gid, m.answer); }
-    for (const [gid, p] of [...R.peers]) if (p.joined || p.gone || realTime - p.t0 > 60) { if (!p.joined) { try { p.pc.close(); } catch (e) { /* ignore */ } } R.peers.delete(gid); }
-  } catch (e) {
-    if (++R.fails >= 6) { net.status = 'LOST THE ROOM SERVER. USE LONG CODES.'; netRoomClose(false); }
+// a friend's connections arrive one by one (reliable 'r', unordered 'u'); gather them under one record
+function netRoomConn(R, conn) {
+  const meta = conn.metadata || {}, gid = String(meta.gid || ''), kind = meta.ch;
+  if (!/^[0-9a-f]{8,32}$/.test(gid) || (kind !== 'r' && kind !== 'u')) { try { conn.close(); } catch (e) { /* ignore */ } return; }
+  let po = R.peers.get(gid);
+  if (!po) {
+    po = { id: ++net.idc, gid: gid, joined: false, input: { x: 0, y: 0 }, lastIn: realTime, slot: -1, t0: realTime, rel: null, uns: null, inQ: -1,
+      pc: { close() { if (po.rel) po.rel.close(); if (po.uns) po.uns.close(); } } };
+    R.peers.set(gid, po);
   }
-  R.busy = false;
-}
-async function netRoomOffer(gid) {
-  const R = net.room;
-  if (!R || R.peers.has(gid)) return;
-  try {
-    if (net.peers.length + R.peers.size >= 3) { await netRelayCall('POST', `/room/${R.code}/to/${gid}?key=${R.key}`, { offer: 'FULL' }); return; }
-    R.peers.set(gid, { pending: true, t0: realTime, pc: { close() { /* placeholder until the offer exists */ } } });
-    const o = await netMakeOffer();
-    o.peer.gid = gid;
-    R.peers.set(gid, o.peer);
-    await netRelayCall('POST', `/room/${R.code}/to/${gid}?key=${R.key}`, { offer: o.code });
-  } catch (e) { R.peers.delete(gid); }
-}
-async function netRoomAnswer(gid, code) {
-  const R = net.room, peer = R && R.peers.get(gid);
-  if (!peer || !peer.rel) return;
-  try {
-    const d = await netUnpack(code);
-    if (d.t === 'a') await peer.pc.setRemoteDescription({ type: 'answer', sdp: d.s });
-  } catch (e) { /* a bad reply: the friend can try again */ }
+  const ch = new NetCh(conn);
+  ch.onmessage = (ev) => { let m = null; try { m = JSON.parse(ev.data); } catch (e) { return; } netHostMsg(po, m); };
+  if (kind === 'r') { po.rel = ch; ch.onclose = () => { netLog('friend ' + po.id + ' channel closed'); netPeerGone(po); }; } else po.uns = ch;
+  netLog('host got ' + kind + ' connection from ' + po.id);
 }
 async function netRoomJoin(text) {
   const code = String(text || '').replace(/\D/g, '');
   if (code.length !== 6) throw new Error('TYPE ALL 6 DIGITS');
+  if (!netRoomsAvailable()) throw new Error('THE ONLINE LIBRARY DID NOT LOAD');
+  if (net.role === 'host') throw new Error('YOU ARE HOSTING RIGHT NOW');
   const tok = ++net.joinTok;
+  if (net.guest) netEnd();
+  const peer = await netOpenPeer(null).catch((e) => { throw netPeerError(e); });
+  if (tok !== net.joinTok) { try { peer.destroy(); } catch (e) { /* ignore */ } return; }
   const gid = Array.from(crypto.getRandomValues(new Uint8Array(8)), (b) => b.toString(16).padStart(2, '0')).join('');
-  await netRelayCall('POST', `/room/${code}/join`, { gid: gid });
-  const t0 = Date.now();
-  while (Date.now() - t0 < 25000) {
-    await new Promise((r) => setTimeout(r, 700));
-    if (tok !== net.joinTok) return;
-    const j = await netRelayCall('GET', `/room/${code}/guest/${gid}`);
-    const m = (j.msgs || []).find((x) => x.t === 'offer');
-    if (m) {
-      if (m.offer === 'FULL') throw new Error('THE ROOM IS FULL');
-      const reply = await netGuestAccept(m.offer);
-      if (tok !== net.joinTok) return;
-      await netRelayCall('POST', `/room/${code}/answer`, { gid: gid, answer: reply });
-      return;
-    }
-  }
-  throw new Error('THE HOST DID NOT ANSWER. IS THE CODE RIGHT?');
+  const target = NET_PREFIX + code;
+  const open = (ch, reliable) => peer.connect(target, { reliable: reliable, serialization: 'raw', label: ch, metadata: { ch: ch, gid: gid, v: NET_VER } });
+  const g = { peer: peer, pc: { close() { try { peer.destroy(); } catch (e) { /* ignore */ } } }, rel: null, uns: null, t0: realTime, helloT: 0, hello: null };
+  net.guest = g; net.role = 'client'; net.slot = -1; net.lastQ = 0; net.outQ = 0;
+  g.rel = new NetCh(open('r', true)); g.uns = new NetCh(open('u', false));
+  const onMsg = (e) => { let m = null; try { m = JSON.parse(e.data); } catch (er) { return; } netClientMsg(m); };
+  g.rel.onmessage = onMsg; g.uns.onmessage = onMsg;
+  g.rel.onclose = () => netClientLost('THE HOST DISCONNECTED');
+  g.hello = () => netLog('guest hello sent ' + g.rel.readyState) || netSendCh(g.rel, 'hello', { v: NET_VER, kind: settings.netKind || 'goat', skin: rememberedSkin(settings.netKind || 'goat'), look: rememberedLook(settings.netKind || 'goat') });
+  await new Promise((res, rej) => {
+    const to = setTimeout(() => rej(new Error('THE HOST DID NOT ANSWER. IS THE CODE RIGHT?')), 20000);
+    peer.on('error', (e) => { clearTimeout(to); rej(netPeerError(e)); });
+    g.rel.onopen = () => { clearTimeout(to); g.hello(); res(); };
+    if (g.rel.readyState === 'open') g.rel.onopen();
+  }).catch((e) => { if (net.guest === g) netEnd(); throw e; });
 }
 function netHostHello(peer, d) {
   const bye = (why) => { netSendCh(peer.rel, 'bye', why); setTimeout(() => { try { peer.pc.close(); } catch (e) { /* ignore */ } }, 400); if (net.pending === peer) net.pending = null; };
@@ -6686,7 +6756,7 @@ function netHostMsg(peer, m) {
   if (!m || typeof m.t !== 'string') return;
   if (m.t === 'hello') { netLog('host got hello from ' + peer.id); if (!peer.joined) netHostHello(peer, m.d); return; }
   if (!peer.joined) return;
-  if (m.t === 'in') { const d = m.d || {}; peer.input.x = clamp(netNum(d.x), -1, 1); peer.input.y = clamp(netNum(d.y), -1, 1); peer.lastIn = realTime; }
+  if (m.t === 'in') { const d = m.d || {}; if (typeof d.q === 'number') { if (d.q <= peer.inQ) return; peer.inQ = d.q; } peer.input.x = clamp(netNum(d.x), -1, 1); peer.input.y = clamp(netNum(d.y), -1, 1); peer.lastIn = realTime; }
   else if (m.t === 'act') { if (m.d === 'action' || m.d === 'ability') netRemoteEvent({ dev: 'net' + peer.id, type: m.d }); }
   else if (m.t === 'pick') netHostPick(peer, m.d);
   else if (m.t === 'ping') { peer.lastIn = realTime; netSendCh(peer.rel, 'pong', m.d); }
@@ -6725,7 +6795,7 @@ function netEnd(why) {
   } else if (net.role === 'client' && net.guest) {
     try { net.guest.pc.close(); } catch (e) { /* ignore */ }
   }
-  netRoomClose(true);
+  netRoomClose();
   net.role = 'off'; net.peers = []; net.pending = null; net.guest = null; net.slot = -1; net.me = null; net.over = null; net.leaveAsk = false; net.snap = null;
   net.sheepById.clear(); net.enemyById.clear(); net.ev = []; net.lastPong = 0; net.ping = 0;
 }
@@ -6798,7 +6868,7 @@ function netClientMsg(m) {
     }
     case 'roster': net.roster = d; mode = d.mode || mode; if (state === 'PLAYING') netBuildPlayers(d.players); break;
     case 'world': netClientWorld(d); break;
-    case 'snap': net.snap = d; break;
+    case 'snap': if (d.q > net.lastQ) { net.lastQ = d.q; net.snap = d; } break;
     case 'ev': for (const e of d) netPlayEvent(e); break;
     case 'over': net.over = d; break;
     case 'lobby': if (state === 'PLAYING' || state === 'LOADING') { net.over = null; net.snap = null; players = []; useMenuWorld(); goScreen('NETWAIT'); } break;
@@ -6958,7 +7028,7 @@ function netSnapshot() {
     for (const f of NET_PF) r.push(f === 'carry' ? (p.carry ? 1 : 0) : (f === 'fx' || f === 'fy' ? NET_R(p[f], 2) : NET_R(p[f], f === 'x' || f === 'y' || f === 'vx' || f === 'vy' ? 1 : 2)));
     pl.push(r);
   }
-  return { sh: sh, en: en, p: pl, h: {
+  return { q: ++net.snapQ, sh: sh, en: en, p: pl, h: {
     sc: score, pn: mission.penned, bl: bells, wn: wave.n, ph: wave.phase, cn: comboN, ca: NET_R(realTime - comboT), vt: NET_R(versus.t), vk: versus.taken,
     mn: mission.n, es: endless.stage, gr: world.goalR || 0, pz: paused ? 1 : 0, dt: NET_R(dayTarget, 2), dp: NET_R(dayProgress, 2), tt: mission.herdStart, kl: mission.kills,
     bn: banner.t > 0 ? [banner.a, banner.b, NET_R(banner.t)] : 0 } };
@@ -7019,7 +7089,7 @@ function netClientUpdate(dt) {
   if (net.inT >= 1 / 30 && net.guest) {
     net.inT = 0;
     const m = netLocalMove();
-    netSendCh(net.guest.uns, 'in', { x: NET_R(m.x, 2), y: NET_R(m.y, 2) });
+    netSendCh(net.guest.uns, 'in', { x: NET_R(m.x, 2), y: NET_R(m.y, 2), q: ++net.outQ });
   }
   const k = 1 - Math.exp(-14 * dt);
   const adv = (o) => {
@@ -7059,8 +7129,9 @@ function netTick(dt) {
     return;
   }
   if (net.role === 'host') {
-    if (!net.peers.length) return;
+    if (!net.peers.length && !(net.room && net.room.peers.size)) return;
     for (const p of net.peers.slice()) if (realTime - p.lastIn > 15) netPeerGone(p);
+    if (net.room) for (const [gid, po] of [...net.room.peers]) if (po.joined || po.gone || realTime - po.t0 > 30) { if (!po.joined) { try { po.pc.close(); } catch (e) { /* ignore */ } } net.room.peers.delete(gid); }
     if (state === 'PLAYING') {
       net.snapT += dt;
       if (net.snapT >= 0.05) { net.snapT = 0; netBroadcast('snap', netSnapshot(), true); }
@@ -7205,9 +7276,9 @@ function drawNetOverlay() {
 const NB = {};
 function netBoxInit() {
   try {
-    const u = new URLSearchParams(location.search).get('relay');
-    if (u === 'off') { settings.relay = ''; saveSettings(); }
-    else if (u && /^https?:\/\/[^\s'"]+$/.test(u)) { settings.relay = u.replace(/\/+$/, ''); saveSettings(); }
+    const u = new URLSearchParams(location.search).get('peer');
+    if (u === 'default') { settings.peer = ''; saveSettings(); }
+    else if (u && /^https?:\/\/[^\s'"]+$/.test(u)) { settings.peer = u.replace(/\/+$/, ''); saveSettings(); }
   } catch (e) { /* no address bar */ }
   const q = (id) => document.getElementById(id);
   for (const id of ['netbox', 'nbTitle', 'nbHelp', 'nbRoom', 'nbCode', 'nbCopyCode', 'nbJoin', 'nbNum', 'nbJoinGo', 'nbManual', 'nbL1', 'nbOut', 'nbCopy', 'nbMake', 'nbL2', 'nbIn', 'nbPaste', 'nbGo', 'nbStatus', 'nbMode', 'nbClose']) NB[id] = q(id);
@@ -7269,9 +7340,9 @@ function netBoxInit() {
 function netOpenBox(kind, manual) {
   if (!NB.netbox) return;
   net.boxKind = kind; net.shownStatus = net.status;
-  const host = kind === 'host', room = !!netRelayBase() && !manual;
+  const host = kind === 'host', room = netRoomsAvailable() && !manual;
   net.boxRoom = room;
-  NB.nbMode.style.display = netRelayBase() ? '' : 'none';
+  NB.nbMode.style.display = netRoomsAvailable() ? '' : 'none';
   NB.nbMode.textContent = room ? 'USE LONG CODES INSTEAD' : 'USE A 6-DIGIT ROOM CODE';
   NB.nbRoom.hidden = !(room && host); NB.nbJoin.hidden = !(room && !host); NB.nbManual.hidden = room;
   NB.nbOut.value = ''; NB.nbIn.value = ''; NB.nbStatus.textContent = '';

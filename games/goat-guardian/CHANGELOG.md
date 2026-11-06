@@ -2,6 +2,19 @@
 
 ## [Unreleased]
 
+## [0.16.0] - 2026-11-06
+### Changed
+- **Online play now runs on PeerJS + WebRTC.** The 6-digit room code is the host's PeerJS id (`getembilly-123456`): HOST A GAME opens a room on the PeerJS broker (the free cloud one by default, or your own PeerServer), and friends type the code to connect directly. No relay to deploy any more. PeerJS 1.5.5 is bundled (`vendor/peerjs.min.js`, MIT) and is inlined into the one-file offline build, copied by the site and demo builds, and cached by the service worker.
+  - The game's host-authoritative protocol is unchanged. PeerJS connections are wrapped to look like data channels (`NetCh`), so the same messages are used for PeerJS rooms and for long codes. Each friend opens one reliable and one unordered connection; because PeerJS's unordered mode still retransmits, snapshots and controls now carry sequence numbers and stale ones are ignored.
+  - PeerJS adds free STUN and TURN servers, which helps on networks that block direct connections.
+  - The long copy-and-paste codes remain as a fallback: automatic when the broker can't be reached or the library didn't load, or with USE LONG CODES INSTEAD.
+  - New friendly messages for a wrong code, an unreachable broker, a full room, a host that doesn't answer and a browser that can't do WebRTC.
+  - `PEER_URL=https://peer.yourdomain.com/billy` (build scripts) or `?peer=` (once, remembered) points the game at your own PeerServer. `RELAY_URL`, `?relay=` and `NET_RELAY` are replaced by `PEER_URL`, `?peer=` and `NET_PEER`.
+- `tools/relay/` (the custom matchmaking service from 0.15) is no longer used by the game. It is kept, with its tests, as an alternative until you decide to remove it.
+- `node tests/rooms.js` now runs against a real local PeerJS server (`cd tests && npm install` once): a host, three friends typing the code, a fourth refused as full, a wrong code, a 4-player round with controls and ordered snapshots, the host leaving, and the broker going down.
+### Fixed
+- **Back views of the goat and all dogs, the wolf and the fox.** From behind, the lab art drew a head wider than the body on thin legs (a bobblehead; the goat looked like a stick figure). Below the head, the body is now widened to shoulders and haunches and the hind legs are split apart, following each frame's own crouch so all 17 animation frames still line up (per-animal settings in `LAB_BACK`). Heads, ears, hats and hair are untouched. The smoke test checks that every body grew.
+
 ## [0.15.0] - 2026-11-06
 ### Added
 - **6-digit room codes.** When a relay is set up (see `tools/relay/README.md`), HOST A GAME shows a big 6-digit code (it is also shown in the lobby and on the online screen), friends choose JOIN A GAME, type the code (a space is fine) and connect on their own, with no copy and paste. A full room, a wrong code, a short code, an unreachable relay and a host who doesn't answer each get a clear message. The host's room stays open while the game is played and closes when the host leaves. The long copy-and-paste codes stay as a fallback ("USE LONG CODES INSTEAD", and automatic when the relay can't be reached) and as the mode when no relay is set.

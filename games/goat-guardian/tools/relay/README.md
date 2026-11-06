@@ -1,3 +1,5 @@
+> **Not used by the game since v0.16.** Online rooms now use PeerJS (see the main README). This relay is kept as an alternative; it can be deleted if you don't want it.
+
 # Get em Billy relay (for 6-digit room codes)
 
 A tiny matchmaking service. When a player hosts, it hands out a 6-digit code; friends type the code and the relay passes the

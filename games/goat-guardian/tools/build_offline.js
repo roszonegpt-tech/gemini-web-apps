@@ -3,17 +3,24 @@
 //   build/get-em-billy-demo.html   with --demo (3 routes, 3 arenas, 8 waves; see tools/build_demo.sh)
 // Open it by double-clicking (file://), from a phone's Files app, or host it anywhere. Everything is inside
 // the file: the page, the code, the icons (as data URIs) and all art and sound (made in code). It needs no
-// other file and makes no network requests. RELAY_URL=https://... bakes in the 6-digit room code server. Online play still needs a connection between the players.
+// other file (PeerJS is inlined). Online play needs a connection between the players: rooms use the free PeerJS broker
+// (or your own: PEER_URL=https://peer.yourdomain.com/billy). Online play still needs a connection between the players.
 const fs = require('fs');
-const bakeRelay = require('./relay_url.js');
+const bakePeer = require('./peer_url.js');
 const path = require('path');
 const root = path.resolve(__dirname, '..');
 const args = process.argv.slice(2);
 const demo = args.includes('--demo');
 const outDir = path.resolve(root, args.find(a => !a.startsWith('--')) || 'build');
-let html = bakeRelay(fs.readFileSync(path.join(root, 'index.html'), 'utf8'));
+let html = bakePeer(fs.readFileSync(path.join(root, 'index.html'), 'utf8'));
 const must = (cond, what) => { if (!cond) { console.error('build_offline: could not find ' + what); process.exit(1); } };
 const icon = 'data:image/png;base64,' + fs.readFileSync(path.join(root, 'assets/icons/icon-192.png')).toString('base64');
+// the PeerJS library goes inside the file
+const tag = '<script src="vendor/peerjs.min.js"></script>';
+must(html.includes(tag), 'the PeerJS script tag');
+const lib = fs.readFileSync(path.join(root, 'vendor/peerjs.min.js'), 'utf8');
+must(!/<\/script/i.test(lib), 'a library without closing script tags');
+html = html.replace(tag, () => '<script>' + lib + '</script>');
 // no manifest or service worker: a lone file can't carry them
 must(/<link rel="manifest"[^>]*>\n?/.test(html), 'the manifest link');
 html = html.replace(/<link rel="manifest"[^>]*>\n?/, '');
