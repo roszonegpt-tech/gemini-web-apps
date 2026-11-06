@@ -182,7 +182,15 @@ const { chromium } = require('playwright');
     };
     // 0.17.2: no outline by default; the lab's own front and back views; the goat's side view has a level back that runs
     // into the neck with no notch or gap between the body and the head, in every frame
-    out.outline = !LAB_OUTLINE && SP.dog.E[0].pad === 0 && !edgeDark(SP.goat.E[0]);
+    // 0.18.0: the goat and the farm dogs are the outlined farm shapes; the wolf and fox keep the lab art without one
+    out.outline = !LAB_OUTLINE && FARM_OUTLINE && [SP.goat.E[0], SP.goat.run.E[1], SP.dog.E[2], labSet('corgi', { hat: 2 }).N[0]].every(sp => sp.pad === 1 && edgeDark(sp)) && SP.wolf.E[0].pad === 0 && !edgeDark(SP.wolf.E[0]);
+    // the farm gait: all four walk and gallop frames differ, the feet move, and the body rises on the passing frames
+    const vbox = (sp) => { const d = sp.r.getContext('2d').getImageData(0, 0, sp.w, sp.h).data; let x0 = 99, x1 = -1, y0 = 99, y1 = -1; for (let y = 0; y < sp.h; y++) for (let x = 0; x < sp.w; x++) if (d[(y * sp.w + x) * 4 + 3]) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); } return { w: x1 - x0 + 1, h: y1 - y0 + 1, top: y0, bot: y1 }; };
+    const feet = (sp) => { const d = sp.r.getContext('2d').getImageData(0, 0, sp.w, sp.h).data, y = sp.h - 2; let k = ''; for (let x = 0; x < sp.w; x++) k += d[(y * sp.w + x) * 4 + 3] ? '#' : '.'; return k; };
+    out.gait = [SP.goat, SP.dog, labSet('corgi', {})].every(st => [st.E, st.run.E].every(fr => new Set(fr.map(px)).size === 4 && new Set(fr.map(feet)).size >= 3 && vbox(fr[1]).top < vbox(fr[0]).top && fr.every(f => vbox(f).bot === vbox(fr[0]).bot)));
+    // sizes stay close to the old sprites: goats about as big as before and bigger than the dogs
+    const gv = vbox(SP.goat.E[0]), dv = vbox(SP.dog.E[0]);
+    out.sizes = gv.w <= 24 && gv.h <= 22 && dv.w <= 18 && dv.h <= 17 && gv.h > dv.h && gv.w > dv.w;
     out.views34 = px(SP.dog.N[0]) !== px(SP.dog.NE[0]) && px(SP.goat.S[0]) !== px(SP.goat.SE[0]);
     const gu = labUnit('goat');
     out.goatBack = Object.keys(gu.art.E).every(a => gu.art.E[a].every(rows => {
@@ -236,7 +244,7 @@ const { chromium } = require('playwright');
   });
   if (!v9.ram || !v9.billyTheme || !v9.stompLocked || !v9.stompBought || !v9.splat || !v9.cracked) fail('billy ' + JSON.stringify(v9));
   if (v9.styleState !== 'STYLE' || !v9.styleSaved || v9.styleRows < 12 || v9.styleBack !== 'PLAYERS') fail('style ' + JSON.stringify(v9));
-  if (v9.goats !== 12 || v9.dogs !== 10 || !v9.sets || !v9.leftArt || !v9.items || !v9.sanitize || !v9.remap || !v9.backs || !v9.outline || !v9.views34 || !v9.goatBack || !v9.peerjs || v9.locked || !v9.taller || !v9.boss || v9.gaitFlips) fail('breeds ' + JSON.stringify(v9));
+  if (v9.goats !== 12 || v9.dogs !== 10 || !v9.sets || !v9.leftArt || !v9.items || !v9.sanitize || !v9.remap || !v9.backs || !v9.outline || !v9.views34 || !v9.goatBack || !v9.gait || !v9.sizes || !v9.peerjs || v9.locked || !v9.taller || !v9.boss || v9.gaitFlips) fail('breeds ' + JSON.stringify(v9));
   if (v9.corgi !== 'stun' || v9.pyrenees !== 'flee' || !v9.carry || !v9.drop || v9.ratter !== 'launched' || !v9.sit) fail('dog skills ' + JSON.stringify(v9));
   const wasFs = await p.evaluate(() => isFs());
   await p.evaluate(() => exitFs());

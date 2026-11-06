@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+## [0.18.0] - 2026-11-06
+### Changed
+- **New goat and farm dogs, from the shapes in the offline edit you liked** (`Get_Em_Billy_Offline.html`, an edit of 0.14 with `nativeAnimalRows`). The goat and all ten dogs are drawn from shapes on a 30x30 grid (level back from a rounded rump, a neck rising into the head, swept horns, side-set eye, beard), then shrunk to the game's sprite size (`FARM_SCALE`: goat 0.7, dogs 0.56) and given a dark outline. The goat is about the size it was (roughly 20x20 visible pixels, still bigger than every dog) and the dogs are back near their old size (about 15x14).
+- **Legs walk and gallop properly.** In the edit, the legs only slid a pixel sideways. Now each leg reaches forward, stands under the body, pushes back and lifts in a trot (near hind with far front, far hind with near front), the near and far legs of a pair open into a clear V, the body rises a pixel on the passing frames, and the gallop takes longer strides with higher lifts. Front and back views lift their legs in turn.
+- **Dogs closer to the older look:** long and low (lower body, shorter legs, a longer barrel than the goat) while keeping the new back and neck.
+- Hats, hair and accessories are taken from the lab art and moved onto the new heads; outfits recolour the new barrel and legs. Sit, lie, alert, sniff, bite and the ram are built from the new frames as before.
+- Player cards in the lobby fit the taller sprites (`cardSprite`).
+- The wolf, fox, bat, hawk, Great Wolf and sheep are unchanged.
+- The smoke test checks the outline, that all four walk and gallop frames differ with moving feet and a body rise, and the goat and dog sizes.
+
 ## [0.17.2] - 2026-11-06
 ### Changed
 - **Back to the original look:** no outlines, and the lab's own front and back views (with the 0.16.0 widened backs) for every animal. The 0.17.0 outline and the 0.17.1 side-only views are still in the code, switched off (`LAB_OUTLINE`, `LAB_TRUE_BACK`, `LAB_SIDE_ONLY`).

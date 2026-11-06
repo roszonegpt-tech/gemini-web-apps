@@ -756,6 +756,195 @@ function labScale(g, k) {
   });
   return out;
 }
+// ---------------------------------------------------------------------
+// Farm animals (0.18.0): the goat and the ten farm dogs are drawn from shapes (a 30x30 grid, the style of the reference
+// sheets: a level back from a rounded rump, a neck rising into the head, a chunky barrel) instead of the lab grids,
+// then shrunk to the game's sprite size and outlined. Legs walk and gallop in a trot: the near hind and far front leg
+// move together, the far hind and near front leg half a cycle later, each leg reaching forward, standing under the
+// body, pushing back and lifting, while the body rises on the passing frames. Hats, hair and accessories come from the
+// lab art, moved onto the new head; outfits recolour the barrel. The shapes were first drafted in an offline edit of
+// 0.14 (REFERENCE_ANIMALS / nativeAnimalRows) and are reworked here.
+// ---------------------------------------------------------------------
+const FARM_UNITS = new Set(['goat', 'bcollie', 'corgi', 'sheltie', 'acd', 'oes', 'gsd', 'jrt', 'bernese', 'komondor', 'pyrenees']);
+const FARM_SCALE = { goat: 0.7, dog: 0.56 };
+const FARM_OUTLINE = true;
+const FARM_N = 30, FARM_GROUND = 28;
+function farmRows(id, direction, action, frame, coat) {
+  const g = Array.from({ length: FARM_GROUND + 1 }, () => Array(FARM_N).fill('.'));
+  let oy = 0;
+  const put = (x, y, c) => { x = Math.round(x); y = Math.round(y); if (x >= 0 && x < FARM_N && y >= 0 && y <= FARM_GROUND) g[y][x] = c; };
+  const dot = (x, y, c) => put(x, y + oy, c);
+  const box = (x, y, w, h, c) => { for (let j = y; j < y + h; j++) for (let i = x; i < x + w; i++) dot(i, j, c); };
+  const oval = (cx, cy, rx, ry, c) => { for (let y = Math.floor(cy - ry); y <= cy + ry; y++) for (let x = Math.floor(cx - rx); x <= cx + rx; x++) if (((x - cx) / rx) ** 2 + ((y - cy) / ry) ** 2 <= 1) dot(x, y, c); };
+  const line = (x, y, xx, yy, c) => { const n = Math.max(Math.abs(xx - x), Math.abs(yy - y)); for (let i = 0; i <= n; i++) dot(x + (xx - x) * i / (n || 1), y + (yy - y) * i / (n || 1), c); };
+  const goat = id === 'goat', dog = !goat, short = id === 'corgi', shag = id === 'oes' || id === 'komondor';
+  const fluffy = ['sheltie', 'bernese', 'pyrenees', 'oes', 'komondor'].includes(id);
+  // goat coats are the saved breed identifiers
+  const pygmy = goat && (coat === 8 || coat === 9), nubian = goat && coat === 3, valais = goat && coat === 2;
+  const boer = goat && coat === 5, golden = goat && coat === 6;
+  const back = direction === 'N' || direction === 'NE' || direction === 'NW', front = direction === 'N' || direction === 'S';
+  const diagonal = direction.length === 2;
+  const moving = action === 'walk' || action === 'run', run = action === 'run', f = frame % 4;
+  const jumping = action === 'jump' && frame === 1, attacking = action === 'attack' && frame > 0 && frame < 3;
+  // trot phases: 0 reach forward, 1 under the body, 2 push back, 3 lifted and swinging forward
+  const phA = moving ? f : 1, phB = moving ? (f + 2) % 4 : 1;
+  // (two grid rows, so the rise survives the shrink to sprite size: one sprite pixel)
+  const bob = jumping ? 4 : moving && (f === 1 || f === 3) ? 2 : 0;
+  // dogs sit long and low like the older art; goats stand taller on longer legs
+  const bodyY = goat ? (pygmy ? 18 : 17) : short ? 21 : 19, belly = goat ? 22 : short ? 25 : 23;
+  const goatHead = { 0: 8, 7: 7, 5: 9, 3: 8, 2: 8, 10: 9, 6: 10, 11: 6, 8: 11, 9: 12 };
+  const headY = (goat ? (goatHead[coat] ?? 8) : short ? 14 : shag ? 11 : 10) + (attacking ? 3 : 0);
+  const hoof = goat ? 'N' : null;
+  // a leg from the hip (which rides with the body) to the foot (which stays on the ground while it stands). The near and
+  // far leg of each pair hang from almost the same hip, so a stride opens into a clear V instead of a blur of four legs.
+  const leg = (x, far, ph) => {
+    const top = belly - 2 - bob, ground = far ? FARM_GROUND - 1 : FARM_GROUND, st = run ? 4 : 3;
+    let fx = x, fy = ground;
+    if (jumping) { fx = x + (far ? 1 : 3); fy = ground - 4; }
+    else if (ph === 0) fx = x + st;
+    else if (ph === 2) fx = x - st;
+    else if (ph === 3) { fx = x + (run ? 2 : 1); fy = ground - (run ? 4 : 3); }
+    const col = far ? 's' : 'S', n = Math.max(1, fy - 1 - top);
+    for (let i = 0; i <= n; i++) { const lx = Math.round(x + (fx - x) * i / n); put(lx, top + i, col); put(lx + 1, top + i, col); }
+    const foot = hoof || (far ? 's' : 'L');
+    put(fx, fy, foot); put(fx + 1, fy, foot);
+  };
+  oy = -bob;
+  if (!front) {
+    leg(9, true, phB); leg(20, true, phA);
+    // tails and a rounded rump
+    if (goat) { line(6, bodyY - 1, 3, bodyY - 5, 'S'); dot(2, bodyY - 5, 'L'); }
+    else if (short) oval(4, bodyY - 1, 2, 2, 'L');
+    else if (fluffy) { oval(4, bodyY - 2, 3, 4, 'S'); line(2, bodyY - 4, 3, bodyY + 1, 'L'); dot(2, bodyY + 2, 's'); }
+    else if (id === 'gsd' || id === 'acd') { line(6, bodyY - 1, 2, bodyY + 4, 's'); line(5, bodyY - 1, 2, bodyY + 3, 'S'); }
+    else { line(6, bodyY - 1, 2, bodyY - 6, 'S'); line(2, bodyY - 6, 2, bodyY - 8, 'L'); }
+    // the barrel: haunch, ribs and shoulder; dogs are a little longer than goats
+    const len = dog ? 9 : pygmy ? 7 : boer ? 9 : coat === 11 ? 7 : 8;
+    oval(13, bodyY, len, pygmy || boer ? 6 : dog ? 4 : 5, 'S');
+    oval(8, bodyY + 1, 4, dog ? 3 : 4, 'S');
+    oval(19, bodyY, 4, dog ? 5 : 6, 'S');
+    line(7, bodyY - 3, 13, bodyY - 4, 'L');
+    line(7, bodyY + 3, 12, belly, 's'); line(12, belly, 19, belly, 's');
+    if (goat) {
+      if (valais) { oval(19, 16, 4, 6, 'i'); box(17, 13, 5, 8, 'i'); }
+      else if ([7, 10, 11].includes(coat)) { line(8, bodyY - 4, 18, bodyY - 4, 'i'); line(9, bodyY - 3, 18, bodyY - 3, 'i'); }
+      else if ([3, 4, 8, 9].includes(coat)) { oval(10, bodyY, 3, 2, 'i'); oval(16, bodyY + 2, 2, 2, 'i'); }
+      if (golden || valais) for (let x = 7; x < 21; x += 3) { line(x, bodyY + 1, x - 1, belly + 1, 'S'); dot(x, belly - 1, 'L'); }
+    } else if (['gsd', 'bcollie', 'sheltie', 'bernese'].includes(id)) { oval(13, bodyY - 1, 6, 3, 'i'); oval(20, bodyY + 1, 3, 4, 'L'); }
+    else if (id === 'oes') oval(11, bodyY, 6, 4, 'i');
+    else if (id === 'jrt') oval(10, bodyY - 2, 3, 2, 'i');
+    else if (id === 'acd') for (const [x, y] of [[8, -2], [10, 0], [13, -4], [15, -1], [17, 2], [12, 3]]) { dot(x, bodyY + y, 'i'); dot(x + 1, bodyY + y, 'L'); }
+    if (shag) for (let x = 6; x < 22; x += 3) { line(x, bodyY - 2, x - 1, belly + 1, 's'); line(x + 1, bodyY - 2, x, belly - 1, 'L'); }
+    leg(7, false, phA); leg(18, false, phB);
+    // a neck rising from the shoulders keeps the head off the back
+    const hx = attacking ? 1 : 0, hc = goat ? 'i' : 'S';
+    oval(21, (goat ? 14 : 16) + (short ? 2 : 0), 3, goat ? 6 : 5, goat && (boer || valais) ? 'i' : 'S');
+    line(19, goat ? 12 : 14, 18, goat ? 18 : 19, 'L');
+    if (goat) {
+      // long nasal bridge and squared muzzle
+      [[0, 20, 23], [1, 19, 24], [2, 20, 25], [3, 21, 26], [4, 22, 27], [5, 22, 28], [6, 23, 28], [7, 23, 27]].forEach(([y, l, r]) => box(l + hx, headY + y, r - l + 1, 1, 'i'));
+      line(24 + hx, headY + 2, 27 + hx, headY + 5, coat === 10 ? 'L' : 'p');
+      box(26 + hx, headY + 5, 2, 2, 'p');
+      if (!back) { dot(27 + hx, headY + 5, 'N'); line(25 + hx, headY + 7, 27 + hx, headY + 7, 's'); }
+      // horns sweep back; ears stick out sideways under them
+      const rise = valais || coat === 7 ? 5 : 4;
+      line(21 + hx, headY, 19 + hx, headY - rise + 1, 'p'); line(19 + hx, headY - rise + 1, 16 + hx, headY - rise, 'p');
+      line(24 + hx, headY, 22 + hx, headY - 3, 'p'); line(22 + hx, headY - 3, 20 + hx, headY - 4, 'p');
+      if (nubian || boer) { oval(19 + hx, headY + 5, 2, nubian ? 5 : 3, 'i'); line(18 + hx, headY + 3, 18 + hx, headY + 7, 'p'); }
+      else { box(15 + hx, headY + 1, 6, 2, 'i'); box(16 + hx, headY + 2, 3, 1, 'p'); dot(14 + hx, headY + 1, 'i'); }
+      // the beard
+      box(23 + hx, headY + 8, 2, 3, 's'); dot(24 + hx, headY + 11, 's');
+      // one side-set eye with a horizontal pupil
+      if (!back) { box(21 + hx, headY + 2, 3, 2, 'e'); box(21 + hx, headY + 3, 3, 1, 'N'); dot(21 + hx, headY + 2, 'E'); }
+    } else {
+      oval(22 + hx, headY + 2, 4, 4, hc);
+      oval(25 + hx, headY + 4, 3, 2, 'L');
+      dot(28 + hx, headY + 4, 'N'); line(25 + hx, headY + 6, 27 + hx, headY + 6, 's');
+      const floppy = ['jrt', 'bernese', 'oes', 'pyrenees', 'komondor'].includes(id);
+      if (floppy) { oval(19 + hx, headY + 4, 2, shag ? 5 : 4, 's'); line(18 + hx, headY + 3, 18 + hx, headY + 6, 'i'); }
+      else {
+        line(19 + hx, headY + 1, 19 + hx, headY - 4, 'S'); line(19 + hx, headY - 4, 22 + hx, headY + 1, 'S'); line(20 + hx, headY - 2, 21 + hx, headY, 'p');
+        line(24 + hx, headY, 25 + hx, headY - 4, 'S'); line(25 + hx, headY - 4, 26 + hx, headY + 1, 'S');
+      }
+      if (['gsd', 'acd', 'sheltie'].includes(id)) line(21 + hx, headY, 23 + hx, headY + 2, 'i');
+      if (fluffy) { line(19, headY + 6, 17, headY + 10, 'L'); line(20, headY + 7, 19, headY + 11, 'L'); }
+      if (short) line(22, headY, 24, headY + 4, 'L');
+      if (shag) { line(20, headY - 1, 20, headY + 4, 'L'); line(23, headY - 1, 22, headY + 2, 's'); }
+      if (!back) { box(23 + hx, headY + 2, 2, 2, 'N'); dot(23 + hx, headY + 2, 'E'); if (diagonal) { dot(21 + hx, headY + 3, 'N'); dot(21 + hx, headY + 2, 'E'); } }
+      else { line(23 + hx, headY + 1, 24 + hx, headY + 4, hc); dot(28 + hx, headY + 4, hc); }
+    }
+  } else {
+    // front and back: the barrel, two legs that lift in turn, the head and the tail (from behind)
+    const fl = (x, ph) => {
+      const top = 21 - bob, up = ph === 3 ? (run ? 3 : 2) : 0, fy = FARM_GROUND - up;
+      for (let y = top; y < fy - 1; y++) { put(x, y, 'S'); put(x + 1, y, 'S'); }
+      const foot = hoof || 'L';
+      for (let i = 0; i <= 1; i++) { put(x + i, fy - 1, foot); put(x + i, fy, foot); }
+    };
+    oval(15, bodyY + 1, dog ? 8 : 7, dog ? 5 : 6, 'S'); oval(15, bodyY - 2, 6, 5, 'L');
+    fl(10, phA); fl(19, phB);
+    oval(15, headY + 2, goat ? 4 : 6, goat ? 6 : 5, goat ? 'i' : 'S');
+    if (goat) {
+      line(12, headY - 2, 10, headY - 6, 'p'); line(10, headY - 6, 8, headY - 6, 'p'); line(18, headY - 2, 20, headY - 6, 'p'); line(20, headY - 6, 22, headY - 6, 'p');
+      box(6, headY, 6, 2, 'i'); box(18, headY, 6, 2, 'i'); line(7, headY + 1, 10, headY + 1, 'p'); line(20, headY + 1, 23, headY + 1, 'p');
+      box(14, headY + 9, 3, 3, 's'); dot(15, headY + 12, 's');
+      if (nubian || boer) { oval(9, headY + 4, 2, 4, 'i'); oval(21, headY + 4, 2, 4, 'i'); }
+    } else if (shag || ['bernese', 'pyrenees', 'jrt'].includes(id)) { oval(9, headY + 3, 2, 5, 's'); oval(21, headY + 3, 2, 5, 's'); }
+    else { line(10, headY - 1, 10, headY - 6, 'S'); line(10, headY - 6, 13, headY - 1, 'S'); line(20, headY - 1, 20, headY - 6, 'S'); line(20, headY - 6, 17, headY - 1, 'S'); }
+    if (!back && goat) {
+      box(11, headY + 1, 3, 2, 'e'); box(17, headY + 1, 3, 2, 'e'); box(11, headY + 2, 3, 1, 'N'); box(17, headY + 2, 3, 1, 'N');
+      box(13, headY + 6, 5, 3, 'p'); dot(13, headY + 7, 'N'); dot(17, headY + 7, 'N'); line(14, headY + 9, 16, headY + 9, 's');
+    } else if (!back) { box(11, headY + 1, 2, 2, 'N'); dot(11, headY + 1, 'E'); box(17, headY + 1, 2, 2, 'N'); dot(17, headY + 1, 'E'); oval(15, headY + 5, 3, 2, 'L'); box(14, headY + 4, 2, 1, 'N'); }
+    else { line(15, bodyY + 2, 15, bodyY + 6, 's'); line(15, bodyY + 6, 16, bodyY + 7, 'S'); }
+  }
+  if (direction === 'W' || direction === 'SW' || direction === 'NW') g.forEach(r => r.reverse());
+  return g;
+}
+// lab items (hats, hair, accessories) on the new head: the lab draws them for its own head, so they are cut out of the
+// lab frame, scaled from the lab's sprite scale to the farm scale and moved by the difference between the two heads'
+// top points. Outfits recolour the farm barrel and legs instead.
+function farmAnchor(g) {
+  const top = g.findIndex(r => r.some(c => c !== '.'));
+  let sx = 0, n = 0;
+  for (let y = top; y < Math.min(g.length, top + 3); y++) g[y].forEach((c, x) => { if (c !== '.') { sx += x; n++; } });
+  return [n ? sx / n : 0, top];
+}
+function farmGrid(u, id, d, a, i, look) {
+  const g = farmRows(id, d, a, i, look.coat);
+  const kF = FARM_SCALE[id === 'goat' ? 'goat' : 'dog'], kL = u.scale === undefined ? LAB_SCALE : u.scale;
+  if (look.outfit > 0) farmOutfit(g, LAB.items.outfit[look.outfit - 1]);
+  if (look.hair || look.hat || look.acc.length) {
+    const rows = u.art[d][a][i], off = u.off && u.off[d] && u.off[d][a] && u.off[d][a][i];
+    const bare = Object.assign({}, LAB_LOOK0, { coat: look.coat }), head = Object.assign({}, look, { outfit: 0 });
+    const base = labCompose(u, rows, off, d, bare), dressed = labCompose(u, rows, off, d, head);
+    const [lx, ly] = farmAnchor(base), [fx, fy] = farmAnchor(g), r = kL / kF;
+    for (let y = 0; y < dressed.length; y++) for (let x = 0; x < dressed[y].length; x++) {
+      const c = dressed[y][x];
+      if (c === '.' || c === base[y][x]) continue;
+      const x0 = fx + (x - lx) * r, y0 = fy + (y - ly) * r;
+      for (let yy = Math.floor(y0); yy < Math.max(Math.floor(y0) + 1, Math.floor(y0 + r)); yy++)
+        for (let xx = Math.floor(x0); xx < Math.max(Math.floor(x0) + 1, Math.floor(x0 + r)); xx++)
+          if (yy >= 0 && yy < g.length && xx >= 0 && xx < FARM_N) g[yy][xx] = c;
+    }
+  }
+  return g;
+}
+// an outfit recolours the barrel: its top row, its body letters and its hem, and the legs below
+function farmOutfit(g, it) {
+  const H = g.length, fill = g.map(r => r.filter(c => c !== '.').length), maxW = Math.max(...fill);
+  let bot = 0; fill.forEach((n, y) => { if (n >= maxW * 0.55) bot = y; });
+  const top = Math.max(0, bot - 6);
+  for (let y = top; y < H; y++) for (let x = 0; x < FARM_N; x++) {
+    const ch = g[y][x];
+    if (ch === '.' || ch === 'H' || 'ipeEN'.includes(ch)) continue;
+    if (y <= bot) {
+      const above = y > 0 ? g[y - 1][x] : '.';
+      if (it.top && (above === '.' || y === top)) g[y][x] = it.top;
+      else if (it.hem && y === bot) g[y][x] = it.hem;
+      else if (it.R[ch]) g[y][x] = it.R[ch];
+    } else if (it.L[ch]) g[y][x] = it.L[ch];
+  }
+}
 const labCache = new Map();
 function labSet(id, look) {
   look = normLabLook(look);
@@ -764,9 +953,10 @@ function labSet(id, look) {
   if (set) return set;
   const u = labUnit(id), m = labColors(u, look);
   for (const k in m) if (typeof m[k] === 'string' && m[k][0] === '#') labRegister(m[k]);
-  const grid = (d, a, i) => labCompose(u, u.art[d][a][i], u.off && u.off[d] && u.off[d][a] && u.off[d][a][i], d, look);
-  const sc = u.scale === undefined ? LAB_SCALE : u.scale;
-  const outl = LAB_OUTLINE && !u.noOutline, ol = outl ? labOutline : (g) => g;
+  const farm = FARM_UNITS.has(id);
+  const grid = farm ? (d, a, i) => farmGrid(u, id, d, a, i, look) : (d, a, i) => labCompose(u, u.art[d][a][i], u.off && u.off[d] && u.off[d][a] && u.off[d][a][i], d, look);
+  const sc = farm ? FARM_SCALE[id === 'goat' ? 'goat' : 'dog'] : u.scale === undefined ? LAB_SCALE : u.scale;
+  const outl = farm ? FARM_OUTLINE : LAB_OUTLINE && !u.noOutline, ol = outl ? labOutline : (g) => g;
   const pair = (dR, dL, gR, gL) => { const sp = new LabSpr(labCanvas(ol(labScale(gR, sc)), m), labCanvas(ol(labScale(gL, sc)), m)); sp.pad = outl ? 1 : 0; return sp; };
   set = { run: {}, idle: {}, jump: {}, attack: {}, act: {}, pose: { sit: {}, lie: {}, alert: {}, sniff: {}, bite: {} }, unit: id };
   for (const [k, dR, dL] of (LAB_TRUE_BACK || u.keepViews ? LAB_PAIRS_TRUE : LAB_SIDE_ONLY ? LAB_PAIRS_SIDE : LAB_PAIRS_34)) {
@@ -3546,6 +3736,11 @@ function sprBox(sp) {
   sp._box = x1 < 0 ? { x: 0, y: 0, w: sp.w, h: sp.h } : { x: x0, y: y0, w: x1 - x0 + 1, h: y1 - y0 + 1 };
   return sp._box;
 }
+// an animal in a player card: double size when its idle frame fits the box (else actual size), centred, feet on the grass
+function cardSprite(sp, ref, bx, by, bw, bh) {
+  const rb = sprBox(ref), k = rb.w * 2 <= bw - 2 && rb.h * 2 <= bh - 4 ? 2 : 1;
+  G.drawImage(sp.r, 0, 0, sp.w, sp.h, Math.round(bx + bw / 2 - (rb.x + rb.w / 2) * k), by + bh - 2 - (rb.y + rb.h) * k, sp.w * k, sp.h * k);
+}
 // the farm dog a player is running as (locked picks fall back to the collie)
 function goatSetCached(i) { return labSet('goat', { coat: GOAT_BREEDS[i].coat }); }
 function rememberedLook(kind) { return normLabLook(settings.looks && settings.looks[kind]); }
@@ -6147,7 +6342,7 @@ function drawTitle() {
   rect(0, fy - 3, W, 13, 'k');
   if (best.escort || best.defend) text('BEST  ESCORT ' + best.escort + '  DEFEND ' + best.defend, W / 2, fy, 'y', { align: 'center' });
   else text('1-4 PLAYERS  GOATS AND DOGS', W / 2, fy, 's', { align: 'center' });
-  text(DEMO ? 'DEMO V0.17.2' : 'V0.17.2', W - 3, fy - 12, 'i', { align: 'right', outline: 'k' });
+  text(DEMO ? 'DEMO V0.18' : 'V0.18', W - 3, fy - 12, 'i', { align: 'right', outline: 'k' });
 }
 const MODES = [
   { id: 'escort', title: 'ESCORT', l1: 'HERD THE FLOCK PIN TO PIN', icon: 'pinGoal' },
@@ -6226,8 +6421,7 @@ function drawPlayerSelect() {
     rect(bx, by, bw, bh, 'g');
     rect(bx, by + bh - 3, bw, 3, 'h');
     G.save(); G.beginPath(); G.rect(bx, by, bw, bh); G.clip();
-    const spb = sprBox(pset.idle.E[0]);
-    G.drawImage(sp.r, 0, 0, sp.w, sp.h, Math.round(bx + bw / 2 - (spb.x + spb.w / 2) * 2), by + bh - 2 - sp.h * 2 + (sp.pad || 0) * 2, sp.w * 2, sp.h * 2);
+    cardSprite(sp, pset.idle.E[0], bx, by, bw, bh);
     G.restore();
     const tx = x + 52;
     const kname = p.kind === 'wolf' ? 'WOLF' : (p.kind === 'dog' ? dogBreed(p).name : skinList('goat')[skinOk('goat', p.skin || 0) ? p.skin || 0 : 0].name + ' GOAT');
@@ -7289,8 +7483,7 @@ function drawNetWait() {
   const bx = x + 7, by = y + 14, bw = 40, bh = ch - 18;
   rect(bx, by, bw, bh, 'g'); rect(bx, by + bh - 3, bw, 3, 'h');
   G.save(); G.beginPath(); G.rect(bx, by, bw, bh); G.clip();
-  const spb = sprBox(set.idle.E[0]);
-  G.drawImage(sp.r, 0, 0, sp.w, sp.h, Math.round(bx + bw / 2 - (spb.x + spb.w / 2) * 2), by + bh - 2 - sp.h * 2 + (sp.pad || 0) * 2, sp.w * 2, sp.h * 2);
+  cardSprite(sp, set.idle.E[0], bx, by, bw, bh);
   G.restore();
   hits.push({ x: bx, y: by, w: bw, h: bh, fn: () => { cycleSkin(me, 1); netSendPick(); } });
   const tx = x + 52;

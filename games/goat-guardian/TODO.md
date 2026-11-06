@@ -9,7 +9,7 @@ All 20 items from the feature list were added in v0.7.0. What remains is playtes
 - [ ] Check night lanterns and fog on long routes for readability.
 - [ ] Install the GitHub Pages build on a phone and test offline play.
 - [ ] Test 6-digit rooms through the real PeerJS cloud broker across two real networks (and mobile data). If the free broker proves unreliable, run your own PeerServer (see README) and build with `PEER_URL`.
-- [ ] Art: check the new goat side view (level back, neck, longer legs) on a real phone. Possible next steps: an ear that sticks out backwards and a beard like the reference goats, the same neck fix for the three-quarter (SE/NE) goat views, and outfits on the ram frames (they never lined up).
+- [ ] Art: check the 0.18 farm goat and dogs on a real phone (size, outline, trot). Tune `FARM_SCALE` or the dog shapes if the dogs should look more like the old lab dogs. Possible next steps: an ear that sticks out backwards and a beard like the reference goats, the same neck fix for the three-quarter (SE/NE) goat views, and outfits on the ram frames (they never lined up).
 - [ ] Decide whether to delete `tools/relay/` and `tests/relay_core.js` (the custom relay is no longer used).
 - [ ] Online: client-side prediction, guest reconnect, spectators.
 - [ ] Demo: add a Steam/itch link via `FULL_URL`, and decide whether to limit STYLE in the demo.
