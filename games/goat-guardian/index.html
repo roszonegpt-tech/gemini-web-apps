@@ -4560,13 +4560,139 @@ const DOGS_TRAILER = [
       return [{ at: 0.1, run: () => spawnFlock(false) }, { at: 1.2, run: () => spawnFlock(true) }];
     } }
 ];
+// ---- the TikTok series: five short, funny episodes, one per game mode (startTrailer('s1')..('s5'))
+// Speech bubbles: say(who, text, seconds). `who` is an actor or a function that finds one; every bubble also logs a mark
+// (sayS sheep, sayD dog, sayG goat, sayW wolf or other foe, sayH heart) so the soundtrack can add a bleat, a woof, ...
+function say(who, str, dur) {
+  const o = typeof who === 'function' ? who() : who;
+  if (!o) return;
+  const kind = str === '<3' ? 'H' : (players.includes(o) ? (o.kind === 'dog' ? 'D' : (o.kind === 'goat' ? 'G' : 'W')) : (sheep.includes(o) ? 'S' : 'W'));
+  showcase.bubbles.push({ o: o, str: str, t0: showcase.t, dur: dur || 2 });
+  if (typeof window.__trailerMark === 'function') window.__trailerMark('say' + kind);
+}
+function drawBubbles() {
+  if (!showcase.on || !showcase.trailer || !showcase.bubbles) return;
+  G = bctx;
+  const maxCh = clamp(Math.floor((W - 16) / 4), 8, 16);
+  for (const b of showcase.bubbles) {
+    const age = showcase.t - b.t0;
+    if (age < 0 || age > b.dur) continue;
+    const o = b.o, heart = b.str === '<3';
+    const lines = [];
+    if (!heart) { let cur = ''; for (const w of b.str.split(' ')) { if (cur && (cur + ' ' + w).length > maxCh) { lines.push(cur); cur = w; } else cur = cur ? cur + ' ' + w : w; } lines.push(cur); }
+    const tw = heart ? 5 : Math.max(...lines.map(l => textWidth(l, 1))), bw = tw + 6, bh = heart ? 9 : lines.length * 7 + 3;
+    // pops in with a little bounce, floats gently, shrinks out
+    const pop = clamp(age / 0.12, 0, 1), out = clamp((b.dur - age) / 0.15, 0, 1), s = Math.min(pop, out);
+    if (s < 0.5) continue;
+    const bob = Math.round(Math.sin(realTime * 7 + b.t0) * 1) + (age < 0.12 ? 2 : 0);
+    let x = wx(o.x), y = wy(o.y - (o.alt || 0)) - 20 - bh + bob;
+    x = clamp(x, Math.ceil(bw / 2) + 2, W - Math.ceil(bw / 2) - 2);
+    const x0 = Math.round(x - bw / 2), y0 = Math.round(y);
+    rect(x0 + 1, y0, bw - 2, bh, 'k'); rect(x0, y0 + 1, bw, bh - 2, 'k');                 // rounded black edge
+    rect(x0 + 1, y0 + 1, bw - 2, bh - 2, 'w');
+    const tx = clamp(wx(o.x), x0 + 3, x0 + bw - 4);                                       // the tail points at the speaker
+    rect(tx - 1, y0 + bh, 3, 1, 'k'); rect(tx, y0 + bh + 1, 1, 1, 'k'); px(tx, y0 + bh - 1, 'w'); px(tx - 1, y0 + bh - 1, 'w'); px(tx + 1, y0 + bh - 1, 'w');
+    if (heart) { for (const [dx, dy] of [[0, 0], [1, 0], [3, 0], [4, 0], [0, 1], [1, 1], [2, 1], [3, 1], [4, 1], [1, 2], [2, 2], [3, 2], [2, 3]]) px(x0 + 3 + dx, y0 + 2 + dy, 'r'); }
+    else lines.forEach((l, i) => text(l, x0 + 3, y0 + 2 + i * 7, 'k'));
+  }
+}
+const SAY = (at, who, str, dur) => ({ at: at, run: () => say(who, str, dur) });
+const sheepN = (k) => () => sheep.length ? sheep[k % sheep.length] : null;
+const plr = (k) => () => players[k];
+const foeN = (k) => () => { const l = enemies.filter(e => e.state !== 'launched' && e.state !== 'emerge'); return l.length ? l[k % l.length] : null; };
+const EV = (t, fn) => ({ at: t, run: fn });
+const SERIES_END = (ep, title, sub) => ({ id: 'e' + ep + '_end', finale: true, dur: 4.6, day: 0.15, end: { ep: ep, title: title, sub: sub }, setup() {
+  players = [];
+  world = menuWorld; enemies = []; particles = []; texts = []; splats = [];
+  spawnHerd(world.start.x, world.start.y, 10, true);
+  makeDemo();
+  snapCam(world.start.x, world.start.y);
+  dayProgress = 0.15; setWeather('');
+  goScreen('TITLE');
+  return [{ at: 0.1, run: () => spawnFlock(false) }];
+} });
+// a hat for Billy / a dog: look presets
+const HAT = (h, c) => normLabLook({ hat: h, col: { hat: c || 0 } });
+const SERIES = {
+  // 1. ESCORT: how to walk the flock home
+  1: [
+    { id: 'e1_c1', card: ['HOW TO WALK', '10 SHEEP HOME'], dur: 2.2, day: 0.2, setup() { trailerEscort(1, 0.3, ['dog:0', 'goat'], 0.2); return []; } },
+    { id: 'e1_a1', cap: 'STEP 1: GET A DOG', dur: 4.6, day: 0.12, setup() { trailerEscort(1, 0.3, ['dog:0', 'goat'], 0.12); resetUpgrades();
+        return [SAY(0.4, sheepN(0), 'WHERE ARE WE GOING?', 2), SAY(1.9, plr(0), 'HOME.', 1.4), SAY(3.1, sheepN(1), 'NO.', 1.3)]; } },
+    { id: 'e1_a2', cap: 'STEP 2: SHEEP HAVE OPINIONS', dur: 4.8, day: 0.3, setup() { trailerEscort(3, 0.4, ['dog:0', 'goat'], 0.3); resetUpgrades();
+        return [SAY(0.3, sheepN(0), 'GRASS.', 0.8), SAY(1.2, sheepN(5), 'GRASS!', 0.8), SAY(2.1, sheepN(8), 'GRASS!!!', 1.0), SAY(3.3, plr(0), 'PLEASE?', 1.2), EV(3.6, () => dogSkill(world.goal))]; } },
+    { id: 'e1_a3', cap: 'STEP 3: A WOLF', dur: 5.0, day: 0.6, setup() { trailerEscort(1, 0.5, ['dog:0', 'goat'], 0.6); resetUpgrades();
+        return [EV(0.2, () => rushBilly('wolf', null, 52)), SAY(0.9, foeN(0), 'SNACK?', 1.3), SAY(2.0, plr(1), 'NO.', 1.2), SAY(3.3, foeN(0), '...OW', 1.3), SAY(3.9, sheepN(3), 'BAAAA!', 1.0)]; } },
+    { id: 'e1_a4', cap: 'STEP 4: THE RED PIN', dur: 5.0, day: 0.3, setup() { trailerEscort(1, 0.84, ['dog:0', 'goat'], 0.3); resetUpgrades();
+        return [EV(0.5, () => dogSkill(world.goal)), SAY(2.6, sheepN(0), 'WE DID IT!', 1.6), SAY(3.2, sheepN(2), '<3', 1.6), SAY(3.5, sheepN(5), '<3', 1.4), SAY(3.8, plr(0), 'GOOD SHEEP.', 1.2)]; } },
+    SERIES_END(1, 'ESCORT MODE', '10 ROUTES, ZERO LOST SHEEP')
+  ],
+  // 2. DEFEND: hold the henge
+  2: [
+    { id: 'e2_c1', card: ['THE WOLVES:', 'JUST A SNACK'], eyes: 'r', dur: 2.4, day: 0.6, setup() { trailerDefend(0, ['goat', 'dog'], 0.6); return []; } },
+    { id: 'e2_a1', cap: 'WAVE 1: POLITE WOLVES', dur: 4.8, day: 0.5, setup() { trailerDefend(0, ['goat', 'dog'], 0.5); resetUpgrades();
+        return [EV(0.2, () => spawnNear('wolf', { open: true }, 56)), SAY(1.1, foeN(0), 'HI. SHEEP PLEASE?', 2), SAY(2.8, plr(0), 'NO.', 1.2), EV(1.6, () => spawnNear('wolf', { open: true }, 60)), SAY(3.6, foeN(1), 'RUDE.', 1.2)]; } },
+    { id: 'e2_a2', cap: 'WAVE 5: LESS POLITE', dur: 4.8, day: 0.12, setup() { trailerDefend(4, ['goat', 'goat'], 0.12); resetUpgrades();
+        return [0.1, 0.5, 0.9, 1.4, 2.0, 2.6].map(t => EV(t, () => spawnNear(rand() < 0.3 ? 'bat' : 'wolf', { open: true }, 46))).concat([SAY(1.2, plr(0), 'MEH.', 1.2), SAY(2.3, foeN(0), 'OW.', 1.0), SAY(3.0, plr(1), 'BAA.', 1.2), SAY(3.6, foeN(1), 'WHY.', 1.0)]); } },
+    { id: 'e2_a3', cap: 'FOUR FRIENDS, ONE HENGE', dur: 4.8, day: 0.4, setup() { trailerDefend(9, ['goat', 'dog', 'goat', 'dog'], 0.4); resetUpgrades();
+        return [0, 0.3, 0.6, 1.0, 1.5, 2.0, 2.6].map((t, i) => EV(t, () => spawnNear(['wolf', 'bat', 'fox'][i % 3], { open: true }, 54))).concat([SAY(0.6, plr(0), 'BAA!', 1.0), SAY(1.2, plr(1), 'WOOF!', 1.0), SAY(1.8, plr(2), 'BAAA!', 1.0), SAY(2.4, plr(3), 'WOOF WOOF!', 1.2), SAY(3.4, sheepN(2), 'WE LOVE THIS', 1.5)]); } },
+    { id: 'e2_a4', cap: 'WAVE 10: THE BIG ONE', dur: 5.6, day: 0.6, setup() { trailerDefend(5, ['goat', 'goat', 'dog'], 0.6); resetUpgrades();
+        return [EV(0.1, () => { const e = spawnNear('wolf', { boss: true }, 70); e.t = 0.2; }), SAY(1.4, foeN(0), 'SNACK.', 1.4), SAY(2.6, plr(0), '...NO.', 1.3), SAY(4.2, sheepN(1), 'THANKS BILLY', 1.4)]; } },
+    SERIES_END(2, 'DEFEND MODE', 'WAVE AFTER WAVE AFTER WAVE')
+  ],
+  // 3. DAILY: a new route every day
+  3: [
+    { id: 'e3_c1', card: ['A NEW ROUTE', 'EVERY SINGLE DAY'], dur: 2.2, day: 0.3, setup() { trailerEscort(0, 0.3, ['goat', 'dog'], 0.3); return []; } },
+    { id: 'e3_a1', cap: 'MONDAY', dur: 3.8, day: 0.1, setup() { trailerEscort(0, 0.3, ['goat', 'dog'], 0.1); setWeather(''); resetUpgrades();
+        return [SAY(0.4, sheepN(0), 'NEW ROUTE!', 1.6), SAY(1.8, sheepN(2), 'NEW GRASS!', 1.5)]; } },
+    { id: 'e3_a2', cap: 'TUESDAY', dur: 3.8, day: 0.3, setup() { trailerEscort(4, 0.3, ['goat', 'dog'], 0.3); setWeather('rain'); resetUpgrades();
+        return [SAY(0.4, sheepN(1), 'IT IS WET.', 1.5), SAY(1.8, sheepN(3), 'SO WET.', 1.5), SAY(2.7, plr(1), 'WOOF?', 1.0)]; } },
+    { id: 'e3_a3', cap: 'WEDNESDAY', dur: 3.8, day: 1.0, setup() { trailerEscort(2, 0.4, ['goat', 'dog'], 1.0); setWeather(''); resetUpgrades();
+        return [SAY(0.4, sheepN(0), 'IT IS DARK.', 1.5), EV(1.0, () => rushBilly('wolf', null, 56)), SAY(1.9, foeN(0), 'HELLO.', 1.2), SAY(2.8, plr(0), 'BAA.', 1.0)]; } },
+    { id: 'e3_a4', cap: 'THURSDAY', dur: 3.8, day: 0.32, setup() { trailerEscort(7, 0.24, ['goat', 'dog'], 0.32); setWeather('storm'); weather.nextBolt = 1.2; resetUpgrades();
+        return [SAY(0.4, sheepN(0), 'NOPE.', 1.2), SAY(1.5, sheepN(2), 'NOPE NOPE.', 1.5), SAY(2.6, sheepN(4), '<3', 1.2)]; } },
+    { id: 'e3_a5', cap: 'FRIDAY', dur: 4.2, day: 0.55, setup() { trailerEscort(8, 0.3, ['goat', 'dog'], 0.55); setWeather(''); resetUpgrades();
+        return [EV(0.3, () => rushBilly('wolf', null, 54)), SAY(1.0, foeN(0), 'HI AGAIN.', 1.4), SAY(2.2, plr(0), 'SAME WOLVES.', 1.5), SAY(3.2, sheepN(1), 'SAME.', 1.0)]; } },
+    SERIES_END(3, 'DAILY MODE', 'ONE NEW ROUTE A DAY')
+  ],
+  // 4. ENDLESS: how long can you last
+  4: [
+    { id: 'e4_c1', card: ['HOW LONG CAN', 'YOU LAST?'], dur: 2.2, day: 0.2, setup() { billyArena(2, 0.1); return []; } },
+    { id: 'e4_a1', cap: 'STAGE 1', dur: 3.6, day: 0.1, setup() { billyArena(2, 0.1); return [EV(0.3, () => rushBilly('wolf', null, 50)), SAY(1.0, plr(0), 'EASY.', 1.3), SAY(2.0, sheepN(0), 'ARE WE THERE YET?', 1.6)]; } },
+    { id: 'e4_a2', cap: 'STAGE 12', dur: 3.8, day: 0.4, setup() { billyArena(9, 0.4, HAT(1, 1)); return [0, 0.5, 1.0, 1.6].map((t, i) => EV(t, () => rushBilly(['wolf', 'bat', 'fox', 'wolf'][i], null, 40 + i * 6))).concat([SAY(0.8, plr(0), 'STILL EASY.', 1.3), SAY(2.4, sheepN(1), 'NEW HAT?', 1.3)]); } },
+    { id: 'e4_a3', cap: 'STAGE 40', dur: 4.0, day: 0.95, setup() { billyArena(5, 0.95, normLabLook({ hat: 3, col: { hat: 5 }, outfit: 1 })); return [0, 0.4, 0.8, 1.2, 1.7, 2.2].map((t, i) => EV(t, () => rushBilly(['wolf', 'wolf', 'fox', 'bat', 'wolf', 'fox'][i], i % 3 === 0 ? { alpha: true } : null, 38 + (i % 3) * 10))).concat([SAY(0.9, plr(0), 'STILL ONE GOAT.', 1.6), SAY(2.6, foeN(0), 'I NEED A NAP.', 1.4)]); } },
+    { id: 'e4_a4', cap: 'STAGE 99', dur: 4.8, day: 0.6, setup() { billyArena(6, 0.6, normLabLook({ hat: 2, col: { hat: 3 }, acc: [2], outfit: 5 })); upg.ram = 3; upg.stomp = 1;
+        return [0, 0.3, 0.6, 0.9, 1.3, 1.7, 2.1, 2.6, 3.1].map((t, i) => EV(t, () => rushBilly(['wolf', 'bat', 'wolf', 'fox'][i % 4], i === 4 ? { boss: true } : null, 34 + (i % 3) * 12))).concat([SAY(1.0, sheepN(0), 'WHY?', 1.0), SAY(2.0, plr(0), 'FASHION.', 1.3), SAY(3.2, foeN(0), 'PLEASE STOP.', 1.5)]); } },
+    SERIES_END(4, 'ENDLESS MODE', 'HOW FAR CAN THE FLOCK GO?')
+  ],
+  // 5. VERSUS: play as the wolf
+  5: [
+    { id: 'e5_c1', card: ['WOLF POV:', 'I JUST LIKE SHEEP'], dur: 2.4, day: 0.5, setup() { trailerDefend(1, ['wolf', 'goat', 'dog'], 0.5); return []; } },
+    { id: 'e5_a1', cap: 'THE SNEAKY PART', dur: 4.6, day: 0.5, setup() { trailerDefend(1, ['wolf', 'goat', 'dog'], 0.5); resetUpgrades();
+        mode = 'versus'; Object.assign(versus, { t: 150, taken: 0, hits: 0, packT: 99, winner: '' });
+        const w = players[0]; const sp = forestSpawn(world.start.x, world.start.y, 50, 80); w.x = sp.x; w.y = sp.y; snapCam(w.x, w.y);
+        return [SAY(0.5, plr(0), 'SNEAKY...', 1.5), SAY(1.9, sheepN(0), 'HI WOLF.', 1.4), SAY(3.0, plr(0), '...HI.', 1.2)]; } },
+    { id: 'e5_a2', cap: 'THE SHEPHERDS ARE HOME', dur: 4.8, day: 0.5, setup() { trailerDefend(1, ['wolf', 'goat', 'dog'], 0.5); resetUpgrades();
+        mode = 'versus'; Object.assign(versus, { t: 150, taken: 0, hits: 0, packT: 99, winner: '' });
+        const w = players[0]; w.x = players[1].x + 34; w.y = players[1].y + 6; snapCam(players[1].x, players[1].y);
+        return [SAY(0.5, plr(1), 'NOPE.', 1.2), SAY(1.4, plr(2), 'WOOF!', 1.2), SAY(2.3, plr(0), 'OH NO.', 1.4), SAY(3.5, plr(0), 'SORRY!', 1.2)]; } },
+    { id: 'e5_a3', cap: 'TEAM WOLF', dur: 4.8, day: 0.85, setup() { trailerDefend(1, ['wolf', 'wolf', 'goat', 'dog'], 0.85); resetUpgrades();
+        mode = 'versus'; Object.assign(versus, { t: 150, taken: 0, hits: 0, packT: 99, winner: '' });
+        for (const k of [0, 1]) { const sp = forestSpawn(world.start.x, world.start.y, 50 + k * 14, 80 + k * 14); players[k].x = sp.x; players[k].y = sp.y; }
+        snapCam(players[0].x, players[0].y);
+        return [SAY(0.6, plr(0), 'AWOOO!', 1.3), SAY(1.4, plr(1), 'AWOOO?', 1.3), SAY(2.6, sheepN(2), 'THEY ARE CUTE', 1.5), SAY(3.6, plr(2), 'NO.', 1.1)]; } },
+    SERIES_END(5, 'VERSUS MODE', 'WOLVES VS SHEPHERDS')
+  ]
+};
 function startTrailer(which) {
   if (!showcase.on) showcase.saved = players;
-  rngFn = mulberry32(which === 'billy' ? 4242 : (which === 'dogs' ? 9090 : 777));
+  const ep = /^s[1-5]$/.test(which) ? +which[1] : 0;
+  rngFn = mulberry32(ep ? 5000 + ep * 111 : (which === 'billy' ? 4242 : (which === 'dogs' ? 9090 : 777)));
   showcase.on = true;
   showcase.trailer = true;
-  showcase.scenes = which === 'billy' ? BILLY_TRAILER : (which === 'dogs' ? DOGS_TRAILER : TRAILER);
-  showcase.close = which === 'billy' || which === 'dogs';
+  showcase.scenes = ep ? SERIES[ep] : (which === 'billy' ? BILLY_TRAILER : (which === 'dogs' ? DOGS_TRAILER : TRAILER));
+  showcase.close = ep > 0 || which === 'billy' || which === 'dogs';
+  showcase.bubbles = [];
   showcase.i = -1;
   resize();            // closer camera for the trailer
   nextScene();
@@ -4624,6 +4750,14 @@ function drawTrailerOverlay() {
     const k = clamp((t - 1.2) / 0.6, 0, 1);
     if (k > 0) {
       const fy = portrait ? Math.round(H * 0.62) : H - bar - 30;
+      if (sc.end) {
+        // a series episode: which mode, a one-line joke, and the call to action
+        text('EPISODE ' + sc.end.ep + ' OF 5', W / 2, fy - 12, 'y', { align: 'center', outline: 'k' });
+        text(sc.end.title, W / 2, fy, 'w', { s: W >= 150 ? 2 : 1, align: 'center', outline: 'k' });
+        text(sc.end.sub, W / 2, fy + 14, 'l', { align: 'center', outline: 'k' });
+        text('PLAY FREE', W / 2, fy + 25, 'y', { align: 'center', outline: 'k' });
+        return;
+      }
       text('PLAY NOW', W / 2, fy, 'w', { s: 2, align: 'center', outline: 'k' });
       if (portrait) { text('FREE IN YOUR BROWSER', W / 2, fy + 18, 'y', { align: 'center', outline: 'k' }); text('1-4 PLAYERS', W / 2, fy + 28, 'y', { align: 'center', outline: 'k' }); }
       else text('FREE IN YOUR BROWSER  -  1-4 PLAYERS', W / 2, fy + 18, 'y', { align: 'center', outline: 'k' });
@@ -4664,6 +4798,7 @@ function nextScene() {
   const sc = list[showcase.i];
   showcase.t = 0;
   showcase.doneT = -1;
+  showcase.bubbles = [];
   showcase.day = sc.day;
   if (!sc.card && !sc.editor && !sc.finale) goScreen('PLAYING');
   showcase.events = sc.setup();
@@ -6077,6 +6212,7 @@ function drawWorldScene() {
     if (t.life / t.max < 0.3 && Math.floor(t.life * 20) % 2 === 0) continue;
     text(t.str, wx(t.x), wy(t.y), t.col, { align: 'center', outline: 'k' });
   }
+  drawBubbles();
 }
 // glowing eyes of every predator show through the dark
 function drawNightEyes() {
@@ -6368,7 +6504,7 @@ function drawTitle() {
   rect(0, fy - 3, W, 13, 'k');
   if (best.escort || best.defend) text('BEST  ESCORT ' + best.escort + '  DEFEND ' + best.defend, W / 2, fy, 'y', { align: 'center' });
   else text('1-4 PLAYERS  GOATS AND DOGS', W / 2, fy, 's', { align: 'center' });
-  text(DEMO ? 'DEMO V0.18.4' : 'V0.18.4', W - 3, fy - 12, 'i', { align: 'right', outline: 'k' });
+  text(DEMO ? 'DEMO V0.19' : 'V0.19', W - 3, fy - 12, 'i', { align: 'right', outline: 'k' });
 }
 const MODES = [
   { id: 'escort', title: 'ESCORT', l1: 'HERD THE FLOCK PIN TO PIN', icon: 'pinGoal' },

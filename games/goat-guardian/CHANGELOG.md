@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+## [0.19.0] - 2026-11-09
+### Added
+- **A five-episode TikTok trailer series, one episode per game mode** (about 22-28 s each, 1080x1920): `tools/trailer/make.sh series` (or `s1 tiktok` ... `s5 tiktok`) writes `build/trailer-series-N-tiktok/ep-N-<mode>-tiktok.mp4`. Each has a joke hook card, four short scenes with a small caption tag, and a finale ("EPISODE N OF 5", the mode, a one-line joke, PLAY FREE):
+  1. **ESCORT**: "How to walk 10 sheep home" (get a dog; sheep have opinions about grass; a wolf; the red pin).
+  2. **DEFEND**: "The wolves: just a snack" (polite wolves, less polite wolves, four friends, the big one).
+  3. **DAILY**: "A new route every single day" (Monday to Friday: sunny, wet, dark, a storm, same wolves).
+  4. **ENDLESS**: "How long can you last?" (stage 1, 12, 40, 99, with Billy's outfit getting more ridiculous).
+  5. **VERSUS**: "Wolf POV: I just like sheep" (sneaking, the shepherds are home, team wolf).
+- **Speech bubbles** (`say(who, text, seconds)`, `drawBubbles`): white pixel bubbles with a tail that pop in over sheep, dogs, goats and wolves, plus a small heart bubble, so the animals can talk. Each bubble logs a mark so the soundtrack adds a matching bleat, woof, grumble or chime (`sayS/D/G/W/H`).
+- A cute soundtrack for each episode (`render_audio.js`, `SER`): a bouncy groove per episode, boings and drum rolls under the hook cards, a tune that climbs as the endless stages get higher, and sneaky plucks for the wolf's first scene.
+- The smoke test checks that all five episodes are complete.
+
 ## [0.18.4] - 2026-11-06
 ### Added
 - **TikTok versions of the trailers.** `tools/trailer/make.sh billy tiktok` and `dogs tiktok` record the game in a 1080x1920 window and write `build/trailer-billy-tiktok/billy-trailer-tiktok.mp4` (55 s) and `build/trailer-dogs-tiktok/dogs-trailer-tiktok.mp4` (62 s): portrait 9:16, 30 fps, H.264 high profile + AAC, same soundtracks. In a portrait trailer window the game sizes the picture by its width (about 120 world pixels across, so the animals stay big), drops the letterbox bars, wraps the story cards onto more lines at a readable size (`drawTrailerOverlay`; cards also never exceed the screen width now), puts the captions about two-thirds down (clear of TikTok's bottom buttons and caption) and stacks the finale text. Widescreen output is unchanged.

@@ -1,25 +1,27 @@
-// Usage: node tools/trailer/render_audio.js [outDir] [main|billy|dogs]
+// Usage: node tools/trailer/render_audio.js [outDir] [main|billy|dogs|s1..s5]
 // Renders the trailer soundtrack offline (OfflineAudioContext in Chromium), timed to recorded scene marks.
 const { chromium } = require('playwright');
 const fs = require('fs');
 const path = require('path');
 const OUT = path.resolve(process.argv[2] || 'build/trailer');
 const BILLY = process.argv[3] === 'billy', DOGS = process.argv[3] === 'dogs';
+const SER = /^s[1-5]$/.test(process.argv[3] || '') ? +process.argv[3][1] : 0;   // the TikTok series, episodes 1-5
 (async () => {
   const marksAbs = JSON.parse(fs.readFileSync(path.join(OUT, 'trailer_marks.json'), 'utf8'));
   const start = marksAbs[0].t;
   const all = marksAbs.map(m => ({ id: m.id, t: m.t - start }));
   // scene cuts, plus in-game events logged during recording (ram hits, screen cracks)
-  const EVENTS = ['hit', 'crack', 'bark', 'skill'];
+  const EVENTS = ['hit', 'crack', 'bark', 'skill', 'sayS', 'sayD', 'sayG', 'sayW', 'sayH'];
   const marks = all.filter(m => EVENTS.indexOf(m.id) < 0);
   const ev = (id) => all.filter(m => m.id === id).map(m => m.t);
   const hits = ev('hit'), cracks = ev('crack'), barks = ev('bark'), skills = ev('skill');
-  const total = marks[marks.length - 1].t + (BILLY || DOGS ? 6.7 : 6.2);
+  const says = { S: ev('sayS'), D: ev('sayD'), G: ev('sayG'), W: ev('sayW'), H: ev('sayH') };
+  const total = marks[marks.length - 1].t + (SER ? 5.0 : BILLY || DOGS ? 6.7 : 6.2);
   const b = await chromium.launch();
   const p = await b.newPage();
   await p.goto('file://' + path.resolve(__dirname, '../../index.html'));
   await p.waitForTimeout(300);
-  const b64 = await p.evaluate(async ({ marks, total, hits, cracks, barks, skills, BILLY, DOGS }) => {
+  const b64 = await p.evaluate(async ({ marks, total, hits, cracks, barks, skills, says, BILLY, DOGS, SER }) => {
     const sr = 44100;
     const ctx = new OfflineAudioContext(2, Math.ceil(sr * total), sr);
     const comp = ctx.createDynamicsCompressor();
@@ -225,6 +227,49 @@ const BILLY = process.argv[3] === 'billy', DOGS = process.argv[3] === 'dogs';
       crash(fc); kick(fc); bleat(fc + 0.2, 0.5);
       for (const t of hits) ramHit(t);
       for (const t of cracks) { glass(t); crash(t); }
+    } else if (SER) {
+      // ---- the TikTok series: cute and bouncy, one groove per episode, with a squeak for every speech bubble ----
+      const boing = (t, v) => { osc('sine', 260, 760, t, 0.16, v || 0.2); osc('triangle', 520, 1500, t, 0.12, (v || 0.2) * 0.4); };
+      const squeak = (t) => { osc('sine', 1100 + Math.random() * 200, 1700, t, 0.07, 0.1); };
+      const grumble = (t) => { osc('sawtooth', 150, 95, t, 0.28, 0.12, 700, -0.1); osc('sawtooth', 154, 92, t, 0.28, 0.08, 600, 0.1); };
+      const pluck = (t, n, v) => { osc('square', hz(n), hz(n), t, 0.09, v || 0.07, 1800, 0.2); osc('triangle', hz(n - 12), hz(n - 12), t, 0.12, (v || 0.07) * 1.6); };
+      let k = 0;
+      marks.forEach((m) => {
+        const g = M[m.id], kind = m.id.split('_')[1][0];
+        if (kind === 'c') {
+          // the hook card: a rising wobble, then a drum roll into the scene
+          riser(g.t, g.end - g.t, 0.3); boing(g.t + 0.2, 0.16);
+          for (let q = 0; q < 6; q++) snare(g.end - 0.5 + q * 0.085, 0.1 + q * 0.04);
+        } else if (kind === 'a') {
+          k++;
+          crash(g.t);
+          if (SER === 1) dogRiff(g.t, g.end, { lead: true, whistle: true, arp: k % 2 === 0, bpm: 150, tr: k === 4 ? 2 : 0 });
+          else if (SER === 2) billyRiff(g.t, g.end, { lead: true, harm: k > 1, arp: k === 3, heavy: k === 4, bpm: 138 });
+          else if (SER === 3) groove(g.t, g.end, k === 3 ? 'night' : 'day', { bpm: 138, arp: true, tr: [0, 2, 0, 5, 7][k - 1], half: k === 3 });
+          else if (SER === 4) dogRiff(g.t, g.end, { lead: true, whistle: k > 1, arp: k > 2, bpm: 128 + k * 14, tr: [0, 2, 4, 7][k - 1], crash: k === 4 });
+          else {
+            if (k === 1) { drone(g.t, g.end - g.t, 38, 0.04); for (let t = g.t; t < g.end; t += 0.5) pluck(t, [43, 46, 48, 46][Math.floor((t - g.t) / 0.5) % 4]); }
+            else dogRiff(g.t, g.end, { lead: true, arp: k === 3, bpm: 150, tr: k === 3 ? -2 : 0, heavy: true });
+          }
+        } else {
+          crash(g.t); boom(g.t);
+          const th = SER === 2 ? 40 : 60;
+          if (SER === 2 || SER === 5) billyRiff(g.t, g.end - 1.4, { lead: true, harm: true, arp: true, crash: true, bpm: 140 });
+          else dogRiff(g.t, g.end - 1.4, { lead: true, whistle: true, arp: true, crash: true, bpm: 150 });
+          const fc = g.end - 1.4;
+          for (const n of (SER === 2 || SER === 5) ? [40, 47, 52, 59, 64] : [55, 59, 62, 67, 43]) osc('square', hz(n), hz(n), fc, 1.3, 0.05, 2400, (n % 3 - 1) * 0.3);
+          crash(fc); kick(fc); if (SER === 2 || SER === 5) bleat(fc + 0.25, 0.4); else woof(fc + 0.25, 0.35);
+        }
+      });
+      for (const t of says.S) bleat(t, 0.16);
+      for (const t of says.G) bleat(t, 0.28);
+      for (const t of says.D) woof(t, 0.26);
+      for (const t of says.W) grumble(t);
+      for (const t of says.H) { chime(t); squeak(t + 0.12); }
+      for (const t of hits) ramHit(t);
+      for (const t of cracks) { glass(t); crash(t); }
+      for (const t of barks) woof(t, 0.22);
+      for (const t of skills) chime(t);
     } else {
     // ---- score ----
     let s = seg('cold'); drone(s.t, s.end - s.t + 0.3, 38, 0.05); for (let t = s.t + 0.3; t < s.end; t += 0.95) heart(t, 0.7); howl(s.t + 1.0);
@@ -260,7 +305,7 @@ const BILLY = process.argv[3] === 'billy', DOGS = process.argv[3] === 'dogs';
     for (let i = 0; i < n; i++) { dv.setInt16(o, Math.max(-1, Math.min(1, L[i])) * 32767, true); dv.setInt16(o + 2, Math.max(-1, Math.min(1, R[i])) * 32767, true); o += 4; }
     const blob = new Blob([ab], { type: 'audio/wav' });
     return await new Promise((res) => { const fr = new FileReader(); fr.onload = () => res(fr.result.split(',')[1]); fr.readAsDataURL(blob); });
-  }, { marks, total, hits, cracks, barks, skills, BILLY, DOGS });
+  }, { marks, total, hits, cracks, barks, skills, says, BILLY, DOGS, SER });
   fs.writeFileSync(path.join(OUT, 'trailer_audio.wav'), Buffer.from(b64, 'base64'));
   fs.writeFileSync(path.join(OUT, 'trailer_cut.json'), JSON.stringify({ start, total }));
   console.log('audio ok', total.toFixed(2), 's');

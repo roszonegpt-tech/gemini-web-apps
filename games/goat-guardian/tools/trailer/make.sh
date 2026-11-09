@@ -3,6 +3,9 @@
 #   tools/trailer/make.sh          -> build/trailer/get-em-billy-trailer.mp4   (~69 s, every mode)
 #   tools/trailer/make.sh billy    -> build/trailer-billy/billy-trailer.mp4    (~55 s, Billy + his theme)
 #   tools/trailer/make.sh dogs     -> build/trailer-dogs/dogs-trailer.mp4      (~60 s, the ten farm dogs + their theme)
+#   tools/trailer/make.sh s1 tiktok .. s5 tiktok   -> build/trailer-series-N-tiktok/ep-N-<mode>-tiktok.mp4  (the 5-episode TikTok series,
+#                                     ~25 s each: escort, defend, daily, endless, versus; funny speech bubbles)
+#   tools/trailer/make.sh series   -> all five episodes, portrait
 #   tools/trailer/make.sh billy tiktok | dogs tiktok | main tiktok
 #                                  -> build/trailer-billy-tiktok/billy-trailer-tiktok.mp4 (1080x1920 portrait, 9:16, 30 fps,
 #                                     H.264 + AAC; the game is recorded in a portrait window so the picture is laid out for it)
@@ -10,8 +13,10 @@ set -euo pipefail
 cd "$(dirname "$0")/../.."
 WHICH="${1:-main}"
 FMT="${2:-}"
+if [ "$WHICH" = "series" ]; then for n in 1 2 3 4 5; do "$0" "s$n" tiktok; done; exit 0; fi
 if [ "$WHICH" = "billy" ]; then OUT=build/trailer-billy; NAME=billy-trailer.mp4
 elif [ "$WHICH" = "dogs" ]; then OUT=build/trailer-dogs; NAME=dogs-trailer.mp4
+elif [[ "$WHICH" =~ ^s[1-5]$ ]]; then N="${WHICH:1}"; MODES=(x escort defend daily endless versus); OUT="build/trailer-series-$N"; NAME="ep-$N-${MODES[$N]}.mp4"
 else OUT=build/trailer; NAME=get-em-billy-trailer.mp4; fi
 EXTRA=""
 if [ "$FMT" = "tiktok" ]; then OUT="$OUT-tiktok"; NAME="${NAME%.mp4}-tiktok.mp4"; EXTRA="-profile:v high -level 4.2"; fi

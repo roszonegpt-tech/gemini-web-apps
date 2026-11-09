@@ -203,6 +203,8 @@ const { chromium } = require('playwright');
       for (let y = bt; y <= bb; y++) if (/[^.]\.+[^.]/.test(rows[y].slice(4).replace(/\.+$/, ''))) return false;
       return /S{3,}i/.test(rows[bt]);
     })) && /S{4,}i/.test(gu.art.E.idle[0][7]) && gu.art.W.idle[0][7] === [...gu.art.E.idle[0][7]].reverse().join('');
+    // 0.19.0: the TikTok trailer series: five episodes (one per mode), each a hook card, 3-5 action scenes with unique ids and a finale
+    out.series = Object.keys(SERIES).length === 5 && Object.keys(SERIES).every(n => { const l = SERIES[n]; return l[0].card && l[l.length - 1].finale && l[l.length - 1].end.ep === +n && new Set(l.map(s => s.id)).size === l.length && l.every(s => s.id.startsWith('e' + n + '_')) && l.length >= 5; });
     out.sanitize = JSON.stringify(normLabLook({ hat: 99, acc: [7, 'x', 1, 1], col: { hat: -2 }, coat: 'z' })) === JSON.stringify(normLabLook({ acc: [1] }));
     remapQ = -1; buildRemap(0.8); out.remap = LAB_EXTRA.size > 20 && [...LAB_EXTRA.keys()].every(k => remapTable.has(k)); remapQ = -1; buildRemap(dayProgress);
     const vis = (sp) => sprBox(sp).h;
@@ -248,7 +250,7 @@ const { chromium } = require('playwright');
   });
   if (!v9.ram || !v9.billyTheme || !v9.stompLocked || !v9.stompBought || !v9.splat || !v9.cracked) fail('billy ' + JSON.stringify(v9));
   if (v9.styleState !== 'STYLE' || !v9.styleSaved || v9.styleRows < 12 || v9.styleBack !== 'PLAYERS') fail('style ' + JSON.stringify(v9));
-  if (v9.goats !== 12 || v9.dogs !== 10 || !v9.sets || !v9.leftArt || !v9.items || !v9.sanitize || !v9.remap || !v9.backs || !v9.outline || !v9.views34 || !v9.goatBack || !v9.gait || !v9.sizes || !v9.grounded || !v9.peerjs || v9.locked || !v9.taller || !v9.boss || v9.gaitFlips) fail('breeds ' + JSON.stringify(v9));
+  if (v9.goats !== 12 || v9.dogs !== 10 || !v9.sets || !v9.leftArt || !v9.items || !v9.sanitize || !v9.remap || !v9.backs || !v9.outline || !v9.views34 || !v9.goatBack || !v9.series || !v9.gait || !v9.sizes || !v9.grounded || !v9.peerjs || v9.locked || !v9.taller || !v9.boss || v9.gaitFlips) fail('breeds ' + JSON.stringify(v9));
   if (v9.corgi !== 'stun' || v9.pyrenees !== 'flee' || !v9.carry || !v9.drop || v9.ratter !== 'launched' || !v9.sit) fail('dog skills ' + JSON.stringify(v9));
   const wasFs = await p.evaluate(() => isFs());
   await p.evaluate(() => exitFs());
