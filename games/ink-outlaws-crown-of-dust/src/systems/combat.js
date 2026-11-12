@@ -12,7 +12,7 @@ C.attack = function (M, u, ang, o) {
   o = o || {}; E.face(u, ang);
   const w = u.w, beast = u.def.bite != null;
   const act = o.act || (beast ? 'attack' : (w.kind === 'gun' || w.thrust) ? 'shoot' : 'attack');
-  if (w.kind === 'melee' || beast) { if (C.onScreen(M, u)) sfx(beast ? 'roar' === o.snd ? 'roar' : 'swing' : 'swing'); }
+  if (w.kind === 'melee' || beast) { if (C.onScreen(M, u)) sfx('swing'); }
   E.startOne(u, act, Object.assign({rate: beast ? 1 : w.rate, aimAng: ang}, o, {act: act}));
   u.cd = (beast ? 1.1 : w.cd) * (0.85 + Math.random() * 0.3);
   return true;
@@ -59,12 +59,14 @@ C.hurt = function (M, t, dmg, src, ang, push, o) {
   dmg = Math.max(1, Math.round(dmg * (0.88 + Math.random() * 0.24)));
   if (t.isStruct) {
     if (t.hp == null) return false; if (t.lock && t.lock(M)) { C.num(M, t.x, t.y, 30, 'LOCKED', false, U.PAPER3); return false; }
+    if (t.kind === 'hall') dmg = Math.max(1, Math.round(dmg * 0.5));
     t.hp -= dmg; t.hot = 0.12; C.num(M, t.x, t.y, (t.top || 30), String(dmg), false);
     M.fx.push({k: 'puff', x: t.x + (Math.random() - 0.5) * 10, y: t.y + 1, h: 10 + Math.random() * 14, t: 0, T: 0.25, r: 5});
     if (t.hp <= 0) CD.World.destroy(M, t, src); return true;
   }
   if (t.hero && M.god) return false;
   if (t.def.armor) dmg = Math.max(1, Math.round(dmg * (1 - t.def.armor)));
+  if (t.prisoner) dmg = Math.max(1, Math.round(dmg * 0.4));        // an escorted prisoner is hard to kill outright
   t.hp -= dmg; t.flash = 0.14;
   const k = (t.boss ? 0.15 : t.r > 9 ? 0.4 : 1) * (push || 0); t.kx += Math.cos(ang) * k; t.ky += Math.sin(ang) * k;
   if (o && o.stun && !t.boss) t.stun = Math.max(t.stun, o.stun);
@@ -104,12 +106,15 @@ C.heal = function (M, t, v) { if (t.dead || t.hp >= t.maxHp) return; t.hp = Math
 C.update = function (M, dt) {
   /* shots */
   for (const b of M.shots) {
-    b.x += b.vx * dt; b.y += b.vy * dt; b.life -= dt; if (b.life <= 0) { if (b.splash) C.boomlet(M, b); else M.fx.push({k: 'puff', x: b.x, y: b.y, h: b.h, t: 0, T: 0.2, r: 3}); continue; }
+    const px = b.x, py = b.y; b.x += b.vx * dt; b.y += b.vy * dt; b.life -= dt; if (b.drop) b.h = Math.max(12, b.h - b.drop * dt);
+    const sx = b.x - px, sy = b.y - py, sl = sx * sx + sy * sy || 1; if (b.life <= 0) { if (b.splash) C.boomlet(M, b); else M.fx.push({k: 'puff', x: b.x, y: b.y, h: b.h, t: 0, T: 0.2, r: 3}); continue; }
     if (CD.World.shotBlocked(M, b.x, b.y)) { b.life = -1; if (b.splash) C.boomlet(M, b); else M.fx.push({k: 'puff', x: b.x, y: b.y, h: b.h, t: 0, T: 0.2, r: 3.5}); continue; }
     let stop = false;
     C.each(M, b.team, t => {
       if (stop || (b.hitIds && b.hitIds.has(t.id))) return; const rr = t.r + (b.orb ? 4 : 2.5);
-      if (Math.abs(t.x - b.x) > rr || Math.abs(t.y - b.y) > rr) return; if (t.isStruct && t.low) return;
+      const k = U.clamp(((t.x - px) * sx + (t.y - py) * sy) / sl, 0, 1), qx = px + sx * k - t.x, qy = py + sy * k - t.y;   // swept test: fast shots cannot skip through thin targets
+      if (t.isStruct) { if (t.low || Math.abs(qx) > t.hw + 2 || Math.abs(qy) > t.hh + 2) return; }
+      else if (qx * qx + qy * qy > rr * rr) return;
       if (b.splash) { stop = true; return; }
       if (!C.hurt(M, t, b.dmg, b.src, Math.atan2(b.vy, b.vx), b.push)) return;
       if (b.pierce > 0) { b.pierce--; (b.hitIds || (b.hitIds = new Set())).add(t.id); } else stop = true;

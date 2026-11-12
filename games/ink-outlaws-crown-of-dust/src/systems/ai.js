@@ -19,8 +19,11 @@ function seek(M, u, tx, ty, speed, dt) {
       gx = a.path[a.pi][0]; gy = a.path[a.pi][1]; a.stuck = 0;
     } else a.stuck = (a.stuck || 0) + dt;
   } else { a.path = null; a.stuck = 0; }
-  const dx = gx - u.x, dy = gy - u.y, d = Math.hypot(dx, dy) || 1;
-  return E.move(M, u, dx / d, dy / d, speed, dt);
+  let dx = gx - u.x, dy = gy - u.y; const d = Math.hypot(dx, dy) || 1; dx /= d; dy /= d;
+  if (a.side) { a.sideT -= dt; const c = 0.34, s = 0.94 * a.side, x = dx * c - dy * s; dy = dx * s + dy * c; dx = x; if (a.sideT <= 0) a.side = 0; }   // jammed on a rock or a friend: step round it
+  const moved = E.move(M, u, dx, dy, speed, dt);
+  if (moved < speed * dt * 0.3) { a.jam = (a.jam || 0) + dt; if (a.jam > 0.25 && !a.side) { a.side = Math.random() < 0.5 ? 1 : -1; a.sideT = 0.45; a.jam = 0; } } else a.jam = 0;
+  return moved;
 }
 AI.seek = seek;
 function reachOf(u) { return u.def.bite != null ? u.r + 13 * u.mult : (u.def.reach || u.w.reach) * (u.mult > 1 ? u.mult : 1); }
@@ -50,7 +53,7 @@ function fight(M, u, t, dt, leash) {
 }
 function nearest(M, u, team, maxD, from, fromR, structs) {
   let best = null, bd = maxD;
-  for (const t of M.units) { if (t.team !== team || t.dead || t.caged || t.dormant || t.def.ai === 'pet') continue; const d = dist(u, t); if (d < bd && (!from || Math.hypot(t.x - from[0], t.y - from[1]) < fromR)) { bd = d; best = t; } }
+  for (const t of M.units) { if (t.team !== team || t.dead || t.caged || t.dormant || t.def.ai === 'pet') continue; const d = dist(u, t) * (t.prisoner ? 2.2 : 1); if (d < bd && (!from || Math.hypot(t.x - from[0], t.y - from[1]) < fromR)) { bd = d; best = t; } }
   if (!best && structs) for (const s of M.structs) { if (s.team !== team || s.gone || s.hp == null || (s.lock && s.lock(M))) continue; const d = dist(u, s); if (d < bd && (!from || Math.hypot(s.x - from[0], s.y - from[1]) < fromR)) { bd = d; best = s; } }
   return best;
 }
@@ -79,7 +82,7 @@ function enemy(M, u, dt) {
     a.sp = (a.sp == null ? 4 + Math.random() * 4 : a.sp) - dt;
     if (a.sp <= 0) {
       a.sp = u.boss ? 7 : 10;
-      if (d.summon && M.enemyCount() < 40) { E.startOne(u, 'dance3', {rate: 1.6}); for (let i = 0; i < (u.boss ? 3 : 2); i++) { const n = E.spawn(M, d.summon, 1, u.x + (Math.random() - 0.5) * 50, u.y + (Math.random() - 0.5) * 40); n.ai.hate = t; n.ai.alert = true; M.fx.push({k: 'ring', x: n.x, y: n.y, t: 0, T: 0.35, r: 14, col: '#6fd08a'}); } CD.Sfx.play('magic'); return; }
+      if (d.summon && M.enemyCount() < 40 && (a.sumN = (a.sumN || 0) + 1) <= (u.boss ? 5 : 3)) { E.startOne(u, 'dance3', {rate: 1.6}); for (let i = 0; i < (u.boss ? 3 : 2); i++) { const n = E.spawn(M, d.summon, 1, u.x + (Math.random() - 0.5) * 50, u.y + (Math.random() - 0.5) * 40); n.ai.hate = t; n.ai.alert = true; M.fx.push({k: 'ring', x: n.x, y: n.y, t: 0, T: 0.35, r: 14, col: '#6fd08a'}); } CD.Sfx.play('magic'); return; }
       if (d.nova && dist(u, t) < 170) { E.startOne(u, 'dance2', {rate: 1.4}); for (let i = 0; i < 12; i++) { const an = i / 12 * 6.283; M.shots.push({x: u.x, y: u.y, h: 18, vx: Math.cos(an) * 120, vy: Math.sin(an) * 120, life: 1.5, dmg: 12 * u.dmg, team: 1, src: u, orb: '#e0435a', splash: 14, push: 60}); } CD.Sfx.play('magic'); return; }
       if (d.heals) { let low = null; for (const o of M.units) if (o.team === 1 && !o.dead && o.hp < o.maxHp * 0.8 && dist(o, u) < 140 && (!low || o.hp / o.maxHp < low.hp / low.maxHp)) low = o; if (low) { E.startOne(u, 'shoot', {fire: false}); C.heal(M, low, low.maxHp * 0.3); CD.Sfx.play('heal'); return; } a.sp = 3; }
     }

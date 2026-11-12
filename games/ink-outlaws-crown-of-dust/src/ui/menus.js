@@ -94,10 +94,9 @@ UI.launch = function (t, spec, raid) {
   CD.go('mission');
 };
 UI.afterMission = function (t, spec, res, raid) {
-  const G = CD.G; CD.go('map'); CD.Map.invalidate();
-  let out = null;
+  const G = CD.G; let out = null;
   if (raid) { G.missions++; G.kills += res.kills; G.gold += res.gold; out = K.resolveRaid(raid, res.win); } else K.applyAttack(t, res);
-  K.save(); CD.Map.invalidate(); UI.mapStat();
+  K.save(); CD.Map.invalidate(); CD.go('map');
   const m = modal(res.win ? 'Victory' : 'Defeat', 'big');
   mk('p', null, res.win ? (raid ? t.name + ' holds.' : t.name + ' is yours.') : (res.why || 'The day is lost.'), m.p);
   stat(m.p, 'Gold', '+' + res.gold); stat(m.p, 'Enemies down', String(res.kills)); stat(m.p, 'Time', Math.floor(res.time / 60) + ':' + String(Math.floor(res.time % 60)).padStart(2, '0'));

@@ -17,7 +17,7 @@ W.BIOME = {
 /* gameplay shape of each structure: half footprint (ground units), health, height of its top for numbers */
 const SD = W.SD = {
   tent: {hw: 16, hh: 8, hp: 70, top: 36, spawner: true}, bigtent: {hw: 24, hh: 11, hp: 150, top: 46, spawner: true}, shack: {hw: 15, hh: 8, hp: 80, top: 46, spawner: true},
-  house: {hw: 28, hh: 10, hp: null, top: 60}, hall: {hw: 40, hh: 12, hp: 520, top: 80}, keep: {hw: 46, hh: 13, hp: null, top: 110},
+  house: {hw: 28, hh: 10, hp: null, top: 60}, hall: {hw: 40, hh: 12, hp: 900, top: 80}, keep: {hw: 46, hh: 13, hp: null, top: 110},
   tower: {hw: 9, hh: 5, hp: 130, top: 86, shoot: {range: 200, cd: 1.8, dmg: 9, arrow: true, h: 62, speed: 240}}, guntower: {hw: 10, hh: 6, hp: 180, top: 40, shoot: {range: 185, cd: 0.75, dmg: 8, h: 32, speed: 320}},
   barricade: {hw: 17, hh: 4, hp: 150, top: 24, low: true}, totem: {hw: 5, hh: 4, hp: 170, top: 72}, cage: {hw: 13, hh: 8, hp: 70, top: 38},
   chest: {hw: 7, hh: 4, hp: null, top: 12, use: 'chest'}, crate: {hw: 7, hh: 5, hp: 12, top: 14, team: 3, loot: 0.5}, barrel: {hw: 5, hh: 4, hp: 12, top: 16, team: 3, loot: 0.3},
@@ -55,7 +55,7 @@ W.resolve = function (M, u) {
 W.shotBlocked = function (M, x, y) {
   if (x < -20 || y < -20 || x > M.W + 20 || y > M.H + 20) return true;
   const list = M.buckets[Math.floor(x / BK) + Math.floor(y / BK) * 1000]; if (!list) return false;
-  for (const c of list) if (c.wall && !c.gone && Math.abs(x - c.x) < c.hw && Math.abs(y - c.y) < c.hh) return true;
+  for (const c of list) if (c.wall && !c.gone && !(c.s && c.s.hp != null) && Math.abs(x - c.x) < c.hw && Math.abs(y - c.y) < c.hh) return true;   // things with health take the hit instead
   return false;
 };
 const blocked = (M, x, y) => { const cx = Math.floor(x / NC), cy = Math.floor(y / NC); return cx < 0 || cy < 0 || cx >= M.nx || cy >= M.ny || M.block[cx + cy * M.nx] === 1; };
@@ -77,7 +77,7 @@ W.path = function (M, x0, y0, x1, y1) {
   const h = (x, y) => { const dx = Math.abs(x - gx), dy = Math.abs(y - gy); return (dx + dy) + (1.414 - 2) * Math.min(dx, dy); };
   const s = sx + sy * nx, g = gx + gy * nx; St[s] = stamp; G[s] = 0; From[s] = -1; push(s, h(sx, sy));
   let it = 0, found = false;
-  while (heap.length && it++ < 2600) {
+  while (heap.length && it++ < 9000) {
     const cur = pop(); if (cur === g) { found = true; break; }
     const cx = cur % nx, cy = (cur - cx) / nx, cg = G[cur];
     for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
@@ -98,7 +98,7 @@ W.addStruct = function (M, kind, x, y, o) {
   const s = Object.assign({id: sid++, isStruct: true, kind: kind, art: kind, x: x, y: y, hw: d.hw, hh: d.hh, r: Math.max(d.hw, d.hh) * 0.8, hp: d.hp, maxHp: d.hp, top: d.top, team: d.team != null ? d.team : 2, v: 0, pal: M.pal, low: d.low, hot: 0, t: Math.random() * 3, cd: 1}, o || {});
   if (s.hp != null && s.team === 1) { s.hp = s.maxHp = Math.round(s.hp * M.hpScale); }
   M.structs.push(s);
-  if (!d.nosolid) { s.col = {x: x, y: y, hw: d.hw, hh: d.hh, s: s, wall: !d.low && d.hw > 6, nonav: kind === 'crate' || kind === 'barrel' || kind === 'keg' || kind === 'chest'}; M.cols.push(s.col); if (M.ready) W.rebuild(M); }
+  if (!d.nosolid) { s.col = {x: x, y: y, hw: d.hw, hh: d.hh, s: s, wall: !d.low && d.hw > 6}; M.cols.push(s.col); if (M.ready) W.rebuild(M); }
   return s;
 };
 W.destroy = function (M, s, src) {
@@ -132,7 +132,7 @@ W.updateStructs = function (M, dt) {
     if (s.kind === 'keg' && s.armed) { for (const u of M.units) if (u.team === 1 && !u.dead && Math.hypot(u.x - s.x, u.y - s.y) < 20) { W.destroy(M, s, hero); break; } }
     if (s.spawn && s.team === 1 && hero && !hero.dead) {         // spawner tents wake when the hero is near or the camp is alarmed
       const sp = s.spawn, near = Math.hypot(hero.x - s.x, hero.y - s.y) < sp.wake || M.alarm;
-      if (near) { sp.t -= dt; sp.kids = sp.kids.filter(k => !k.dead); if (sp.t <= 0 && sp.kids.length < sp.cap && M.enemyCount() < 46) { sp.t = sp.every; const id = U.pick(sp.pool, M.rng), n = E.spawn(M, id, 1, s.x + (M.rng() - 0.5) * 10, s.y + s.hh + 8); n.ai.hate = hero; n.ai.alert = true; sp.kids.push(n);
+      if (near) { sp.t -= dt; sp.kids = sp.kids.filter(k => !k.dead); if (sp.t <= 0 && sp.left > 0 && sp.kids.length < sp.cap && M.enemyCount() < 46) { sp.t = sp.every; sp.left--; const id = U.pick(sp.pool, M.rng), n = E.spawn(M, id, 1, s.x + (M.rng() - 0.5) * 10, s.y + s.hh + 8); n.ai.hate = hero; n.ai.alert = true; sp.kids.push(n);
         M.fx.push({k: 'puff', x: n.x, y: n.y, h: 8, t: 0, T: 0.3, r: 7}); } }
     }
   }
@@ -173,7 +173,7 @@ function paintGround(M, rng, roads) {
 /* ================= generation ================= */
 function prop(M, kind, x, y, v, pal) {
   const p = {kind: kind, x: x, y: y, v: v || 0, pal: pal}; M.props.push(p);
-  const r = SOLIDR[kind]; if (r) M.cols.push({x: x, y: y, hw: r, hh: r * 0.7, nonav: r < 5});
+  const r = SOLIDR[kind]; if (r) M.cols.push({x: x, y: y, hw: r, hh: r * 0.7});
   return p;
 }
 function wall(M, x0, y0, x1, y1, kind, rng) {                // straight run of stakes or stone blocks with one collider
@@ -207,7 +207,7 @@ function group(M, x, y, n, o) { const out = []; for (let i = 0; i < n; i++) { co
 W.group = group;
 function spawnerTent(M, x, y, big) {
   const kind = M.spec.faction === 'corsair' ? (big ? 'bigtent' : 'shack') : big ? 'bigtent' : 'tent';
-  const s = W.addStruct(M, kind, x, y, {team: 1, v: Math.floor(M.rng() * 4)}); s.spawn = {every: Math.max(4.5, 9 - M.tier * 0.7) * (big ? 0.8 : 1), t: 2 + M.rng() * 3, cap: big ? 4 : 3, kids: [], wake: 230, pool: M.tier >= 3 ? M.F.grunts.concat(M.F.mid) : M.F.grunts};
+  const s = W.addStruct(M, kind, x, y, {team: 1, v: Math.floor(M.rng() * 4)}); s.spawn = {every: Math.max(4.5, 9 - M.tier * 0.7) * (big ? 0.8 : 1), t: 2 + M.rng() * 3, cap: big ? 4 : 3, left: (big ? 7 : 5) + M.tier, kids: [], wake: 230, pool: M.tier >= 3 ? M.F.grunts.concat(M.F.mid) : M.F.grunts};
   M.tents.push(s); return s;
 }
 function outpost(M, x, y, n) {
@@ -276,15 +276,20 @@ W.build = function (M, spec) {
     for (const r of roads) for (let i = 0; i < r.length - 1; i++) { const n = Math.ceil(Math.hypot(r[i + 1][0] - r[i][0], r[i + 1][1] - r[i][1]) / 40); for (let k = 0; k <= n; k++) M.clear.push([r[i][0] + (r[i + 1][0] - r[i][0]) * k / n, r[i][1] + (r[i + 1][1] - r[i][1]) * k / n, 26, 0]); }
     camp(M, ccx, cy, hw, hh, {gw: gw, gs: T === 'raid' || big ? -30 : null, tents: T === 'raid' ? Math.min(4, 2 + Math.floor(M.tier / 2)) : big ? 3 : T === 'rescue' ? 2 : 2, big: M.tier >= 3});
     outpost(M, o1[0], o1[1], 2 + Math.ceil(M.tier / 2)); if (M.tier >= 2 || T !== 'raid') outpost(M, o2[0], o2[1], 3 + Math.ceil(M.tier / 2));
+    if (spec.prisoner) {                                      // a caged outlaw: the whole point of a rescue, a bonus anywhere else
+      const at = T === 'rescue' ? [ccx + 20, cy - 10] : [ccx - 36, cy + hh - 46]; M.cage = W.addStruct(M, 'cage', at[0], at[1], {team: 1});
+      const p = E.spawn(M, spec.prisoner, 0, at[0], at[1] - 2, {caged: true, dir: 'S'}); p.prisoner = true; M.prisoner = p;
+    }
     stake(M, 170, cy - 46); stake(M, 430, cy + gw * 0.5 + 44); stake(M, ccx - hw - 56, cy + gw - 50); stake(M, ccx - hw - 56, cy + gw + 50);
     if (T === 'raid') {
       M.totem = W.addStruct(M, 'totem', ccx + 54, cy - 6, {team: 1, lock: m => m.tents.some(t => !t.gone && t.inCamp)}); M.tents.forEach(t => { if (Math.abs(t.x - ccx) < hw && Math.abs(t.y - cy) < hh) t.inCamp = true; });
       const chief = E.spawn(M, roster(M, M.tier >= 2 ? 'elite' : 'heavy'), 1, ccx + 30, cy + 14); chief.elite = true; chief.ai.home = [ccx + 30, cy + 14]; M.chief = chief;
     } else if (T === 'rescue') {
-      M.cage = W.addStruct(M, 'cage', ccx + 20, cy - 10, {team: 1}); const p = E.spawn(M, spec.prisoner || 'kit', 0, ccx + 20, cy - 12, {caged: true, dir: 'S'}); p.prisoner = true; M.prisoner = p;
       group(M, ccx + 20, cy + 30, 2, {kind: M.tier >= 3 ? 'heavy' : null});
     } else if (T === 'heist') {
       M.boxes = []; [[-hw + 40, -hh + 60], [hw - 40, 0], [-10, hh - 30]].forEach(p => { const b = {k: 'box', x: ccx + p[0], y: cy + p[1], v: 1, t: 0, z: 0, vz: 0, fixed: true}; M.pickups.push(b); M.boxes.push(b); });
+      const near = o => M.boxes.some(b => Math.hypot(b.x - o.x, b.y - o.y) < 30) && !(SD[o.kind] || {}).spawner && o.kind !== 'tower';   // keep every strongbox reachable
+      M.structs = M.structs.filter(o => !near(o)); M.cols = M.cols.filter(c => !(c.s && near(c.s)));
       M.wagon = W.addStruct(M, 'wagon', start[0] + 6, start[1] - 40, {pal: 'outlaw'}); group(M, ccx, cy, 2, {kind: 'heavy'});
     } else if (big) {
       W.addStruct(M, 'keep', ccx + 60, cy - hh + 40, {}); const b = E.spawn(M, spec.boss || M.F.boss, 1, ccx + 60, cy - 20); b.ai.home = [ccx + 60, cy - 20]; b.ai.asleep = true; M.boss = b; M.bosses = [b];

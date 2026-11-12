@@ -19,9 +19,11 @@ MS.start = function (spec, onEnd) {
   h.hero = true; h.baseLook = def.look; h.weapons = (hs.weapons && hs.weapons.length ? hs.weapons : [def.weapon]).slice(0, 2); h.wi = 0; h.mount = hs.mount || null;
   h.maxHp = h.hp = Math.round(def.hp * (1 + 0.15 * (spec.perk.doc || 0)) * 1.15); h.dmg = 1 + 0.12 * (spec.perk.smithy || 0); h.spd = h.mount ? 58 : 46; h.r = h.mount ? 9 : 6;
   h.rollCd = 0; h.spCd = 2; h.chain = 0; h.chainT = -9; h.dir = spec.type === 'defend' ? 'S' : 'E'; h.aim = E.ang(h.dir); M.hero = h; heroLook(h);
-  (spec.posse || []).forEach((id, i) => { const a = i / Math.max(1, spec.posse.length) * 6.283, p = E.spawn(M, id, 0, h.x - 18 + Math.cos(a) * 22, h.y + Math.sin(a) * 18); p.slot = i; p.dmg = 0.8 + 0.1 * (spec.perk.smithy || 0); p.maxHp = p.hp = Math.round(p.maxHp * (1 + 0.1 * (spec.perk.doc || 0))); p.dir = h.dir; M.posse.push(p); });
+  (spec.posse || []).forEach((id, i) => { const a = i / Math.max(1, spec.posse.length) * 6.283, p = E.spawn(M, id, 0, h.x - 18 + Math.cos(a) * 22, h.y + Math.sin(a) * 18); p.slot = i; p.dmg = 0.8 + 0.1 * (spec.perk.smithy || 0); p.maxHp = p.hp = Math.round(p.maxHp * 1.5 * (1 + 0.1 * (spec.perk.doc || 0))); p.dir = h.dir; M.posse.push(p); });
   M.onKill = (t) => { if (t.team === 0 && !t.hero && !t.prisoner && M.posse.indexOf(t) >= 0) { M.lost.push(t.def.id); M.banner(t.name + ' is down!', 1.6); } if (t.prisoner) end(M, false, t.name + ' did not make it.'); };
-  M.onStruct = (s) => { if (s === M.cage && M.prisoner) { M.prisoner.caged = false; M.stage = 1; M.alarm = true; M.banner(M.prisoner.name + ' is free! Get back to the trail.', 3); CD.Sfx.play('horn'); reinforce(M, 2 + M.tier); }
+  M.onStruct = (s) => { if (s === M.cage && M.prisoner) { const p = M.prisoner; p.caged = false; CD.Sfx.play('horn');
+      if (spec.type === 'rescue') { M.stage = 1; M.alarm = true; M.banner(p.name + ' is free! Get back to the trail.', 3); reinforce(M, 2 + M.tier); }
+      else { p.prisoner = false; p.slot = M.posse.length; p.hp = p.maxHp; M.banner(p.name + ' is free and fighting!', 2.4); } }
     if (s === M.hall) end(M, false, 'The town hall has fallen.'); };
   if (spec.type === 'defend') M.waves = {i: 0, n: 3 + Math.ceil(M.tier / 2), t: 7, live: false};
   /* paint ahead: the hero completely, everyone else standing and moving */
@@ -55,6 +57,7 @@ function mouseWorld(M) { const V = CD.View, s = M.view.S; return [M.cam.x + (I.m
 function autoAim(M, h, ang, range, cone) {
   let best = null, bs = 1e9;
   C.each(M, 0, t => { if (t.isStruct && t.team === 3) return; if (t.dormant) return; if (t.isStruct && t.lock && t.lock(M)) return; const dx = t.x - h.x, dy = t.y - h.y, d = Math.hypot(dx, dy) - t.r; if (d > range) return; const da = Math.abs(U.angDiff(Math.atan2(dy, dx), ang)); if (da > cone && d > 14) return; const sc = d + da * 60 + (t.isStruct ? 40 : 0); if (sc < bs) { bs = sc; best = t; } });
+  if (!best && cone < 3) return autoAim(M, h, ang, Math.min(range, 80), 3.2);     // nothing ahead: turn on whoever is closest
   return best;
 }
 function heroAttack(M, h, ax) {
@@ -142,9 +145,9 @@ function waves(M, dt) {
   const alive = M.enemyCount();
   if (w.live && alive <= 0) { w.live = false; w.t = 6; if (w.i >= w.n) return end(M, true); M.banner('Wave ' + w.i + ' beaten', 1.6); M.scrip += 6; }
   if (!w.live || (w.t2 -= dt) <= 0) { w.t -= dt; if (w.t <= 0 && w.i < w.n) {
-    w.i++; w.live = true; w.t2 = 45; w.t = 0; const last = w.i === w.n, n = 3 + M.tier + w.i * 2, ed = U.shuffle(M.edges.slice(), M.rng);
+    w.i++; w.live = true; w.t2 = 45; w.t = 0; const last = w.i === w.n, n = 3 + M.tier + w.i, ed = U.shuffle(M.edges.slice(), M.rng);
     for (let k = 0; k < (w.i > 2 ? 3 : 2); k++) reinforce(M, Math.ceil(n / (w.i > 2 ? 3 : 2)), ed[k]);
-    if (last) { const b = reinforce(M, 1, ed[0])[0]; const id = W.roster(M, M.tier >= 2 ? 'elite' : 'heavy'); b.dead = true; b.deadT = 9; const e2 = E.spawn(M, id, 1, ed[0][0], ed[0][1]); e2.ai.march = true; e2.elite = true; }
+    if (last) { const e2 = E.spawn(M, W.roster(M, M.tier >= 2 ? 'elite' : 'heavy'), 1, ed[0][0], ed[0][1]); e2.ai.march = true; e2.ai.alert = true; e2.elite = true; }
     M.banner(last ? 'Final wave!' : 'Wave ' + w.i + ' of ' + w.n, 2); CD.Sfx.play('horn'); } }
 }
 MS.objective = function (M) {
@@ -167,8 +170,8 @@ function objective(M, dt) {
     else if (h.downT > 1.2) end(M, false, 'You went down.'); }
 }
 function finish(M) {
-  const win = M.over.win, sp = M.spec, gold = win ? (sp.reward || 0) + M.loot + Math.floor(M.scrip / 2) : Math.floor(M.loot / 2);
-  const res = {win: win, why: M.over.why, gold: gold, loot: M.loot, scrip: M.scrip, kills: M.kills, time: M.t, lost: M.lost, freed: win && sp.type === 'rescue' ? sp.prisoner : null};
+  const win = M.over.win, sp = M.spec, gold = win ? (sp.reward || 0) + M.loot + Math.min(25, Math.floor(M.scrip / 3)) : Math.floor(M.loot / 2);
+  const res = {win: win, why: M.over.why, gold: gold, loot: M.loot, scrip: M.scrip, kills: M.kills, time: M.t, lost: M.lost, freed: win && M.prisoner && !M.prisoner.dead && !M.prisoner.caged ? sp.prisoner : null};
   CD.M = null; I.reset(); M.onEnd(res);
 }
 function camera(M, dt) {

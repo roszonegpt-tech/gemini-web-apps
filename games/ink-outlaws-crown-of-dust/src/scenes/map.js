@@ -35,7 +35,7 @@ CD.scenes.title = {
 const MP = CD.Map = {sel: null, bg: null, dirty: true, t: 0, MH: 250};
 const OWNC = f => D.factions[f].color;
 function mapLayout() {
-  const V = CD.View, top = 50, pad = 8; MP.px = (V.h - top - pad) / MP.MH; MP.MW = (V.w - pad * 2) / MP.px;
+  const V = CD.View, bar = document.getElementById('mapBar'), top = (bar ? bar.getBoundingClientRect().height : 44) + 6, pad = 8; MP.px = (V.h - top - pad) / MP.MH; MP.MW = (V.w - pad * 2) / MP.px;
   if (MP.MW < 250) { MP.px = (V.w - pad * 2) / 250; MP.MW = 250; MP.MHv = (V.h - top - pad) / MP.px; } else MP.MHv = MP.MH;
   MP.ox = pad; MP.oy = top; MP.dirty = true;
 }
@@ -71,7 +71,7 @@ function mapBuild() {
 }
 MP.select = function (id) { MP.sel = id; CD.UI.mapInfo(D.terrById[id]); };
 CD.scenes.map = {
-  enter: arg => { mapLayout(); MP.sel = MP.sel || CD.G.at || 'gulch'; CD.UI.mapChrome(arg); CD.UI.mapInfo(D.terrById[MP.sel]); const hd = D.units[CD.G.hero]; S.warm(E_look(hd), ['idle'], 1, ['S']); },
+  enter: arg => { MP.sel = MP.sel || CD.G.at || 'gulch'; CD.UI.mapChrome(arg); mapLayout(); CD.UI.mapInfo(D.terrById[MP.sel]); const hd = D.units[CD.G.hero]; S.warm(E_look(hd), ['idle'], 1, ['S']); },
   leave: () => {},
   resize: mapLayout,
   update: dt => {
