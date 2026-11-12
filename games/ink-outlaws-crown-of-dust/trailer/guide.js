@@ -26,9 +26,15 @@ film.innerHTML = '<div id="fChap"></div><div id="fKeys"></div><div id="fRing"><b
 const VO = [], CAPS = [], CHAPS = [];
 let DUR = {};
 function chunks(text, max) {                                  // caption chunks: split at sentence and clause ends, then by length
-  const parts = text.match(/[^.!?:]+[.!?:]?\s*/g).map(s => s.trim()).filter(Boolean), out = [];
-  for (const p of parts) { if (p.length <= max) { out.push(p); continue; }
-    const words = p.split(' '); let line = ''; for (const w of words) { if ((line + ' ' + w).trim().length > max && line) { out.push(line.trim()); line = w; } else line += ' ' + w; } if (line.trim()) out.push(line.trim()); }
+  const parts = text.replace(/\b([A-Z])\. /g, '$1\u2024 ').match(/[^.!?:]+[.!?:]?\s*/g).map(s => s.trim().replace(/\u2024/g, '.')).filter(Boolean), out = [];   // keep 'T. rex' together
+  const split = p => {                                         // too long: break at the comma nearest the middle, else at the space nearest it
+    if (p.length <= max) return [p]; const mid = p.length / 2; let best = -1;
+    for (let i = p.indexOf(', '); i >= 0; i = p.indexOf(', ', i + 1)) if (best < 0 || Math.abs(i - mid) < Math.abs(best - mid)) best = i;
+    let at = best >= 0 && Math.abs(best - mid) < p.length * 0.3 ? best + 1 : -1;
+    if (at < 0) { for (let i = p.indexOf(' '); i >= 0; i = p.indexOf(' ', i + 1)) if (at < 0 || Math.abs(i - mid) < Math.abs(at - mid)) at = i; }
+    return split(p.slice(0, at).trim()).concat(split(p.slice(at).trim()));
+  };
+  for (const p of parts) out.push(...split(p));
   const merged = []; for (const c of out) { const last = merged[merged.length - 1]; if (last && (last + ' ' + c).length <= max && last.length < max * 0.45) merged[merged.length - 1] = last + ' ' + c; else merged.push(c); }
   return merged;
 }
@@ -148,7 +154,7 @@ if (!TT) {
   b(Object.assign({vo: 'y08', chapter: 'The goal'}, S.storyMap()));
   /* 4 Riding out */
   b({vo: 'y09', chapter: 'Riding out', enter: () => { CD.UI.hide(); mapChrome('gulch'); }, paint: paintMap, point: () => ['#mapStat', 'Day, gold and land']});
-  b({vo: 'y10', enter: () => { CD.UI.hide(); mapChrome('ford'); }, paint: paintMap, tick: (t, cur) => { if (t > 3.1 && !cur.brief) { cur.brief = 1; CD.UI.brief(D.terrById.ford, K.specFor(D.terrById.ford)); } },
+  b({vo: 'y10', enter: () => { CD.UI.hide(); mapChrome('rise'); }, paint: paintMap, tick: (t, cur) => { if (t > 3.1 && !cur.brief) { cur.brief = 1; CD.UI.brief(D.terrById.rise, K.specFor(D.terrById.rise)); } },
     point: t => t < 3.1 ? ['#mapInfo', 'Job, danger and bounty'] : ['.modal .b.alt', 'Ride out']});
   /* 5 Controls */
   b({vo: 'y11', chapter: 'Controls', set: () => arena({hero: 'harrow', faction: 'corsair', biome: 'desert', seed: 81}), act: (M, t) => { const a = t * 1.3; stick(Math.cos(a), Math.sin(a) * 0.8); }, cam: cam(260, 30),
@@ -205,7 +211,7 @@ if (!TT) {
   b(Object.assign({vo: 't01', span: 4}, S.totems()));
   b(Object.assign({}, S.snig())); b(Object.assign({}, S.vex())); b(Object.assign({}, S.odo()));
   b(Object.assign({vo: 't02'}, S.town()));
-  b({vo: 't03', enter: () => { CD.UI.hide(); mapChrome('ford'); }, paint: paintMap, tick: (t, cur) => { if (t > 1.6 && !cur.brief) { cur.brief = 1; CD.UI.brief(D.terrById.ford, K.specFor(D.terrById.ford)); } }});
+  b({vo: 't03', enter: () => { CD.UI.hide(); mapChrome('rise'); }, paint: paintMap, tick: (t, cur) => { if (t > 1.6 && !cur.brief) { cur.brief = 1; CD.UI.brief(D.terrById.rise, K.specFor(D.terrById.rise)); } }});
   b(Object.assign({vo: 't04', span: 4}, S.tent())); b(Object.assign({}, S.cage())); b(Object.assign({}, S.heist())); b(Object.assign({}, S.defend()));
   b(Object.assign({vo: 't05', point: t => t < 2 ? ['#stick', 'Move'] : ['#bAtk', 'Attack']}, S.combo(), {act: (M, t) => { hold(1); stick(Math.sin(t * 2) * 0.3, 0); }}));
   b(Object.assign({vo: 't06', span: 2, point: () => ['#bRoll', 'Roll']}, S.roll()));
