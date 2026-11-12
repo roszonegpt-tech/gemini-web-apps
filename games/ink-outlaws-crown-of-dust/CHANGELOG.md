@@ -4,6 +4,8 @@ All notable changes to this project. The format follows Keep a Changelog; versio
 
 ## [Unreleased]
 ### Added
+- Narrated "Story and How to Play" guide: `trailer/guide.js`, `guide.html` and `guide_script.json`, and `build/make_vo.py` (Piper TTS). `tests/render_trailer.cjs --film guide` renders YouTube and TikTok cuts with burned-in captions, an `.srt` and chapters.
+- The trailer engine is split into `trailer/director.js`, shared by the trailer and the guide.
 - Gameplay trailer: `trailer/` director (48 shots, 58 s, cut on a 120 BPM beat) and `tests/render_trailer.cjs`, which renders a YouTube cut (1920×1080) and a TikTok cut (1080×1920) frame by frame with an offline soundtrack.
 - Trailer hooks: `spec.noHud`, `spec.skipWarm`, `spec.noEnd`, `spec.bgS`, `M.camLock`, `Sprites.lockScale`, `CD.Sfx.onPlay` / `renderInto`, and `unit.scripted`. Normal play is unchanged.
 ### Fixed

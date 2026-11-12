@@ -117,3 +117,5 @@ header.top .sp{flex:1}
 @media (pointer:coarse) and (max-height:520px){#hBottom{bottom:auto;top:6px;left:50%;right:auto;transform:translateX(-50%)}#hPosse{display:none}#hOrders .b{min-height:28px;padding:2px 7px;font-size:11px}
   #hObj{padding-top:36px;font-size:12px}#stick{flex-basis:108px;width:108px;height:108px}#btns{grid-template-columns:repeat(3,56px);grid-auto-rows:38px}#hPrompt,#hBuild{bottom:130px}#hMap{width:96px;height:61px}#hBoss{top:62px}}
 @media (max-width:520px) and (orientation:portrait){#mapInfo{width:auto;left:8px;right:8px;bottom:8px}#mapInfo p{margin:2px 0}}
+/* body.touchsim: the touch layout on a non-touch screen (used when filming the guide) */
+body.touchsim #pad{display:flex}body.touchsim #hBottom{bottom:142px}body.touchsim #hPrompt,body.touchsim #hBuild{bottom:210px}body.touchsim #hOrders .b{min-height:36px}

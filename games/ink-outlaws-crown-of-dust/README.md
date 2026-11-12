@@ -71,6 +71,20 @@ A 58-second gameplay trailer is filmed from the engine itself by `trailer/traile
 
 The render needs Playwright with Chromium, and `ffmpeg` with libx264.
 
+## Story and How to Play (narrated guide)
+
+`trailer/guide.js` films a narrated guide on the same director engine (`trailer/director.js`).
+
+- **YouTube cut:** about 3:50, 13 chapters.
+- **TikTok cut:** about 56 s.
+
+The real menus and HUD are on screen, with burned-in captions, keycaps and pointer rings.
+
+The narration is offline neural TTS (Piper, voice "norman", a public-domain LibriVox narrator). The script lives in `trailer/guide_script.json`.
+
+1. Generate the narration: `python3 build/make_vo.py --piper <piper binary> --model en_US-norman-medium.onnx`. Setup steps are in the file header.
+2. Render: `node tests/render_trailer.cjs yt --film guide`, or `tt`. This writes the MP4, an `.srt` subtitle file and a chapter list to `build/guide/` (git-ignored).
+
 ## Tests
 
 Tests need Node and Playwright with Chromium. Run them from this folder:

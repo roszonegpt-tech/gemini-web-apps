@@ -12,3 +12,4 @@ tests/out/
 *.log
 tests/out/
 build/trailer/
+build/guide/

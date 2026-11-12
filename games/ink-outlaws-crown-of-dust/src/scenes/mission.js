@@ -27,7 +27,7 @@ MS.start = function (spec, onEnd) {
     if (s === M.hall) end(M, false, 'The town hall has fallen.'); };
   if (spec.type === 'defend') M.waves = {i: 0, n: 3 + Math.ceil(M.tier / 2), t: 7, live: false};
   /* paint ahead: the hero completely, everyone else standing and moving (the trailer director paints for itself) */
-  if (spec.skipWarm) { layout(M); M.cam.x = h.x; M.cam.y = h.y * YS; return M; }
+  if (spec.skipWarm) { layout(M); M.cam.x = h.x; M.cam.y = h.y * YS; if (!spec.noHud) CD.HUD.show(M); return M; }
   const mv = u => u.spd >= 33 ? 'run' : 'walk', seen = new Set();
   S.warm(h.look, ['idle', 'run', 'jump'].concat(h.w.kind === 'gun' || h.w.thrust ? ['shoot'] : ['combo1', 'combo2', 'combo3']), 1);
   for (const u of M.units) { if (u.hero || seen.has(u.look)) continue; seen.add(u.look); S.warm(u.look, ['idle', mv(u)], u.mult, ['S', 'SE', 'E', 'W', 'SW']); }
@@ -253,7 +253,7 @@ MS.draw = function () {
   }
   for (const n of M.nums) if (!M.spec.noHud || n.big) F.num(c, n);
   /* objective pointer */
-  if (ob.at && !M.over && !M.spec.noHud) { const ox = ob.at.x, oy = ob.at.y * YS - (ob.at.top || 30), m = 14;
+  if (ob.at && !M.over && !M.spec.noHud && !M.noPointer) { const ox = ob.at.x, oy = ob.at.y * YS - (ob.at.top || 30), m = 14;
     if (ox > L + m && ox < R - m && oy > T + m + 16 && oy < Bt - m) { const b = Math.sin(M.t * 5) * 2; U.poly(c, [[ox - 4, oy - 14 + b], [ox + 4, oy - 14 + b], [ox, oy - 7 + b]], U.MUST, 0.9); }
     else { const cx = U.clamp(ox, L + m, R - m), cy = U.clamp(oy, T + m + 18, Bt - m), a = Math.atan2(oy - cy, ox - cx); c.save(); c.translate(cx, cy); c.rotate(a); U.poly(c, [[7, 0], [-4, -5], [-1.5, 0], [-4, 5]], U.MUST, 1); c.restore(); } }
   if (I.mouse.seen && I.lastWasMouse && !U.COARSE && !M.over && !M.spec.noHud) { const m = mouseWorld(M), x = m[0], y = m[1] * YS; U.seg(c, x - 4, y, x - 1.5, y, 1, U.INKC); U.seg(c, x + 1.5, y, x + 4, y, 1, U.INKC); U.seg(c, x, y - 4, x, y - 1.5, 1, U.INKC); U.seg(c, x, y + 1.5, x, y + 4, 1, U.INKC); }

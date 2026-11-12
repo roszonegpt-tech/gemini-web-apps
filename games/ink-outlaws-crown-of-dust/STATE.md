@@ -21,6 +21,10 @@ and a sprite cache peak of 166 MB of the 190 MB desktop budget. The autopilot pl
 `trailer/trailer.js` films the game. `node tests/render_trailer.cjs yt|tt` re-renders the MP4s into `build/trailer/` (git-ignored, about 3 minutes each).
 The published Artifact page with both cuts: https://claude.ai/artifact/VLgGKAcKC2SqrrhEkh5QwP (private to the owner until shared).
 
+## Guide video
+Narration: run `build/make_vo.py` (Piper and the norman voice, set up outside the repo), then `node tests/render_trailer.cjs yt|tt --film guide`.
+The YouTube render takes 25–40 min (it screenshots every frame); TikTok takes about 10 min. Outputs go to `build/guide/` (git-ignored).
+
 ## Recently fixed (in case something similar comes back)
 - A line comment in `src/systems/combat.js` swallowed the rest of the shot update, so bullets never expired. **Keep code and `//` comments on separate lines.**
 - Point-blank shots spawned past their target. The first step now sweeps from the shooter's body (`b.px/b.py`).
