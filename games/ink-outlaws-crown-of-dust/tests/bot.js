@@ -8,7 +8,9 @@ window.startBot = function (opt) {
     if (M.over || M.paused) return; if (opt.god !== false) M.god = true; I.lastWasMouse = false;
     const h = M.hero, ob = CD.Mission.objective(M); let e = null, bd = 150;
     if (M.hall) bd = 400;
-    for (const u of M.units) if (u.team === 1 && !u.dead && !u.dormant) { if (M.hall && Math.hypot(u.x - M.hall.x, u.y - M.hall.y) > 230) continue; const d = Math.hypot(u.x - h.x, u.y - h.y); if (d < bd) { bd = d; e = u; } }
+    window.BOTIGN = window.BOTIGN || new Set(); if (M !== window.BOTM) { window.BOTM = M; window.BOTIGN = new Set(); }
+    for (const u of M.units) if (u.team === 1 && !u.dead && !u.dormant && !window.BOTIGN.has(u.id)) { if (M.hall && Math.hypot(u.x - M.hall.x, u.y - M.hall.y) > 230) continue; const d = Math.hypot(u.x - h.x, u.y - h.y); if (d < bd) { bd = d; e = u; } }
+    if (e) { if (window.BOTE !== e.id) { window.BOTE = e.id; window.BOTEH = e.hp; window.BOTET = M.t; } else if (e.hp < window.BOTEH) { window.BOTEH = e.hp; window.BOTET = M.t; } else if (M.t - window.BOTET > 8) { window.BOTIGN.add(e.id); e = null; } }   // ignore an enemy we cannot hurt
     let tgt = e, stop = e ? Math.min(60, (h.w.kind === 'gun' ? h.w.range * 0.5 : h.w.reach * 0.7) + e.r) : 16, objStruct = false;
     if (!tgt && ob.at) { tgt = ob.at; if (ob.at.isStruct && ob.at.hp != null) { objStruct = true; stop = (h.w.kind === 'gun' ? 70 : h.w.reach * 0.6) + (ob.at.r || 8); } else stop = ob.zone ? 14 : 8; }
     if (!tgt && M.hall) { tgt = {x: M.hall.x, y: M.hall.y + 50}; stop = 20; }

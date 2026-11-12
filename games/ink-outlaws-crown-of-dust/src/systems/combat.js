@@ -26,7 +26,7 @@ C.fire = function (M, u, o, an) {
   const ang = o.aimAng != null ? o.aimAng : u.aim, n = o.pellets || w.pellets, spread = o.spread != null ? o.spread : w.spread, mul = (o.mul || 1) * u.dmg;
   for (let i = 0; i < n; i++) {
     const a = ang + (n > 1 ? (i - (n - 1) / 2) * spread + (Math.random() - 0.5) * 0.04 : (Math.random() - 0.5) * (u.hero ? 0.02 : 0.09));
-    M.shots.push({x: u.x + off[0] * 0.6, y: u.y + Math.sin(a) * 3, h: Math.max(6, -off[1]), vx: Math.cos(a) * w.speed, vy: Math.sin(a) * w.speed, life: (o.range || w.range) / w.speed, dmg: w.dmg * mul, team: u.team, src: u,
+    M.shots.push({px: u.x, py: u.y, x: u.x + off[0] * 0.6, y: u.y + Math.sin(a) * 3, h: Math.max(6, -off[1]), vx: Math.cos(a) * w.speed, vy: Math.sin(a) * w.speed, life: (o.range || w.range) / w.speed, dmg: w.dmg * mul, team: u.team, src: u,
       arrow: w.arrow, orb: w.orb, splash: w.splash, pierce: o.pierce != null ? o.pierce : (w.pierce || 0), push: w.push, hitIds: null});
   }
   if (!w.arrow && !w.orb) M.fx.push({k: 'flash', x: u.x + off[0], y: u.y + (an.back ? -0.5 : 0.5), h: -off[1], a: ang, t: 0, T: 0.09, r: n > 1 || u.weapon === 'rifle' ? 7.5 : 5.5});
@@ -66,7 +66,7 @@ C.hurt = function (M, t, dmg, src, ang, push, o) {
   }
   if (t.hero && M.god) return false;
   if (t.def.armor) dmg = Math.max(1, Math.round(dmg * (1 - t.def.armor)));
-  if (t.prisoner) dmg = Math.max(1, Math.round(dmg * 0.4));        // an escorted prisoner is hard to kill outright
+  if (t.prisoner) dmg = Math.max(1, Math.round(dmg * 0.25));        // an escorted prisoner is hard to kill outright
   t.hp -= dmg; t.flash = 0.14;
   const k = (t.boss ? 0.15 : t.r > 9 ? 0.4 : 1) * (push || 0); t.kx += Math.cos(ang) * k; t.ky += Math.sin(ang) * k;
   if (o && o.stun && !t.boss) t.stun = Math.max(t.stun, o.stun);
@@ -106,7 +106,8 @@ C.heal = function (M, t, v) { if (t.dead || t.hp >= t.maxHp) return; t.hp = Math
 C.update = function (M, dt) {
   /* shots */
   for (const b of M.shots) {
-    const px = b.x, py = b.y; b.x += b.vx * dt; b.y += b.vy * dt; b.life -= dt; if (b.drop) b.h = Math.max(12, b.h - b.drop * dt);
+    /* the first step sweeps from the shooter's body, so point-blank shots land */
+    const px = b.px != null ? b.px : b.x, py = b.py != null ? b.py : b.y; b.px = b.py = null; b.x += b.vx * dt; b.y += b.vy * dt; b.life -= dt; if (b.drop) b.h = Math.max(12, b.h - b.drop * dt);
     const sx = b.x - px, sy = b.y - py, sl = sx * sx + sy * sy || 1; if (b.life <= 0) { if (b.splash) C.boomlet(M, b); else M.fx.push({k: 'puff', x: b.x, y: b.y, h: b.h, t: 0, T: 0.2, r: 3}); continue; }
     if (CD.World.shotBlocked(M, b.x, b.y)) { b.life = -1; if (b.splash) C.boomlet(M, b); else M.fx.push({k: 'puff', x: b.x, y: b.y, h: b.h, t: 0, T: 0.2, r: 3.5}); continue; }
     let stop = false;

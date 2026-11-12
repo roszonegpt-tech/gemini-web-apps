@@ -2416,7 +2416,7 @@ D.specialOf = w => ({revolver: 'fan', twin: 'fan', flintlock: 'deadeye', rifle: 
 /* src/config/units.js */
 /* Crown of Dust - cast and stats (src/config/units.js).
    Looks are plain lab look objects (the same schema the Chunk Lab customizer edits), so any look copied out of the lab
-   can be pasted here. All 62 lab presets are used; the rest are new looks built from the same schema. */
+   can be pasted here. All 63 lab presets are used; the rest are new looks built from the same schema. */
 (function () {
 'use strict';
 const CD = window.CD, D = CD.Data = CD.Data || {}, INK = window.INK, K = INK.kit;
@@ -2540,7 +2540,8 @@ unit('brasswood', 'Brasswood', 'crown', {hp: 240, spd: 18, bounty: 16, dmg: 1.3,
 unit('bulwark', 'Bulwark', 'crown', {hp: 280, spd: 18, bounty: 16, dmg: 1.5, elite: true});
 unit('rattle', 'Rattle', 'crown', {hp: 130, spd: 30, bounty: 12, dmg: 1.2, elite: true});
 unit('tyrant', 'Tyrant', 'crown', {hp: 900, spd: 27, r: 18, mult: 2.1, bounty: 60, bite: 34, ai: 'beast', boss: true, stomp: true});
-unit('odo', 'King Odo the Gilded', 'crown', {hp: 900, spd: 24, bounty: 120, dmg: 1.6, boss: true, mult: 1.3, summon: 'footman', nova: true});
+unit('odo', 'King Odo the Gilded', 'crown', {hp: 760, spd: 24, bounty: 120, dmg: 1.6, boss: true, mult: 1.3, summon: 'footman', nova: true, phase2: 'odorider'});
+unit('odorider', 'King Odo the Gilded', 'crown', {hp: 520, spd: 38, r: 11, ai: 'charger', bounty: 0, dmg: 1.7, boss: true, mult: 1.2, summon: 'footman', weapon: 'greatsword'});
 /* loose animals used as scenery and mounts */
 unit('ash', 'Ash', 'outlaw', {ai: 'pet', hp: 999, spd: 30, r: 8}); unit('clementine', 'Clementine', 'outlaw', {ai: 'pet', hp: 999, spd: 26, r: 8}); unit('moss', 'Moss', 'outlaw', {ai: 'pet', hp: 999, spd: 22, r: 9});
 
@@ -2733,7 +2734,7 @@ C.fire = function (M, u, o, an) {
   const ang = o.aimAng != null ? o.aimAng : u.aim, n = o.pellets || w.pellets, spread = o.spread != null ? o.spread : w.spread, mul = (o.mul || 1) * u.dmg;
   for (let i = 0; i < n; i++) {
     const a = ang + (n > 1 ? (i - (n - 1) / 2) * spread + (Math.random() - 0.5) * 0.04 : (Math.random() - 0.5) * (u.hero ? 0.02 : 0.09));
-    M.shots.push({x: u.x + off[0] * 0.6, y: u.y + Math.sin(a) * 3, h: Math.max(6, -off[1]), vx: Math.cos(a) * w.speed, vy: Math.sin(a) * w.speed, life: (o.range || w.range) / w.speed, dmg: w.dmg * mul, team: u.team, src: u,
+    M.shots.push({px: u.x, py: u.y, x: u.x + off[0] * 0.6, y: u.y + Math.sin(a) * 3, h: Math.max(6, -off[1]), vx: Math.cos(a) * w.speed, vy: Math.sin(a) * w.speed, life: (o.range || w.range) / w.speed, dmg: w.dmg * mul, team: u.team, src: u,
       arrow: w.arrow, orb: w.orb, splash: w.splash, pierce: o.pierce != null ? o.pierce : (w.pierce || 0), push: w.push, hitIds: null});
   }
   if (!w.arrow && !w.orb) M.fx.push({k: 'flash', x: u.x + off[0], y: u.y + (an.back ? -0.5 : 0.5), h: -off[1], a: ang, t: 0, T: 0.09, r: n > 1 || u.weapon === 'rifle' ? 7.5 : 5.5});
@@ -2773,7 +2774,7 @@ C.hurt = function (M, t, dmg, src, ang, push, o) {
   }
   if (t.hero && M.god) return false;
   if (t.def.armor) dmg = Math.max(1, Math.round(dmg * (1 - t.def.armor)));
-  if (t.prisoner) dmg = Math.max(1, Math.round(dmg * 0.4));        // an escorted prisoner is hard to kill outright
+  if (t.prisoner) dmg = Math.max(1, Math.round(dmg * 0.25));        // an escorted prisoner is hard to kill outright
   t.hp -= dmg; t.flash = 0.14;
   const k = (t.boss ? 0.15 : t.r > 9 ? 0.4 : 1) * (push || 0); t.kx += Math.cos(ang) * k; t.ky += Math.sin(ang) * k;
   if (o && o.stun && !t.boss) t.stun = Math.max(t.stun, o.stun);
@@ -2813,7 +2814,8 @@ C.heal = function (M, t, v) { if (t.dead || t.hp >= t.maxHp) return; t.hp = Math
 C.update = function (M, dt) {
   /* shots */
   for (const b of M.shots) {
-    const px = b.x, py = b.y; b.x += b.vx * dt; b.y += b.vy * dt; b.life -= dt; if (b.drop) b.h = Math.max(12, b.h - b.drop * dt);
+    /* the first step sweeps from the shooter's body, so point-blank shots land */
+    const px = b.px != null ? b.px : b.x, py = b.py != null ? b.py : b.y; b.px = b.py = null; b.x += b.vx * dt; b.y += b.vy * dt; b.life -= dt; if (b.drop) b.h = Math.max(12, b.h - b.drop * dt);
     const sx = b.x - px, sy = b.y - py, sl = sx * sx + sy * sy || 1; if (b.life <= 0) { if (b.splash) C.boomlet(M, b); else M.fx.push({k: 'puff', x: b.x, y: b.y, h: b.h, t: 0, T: 0.2, r: 3}); continue; }
     if (CD.World.shotBlocked(M, b.x, b.y)) { b.life = -1; if (b.splash) C.boomlet(M, b); else M.fx.push({k: 'puff', x: b.x, y: b.y, h: b.h, t: 0, T: 0.2, r: 3.5}); continue; }
     let stop = false;
@@ -3019,7 +3021,7 @@ function paintGround(M, rng, roads) {
 /* ================= generation ================= */
 function prop(M, kind, x, y, v, pal) {
   const p = {kind: kind, x: x, y: y, v: v || 0, pal: pal}; M.props.push(p);
-  const r = SOLIDR[kind]; if (r) M.cols.push({x: x, y: y, hw: r, hh: r * 0.7, nonav: r < 5});
+  const r = SOLIDR[kind]; if (r) M.cols.push({x: x, y: y, hw: r, hh: r * 0.7});
   return p;
 }
 function wall(M, x0, y0, x1, y1, kind, rng) {                // straight run of stakes or stone blocks with one collider
@@ -3134,6 +3136,8 @@ W.build = function (M, spec) {
       group(M, ccx + 20, cy + 30, 2, {kind: M.tier >= 3 ? 'heavy' : null});
     } else if (T === 'heist') {
       M.boxes = []; [[-hw + 40, -hh + 60], [hw - 40, 0], [-10, hh - 30]].forEach(p => { const b = {k: 'box', x: ccx + p[0], y: cy + p[1], v: 1, t: 0, z: 0, vz: 0, fixed: true}; M.pickups.push(b); M.boxes.push(b); });
+      const near = o => M.boxes.some(b => Math.hypot(b.x - o.x, b.y - o.y) < 30) && !(SD[o.kind] || {}).spawner && o.kind !== 'tower';   // keep every strongbox reachable
+      M.structs = M.structs.filter(o => !near(o)); M.cols = M.cols.filter(c => !(c.s && near(c.s)));
       M.wagon = W.addStruct(M, 'wagon', start[0] + 6, start[1] - 40, {pal: 'outlaw'}); group(M, ccx, cy, 2, {kind: 'heavy'});
     } else if (big) {
       W.addStruct(M, 'keep', ccx + 60, cy - hh + 40, {}); const b = E.spawn(M, spec.boss || M.F.boss, 1, ccx + 60, cy - 20); b.ai.home = [ccx + 60, cy - 20]; b.ai.asleep = true; M.boss = b; M.bosses = [b];
@@ -3460,6 +3464,8 @@ function pickups(M, dt) {
 function waves(M, dt) {
   const w = M.waves; if (!w || M.over) return;
   const alive = M.enemyCount();
+  if (w.live && w.i >= w.n && alive > 0 && alive <= 3 && w.t2 <= 0) {          // the last stragglers break and run instead of hiding behind a rock forever
+    for (const u of M.units) if (u.team === 1 && !u.dead) { u.dead = true; u.deadT = 0.5; u.fall = 1; } M.banner('The stragglers run for the hills!', 2); return end(M, true); }
   if (w.live && alive <= 0) { w.live = false; w.t = 6; if (w.i >= w.n) return end(M, true); M.banner('Wave ' + w.i + ' beaten', 1.6); M.scrip += 6; }
   if (!w.live || (w.t2 -= dt) <= 0) { w.t -= dt; if (w.t <= 0 && w.i < w.n) {
     w.i++; w.live = true; w.t2 = 45; w.t = 0; const last = w.i === w.n, n = 3 + M.tier + w.i, ed = U.shuffle(M.edges.slice(), M.rng);
@@ -4023,7 +4029,7 @@ UI.codex = function (back) {
   const G = CD.G || {seen: {}}, r = screen(true), hd = mk('header', 'top', null, r); mk('h1', null, null, hd).innerHTML = 'Wanted <b>posters</b>'; mk('small', null, Object.keys(D.units).length + ' faces of the Tally Basin', hd); mk('span', 'sp', null, hd); btn('Back', 'sm alt', back, hd);
   const s = mk('div', 'screen', null, r);
   ['outlaw', 'corsair', 'hollow', 'crown'].forEach(f => { const F = D.factions[f], p = mk('div', 'panel', null, s); p.style.marginTop = '10px'; const h = mk('h2', null, F.name, p); h.style.color = F.color; const g = mk('div', 'grid', null, p); g.style.gridTemplateColumns = 'repeat(auto-fill,minmax(150px,1fr))';
-    Object.keys(D.units).forEach(id => { const u = D.units[id]; if (u.faction !== f || id === 'snigrider' || id === 'gloopling') return; const w = D.weapons[u.weapon];
+    Object.keys(D.units).forEach(id => { const u = D.units[id]; if (u.faction !== f || id === 'snigrider' || id === 'odorider' || id === 'gloopling') return; const w = D.weapons[u.weapon];
       card(g, id, {sub: u.bite != null ? 'Beast · ' + u.hp + ' hp' : w.name + ' · ' + u.hp + ' hp', txt: u.blurb || (u.boss ? 'Boss.' : u.elite ? 'Captain.' : false), port: {zoom: u.mult > 1.5 ? 0.9 : 1}}); }); });
 };
 })();
@@ -4059,7 +4065,7 @@ function tick(ts) {
   if (document.hidden || !CD.scene) return;
   CD.time = (CD.time || 0) + dt;
   const t0 = performance.now();
-  try { const n = CD.steps || 1; for (let i = 0; i < n; i++) CD.scene.update(dt * (CD.speed || 1)); CD.scene.draw(); CD.frameMs = (CD.frameMs || 0) * 0.95 + (performance.now() - t0) * 0.05; } catch (e) { if (!tick.err) { tick.err = true; console.error(e); } }
+  try { const n = CD.steps || 1; for (let i = 0; i < n; i++) CD.scene.update(dt * (CD.speed || 1)); CD.scene.draw(); CD.frameMs = (CD.frameMs || 0) * 0.95 + (performance.now() - t0) * 0.05; } catch (e) { if (!tick.err) { tick.err = true; console.error(e && e.stack || e); } }
 }
 CD.Input.init(V.cv); CD.Sfx.setOn(CD.Save.settings.sound); fit();
 CD.go('title');

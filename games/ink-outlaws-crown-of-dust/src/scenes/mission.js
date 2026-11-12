@@ -143,6 +143,8 @@ function pickups(M, dt) {
 function waves(M, dt) {
   const w = M.waves; if (!w || M.over) return;
   const alive = M.enemyCount();
+  if (w.live && w.i >= w.n && alive > 0 && alive <= 3 && w.t2 <= 0) {          // the last stragglers break and run instead of hiding behind a rock forever
+    for (const u of M.units) if (u.team === 1 && !u.dead) { u.dead = true; u.deadT = 0.5; u.fall = 1; } M.banner('The stragglers run for the hills!', 2); return end(M, true); }
   if (w.live && alive <= 0) { w.live = false; w.t = 6; if (w.i >= w.n) return end(M, true); M.banner('Wave ' + w.i + ' beaten', 1.6); M.scrip += 6; }
   if (!w.live || (w.t2 -= dt) <= 0) { w.t -= dt; if (w.t <= 0 && w.i < w.n) {
     w.i++; w.live = true; w.t2 = 45; w.t = 0; const last = w.i === w.n, n = 3 + M.tier + w.i, ed = U.shuffle(M.edges.slice(), M.rng);

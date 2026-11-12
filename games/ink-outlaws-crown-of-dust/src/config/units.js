@@ -1,6 +1,6 @@
 /* Crown of Dust - cast and stats (src/config/units.js).
    Looks are plain lab look objects (the same schema the Chunk Lab customizer edits), so any look copied out of the lab
-   can be pasted here. All 62 lab presets are used; the rest are new looks built from the same schema. */
+   can be pasted here. All 63 lab presets are used; the rest are new looks built from the same schema. */
 (function () {
 'use strict';
 const CD = window.CD, D = CD.Data = CD.Data || {}, INK = window.INK, K = INK.kit;
@@ -124,7 +124,8 @@ unit('brasswood', 'Brasswood', 'crown', {hp: 240, spd: 18, bounty: 16, dmg: 1.3,
 unit('bulwark', 'Bulwark', 'crown', {hp: 280, spd: 18, bounty: 16, dmg: 1.5, elite: true});
 unit('rattle', 'Rattle', 'crown', {hp: 130, spd: 30, bounty: 12, dmg: 1.2, elite: true});
 unit('tyrant', 'Tyrant', 'crown', {hp: 900, spd: 27, r: 18, mult: 2.1, bounty: 60, bite: 34, ai: 'beast', boss: true, stomp: true});
-unit('odo', 'King Odo the Gilded', 'crown', {hp: 900, spd: 24, bounty: 120, dmg: 1.6, boss: true, mult: 1.3, summon: 'footman', nova: true});
+unit('odo', 'King Odo the Gilded', 'crown', {hp: 760, spd: 24, bounty: 120, dmg: 1.6, boss: true, mult: 1.3, summon: 'footman', nova: true, phase2: 'odorider'});
+unit('odorider', 'King Odo the Gilded', 'crown', {hp: 520, spd: 38, r: 11, ai: 'charger', bounty: 0, dmg: 1.7, boss: true, mult: 1.2, summon: 'footman', weapon: 'greatsword'});
 /* loose animals used as scenery and mounts */
 unit('ash', 'Ash', 'outlaw', {ai: 'pet', hp: 999, spd: 30, r: 8}); unit('clementine', 'Clementine', 'outlaw', {ai: 'pet', hp: 999, spd: 26, r: 8}); unit('moss', 'Moss', 'outlaw', {ai: 'pet', hp: 999, spd: 22, r: 9});
 

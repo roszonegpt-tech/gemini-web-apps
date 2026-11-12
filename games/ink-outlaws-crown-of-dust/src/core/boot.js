@@ -25,7 +25,7 @@ function tick(ts) {
   if (document.hidden || !CD.scene) return;
   CD.time = (CD.time || 0) + dt;
   const t0 = performance.now();
-  try { const n = CD.steps || 1; for (let i = 0; i < n; i++) CD.scene.update(dt * (CD.speed || 1)); CD.scene.draw(); CD.frameMs = (CD.frameMs || 0) * 0.95 + (performance.now() - t0) * 0.05; } catch (e) { if (!tick.err) { tick.err = true; console.error(e); } }
+  try { const n = CD.steps || 1; for (let i = 0; i < n; i++) CD.scene.update(dt * (CD.speed || 1)); CD.scene.draw(); CD.frameMs = (CD.frameMs || 0) * 0.95 + (performance.now() - t0) * 0.05; } catch (e) { if (!tick.err) { tick.err = true; console.error(e && e.stack || e); } }
 }
 CD.Input.init(V.cv); CD.Sfx.setOn(CD.Save.settings.sound); fit();
 CD.go('title');

@@ -174,7 +174,7 @@ UI.codex = function (back) {
   const G = CD.G || {seen: {}}, r = screen(true), hd = mk('header', 'top', null, r); mk('h1', null, null, hd).innerHTML = 'Wanted <b>posters</b>'; mk('small', null, Object.keys(D.units).length + ' faces of the Tally Basin', hd); mk('span', 'sp', null, hd); btn('Back', 'sm alt', back, hd);
   const s = mk('div', 'screen', null, r);
   ['outlaw', 'corsair', 'hollow', 'crown'].forEach(f => { const F = D.factions[f], p = mk('div', 'panel', null, s); p.style.marginTop = '10px'; const h = mk('h2', null, F.name, p); h.style.color = F.color; const g = mk('div', 'grid', null, p); g.style.gridTemplateColumns = 'repeat(auto-fill,minmax(150px,1fr))';
-    Object.keys(D.units).forEach(id => { const u = D.units[id]; if (u.faction !== f || id === 'snigrider' || id === 'gloopling') return; const w = D.weapons[u.weapon];
+    Object.keys(D.units).forEach(id => { const u = D.units[id]; if (u.faction !== f || id === 'snigrider' || id === 'odorider' || id === 'gloopling') return; const w = D.weapons[u.weapon];
       card(g, id, {sub: u.bite != null ? 'Beast · ' + u.hp + ' hp' : w.name + ' · ' + u.hp + ' hp', txt: u.blurb || (u.boss ? 'Boss.' : u.elite ? 'Captain.' : false), port: {zoom: u.mult > 1.5 ? 0.9 : 1}}); }); });
 };
 })();

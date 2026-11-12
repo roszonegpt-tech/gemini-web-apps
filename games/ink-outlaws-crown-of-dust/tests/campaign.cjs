@@ -3,7 +3,7 @@
    node tests/campaign.cjs [maxDays=40] [steps=8]     Exit 1 on a page error, a stuck mission or no victory. */
 const { chromium } = require('playwright'), serve = require('./serve.cjs'), fs = require('fs'), path = require('path');
 (async () => {
-  const maxDays = +process.argv[2] || 40, steps = +process.argv[3] || 8, s = await serve(0), b = await chromium.launch();
+  fs.mkdirSync(path.join(__dirname, 'out'), {recursive: true}); const maxDays = +process.argv[2] || 40, steps = +process.argv[3] || 8, s = await serve(0), b = await chromium.launch();
   const pg = await b.newPage({viewport: {width: 1280, height: 760}}); const errs = [];
   pg.on('pageerror', e => errs.push(e.message)); pg.on('console', m => { if (m.type() === 'error') errs.push(m.text()); });
   await pg.goto('http://localhost:' + s.address().port + '/index.html'); await pg.addScriptTag({content: fs.readFileSync(path.join(__dirname, 'bot.js'), 'utf8')});
@@ -16,7 +16,9 @@ const { chromium } = require('playwright'), serve = require('./serve.cjs'), fs =
     if (st.modal) { if (await click('Continue') || await click('Defend it yourself') || await click('Right') || await click('Saddle up') || await click('Make the stand again')) { await pg.waitForTimeout(300); continue; } }
     if (st.scene === 'mission') {
       const t0 = Date.now(); while (Date.now() - t0 < 240000) { await pg.waitForTimeout(1500); if (await pg.evaluate(() => !CD.M)) break; }
-      if (await pg.evaluate(() => !!CD.M)) { fail = 'mission stuck: ' + await pg.evaluate(() => CD.Mission.objective(CD.M).txt); break; } continue;
+      if (await pg.evaluate(() => !!CD.M)) { fail = 'mission stuck: ' + await pg.evaluate(() => { const M = CD.M, h = M.hero, ob = CD.Mission.objective(M);
+        return JSON.stringify({obj: ob.txt, spec: [M.spec.terr, M.spec.seed, M.spec.tier], hero: [Math.round(h.x), Math.round(h.y)], at: ob.at && [Math.round(ob.at.x), Math.round(ob.at.y)], near: M.units.filter(u => !u.dead && u.team === 1 && Math.hypot(u.x - h.x, u.y - h.y) < 160).map(u => [u.def.id, Math.round(u.x), Math.round(u.y), u.hp, !!u.dormant])}); });
+        await pg.screenshot({path: path.join(__dirname, 'out', 'stuck.png')}).catch(() => {}); break; } continue;
     }
     /* spend: posse seats first, then hire, smithy, doc, towers, the rest */
     await pg.evaluate(() => { const G = CD.G, K = CD.Camp;
