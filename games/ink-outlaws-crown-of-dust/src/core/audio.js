@@ -4,19 +4,22 @@
 const CD = window.CD;
 const A = CD.Sfx = {ctx: null, on: true, vol: 0.5, last: {}};
 let noiseBuf = null;
+/* where voices play: the live context by default; renderInto() points this at an OfflineAudioContext for the trailer */
+let cur = {ctx: null, dest: null, t: 0, noise: null};
+function makeNoise(c) { const b = c.createBuffer(1, c.sampleRate * 0.5, c.sampleRate), d = b.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; return b; }
 A.unlock = function () {
   if (A.ctx) { if (A.ctx.state === 'suspended') A.ctx.resume(); return; }
   const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
   try { A.ctx = new AC(); A.master = A.ctx.createGain(); A.master.gain.value = A.vol; A.master.connect(A.ctx.destination);
-    noiseBuf = A.ctx.createBuffer(1, A.ctx.sampleRate * 0.5, A.ctx.sampleRate); const d = noiseBuf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; } catch (e) { A.ctx = null; }
+    noiseBuf = makeNoise(A.ctx); } catch (e) { A.ctx = null; }
 };
 function tone(type, f0, f1, dur, vol, delay) {
-  const c = A.ctx, t = c.currentTime + (delay || 0), o = c.createOscillator(), g = c.createGain(); o.type = type; o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(Math.max(20, f1), t + dur);
-  g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.001, t + dur); o.connect(g); g.connect(A.master); o.start(t); o.stop(t + dur + 0.02);
+  const c = cur.ctx, t = cur.t + (delay || 0), o = c.createOscillator(), g = c.createGain(); o.type = type; o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(Math.max(20, f1), t + dur);
+  g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.001, t + dur); o.connect(g); g.connect(cur.dest); o.start(t); o.stop(t + dur + 0.02);
 }
 function noise(dur, vol, freq, q, delay) {
-  const c = A.ctx, t = c.currentTime + (delay || 0), s = c.createBufferSource(), g = c.createGain(), f = c.createBiquadFilter(); s.buffer = noiseBuf; f.type = q ? 'bandpass' : 'lowpass'; f.frequency.value = freq; if (q) f.Q.value = q;
-  g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.001, t + dur); s.connect(f); f.connect(g); g.connect(A.master); s.start(t); s.stop(t + dur + 0.02);
+  const c = cur.ctx, t = cur.t + (delay || 0), s = c.createBufferSource(), g = c.createGain(), f = c.createBiquadFilter(); s.buffer = cur.noise; f.type = q ? 'bandpass' : 'lowpass'; f.frequency.value = freq; if (q) f.Q.value = q;
+  g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.001, t + dur); s.connect(f); f.connect(g); g.connect(cur.dest); s.start(t); s.stop(t + dur + 0.02);
 }
 const S = {
   click: () => tone('square', 520, 380, 0.05, 0.12),
@@ -41,10 +44,18 @@ const S = {
   page: () => noise(0.09, 0.2, 2600, 0.8)
 };
 A.play = function (name) {
+  if (A.onPlay) A.onPlay(name);
   if (!A.on || !A.ctx || !S[name]) return; const now = A.ctx.currentTime;
   if (A.last[name] && now - A.last[name] < 0.045) return; A.last[name] = now;
+  cur = {ctx: A.ctx, dest: A.master, t: now, noise: noiseBuf};
   try { S[name](); } catch (e) { /* audio is never worth a crash */ }
 };
 A.setOn = v => { A.on = v; };
+/* play one named effect into another context at time t (used to render the trailer's soundtrack offline) */
+A.renderInto = function (ctx, dest, t, name) {
+  if (!S[name]) return; if (!ctx._cdNoise) ctx._cdNoise = makeNoise(ctx);
+  cur = {ctx: ctx, dest: dest, t: t, noise: ctx._cdNoise}; try { S[name](); } catch (e) { /* skip a voice rather than lose the track */ }
+};
+A.names = () => Object.keys(S);
 window.addEventListener('pointerdown', A.unlock, {passive: true}); window.addEventListener('keydown', A.unlock);
 })();

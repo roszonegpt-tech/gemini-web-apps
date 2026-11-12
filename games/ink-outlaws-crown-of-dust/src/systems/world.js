@@ -144,7 +144,7 @@ W.stain = function (M, x, y, r, col) { W.decal(M, c => { const rng = U.rng32((x 
   for (let i = 0; i < 5; i++) { const a = rng() * 6.28, d = r * (0.9 + rng() * 0.7); U.ell(c, x + Math.cos(a) * d, y * U.YS + Math.sin(a) * d * 0.5, 0.6 + rng() * 1.2, 0.4 + rng() * 0.6, col || U.INKC); } }); };
 W.scorch = function (M, x, y, r) { W.stain(M, x, y, r, '#2a2228'); };
 function paintGround(M, rng, roads) {
-  const B = M.B, sc = M.bgS = Math.min(S.scale, 2, Math.sqrt(7e6 / (M.W * M.H * U.YS))), cv = M.bg = document.createElement('canvas'); cv.width = Math.ceil(M.W * sc); cv.height = Math.ceil(M.H * U.YS * sc);
+  const B = M.B, sc = M.bgS = Math.min(S.scale, M.spec.bgS || 2, Math.sqrt((M.spec.bgS ? 3e7 : 7e6) / (M.W * M.H * U.YS))), cv = M.bg = document.createElement('canvas'); cv.width = Math.ceil(M.W * sc); cv.height = Math.ceil(M.H * U.YS * sc);
   const c = M.bgc = cv.getContext('2d'); c.setTransform(sc, 0, 0, sc, 0, 0); const Wd = M.W, Hd = M.H * U.YS;
   c.fillStyle = B.ground; c.fillRect(0, 0, Wd, Hd);
   for (let i = 0; i < 46; i++) {                              // soft patches of darker and lighter ground

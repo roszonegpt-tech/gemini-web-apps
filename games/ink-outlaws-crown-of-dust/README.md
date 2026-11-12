@@ -60,6 +60,17 @@ games/ink-outlaws-crown-of-dust/
 └─ build/build.py          single-file build
 ```
 
+## Trailer
+
+A 58-second gameplay trailer is filmed from the engine itself by `trailer/trailer.js`. It has 48 shots cut on a 120 BPM beat, and its soundtrack is made from the game's own synth sounds plus a drum and bass loop.
+
+- **Watch it live:** open `trailer/index.html#yt` (16:9) or `trailer/index.html#tt` (9:16) and press Play.
+- **Render the video files:** `node tests/render_trailer.cjs yt` or `node tests/render_trailer.cjs tt` writes an H.264 + AAC MP4, 30 fps,
+  to `build/trailer/`, which is git-ignored.
+- **Contact sheet:** add `--sheet` to get one frame per shot instead of a video.
+
+The render needs Playwright with Chromium, and `ffmpeg` with libx264.
+
 ## Tests
 
 Tests need Node and Playwright with Chromium. Run them from this folder:

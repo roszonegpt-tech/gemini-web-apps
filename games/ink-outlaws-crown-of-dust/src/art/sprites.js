@@ -10,6 +10,7 @@ const RX0 = 64, RY0 = 100, RW = 128, RH = 116;          // scratch region in pai
 let scratch = null, sctx = null, tint = null;
 
 S.configure = function (pxPerUnit) {
+  if (S.lockScale) return;                                    // the trailer renderer picks its own resolution
   const cap = U.COARSE ? 3 : 4, sc = U.clamp(Math.round(pxPerUnit), 2, cap);
   S.budget = U.COARSE ? 70e6 : 190e6;
   if (sc !== S.scale) { S.scale = sc; S.flush(); }

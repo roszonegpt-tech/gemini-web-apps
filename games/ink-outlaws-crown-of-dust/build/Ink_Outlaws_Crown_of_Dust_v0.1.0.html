@@ -1770,19 +1770,22 @@ U.text = (c, s, x, y, px, fill, opt) => {
 const CD = window.CD;
 const A = CD.Sfx = {ctx: null, on: true, vol: 0.5, last: {}};
 let noiseBuf = null;
+/* where voices play: the live context by default; renderInto() points this at an OfflineAudioContext for the trailer */
+let cur = {ctx: null, dest: null, t: 0, noise: null};
+function makeNoise(c) { const b = c.createBuffer(1, c.sampleRate * 0.5, c.sampleRate), d = b.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; return b; }
 A.unlock = function () {
   if (A.ctx) { if (A.ctx.state === 'suspended') A.ctx.resume(); return; }
   const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
   try { A.ctx = new AC(); A.master = A.ctx.createGain(); A.master.gain.value = A.vol; A.master.connect(A.ctx.destination);
-    noiseBuf = A.ctx.createBuffer(1, A.ctx.sampleRate * 0.5, A.ctx.sampleRate); const d = noiseBuf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; } catch (e) { A.ctx = null; }
+    noiseBuf = makeNoise(A.ctx); } catch (e) { A.ctx = null; }
 };
 function tone(type, f0, f1, dur, vol, delay) {
-  const c = A.ctx, t = c.currentTime + (delay || 0), o = c.createOscillator(), g = c.createGain(); o.type = type; o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(Math.max(20, f1), t + dur);
-  g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.001, t + dur); o.connect(g); g.connect(A.master); o.start(t); o.stop(t + dur + 0.02);
+  const c = cur.ctx, t = cur.t + (delay || 0), o = c.createOscillator(), g = c.createGain(); o.type = type; o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(Math.max(20, f1), t + dur);
+  g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.001, t + dur); o.connect(g); g.connect(cur.dest); o.start(t); o.stop(t + dur + 0.02);
 }
 function noise(dur, vol, freq, q, delay) {
-  const c = A.ctx, t = c.currentTime + (delay || 0), s = c.createBufferSource(), g = c.createGain(), f = c.createBiquadFilter(); s.buffer = noiseBuf; f.type = q ? 'bandpass' : 'lowpass'; f.frequency.value = freq; if (q) f.Q.value = q;
-  g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.001, t + dur); s.connect(f); f.connect(g); g.connect(A.master); s.start(t); s.stop(t + dur + 0.02);
+  const c = cur.ctx, t = cur.t + (delay || 0), s = c.createBufferSource(), g = c.createGain(), f = c.createBiquadFilter(); s.buffer = cur.noise; f.type = q ? 'bandpass' : 'lowpass'; f.frequency.value = freq; if (q) f.Q.value = q;
+  g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.001, t + dur); s.connect(f); f.connect(g); g.connect(cur.dest); s.start(t); s.stop(t + dur + 0.02);
 }
 const S = {
   click: () => tone('square', 520, 380, 0.05, 0.12),
@@ -1807,11 +1810,19 @@ const S = {
   page: () => noise(0.09, 0.2, 2600, 0.8)
 };
 A.play = function (name) {
+  if (A.onPlay) A.onPlay(name);
   if (!A.on || !A.ctx || !S[name]) return; const now = A.ctx.currentTime;
   if (A.last[name] && now - A.last[name] < 0.045) return; A.last[name] = now;
+  cur = {ctx: A.ctx, dest: A.master, t: now, noise: noiseBuf};
   try { S[name](); } catch (e) { /* audio is never worth a crash */ }
 };
 A.setOn = v => { A.on = v; };
+/* play one named effect into another context at time t (used to render the trailer's soundtrack offline) */
+A.renderInto = function (ctx, dest, t, name) {
+  if (!S[name]) return; if (!ctx._cdNoise) ctx._cdNoise = makeNoise(ctx);
+  cur = {ctx: ctx, dest: dest, t: t, noise: ctx._cdNoise}; try { S[name](); } catch (e) { /* skip a voice rather than lose the track */ }
+};
+A.names = () => Object.keys(S);
 window.addEventListener('pointerdown', A.unlock, {passive: true}); window.addEventListener('keydown', A.unlock);
 })();
 
@@ -1917,6 +1928,7 @@ const RX0 = 64, RY0 = 100, RW = 128, RH = 116;          // scratch region in pai
 let scratch = null, sctx = null, tint = null;
 
 S.configure = function (pxPerUnit) {
+  if (S.lockScale) return;                                    // the trailer renderer picks its own resolution
   const cap = U.COARSE ? 3 : 4, sc = U.clamp(Math.round(pxPerUnit), 2, cap);
   S.budget = U.COARSE ? 70e6 : 190e6;
   if (sc !== S.scale) { S.scale = sc; S.flush(); }
@@ -2695,7 +2707,7 @@ E.draw = function (c, M, u) {
   if (u.stun > 0 && !u.dead) o.sy = 0.94;
   u.lastSp = S.draw(c, u.look, an[0], an[1], u.dir, sx, sy - u.z, o);
   if (u.caged) return;
-  if (!u.dead && u.hp < u.maxHp && !u.hero && !u.boss) {       // small ink health bar
+  if (!u.dead && u.hp < u.maxHp && !u.hero && !u.boss && !M.spec.noHud) {       // small ink health bar
     const w = Math.min(26, 10 + u.maxHp / 12), y = sy - (u.lastSp ? -u.lastSp.oy : 50) - 4, f = Math.max(0, u.hp / u.maxHp);
     c.fillStyle = U.INKC; c.fillRect(sx - w / 2 - 0.6, y - 0.6, w + 1.2, 3.2); c.fillStyle = u.team === 0 ? '#7fae5a' : U.RED; c.fillRect(sx - w / 2, y, w * f, 2);
   }
@@ -2992,7 +3004,7 @@ W.stain = function (M, x, y, r, col) { W.decal(M, c => { const rng = U.rng32((x 
   for (let i = 0; i < 5; i++) { const a = rng() * 6.28, d = r * (0.9 + rng() * 0.7); U.ell(c, x + Math.cos(a) * d, y * U.YS + Math.sin(a) * d * 0.5, 0.6 + rng() * 1.2, 0.4 + rng() * 0.6, col || U.INKC); } }); };
 W.scorch = function (M, x, y, r) { W.stain(M, x, y, r, '#2a2228'); };
 function paintGround(M, rng, roads) {
-  const B = M.B, sc = M.bgS = Math.min(S.scale, 2, Math.sqrt(7e6 / (M.W * M.H * U.YS))), cv = M.bg = document.createElement('canvas'); cv.width = Math.ceil(M.W * sc); cv.height = Math.ceil(M.H * U.YS * sc);
+  const B = M.B, sc = M.bgS = Math.min(S.scale, M.spec.bgS || 2, Math.sqrt((M.spec.bgS ? 3e7 : 7e6) / (M.W * M.H * U.YS))), cv = M.bg = document.createElement('canvas'); cv.width = Math.ceil(M.W * sc); cv.height = Math.ceil(M.H * U.YS * sc);
   const c = M.bgc = cv.getContext('2d'); c.setTransform(sc, 0, 0, sc, 0, 0); const Wd = M.W, Hd = M.H * U.YS;
   c.fillStyle = B.ground; c.fillRect(0, 0, Wd, Hd);
   for (let i = 0; i < 46; i++) {                              // soft patches of darker and lighter ground
@@ -3298,7 +3310,7 @@ function ally(M, u, dt) {
 
 AI.update = function (M, dt) {
   for (const u of M.units) {
-    if (u.hero || u.dead || u.caged) continue;
+    if (u.hero || u.dead || u.caged || u.scripted) continue;     // scripted: moved by the trailer director
     if (u.stun > 0 || u.one || u.roll) continue;
     if (M.over) { continue; }
     if (u.team === 1) enemy(M, u, dt); else ally(M, u, dt);
@@ -3332,7 +3344,7 @@ D.missionNames = {raid: 'Raid', rescue: 'Rescue', heist: 'Heist', defend: 'Defen
 MS.start = function (spec, onEnd) {
   spec.perk = spec.perk || {};
   const M = CD.M = {spec: spec, onEnd: onEnd, t: 0, cam: {x: 0, y: 0}, view: {w: 320, h: 200, S: 3}, shake: 0, kills: 0, scrip: 6 + 4 * (spec.perk.powder || 0), loot: 0, perk: spec.perk, order: 'follow', orderPt: null, focus: null, over: null,
-    state: 'load', revives: spec.perk.doc || 0, boxN: 0, god: false, bannerTxt: '', bannerT: 0, paused: false, buildOpen: false, near: null, posse: [], stage: 0, lost: []};
+    state: spec.skipWarm ? 'play' : 'load', noEnd: !!spec.noEnd, revives: spec.perk.doc || 0, boxN: 0, god: false, bannerTxt: '', bannerT: 0, paused: false, buildOpen: false, near: null, posse: [], stage: 0, lost: []};
   M.banner = (txt, T) => { M.bannerTxt = txt; M.bannerT = T || 2; M.bannerT0 = T || 2; };
   M.enemyCount = () => { let n = 0; for (const u of M.units) if (u.team === 1 && !u.dead) n++; return n; };
   W.build(M, spec);
@@ -3347,7 +3359,8 @@ MS.start = function (spec, onEnd) {
       else { p.prisoner = false; p.slot = M.posse.length; p.hp = p.maxHp; M.banner(p.name + ' is free and fighting!', 2.4); } }
     if (s === M.hall) end(M, false, 'The town hall has fallen.'); };
   if (spec.type === 'defend') M.waves = {i: 0, n: 3 + Math.ceil(M.tier / 2), t: 7, live: false};
-  /* paint ahead: the hero completely, everyone else standing and moving */
+  /* paint ahead: the hero completely, everyone else standing and moving (the trailer director paints for itself) */
+  if (spec.skipWarm) { layout(M); M.cam.x = h.x; M.cam.y = h.y * YS; return M; }
   const mv = u => u.spd >= 33 ? 'run' : 'walk', seen = new Set();
   S.warm(h.look, ['idle', 'run', 'jump'].concat(h.w.kind === 'gun' || h.w.thrust ? ['shoot'] : ['combo1', 'combo2', 'combo3']), 1);
   for (const u of M.units) { if (u.hero || seen.has(u.look)) continue; seen.add(u.look); S.warm(u.look, ['idle', mv(u)], u.mult, ['S', 'SE', 'E', 'W', 'SW']); }
@@ -3368,7 +3381,7 @@ function reinforce(M, n, from) {
   const p = from || [M.W - 30, M.H / 2 + (M.rng() - 0.5) * 300]; const g = W.group(M, p[0], p[1], n, {set: {}}); for (const u of g) { u.ai.march = true; u.ai.alert = true; u.ai.hate = M.hero; } return g;
 }
 function end(M, win, why) {
-  if (M.over) return; M.over = {win: win, t: 0, why: why || ''}; CD.Sfx.play(win ? 'win' : 'lose'); M.banner(win ? 'VICTORY' : 'DEFEATED', 3);
+  if (M.over || M.noEnd) return; M.over = {win: win, t: 0, why: why || ''}; CD.Sfx.play(win ? 'win' : 'lose'); M.banner(win ? 'VICTORY' : 'DEFEATED', 3);
   if (win) for (const u of M.units) if (u.team === 0 && !u.dead && u.def.ai !== 'pet') { u.one = null; u.dance = 1 + (u.id % 3); u.t = 0; }
 }
 MS.end = (win, why) => { if (CD.M) end(CD.M, win, why); };
@@ -3478,6 +3491,7 @@ MS.objective = function (M) {
   if (T === 'raid') { const n = M.tents.filter(t => !t.gone && t.inCamp).length; if (n) return {txt: 'Burn the camp tents: ' + n + ' left', at: M.tents.find(t => !t.gone && t.inCamp)}; return {txt: 'Topple the standard', at: M.totem}; }
   if (T === 'rescue') return M.stage === 0 ? {txt: 'Break the cage and free ' + M.prisoner.name, at: M.cage} : {txt: 'Bring ' + M.prisoner.name + ' back down the trail', at: {x: M.start[0], y: M.start[1]}, zone: 60};
   if (T === 'heist') return M.boxN < 3 ? {txt: 'Grab the strongboxes: ' + M.boxN + ' of 3', at: M.boxes.find(b => !b.got)} : {txt: 'Back to the wagon!', at: M.wagon, zone: 50};
+  if (T === 'defend' && !M.waves) return {txt: '', at: null};
   if (T === 'defend') return {txt: M.waves.i === 0 ? 'Riders coming. Build at the stakes!' : 'Hold the town: wave ' + M.waves.i + ' of ' + M.waves.n, at: null};
   const b = (M.bosses || []).find(x => !x.dead); return {txt: 'Bring down ' + (b ? b.name : 'the boss'), at: b};
 };
@@ -3498,6 +3512,7 @@ function finish(M) {
   CD.M = null; I.reset(); M.onEnd(res);
 }
 function camera(M, dt) {
+  if (M.camLock) return;                                      // the trailer director frames its own shots
   const h = M.hero, tx = h.x + Math.cos(h.aim) * 22, ty = (h.y + Math.sin(h.aim) * 16) * YS - 14, k = 1 - Math.pow(0.004, dt);
   M.cam.x += (tx - M.cam.x) * k; M.cam.y += (ty - M.cam.y) * k; clampCam(M); if (M.shake > 0) M.shake = Math.max(0, M.shake - dt * 22);
 }
@@ -3515,7 +3530,7 @@ MS.update = function (dt) {
   M.units = M.units.filter(u => !(u.stained && u.deadT > 0.95));
   W.updateStructs(M, dt); C.update(M, dt); pickups(M, dt); waves(M, dt); objective(M, dt);
   if (CD.M !== M) return;
-  camera(M, dt); CD.HUD.update(M); I.flush();
+  camera(M, dt); if (!M.spec.noHud) CD.HUD.update(M); I.flush();
 };
 
 /* ================= drawing ================= */
@@ -3525,7 +3540,7 @@ function drawStruct(c, M, s) {
   A.draw(c, s.art, x, y, s.v, s.pal);
   if (s.kind === 'campfire') F.flame(c, x, y - 1, M.t + s.id);
   if (s.lock && s.lock(M)) { U.text(c, 'LOCKED', x, y - s.top - 4, 5, U.PAPER3, {stroke: 1.4}); }
-  if (s.hp != null && s.hp < s.maxHp && s.team !== 3) { const w = Math.min(30, 12 + s.maxHp / 14), f = Math.max(0, s.hp / s.maxHp), yy = y - s.top - 4; c.fillStyle = U.INKC; c.fillRect(x - w / 2 - 0.6, yy - 0.6, w + 1.2, 3.2); c.fillStyle = s.team === 0 ? '#7fae5a' : U.RED; c.fillRect(x - w / 2, yy, w * f, 2); }
+  if (s.hp != null && s.hp < s.maxHp && s.team !== 3 && !M.spec.noHud) { const w = Math.min(30, 12 + s.maxHp / 14), f = Math.max(0, s.hp / s.maxHp), yy = y - s.top - 4; c.fillStyle = U.INKC; c.fillRect(x - w / 2 - 0.6, yy - 0.6, w + 1.2, 3.2); c.fillStyle = s.team === 0 ? '#7fae5a' : U.RED; c.fillRect(x - w / 2, yy, w * f, 2); }
   if (s.spawn && s.team === 1) { const sp = s.spawn; if (sp.kids.length < sp.cap && sp.t < 1.2 && sp.t > 0) { c.globalAlpha = 0.8; U.text(c, '!', x, y - s.top - 8, 9, '#ff8a7a', {stroke: 2}); c.globalAlpha = 1; } }
 }
 MS.draw = function () {
@@ -3569,14 +3584,18 @@ MS.draw = function () {
       if (p.k === 'box') { A.draw(c, 'chest', p.x, p.y * YS - bob, 0); c.globalAlpha = 0.6 + 0.4 * Math.sin(M.t * 6); U.ell(c, p.x, p.y * YS, 13, 13 * YS, null, 1, U.MUST); c.globalAlpha = 1; } else A.draw(c, p.k, p.x, p.y * YS - p.z - bob, 0); }
     else if (o.e) F.draw(c, o.e);
   }
-  for (const n of M.nums) F.num(c, n);
+  for (const n of M.nums) if (!M.spec.noHud || n.big) F.num(c, n);
   /* objective pointer */
-  if (ob.at && !M.over) { const ox = ob.at.x, oy = ob.at.y * YS - (ob.at.top || 30), m = 14;
+  if (ob.at && !M.over && !M.spec.noHud) { const ox = ob.at.x, oy = ob.at.y * YS - (ob.at.top || 30), m = 14;
     if (ox > L + m && ox < R - m && oy > T + m + 16 && oy < Bt - m) { const b = Math.sin(M.t * 5) * 2; U.poly(c, [[ox - 4, oy - 14 + b], [ox + 4, oy - 14 + b], [ox, oy - 7 + b]], U.MUST, 0.9); }
     else { const cx = U.clamp(ox, L + m, R - m), cy = U.clamp(oy, T + m + 18, Bt - m), a = Math.atan2(oy - cy, ox - cx); c.save(); c.translate(cx, cy); c.rotate(a); U.poly(c, [[7, 0], [-4, -5], [-1.5, 0], [-4, 5]], U.MUST, 1); c.restore(); } }
-  if (I.mouse.seen && I.lastWasMouse && !U.COARSE && !M.over) { const m = mouseWorld(M), x = m[0], y = m[1] * YS; U.seg(c, x - 4, y, x - 1.5, y, 1, U.INKC); U.seg(c, x + 1.5, y, x + 4, y, 1, U.INKC); U.seg(c, x, y - 4, x, y - 1.5, 1, U.INKC); U.seg(c, x, y + 1.5, x, y + 4, 1, U.INKC); }
+  if (I.mouse.seen && I.lastWasMouse && !U.COARSE && !M.over && !M.spec.noHud) { const m = mouseWorld(M), x = m[0], y = m[1] * YS; U.seg(c, x - 4, y, x - 1.5, y, 1, U.INKC); U.seg(c, x + 1.5, y, x + 4, y, 1, U.INKC); U.seg(c, x, y - 4, x, y - 1.5, 1, U.INKC); U.seg(c, x, y + 1.5, x, y + 4, 1, U.INKC); }
 };
 /* test and debug hooks */
+/* hooks for the trailer director: the hero's own attack and special, as the player would trigger them */
+MS.heroAttack = () => { const M = CD.M; if (M && !M.hero.one && !M.hero.dead) heroAttack(M, M.hero, [0, 0, 0]); };
+MS.special = () => { const M = CD.M; if (M && M.hero.spCd <= 0) { M.hero.spCd = 0; special(M, M.hero); } };
+MS.heroLook = h => heroLook(h);
 MS.debug = {
   god: v => { if (CD.M) CD.M.god = v !== false; },
   win: () => MS.end(true), lose: () => MS.end(false, 'debug'),

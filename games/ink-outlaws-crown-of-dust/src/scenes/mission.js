@@ -11,7 +11,7 @@ D.missionNames = {raid: 'Raid', rescue: 'Rescue', heist: 'Heist', defend: 'Defen
 MS.start = function (spec, onEnd) {
   spec.perk = spec.perk || {};
   const M = CD.M = {spec: spec, onEnd: onEnd, t: 0, cam: {x: 0, y: 0}, view: {w: 320, h: 200, S: 3}, shake: 0, kills: 0, scrip: 6 + 4 * (spec.perk.powder || 0), loot: 0, perk: spec.perk, order: 'follow', orderPt: null, focus: null, over: null,
-    state: 'load', revives: spec.perk.doc || 0, boxN: 0, god: false, bannerTxt: '', bannerT: 0, paused: false, buildOpen: false, near: null, posse: [], stage: 0, lost: []};
+    state: spec.skipWarm ? 'play' : 'load', noEnd: !!spec.noEnd, revives: spec.perk.doc || 0, boxN: 0, god: false, bannerTxt: '', bannerT: 0, paused: false, buildOpen: false, near: null, posse: [], stage: 0, lost: []};
   M.banner = (txt, T) => { M.bannerTxt = txt; M.bannerT = T || 2; M.bannerT0 = T || 2; };
   M.enemyCount = () => { let n = 0; for (const u of M.units) if (u.team === 1 && !u.dead) n++; return n; };
   W.build(M, spec);
@@ -26,7 +26,8 @@ MS.start = function (spec, onEnd) {
       else { p.prisoner = false; p.slot = M.posse.length; p.hp = p.maxHp; M.banner(p.name + ' is free and fighting!', 2.4); } }
     if (s === M.hall) end(M, false, 'The town hall has fallen.'); };
   if (spec.type === 'defend') M.waves = {i: 0, n: 3 + Math.ceil(M.tier / 2), t: 7, live: false};
-  /* paint ahead: the hero completely, everyone else standing and moving */
+  /* paint ahead: the hero completely, everyone else standing and moving (the trailer director paints for itself) */
+  if (spec.skipWarm) { layout(M); M.cam.x = h.x; M.cam.y = h.y * YS; return M; }
   const mv = u => u.spd >= 33 ? 'run' : 'walk', seen = new Set();
   S.warm(h.look, ['idle', 'run', 'jump'].concat(h.w.kind === 'gun' || h.w.thrust ? ['shoot'] : ['combo1', 'combo2', 'combo3']), 1);
   for (const u of M.units) { if (u.hero || seen.has(u.look)) continue; seen.add(u.look); S.warm(u.look, ['idle', mv(u)], u.mult, ['S', 'SE', 'E', 'W', 'SW']); }
@@ -47,7 +48,7 @@ function reinforce(M, n, from) {
   const p = from || [M.W - 30, M.H / 2 + (M.rng() - 0.5) * 300]; const g = W.group(M, p[0], p[1], n, {set: {}}); for (const u of g) { u.ai.march = true; u.ai.alert = true; u.ai.hate = M.hero; } return g;
 }
 function end(M, win, why) {
-  if (M.over) return; M.over = {win: win, t: 0, why: why || ''}; CD.Sfx.play(win ? 'win' : 'lose'); M.banner(win ? 'VICTORY' : 'DEFEATED', 3);
+  if (M.over || M.noEnd) return; M.over = {win: win, t: 0, why: why || ''}; CD.Sfx.play(win ? 'win' : 'lose'); M.banner(win ? 'VICTORY' : 'DEFEATED', 3);
   if (win) for (const u of M.units) if (u.team === 0 && !u.dead && u.def.ai !== 'pet') { u.one = null; u.dance = 1 + (u.id % 3); u.t = 0; }
 }
 MS.end = (win, why) => { if (CD.M) end(CD.M, win, why); };
@@ -157,6 +158,7 @@ MS.objective = function (M) {
   if (T === 'raid') { const n = M.tents.filter(t => !t.gone && t.inCamp).length; if (n) return {txt: 'Burn the camp tents: ' + n + ' left', at: M.tents.find(t => !t.gone && t.inCamp)}; return {txt: 'Topple the standard', at: M.totem}; }
   if (T === 'rescue') return M.stage === 0 ? {txt: 'Break the cage and free ' + M.prisoner.name, at: M.cage} : {txt: 'Bring ' + M.prisoner.name + ' back down the trail', at: {x: M.start[0], y: M.start[1]}, zone: 60};
   if (T === 'heist') return M.boxN < 3 ? {txt: 'Grab the strongboxes: ' + M.boxN + ' of 3', at: M.boxes.find(b => !b.got)} : {txt: 'Back to the wagon!', at: M.wagon, zone: 50};
+  if (T === 'defend' && !M.waves) return {txt: '', at: null};
   if (T === 'defend') return {txt: M.waves.i === 0 ? 'Riders coming. Build at the stakes!' : 'Hold the town: wave ' + M.waves.i + ' of ' + M.waves.n, at: null};
   const b = (M.bosses || []).find(x => !x.dead); return {txt: 'Bring down ' + (b ? b.name : 'the boss'), at: b};
 };
@@ -177,6 +179,7 @@ function finish(M) {
   CD.M = null; I.reset(); M.onEnd(res);
 }
 function camera(M, dt) {
+  if (M.camLock) return;                                      // the trailer director frames its own shots
   const h = M.hero, tx = h.x + Math.cos(h.aim) * 22, ty = (h.y + Math.sin(h.aim) * 16) * YS - 14, k = 1 - Math.pow(0.004, dt);
   M.cam.x += (tx - M.cam.x) * k; M.cam.y += (ty - M.cam.y) * k; clampCam(M); if (M.shake > 0) M.shake = Math.max(0, M.shake - dt * 22);
 }
@@ -194,7 +197,7 @@ MS.update = function (dt) {
   M.units = M.units.filter(u => !(u.stained && u.deadT > 0.95));
   W.updateStructs(M, dt); C.update(M, dt); pickups(M, dt); waves(M, dt); objective(M, dt);
   if (CD.M !== M) return;
-  camera(M, dt); CD.HUD.update(M); I.flush();
+  camera(M, dt); if (!M.spec.noHud) CD.HUD.update(M); I.flush();
 };
 
 /* ================= drawing ================= */
@@ -204,7 +207,7 @@ function drawStruct(c, M, s) {
   A.draw(c, s.art, x, y, s.v, s.pal);
   if (s.kind === 'campfire') F.flame(c, x, y - 1, M.t + s.id);
   if (s.lock && s.lock(M)) { U.text(c, 'LOCKED', x, y - s.top - 4, 5, U.PAPER3, {stroke: 1.4}); }
-  if (s.hp != null && s.hp < s.maxHp && s.team !== 3) { const w = Math.min(30, 12 + s.maxHp / 14), f = Math.max(0, s.hp / s.maxHp), yy = y - s.top - 4; c.fillStyle = U.INKC; c.fillRect(x - w / 2 - 0.6, yy - 0.6, w + 1.2, 3.2); c.fillStyle = s.team === 0 ? '#7fae5a' : U.RED; c.fillRect(x - w / 2, yy, w * f, 2); }
+  if (s.hp != null && s.hp < s.maxHp && s.team !== 3 && !M.spec.noHud) { const w = Math.min(30, 12 + s.maxHp / 14), f = Math.max(0, s.hp / s.maxHp), yy = y - s.top - 4; c.fillStyle = U.INKC; c.fillRect(x - w / 2 - 0.6, yy - 0.6, w + 1.2, 3.2); c.fillStyle = s.team === 0 ? '#7fae5a' : U.RED; c.fillRect(x - w / 2, yy, w * f, 2); }
   if (s.spawn && s.team === 1) { const sp = s.spawn; if (sp.kids.length < sp.cap && sp.t < 1.2 && sp.t > 0) { c.globalAlpha = 0.8; U.text(c, '!', x, y - s.top - 8, 9, '#ff8a7a', {stroke: 2}); c.globalAlpha = 1; } }
 }
 MS.draw = function () {
@@ -248,14 +251,18 @@ MS.draw = function () {
       if (p.k === 'box') { A.draw(c, 'chest', p.x, p.y * YS - bob, 0); c.globalAlpha = 0.6 + 0.4 * Math.sin(M.t * 6); U.ell(c, p.x, p.y * YS, 13, 13 * YS, null, 1, U.MUST); c.globalAlpha = 1; } else A.draw(c, p.k, p.x, p.y * YS - p.z - bob, 0); }
     else if (o.e) F.draw(c, o.e);
   }
-  for (const n of M.nums) F.num(c, n);
+  for (const n of M.nums) if (!M.spec.noHud || n.big) F.num(c, n);
   /* objective pointer */
-  if (ob.at && !M.over) { const ox = ob.at.x, oy = ob.at.y * YS - (ob.at.top || 30), m = 14;
+  if (ob.at && !M.over && !M.spec.noHud) { const ox = ob.at.x, oy = ob.at.y * YS - (ob.at.top || 30), m = 14;
     if (ox > L + m && ox < R - m && oy > T + m + 16 && oy < Bt - m) { const b = Math.sin(M.t * 5) * 2; U.poly(c, [[ox - 4, oy - 14 + b], [ox + 4, oy - 14 + b], [ox, oy - 7 + b]], U.MUST, 0.9); }
     else { const cx = U.clamp(ox, L + m, R - m), cy = U.clamp(oy, T + m + 18, Bt - m), a = Math.atan2(oy - cy, ox - cx); c.save(); c.translate(cx, cy); c.rotate(a); U.poly(c, [[7, 0], [-4, -5], [-1.5, 0], [-4, 5]], U.MUST, 1); c.restore(); } }
-  if (I.mouse.seen && I.lastWasMouse && !U.COARSE && !M.over) { const m = mouseWorld(M), x = m[0], y = m[1] * YS; U.seg(c, x - 4, y, x - 1.5, y, 1, U.INKC); U.seg(c, x + 1.5, y, x + 4, y, 1, U.INKC); U.seg(c, x, y - 4, x, y - 1.5, 1, U.INKC); U.seg(c, x, y + 1.5, x, y + 4, 1, U.INKC); }
+  if (I.mouse.seen && I.lastWasMouse && !U.COARSE && !M.over && !M.spec.noHud) { const m = mouseWorld(M), x = m[0], y = m[1] * YS; U.seg(c, x - 4, y, x - 1.5, y, 1, U.INKC); U.seg(c, x + 1.5, y, x + 4, y, 1, U.INKC); U.seg(c, x, y - 4, x, y - 1.5, 1, U.INKC); U.seg(c, x, y + 1.5, x, y + 4, 1, U.INKC); }
 };
 /* test and debug hooks */
+/* hooks for the trailer director: the hero's own attack and special, as the player would trigger them */
+MS.heroAttack = () => { const M = CD.M; if (M && !M.hero.one && !M.hero.dead) heroAttack(M, M.hero, [0, 0, 0]); };
+MS.special = () => { const M = CD.M; if (M && M.hero.spCd <= 0) { M.hero.spCd = 0; special(M, M.hero); } };
+MS.heroLook = h => heroLook(h);
 MS.debug = {
   god: v => { if (CD.M) CD.M.god = v !== false; },
   win: () => MS.end(true), lose: () => MS.end(false, 'debug'),

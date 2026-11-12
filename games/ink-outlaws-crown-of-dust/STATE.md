@@ -17,6 +17,10 @@ For the whole game: `node tests/campaign.cjs 45 10` (20–45 min; it stops at th
 missions, results and raids), with no console errors. Totals: 854 enemies down, a gang of 8 including the captain, 342 gold left,
 and a sprite cache peak of 166 MB of the 190 MB desktop budget. The autopilot plays in god mode, so this proves the campaign can be completed, not that it is balanced.
 
+## Trailer
+`trailer/trailer.js` films the game. `node tests/render_trailer.cjs yt|tt` re-renders the MP4s into `build/trailer/` (git-ignored, about 3 minutes each).
+The published Artifact page with both cuts: https://claude.ai/artifact/VLgGKAcKC2SqrrhEkh5QwP (private to the owner until shared).
+
 ## Recently fixed (in case something similar comes back)
 - A line comment in `src/systems/combat.js` swallowed the rest of the shot update, so bullets never expired. **Keep code and `//` comments on separate lines.**
 - Point-blank shots spawned past their target. The first step now sweeps from the shooter's body (`b.px/b.py`).

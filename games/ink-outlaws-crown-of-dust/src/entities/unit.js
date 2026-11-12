@@ -84,7 +84,7 @@ E.draw = function (c, M, u) {
   if (u.stun > 0 && !u.dead) o.sy = 0.94;
   u.lastSp = S.draw(c, u.look, an[0], an[1], u.dir, sx, sy - u.z, o);
   if (u.caged) return;
-  if (!u.dead && u.hp < u.maxHp && !u.hero && !u.boss) {       // small ink health bar
+  if (!u.dead && u.hp < u.maxHp && !u.hero && !u.boss && !M.spec.noHud) {       // small ink health bar
     const w = Math.min(26, 10 + u.maxHp / 12), y = sy - (u.lastSp ? -u.lastSp.oy : 50) - 4, f = Math.max(0, u.hp / u.maxHp);
     c.fillStyle = U.INKC; c.fillRect(sx - w / 2 - 0.6, y - 0.6, w + 1.2, 3.2); c.fillStyle = u.team === 0 ? '#7fae5a' : U.RED; c.fillRect(sx - w / 2, y, w * f, 2);
   }

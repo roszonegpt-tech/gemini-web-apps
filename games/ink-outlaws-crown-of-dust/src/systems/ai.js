@@ -139,7 +139,7 @@ function ally(M, u, dt) {
 
 AI.update = function (M, dt) {
   for (const u of M.units) {
-    if (u.hero || u.dead || u.caged) continue;
+    if (u.hero || u.dead || u.caged || u.scripted) continue;     // scripted: moved by the trailer director
     if (u.stun > 0 || u.one || u.roll) continue;
     if (M.over) { continue; }
     if (u.team === 1) enemy(M, u, dt); else ally(M, u, dt);

@@ -3,6 +3,9 @@
 All notable changes to this project. The format follows Keep a Changelog; versions follow semantic versioning.
 
 ## [Unreleased]
+### Added
+- Gameplay trailer: `trailer/` director (48 shots, 58 s, cut on a 120 BPM beat) and `tests/render_trailer.cjs`, which renders a YouTube cut (1920×1080) and a TikTok cut (1080×1920) frame by frame with an offline soundtrack.
+- Trailer hooks: `spec.noHud`, `spec.skipWarm`, `spec.noEnd`, `spec.bgS`, `M.camLock`, `Sprites.lockScale`, `CD.Sfx.onPlay` / `renderInto`, and `unit.scripted`. Normal play is unchanged.
 ### Fixed
 - Crown Clerics no longer out-heal bosses (heals capped at 45); King Odo and the Tyrant no longer stand stacked on one spot.
 
