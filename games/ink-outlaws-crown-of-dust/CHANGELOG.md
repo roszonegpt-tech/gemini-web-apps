@@ -3,6 +3,8 @@
 All notable changes to this project. The format follows Keep a Changelog; versions follow semantic versioning.
 
 ## [Unreleased]
+### Fixed
+- Crown Clerics no longer out-heal bosses (heals capped at 45); King Odo and the Tyrant no longer stand stacked on one spot.
 
 ## [0.1.0] - 2026-11-12
 ### Added

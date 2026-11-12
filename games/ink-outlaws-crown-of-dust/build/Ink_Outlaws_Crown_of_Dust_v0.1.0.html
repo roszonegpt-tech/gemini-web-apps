@@ -3243,7 +3243,7 @@ function enemy(M, u, dt) {
       a.sp = u.boss ? 7 : 10;
       if (d.summon && M.enemyCount() < 40 && (a.sumN = (a.sumN || 0) + 1) <= (u.boss ? 5 : 3)) { E.startOne(u, 'dance3', {rate: 1.6}); for (let i = 0; i < (u.boss ? 3 : 2); i++) { const n = E.spawn(M, d.summon, 1, u.x + (Math.random() - 0.5) * 50, u.y + (Math.random() - 0.5) * 40); n.ai.hate = t; n.ai.alert = true; M.fx.push({k: 'ring', x: n.x, y: n.y, t: 0, T: 0.35, r: 14, col: '#6fd08a'}); } CD.Sfx.play('magic'); return; }
       if (d.nova && dist(u, t) < 170) { E.startOne(u, 'dance2', {rate: 1.4}); for (let i = 0; i < 12; i++) { const an = i / 12 * 6.283; M.shots.push({x: u.x, y: u.y, h: 18, vx: Math.cos(an) * 120, vy: Math.sin(an) * 120, life: 1.5, dmg: 12 * u.dmg, team: 1, src: u, orb: '#e0435a', splash: 14, push: 60}); } CD.Sfx.play('magic'); return; }
-      if (d.heals) { let low = null; for (const o of M.units) if (o.team === 1 && !o.dead && o.hp < o.maxHp * 0.8 && dist(o, u) < 140 && (!low || o.hp / o.maxHp < low.hp / low.maxHp)) low = o; if (low) { E.startOne(u, 'shoot', {fire: false}); C.heal(M, low, low.maxHp * 0.3); CD.Sfx.play('heal'); return; } a.sp = 3; }
+      if (d.heals) { let low = null; for (const o of M.units) if (o.team === 1 && !o.dead && o.hp < o.maxHp * 0.8 && dist(o, u) < 140 && (!low || o.hp / o.maxHp < low.hp / low.maxHp)) low = o; if (low) { E.startOne(u, 'shoot', {fire: false}); C.heal(M, low, Math.min(45, low.maxHp * 0.3)); CD.Sfx.play('heal'); return; } a.sp = 3; }
     }
   }
   if (d.ai === 'charger' && charger(M, u, t, dt)) return;
@@ -3311,7 +3311,7 @@ AI.separate = function (M, dt) {
     for (let j = i + 1; j < n; j++) { const b = us[j]; if (b.dead || b.caged) continue;
       const dx = b.x - a.x, dy = b.y - a.y, rr = (a.r + b.r) * 0.85; if (Math.abs(dx) > rr || Math.abs(dy) > rr) continue;
       const d = Math.hypot(dx, dy); if (d >= rr) continue; const k = (rr - d) * Math.min(1, dt * 9), nx = d > 0.01 ? dx / d : 1, ny = d > 0.01 ? dy / d : 0;
-      const wa = a.dormant || a.boss ? 0 : a.hero ? 0.3 : b.r / (a.r + b.r), wb = b.dormant || b.boss ? 0 : b.hero ? 0.3 : a.r / (a.r + b.r);
+      const both = a.boss && b.boss, wa = a.dormant || (a.boss && !both) ? 0 : a.hero ? 0.3 : b.r / (a.r + b.r), wb = b.dormant || (b.boss && !both) ? 0 : b.hero ? 0.3 : a.r / (a.r + b.r);   // two bosses still push each other apart
       a.x -= nx * k * wa; a.y -= ny * k * wa; b.x += nx * k * wb; b.y += ny * k * wb; } }
 };
 })();

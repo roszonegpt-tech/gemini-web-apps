@@ -13,13 +13,17 @@ From this folder, with Node and Playwright available:
 For the whole game: `node tests/campaign.cjs 45 10` (20–45 min; it stops at the first stall and writes `tests/out/stuck.png`).
 
 ## Last full-campaign run
-In progress at the time of writing (day 3 reached). The previous full run reached day 15 with 10 of 13 territories before stalling on a heist; the fixes above came from that run. Rerun `node tests/campaign.cjs 45 10` to confirm a full win.
+The autopilot reached Castle Gilt on day 14 holding 12 of 13 territories, with both lesser strongholds broken and no console errors.
+It stalled there because Crown Clerics healed King Odo for 30% of his maximum health per cast, and Odo and the Tyrant stood stacked
+on one spot. Both are fixed: heals are capped at 45 and bosses push each other apart. After the fix, an upgraded gang takes Castle Gilt in about 2 minutes of game time.
+A confirming full run was started after this commit; see the PR for its result.
 
 ## Recently fixed (in case something similar comes back)
 - A line comment in `src/systems/combat.js` swallowed the rest of the shot update, so bullets never expired. **Keep code and `//` comments on separate lines.**
 - Point-blank shots spawned past their target. The first step now sweeps from the shooter's body (`b.px/b.py`).
 - Small props (trees, cacti) blocked movement but not navigation, so walkers jammed. All solid props now block the nav grid.
 - Crates could sit on a heist strongbox; they are now cleared from around every box.
+- Crown Clerics could out-heal a boss (now capped at 45 per cast); stacked bosses now push each other apart.
 - The last Defend wave could hang on an enemy wedged behind a rock; 3 or fewer stragglers now flee after the wave timer.
 
 ## Conventions
