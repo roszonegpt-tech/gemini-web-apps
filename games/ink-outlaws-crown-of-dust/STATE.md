@@ -13,10 +13,9 @@ From this folder, with Node and Playwright available:
 For the whole game: `node tests/campaign.cjs 45 10` (20–45 min; it stops at the first stall and writes `tests/out/stuck.png`).
 
 ## Last full-campaign run
-The autopilot reached Castle Gilt on day 14 holding 12 of 13 territories, with both lesser strongholds broken and no console errors.
-It stalled there because Crown Clerics healed King Odo for 30% of his maximum health per cast, and Odo and the Tyrant stood stacked
-on one spot. Both are fixed: heals are capped at 45 and bosses push each other apart. After the fix, an upgraded gang takes Castle Gilt in about 2 minutes of game time.
-A confirming full run was started after this commit; see the PR for its result.
+**Won.** `node tests/campaign.cjs 45 12`: the autopilot took all 13 territories by day 14 through the real menus (briefings,
+missions, results and raids), with no console errors. Totals: 854 enemies down, a gang of 8 including the captain, 342 gold left,
+and a sprite cache peak of 166 MB of the 190 MB desktop budget. The autopilot plays in god mode, so this proves the campaign can be completed, not that it is balanced.
 
 ## Recently fixed (in case something similar comes back)
 - A line comment in `src/systems/combat.js` swallowed the rest of the shot update, so bullets never expired. **Keep code and `//` comments on separate lines.**
