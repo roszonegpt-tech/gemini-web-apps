@@ -70,7 +70,7 @@ function bossScene(o) {
   for (const x of M.bosses) { x.ai.asleep = false; x.ai.alert = true; x.ai.hate = M.hero; }
   const h = M.hero; h.x = b.x - 70; h.y = b.y + 20; face(h, 0); (o.gang || []).forEach((id, i) => pal(M, id, h.x - 10 - (i % 2) * 16, h.y - 26 + i * 16)); return M;
 }
-function arena(o) { const M = duel(Object.assign({tier: 2, noHud: false}, o)); M.noPointer = true; M._arena = true; (o.gang || []).forEach((id, i) => pal(M, id, AX - 22 - (i % 2) * 14, AY - 20 + i * 14)); return M; }
+function arena(o) { const M = duel(Object.assign({tier: 2, noHud: false}, o)); M.noPointer = true; M._arena = true; (o.gang || []).forEach((id, i) => pal(M, id, AX - 22 - (i % 2) * 14, AY - 20 + i * 14)); if (o.gang) CD.HUD.show(M); return M; }   // re-show so the posse chips and order buttons appear
 const cam = (fw, up, dx, dy) => M => ({x: M.hero.x + (dx || 0), y: M.hero.y + (dy || 0), fw: fw * (TT ? 0.8 : 1), up: up});
 function toScreen(M, x, y) { const V = CD.View, s = M.view.S; return [(x - M.cam.x) * s + V.w / 2, (y * YS - M.cam.y) * s + V.h / 2]; }
 function aimAt(M, t) { I.mouse.seen = true; I.lastWasMouse = true; const p = toScreen(M, t.x, t.y - 14); I.mouse.x = p[0]; I.mouse.y = p[1]; }
@@ -120,7 +120,7 @@ const S = {
       for (let i = 0; i < 3; i++) { const u = foe(M, 'lancer', hx + 210, hy + 30 + i * 30); u.ai.march = true; } for (let i = 0; i < 5; i++) { const u = foe(M, 'footman', hx + 240 + (i % 2) * 20, hy - 20 + i * 22); u.ai.march = true; } return M; },
     act: () => hold(1), cam: M => ({x: M.hall.x + 70, y: M.hall.y + 50, fw: 400, up: 30})}),
   gunNest: () => ({set: () => { const M = stage({type: 'defend', faction: 'crown', biome: 'desert', seed: 51, hero: 'kit', scrip: 40, noHud: false}); const st = M.stakes.reduce((a, b2) => b2.x > a.x && b2.y > a.y - 20 ? b2 : a); M.units = M.units.filter(u => u.hero || u.militia);
-      M.hero.x = st.x - 14; M.hero.y = st.y + 10; face(M.hero, 0); M._st = st; for (let i = 0; i < 6; i++) { const u = foe(M, i % 3 ? 'footman' : 'musketeer', st.x + 170 + (i % 2) * 22, st.y - 40 + i * 14); u.ai.march = true; } return M; },
+      M.hero.x = st.x - 14; M.hero.y = st.y + 10; face(M.hero, 0); M._st = st; ['wren', 'goro'].forEach((id, i) => pal(M, id, st.x - 34, st.y - 6 + i * 18)); CD.HUD.show(M); for (let i = 0; i < 6; i++) { const u = foe(M, i % 3 ? 'footman' : 'musketeer', st.x + 170 + (i % 2) * 22, st.y - 40 + i * 14); u.ai.march = true; } return M; },
     act: (M, t) => { if (t > 0.6 && t < 2.2) M.buildOpen = true; if (t > 2.2 && !M._built) { M._built = MS.build(1) || true; } }, keys: t => t > 0.4 && t < 3 ? ['E', '2'] : null,
     cam: M => ({x: M._st.x + 60, y: M._st.y, fw: 300, up: 30})}),
   kegs: () => ({set: () => { const M = arena({hero: 'vega', faction: 'corsair', biome: 'swamp', seed: 52}); const kx = AX + 90; M._kegs = [0, 1, 2].map(i => W.addStruct(M, 'keg', kx + i * 22, AY - 14 + i * 14, {}));
