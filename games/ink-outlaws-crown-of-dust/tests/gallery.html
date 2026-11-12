@@ -1,0 +1,15 @@
+<!doctype html><meta charset="utf-8"><title>Crown of Dust - art gallery</title>
+<body style="margin:0;background:#d9c9a0">
+<canvas id="g" width="1500" height="2400"></canvas>
+<script src="../assets/js/ink.js"></script><script src="../src/core/util.js"></script><script src="../src/art/sprites.js"></script><script src="../src/art/inkkit.js"></script>
+<script>
+/* Debug harness: paints every structure and prop next to a character for scale. Open directly in a browser. */
+const c = document.getElementById('g').getContext('2d'), A = CD.Art, S = CD.Sprites; S.scale = 3;
+const P = id => INK.PRESETS.find(p => p.id === id).look;
+c.scale(3, 3); let x = 10, y = 0, rowH = 0;
+const pals = ['outlaw', 'corsair', 'hollow', 'crown'], multi = ['tent', 'totem', 'tower', 'house', 'rock', 'tree', 'cactus', 'deadtree', 'log', 'grave', 'crate', 'pine', 'bush', 'tuft', 'swamptree', 'boulder', 'mushroom'];
+const items = []; for (const kd of Object.keys(A.defs)) { const n = multi.includes(kd) ? 4 : ['chest', 'cage', 'stonewall', 'haybale', 'bones'].includes(kd) ? 2 : 1; for (let v = 0; v < n; v++) items.push([kd, v, pals[v % 4]]); }
+for (const it of items) { const d = A.defs[it[0]], w = d.r[0] * 2 + 4, h = d.r[1] + d.r[2]; if (x + w > 490) { x = 10; y += rowH + 4; rowH = 0; } rowH = Math.max(rowH, h); A.draw(c, it[0], x + d.r[0], y + rowH - d.r[2], it[1], it[2]); x += w; }
+S.draw(c, P('harrow'), 'idle', 0, 'SE', 460, y + rowH - 4);
+window.DONE = true;
+</script>
