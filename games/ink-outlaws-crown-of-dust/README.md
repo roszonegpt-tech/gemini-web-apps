@@ -60,6 +60,15 @@ games/ink-outlaws-crown-of-dust/
 └─ build/build.py          single-file build
 ```
 
+## Play in an Artifact
+
+`python3 build/build.py --artifact` writes `build/artifact/ink-outlaws-crown-of-dust.html`, the game as a page fragment (title, style, body and inline scripts)
+for a claude.ai Artifact. It is git-ignored and regenerates in a second. `node tests/artifact.cjs` plays it inside the Artifact skeleton at desktop and phone sizes,
+and with browser storage blocked.
+
+Saves use `localStorage`. The Menu (and the title screen) can copy and load a **save code**, one line of text that moves the campaign between browsers and devices.
+Loaded codes are whitelisted and clamped by `K.sanitize` in `src/systems/campaign.js`.
+
 ## Trailer
 
 A 58-second gameplay trailer is filmed from the engine itself by `trailer/trailer.js`. It has 48 shots cut on a 120 BPM beat, and its soundtrack is made from the game's own synth sounds plus a drum and bass loop.

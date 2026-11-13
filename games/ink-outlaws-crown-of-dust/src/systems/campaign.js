@@ -12,7 +12,40 @@ K.fresh = function (heroId) {
   G.armory[def.weapon] = 1; D.terr.forEach(t => { G.own[t.id] = t.own; });
   K.note('Day 1. ' + def.name + ' rides into Dry Gulch with fifty gold and a grudge.'); K.save(); return G;
 };
-K.load = function () { const s = CD.Save.load(); if (!s || !s.G) return null; G = CD.G = s.G; if (!D.units[G.hero]) K.ensureCustom(); if (!D.units[G.hero]) return (G = CD.G = null); return G; };
+K.load = function () { const s = CD.Save.load(); if (!s || !s.G) return null; const g = K.sanitize(s.G); if (!g) return null; G = CD.G = g; return G; };
+/* Rebuild a campaign from untrusted data (storage, or a pasted save code): whitelist every field and clamp every value. */
+K.sanitize = function (g) {
+  if (!g || typeof g !== 'object') return null;
+  const num = (v, lo, hi, d) => typeof v === 'number' && isFinite(v) ? Math.max(lo, Math.min(hi, Math.floor(v))) : d;
+  const isOut = id => typeof id === 'string' && D.outlaws.indexOf(id) >= 0, uniq = a => a.filter((x, i) => a.indexOf(x) === i);
+  let hero = g.hero; if (hero === 'custom' && !D.units.custom) K.ensureCustom(); if (hero !== 'custom' && !isOut(hero)) return null; if (hero === 'custom' && !D.units.custom) hero = 'harrow';
+  const arr = (a, f, n) => Array.isArray(a) ? uniq(a.filter(f)).slice(0, n) : [];
+  const wOk = id => typeof id === 'string' && D.weapons[id], o = {};
+  o.day = num(g.day, 1, 9999, 1); o.gold = num(g.gold, 0, 99999, 0); o.seed = num(g.seed, 0, 2147483647, 1); o.hero = hero;
+  o.roster = arr(g.roster, id => isOut(id) && id !== hero, 40); o.posse = arr(g.posse, id => o.roster.indexOf(id) >= 0, 8);
+  const ws = arr(g.weapons, wOk, 2); o.weapons = ws.length === 2 ? ws : [D.units[hero].weapon, D.units[hero].weapon === 'fists' ? 'revolver' : 'fists'];
+  o.armory = {}; Object.keys(g.armory && typeof g.armory === 'object' ? g.armory : {}).forEach(k => { if (wOk(k)) o.armory[k] = 1; }); o.weapons.forEach(w => { o.armory[w] = 1; });
+  o.mount = D.mounts.some(m => m[0] === g.mount) ? g.mount : null;
+  o.freed = {}; Object.keys(g.freed && typeof g.freed === 'object' ? g.freed : {}).forEach(k => { if (isOut(k)) o.freed[k] = 1; });
+  o.bld = {}; Object.keys(D.bld).forEach(k => { o.bld[k] = num(g.bld && g.bld[k], 0, D.bld[k].cost.length, 0); });
+  o.own = {}; D.terr.forEach(t => { const f = g.own && g.own[t.id]; o.own[t.id] = D.factions[f] ? f : t.own; }); o.own.gulch = 'outlaw';
+  o.at = D.terrById[g.at] ? g.at : 'gulch'; o.won = g.won === true; o.wonOnce = g.wonOnce === true;
+  o.kills = num(g.kills, 0, 1e7, 0); o.missions = num(g.missions, 0, 1e5, 0); o.tut = num(g.tut, 0, 9, 0);
+  o.seen = {}; Object.keys(g.seen && typeof g.seen === 'object' ? g.seen : {}).forEach(k => { if (D.units[k]) o.seen[k] = 1; });
+  o.log = Array.isArray(g.log) ? g.log.filter(x => typeof x === 'string').slice(0, 30).map(x => x.slice(0, 200)) : [];
+  return o;
+};
+/* A save code is the campaign as one pasteable line, for moving it between browsers and devices. */
+const CODE = 'CODSAVE1.';
+K.exportCode = function () { if (!G) return ''; const json = JSON.stringify({v: 1, G: G}); return CODE + btoa(unescape(encodeURIComponent(json))); };
+K.importCode = function (text) {
+  try {
+    const t = String(text || '').replace(/\s+/g, ''); if (t.indexOf(CODE) !== 0) return {ok: false, msg: 'That is not a Crown of Dust save code.'};
+    const obj = JSON.parse(decodeURIComponent(escape(atob(t.slice(CODE.length))))), g = obj && obj.v === 1 ? K.sanitize(obj.G) : null;
+    if (!g) return {ok: false, msg: 'The save code is damaged or from a different version.'};
+    CD.Save.store({G: g}); return {ok: true};
+  } catch (e) { return {ok: false, msg: 'The save code could not be read. Copy it again in full.'}; }
+};
 K.save = function () { if (G) CD.Save.store({G: G}); };
 K.note = function (txt) { G.log.unshift(txt); if (G.log.length > 30) G.log.length = 30; };
 /* the hero designed in the Chunk Lab becomes a real unit entry */

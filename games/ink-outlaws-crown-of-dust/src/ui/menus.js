@@ -31,8 +31,34 @@ UI.title = function () {
   btn('Wanted posters', '', () => UI.codex(() => UI.title()), row);
   const row2 = mk('div', 'row', null, t);
   const sb = btn('', 'sm', () => { CD.Save.settings.sound = !CD.Save.settings.sound; CD.Sfx.setOn(CD.Save.settings.sound); CD.Save.saveSettings(); sb.textContent = 'Sound: ' + (CD.Save.settings.sound ? 'on' : 'off'); }, row2); sb.textContent = 'Sound: ' + (CD.Save.settings.sound ? 'on' : 'off');
+  btn('Controls', 'sm', () => UI.controls(), row2);
+  btn('Load save code', 'sm', () => UI.saveCode('import'), row2);
+  if (document.fullscreenEnabled) btn('Fullscreen', 'sm', () => { try { if (document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen().catch(() => { /* refused here */ }); } catch (e) { /* not allowed in this frame */ } }, row2);
   const lab = mk('a', 'b sm', 'Open the Chunk Lab', row2); lab.href = 'docs/lab/Chunk_Lab_Ink_Outlaws_v0.5.0.html'; lab.style.textDecoration = 'none'; lab.style.display = 'inline-flex'; lab.style.alignItems = 'center'; if (CD.SINGLE) lab.style.display = 'none';
   mk('small', null, 'v' + CD.VERSION + ' · every sprite, building and tree is drawn in code by the Chunk Lab ink painter', t);
+};
+UI.controls = function () {
+  const m = modal('Controls'), K2 = s => '<kbd>' + s + '</kbd>';
+  m.p.insertAdjacentHTML('beforeend', '<table class="keys"><tbody>' +
+    [['Move', K2('W') + K2('A') + K2('S') + K2('D') + ' or arrows', 'Left stick'], ['Attack', 'Mouse or ' + K2('J') + ' (hold to keep firing)', 'ATTACK'], ['Dodge roll', K2('Space') + ' or right click', 'ROLL'],
+     ['Special move', K2('F'), 'SPECIAL'], ['Swap weapon', K2('Q'), 'SWAP'], ['Open chest, build at a stake', K2('E'), 'USE'], ['Posse orders', K2('1') + K2('2') + K2('3') + K2('4'), 'Buttons above the pad'], ['Pause', K2('Esc'), 'II']]
+      .map(r => '<tr><th>' + r[0] + '</th><td>' + r[1] + '</td><td>' + r[2] + '</td></tr>').join('') + '</tbody></table>' +
+    '<p class="note">With the mouse, attacks aim at the cursor. With keys or touch they find the nearest enemy in front of you. Blades chain into a three-hit combo.</p>');
+  btn('Close', 'alt', m.close, mk('div', 'row', null, m.p));
+};
+/* a save code is the whole campaign as one line of text: copy it out, paste it in on another device */
+UI.saveCode = function (mode) {
+  const out = mode === 'export', m = modal(out ? 'Save code' : 'Load save code'), ta = mk('textarea', 'code', null, m.p), msg = mk('p', 'note', null, m.p), row = mk('div', 'row', null, m.p);
+  ta.id = 'saveCode'; ta.rows = 5; ta.spellcheck = false; ta.autocapitalize = 'off';
+  if (out) {
+    ta.value = K.exportCode(); ta.readOnly = true; msg.textContent = 'Copy this line and keep it somewhere safe. Use Load save code on the title screen to bring the campaign back, on this device or another.';
+    const sel = () => { ta.focus(); ta.select(); msg.textContent = 'Select all and copy, then keep it somewhere safe.'; };
+    btn('Copy', 'alt', () => { try { navigator.clipboard.writeText(ta.value).then(() => { msg.textContent = 'Copied.'; }, sel); } catch (e) { sel(); } }, row);
+  } else {
+    ta.placeholder = 'Paste a save code here'; msg.textContent = 'Loading replaces the campaign saved in this browser.';
+    btn('Load', 'alt', () => { const r = K.importCode(ta.value); if (!r.ok) { msg.textContent = r.msg; return; } m.close(); if (K.load()) { CD.Map.sel = null; CD.Map.invalidate(); CD.go('map'); } }, row);
+  }
+  btn('Close', '', m.close, row);
 };
 UI.newGame = function () {
   const r = screen(true), hd = mk('header', 'top', null, r); mk('h1', null, null, hd).innerHTML = 'Pick your <b>captain</b>'; mk('span', 'sp', null, hd); btn('Back', 'sm', () => UI.title(), hd);
@@ -41,7 +67,7 @@ UI.newGame = function () {
   let sel = ids[0]; const cards = {};
   ids.forEach(id => { const c = card(g, id, {port: {zoom: 1.5}}); c.style.cursor = 'pointer'; c.onclick = () => { sel = id; sync(); CD.Sfx.play('click'); }; cards[id] = c; c.querySelector('canvas').style.height = '170px'; });
   const sync = () => ids.forEach(id => cards[id].classList.toggle('sel', id === sel)); sync();
-  if (ids.indexOf('custom') < 0) mk('p', 'note', 'Tip: design a character in the Chunk Lab (title screen) and it appears here as a fourth captain.', s);
+  if (!CD.SINGLE && ids.indexOf('custom') < 0) mk('p', 'note', 'Tip: design a character in the Chunk Lab (title screen) and it appears here as a fourth captain.', s);
   const row = mk('div', 'row', null, s); btn('Ride into Dry Gulch', 'alt', () => { K.fresh(sel); CD.Map.sel = 'gulch'; CD.Map.invalidate(); CD.go('map', {intro: true}); }, row);
 };
 
@@ -73,7 +99,9 @@ UI.pauseMenu = function () {
   btn('Back to the map', 'alt', m.close, row);
   const sb = btn('', '', () => { CD.Save.settings.sound = !CD.Save.settings.sound; CD.Sfx.setOn(CD.Save.settings.sound); CD.Save.saveSettings(); sb.textContent = 'Sound: ' + (CD.Save.settings.sound ? 'on' : 'off'); }, row); sb.textContent = 'Sound: ' + (CD.Save.settings.sound ? 'on' : 'off');
   btn('Save and quit to title', '', () => { K.save(); CD.go('title'); }, row);
-  mk('p', 'note', 'The campaign saves in this browser after every day.', m.p);
+  btn('Copy save code', '', () => { m.close(); UI.saveCode('export'); }, row);
+  btn('Load save code', '', () => { m.close(); UI.saveCode('import'); }, row);
+  mk('p', 'note', 'The campaign saves in this browser after every day. A save code moves it to another device.', m.p);
 };
 
 /* ================= briefing ================= */

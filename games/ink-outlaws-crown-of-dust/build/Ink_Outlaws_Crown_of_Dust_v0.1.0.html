@@ -129,6 +129,16 @@ header.top .sp{flex:1}
 @media (pointer:coarse) and (max-height:520px){#hBottom{bottom:auto;top:6px;left:50%;right:auto;transform:translateX(-50%)}#hPosse{display:none}#hOrders .b{min-height:28px;padding:2px 7px;font-size:11px}
   #hObj{padding-top:36px;font-size:12px}#stick{flex-basis:108px;width:108px;height:108px}#btns{grid-template-columns:repeat(3,56px);grid-auto-rows:38px}#hPrompt,#hBuild{bottom:130px}#hMap{width:96px;height:61px}#hBoss{top:62px}}
 @media (max-width:520px) and (orientation:portrait){#mapInfo{width:auto;left:8px;right:8px;bottom:8px}#mapInfo p{margin:2px 0}}
+/* body.touchsim: the touch layout on a non-touch screen (used when filming the guide) */
+body.touchsim #pad{display:flex}body.touchsim #hBottom{bottom:142px}body.touchsim #hPrompt,body.touchsim #hBuild{bottom:210px}body.touchsim #hOrders .b{min-height:36px}
+/* controls card and save code box */
+table.keys{width:100%;border-collapse:collapse;font-size:14px}
+table.keys th{text-align:left;padding:5px 10px 5px 0;font:700 12px/1.3 var(--head);letter-spacing:.06em;text-transform:uppercase;white-space:nowrap}
+table.keys td{padding:5px 8px 5px 0;vertical-align:top}
+table.keys td:last-child{color:var(--dim);font-size:12px;text-align:right;font-weight:700;letter-spacing:.04em}
+table.keys tr{border-bottom:1.5px dashed var(--paper3)}
+table.keys kbd{margin-right:3px}
+textarea.code{width:100%;font:12px/1.4 ui-monospace,Menlo,Consolas,monospace;border:2px solid var(--ink);border-radius:5px;background:var(--paper);color:var(--ink);padding:6px;resize:none;user-select:text;-webkit-user-select:text}
 
 </style>
 </head>
@@ -1837,9 +1847,10 @@ const KEY = 'crown_of_dust_save_v1', SET = 'crown_of_dust_settings_v1', LAB = 'c
 const S = CD.Save = {KEY: KEY};
 const get = k => { try { const s = localStorage.getItem(k); return s ? JSON.parse(s) : null; } catch (e) { return null; } };
 const put = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch (e) { return false; } };
-S.load = () => { const s = get(KEY); return s && s.v === 1 ? s : null; };
-S.store = st => put(KEY, Object.assign({v: 1, at: Date.now()}, st));
-S.wipe = () => { try { localStorage.removeItem(KEY); } catch (e) { /* storage unavailable */ } };
+S.mem = null;                                 // the last save, kept in memory too, so Continue still works when browser storage is blocked
+S.load = () => { const s = get(KEY) || S.mem; return s && s.v === 1 ? s : null; };
+S.store = st => { const o = Object.assign({v: 1, at: Date.now()}, st); S.mem = o; return put(KEY, o); };
+S.wipe = () => { S.mem = null; try { localStorage.removeItem(KEY); } catch (e) { /* storage unavailable */ } };
 S.settings = Object.assign({sound: true, shake: true}, get(SET) || {});
 S.saveSettings = () => put(SET, S.settings);
 /* the look last edited in the Chunk Lab (same origin), validated against the lab schema so a bad value can never reach the painter */
@@ -3360,7 +3371,7 @@ MS.start = function (spec, onEnd) {
     if (s === M.hall) end(M, false, 'The town hall has fallen.'); };
   if (spec.type === 'defend') M.waves = {i: 0, n: 3 + Math.ceil(M.tier / 2), t: 7, live: false};
   /* paint ahead: the hero completely, everyone else standing and moving (the trailer director paints for itself) */
-  if (spec.skipWarm) { layout(M); M.cam.x = h.x; M.cam.y = h.y * YS; return M; }
+  if (spec.skipWarm) { layout(M); M.cam.x = h.x; M.cam.y = h.y * YS; if (!spec.noHud) CD.HUD.show(M); return M; }
   const mv = u => u.spd >= 33 ? 'run' : 'walk', seen = new Set();
   S.warm(h.look, ['idle', 'run', 'jump'].concat(h.w.kind === 'gun' || h.w.thrust ? ['shoot'] : ['combo1', 'combo2', 'combo3']), 1);
   for (const u of M.units) { if (u.hero || seen.has(u.look)) continue; seen.add(u.look); S.warm(u.look, ['idle', mv(u)], u.mult, ['S', 'SE', 'E', 'W', 'SW']); }
@@ -3586,7 +3597,7 @@ MS.draw = function () {
   }
   for (const n of M.nums) if (!M.spec.noHud || n.big) F.num(c, n);
   /* objective pointer */
-  if (ob.at && !M.over && !M.spec.noHud) { const ox = ob.at.x, oy = ob.at.y * YS - (ob.at.top || 30), m = 14;
+  if (ob.at && !M.over && !M.spec.noHud && !M.noPointer) { const ox = ob.at.x, oy = ob.at.y * YS - (ob.at.top || 30), m = 14;
     if (ox > L + m && ox < R - m && oy > T + m + 16 && oy < Bt - m) { const b = Math.sin(M.t * 5) * 2; U.poly(c, [[ox - 4, oy - 14 + b], [ox + 4, oy - 14 + b], [ox, oy - 7 + b]], U.MUST, 0.9); }
     else { const cx = U.clamp(ox, L + m, R - m), cy = U.clamp(oy, T + m + 18, Bt - m), a = Math.atan2(oy - cy, ox - cx); c.save(); c.translate(cx, cy); c.rotate(a); U.poly(c, [[7, 0], [-4, -5], [-1.5, 0], [-4, 5]], U.MUST, 1); c.restore(); } }
   if (I.mouse.seen && I.lastWasMouse && !U.COARSE && !M.over && !M.spec.noHud) { const m = mouseWorld(M), x = m[0], y = m[1] * YS; U.seg(c, x - 4, y, x - 1.5, y, 1, U.INKC); U.seg(c, x + 1.5, y, x + 4, y, 1, U.INKC); U.seg(c, x, y - 4, x, y - 1.5, 1, U.INKC); U.seg(c, x, y + 1.5, x, y + 4, 1, U.INKC); }
@@ -3688,7 +3699,40 @@ K.fresh = function (heroId) {
   G.armory[def.weapon] = 1; D.terr.forEach(t => { G.own[t.id] = t.own; });
   K.note('Day 1. ' + def.name + ' rides into Dry Gulch with fifty gold and a grudge.'); K.save(); return G;
 };
-K.load = function () { const s = CD.Save.load(); if (!s || !s.G) return null; G = CD.G = s.G; if (!D.units[G.hero]) K.ensureCustom(); if (!D.units[G.hero]) return (G = CD.G = null); return G; };
+K.load = function () { const s = CD.Save.load(); if (!s || !s.G) return null; const g = K.sanitize(s.G); if (!g) return null; G = CD.G = g; return G; };
+/* Rebuild a campaign from untrusted data (storage, or a pasted save code): whitelist every field and clamp every value. */
+K.sanitize = function (g) {
+  if (!g || typeof g !== 'object') return null;
+  const num = (v, lo, hi, d) => typeof v === 'number' && isFinite(v) ? Math.max(lo, Math.min(hi, Math.floor(v))) : d;
+  const isOut = id => typeof id === 'string' && D.outlaws.indexOf(id) >= 0, uniq = a => a.filter((x, i) => a.indexOf(x) === i);
+  let hero = g.hero; if (hero === 'custom' && !D.units.custom) K.ensureCustom(); if (hero !== 'custom' && !isOut(hero)) return null; if (hero === 'custom' && !D.units.custom) hero = 'harrow';
+  const arr = (a, f, n) => Array.isArray(a) ? uniq(a.filter(f)).slice(0, n) : [];
+  const wOk = id => typeof id === 'string' && D.weapons[id], o = {};
+  o.day = num(g.day, 1, 9999, 1); o.gold = num(g.gold, 0, 99999, 0); o.seed = num(g.seed, 0, 2147483647, 1); o.hero = hero;
+  o.roster = arr(g.roster, id => isOut(id) && id !== hero, 40); o.posse = arr(g.posse, id => o.roster.indexOf(id) >= 0, 8);
+  const ws = arr(g.weapons, wOk, 2); o.weapons = ws.length === 2 ? ws : [D.units[hero].weapon, D.units[hero].weapon === 'fists' ? 'revolver' : 'fists'];
+  o.armory = {}; Object.keys(g.armory && typeof g.armory === 'object' ? g.armory : {}).forEach(k => { if (wOk(k)) o.armory[k] = 1; }); o.weapons.forEach(w => { o.armory[w] = 1; });
+  o.mount = D.mounts.some(m => m[0] === g.mount) ? g.mount : null;
+  o.freed = {}; Object.keys(g.freed && typeof g.freed === 'object' ? g.freed : {}).forEach(k => { if (isOut(k)) o.freed[k] = 1; });
+  o.bld = {}; Object.keys(D.bld).forEach(k => { o.bld[k] = num(g.bld && g.bld[k], 0, D.bld[k].cost.length, 0); });
+  o.own = {}; D.terr.forEach(t => { const f = g.own && g.own[t.id]; o.own[t.id] = D.factions[f] ? f : t.own; }); o.own.gulch = 'outlaw';
+  o.at = D.terrById[g.at] ? g.at : 'gulch'; o.won = g.won === true; o.wonOnce = g.wonOnce === true;
+  o.kills = num(g.kills, 0, 1e7, 0); o.missions = num(g.missions, 0, 1e5, 0); o.tut = num(g.tut, 0, 9, 0);
+  o.seen = {}; Object.keys(g.seen && typeof g.seen === 'object' ? g.seen : {}).forEach(k => { if (D.units[k]) o.seen[k] = 1; });
+  o.log = Array.isArray(g.log) ? g.log.filter(x => typeof x === 'string').slice(0, 30).map(x => x.slice(0, 200)) : [];
+  return o;
+};
+/* A save code is the campaign as one pasteable line, for moving it between browsers and devices. */
+const CODE = 'CODSAVE1.';
+K.exportCode = function () { if (!G) return ''; const json = JSON.stringify({v: 1, G: G}); return CODE + btoa(unescape(encodeURIComponent(json))); };
+K.importCode = function (text) {
+  try {
+    const t = String(text || '').replace(/\s+/g, ''); if (t.indexOf(CODE) !== 0) return {ok: false, msg: 'That is not a Crown of Dust save code.'};
+    const obj = JSON.parse(decodeURIComponent(escape(atob(t.slice(CODE.length))))), g = obj && obj.v === 1 ? K.sanitize(obj.G) : null;
+    if (!g) return {ok: false, msg: 'The save code is damaged or from a different version.'};
+    CD.Save.store({G: g}); return {ok: true};
+  } catch (e) { return {ok: false, msg: 'The save code could not be read. Copy it again in full.'}; }
+};
 K.save = function () { if (G) CD.Save.store({G: G}); };
 K.note = function (txt) { G.log.unshift(txt); if (G.log.length > 30) G.log.length = 30; };
 /* the hero designed in the Chunk Lab becomes a real unit entry */
@@ -3905,8 +3949,34 @@ UI.title = function () {
   btn('Wanted posters', '', () => UI.codex(() => UI.title()), row);
   const row2 = mk('div', 'row', null, t);
   const sb = btn('', 'sm', () => { CD.Save.settings.sound = !CD.Save.settings.sound; CD.Sfx.setOn(CD.Save.settings.sound); CD.Save.saveSettings(); sb.textContent = 'Sound: ' + (CD.Save.settings.sound ? 'on' : 'off'); }, row2); sb.textContent = 'Sound: ' + (CD.Save.settings.sound ? 'on' : 'off');
+  btn('Controls', 'sm', () => UI.controls(), row2);
+  btn('Load save code', 'sm', () => UI.saveCode('import'), row2);
+  if (document.fullscreenEnabled) btn('Fullscreen', 'sm', () => { try { if (document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen().catch(() => { /* refused here */ }); } catch (e) { /* not allowed in this frame */ } }, row2);
   const lab = mk('a', 'b sm', 'Open the Chunk Lab', row2); lab.href = 'docs/lab/Chunk_Lab_Ink_Outlaws_v0.5.0.html'; lab.style.textDecoration = 'none'; lab.style.display = 'inline-flex'; lab.style.alignItems = 'center'; if (CD.SINGLE) lab.style.display = 'none';
   mk('small', null, 'v' + CD.VERSION + ' · every sprite, building and tree is drawn in code by the Chunk Lab ink painter', t);
+};
+UI.controls = function () {
+  const m = modal('Controls'), K2 = s => '<kbd>' + s + '</kbd>';
+  m.p.insertAdjacentHTML('beforeend', '<table class="keys"><tbody>' +
+    [['Move', K2('W') + K2('A') + K2('S') + K2('D') + ' or arrows', 'Left stick'], ['Attack', 'Mouse or ' + K2('J') + ' (hold to keep firing)', 'ATTACK'], ['Dodge roll', K2('Space') + ' or right click', 'ROLL'],
+     ['Special move', K2('F'), 'SPECIAL'], ['Swap weapon', K2('Q'), 'SWAP'], ['Open chest, build at a stake', K2('E'), 'USE'], ['Posse orders', K2('1') + K2('2') + K2('3') + K2('4'), 'Buttons above the pad'], ['Pause', K2('Esc'), 'II']]
+      .map(r => '<tr><th>' + r[0] + '</th><td>' + r[1] + '</td><td>' + r[2] + '</td></tr>').join('') + '</tbody></table>' +
+    '<p class="note">With the mouse, attacks aim at the cursor. With keys or touch they find the nearest enemy in front of you. Blades chain into a three-hit combo.</p>');
+  btn('Close', 'alt', m.close, mk('div', 'row', null, m.p));
+};
+/* a save code is the whole campaign as one line of text: copy it out, paste it in on another device */
+UI.saveCode = function (mode) {
+  const out = mode === 'export', m = modal(out ? 'Save code' : 'Load save code'), ta = mk('textarea', 'code', null, m.p), msg = mk('p', 'note', null, m.p), row = mk('div', 'row', null, m.p);
+  ta.id = 'saveCode'; ta.rows = 5; ta.spellcheck = false; ta.autocapitalize = 'off';
+  if (out) {
+    ta.value = K.exportCode(); ta.readOnly = true; msg.textContent = 'Copy this line and keep it somewhere safe. Use Load save code on the title screen to bring the campaign back, on this device or another.';
+    const sel = () => { ta.focus(); ta.select(); msg.textContent = 'Select all and copy, then keep it somewhere safe.'; };
+    btn('Copy', 'alt', () => { try { navigator.clipboard.writeText(ta.value).then(() => { msg.textContent = 'Copied.'; }, sel); } catch (e) { sel(); } }, row);
+  } else {
+    ta.placeholder = 'Paste a save code here'; msg.textContent = 'Loading replaces the campaign saved in this browser.';
+    btn('Load', 'alt', () => { const r = K.importCode(ta.value); if (!r.ok) { msg.textContent = r.msg; return; } m.close(); if (K.load()) { CD.Map.sel = null; CD.Map.invalidate(); CD.go('map'); } }, row);
+  }
+  btn('Close', '', m.close, row);
 };
 UI.newGame = function () {
   const r = screen(true), hd = mk('header', 'top', null, r); mk('h1', null, null, hd).innerHTML = 'Pick your <b>captain</b>'; mk('span', 'sp', null, hd); btn('Back', 'sm', () => UI.title(), hd);
@@ -3915,7 +3985,7 @@ UI.newGame = function () {
   let sel = ids[0]; const cards = {};
   ids.forEach(id => { const c = card(g, id, {port: {zoom: 1.5}}); c.style.cursor = 'pointer'; c.onclick = () => { sel = id; sync(); CD.Sfx.play('click'); }; cards[id] = c; c.querySelector('canvas').style.height = '170px'; });
   const sync = () => ids.forEach(id => cards[id].classList.toggle('sel', id === sel)); sync();
-  if (ids.indexOf('custom') < 0) mk('p', 'note', 'Tip: design a character in the Chunk Lab (title screen) and it appears here as a fourth captain.', s);
+  if (!CD.SINGLE && ids.indexOf('custom') < 0) mk('p', 'note', 'Tip: design a character in the Chunk Lab (title screen) and it appears here as a fourth captain.', s);
   const row = mk('div', 'row', null, s); btn('Ride into Dry Gulch', 'alt', () => { K.fresh(sel); CD.Map.sel = 'gulch'; CD.Map.invalidate(); CD.go('map', {intro: true}); }, row);
 };
 
@@ -3947,7 +4017,9 @@ UI.pauseMenu = function () {
   btn('Back to the map', 'alt', m.close, row);
   const sb = btn('', '', () => { CD.Save.settings.sound = !CD.Save.settings.sound; CD.Sfx.setOn(CD.Save.settings.sound); CD.Save.saveSettings(); sb.textContent = 'Sound: ' + (CD.Save.settings.sound ? 'on' : 'off'); }, row); sb.textContent = 'Sound: ' + (CD.Save.settings.sound ? 'on' : 'off');
   btn('Save and quit to title', '', () => { K.save(); CD.go('title'); }, row);
-  mk('p', 'note', 'The campaign saves in this browser after every day.', m.p);
+  btn('Copy save code', '', () => { m.close(); UI.saveCode('export'); }, row);
+  btn('Load save code', '', () => { m.close(); UI.saveCode('import'); }, row);
+  mk('p', 'note', 'The campaign saves in this browser after every day. A save code moves it to another device.', m.p);
 };
 
 /* ================= briefing ================= */

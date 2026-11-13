@@ -31,6 +31,9 @@ Last render (2026-11-13):
 - Both at −14.2 LUFS, with no errors.
 Both are published on the Artifact page above.
 
+## Playable Artifact
+https://claude.ai/artifact/QwnNSPpFTF5qWaa9vuVZDw (private until shared). Rebuild with `python3 build/build.py --artifact`, test with `node tests/artifact.cjs`, then republish the same file path.
+
 ## Recently fixed (in case something similar comes back)
 - A line comment in `src/systems/combat.js` swallowed the rest of the shot update, so bullets never expired. **Keep code and `//` comments on separate lines.**
 - Point-blank shots spawned past their target. The first step now sweeps from the shooter's body (`b.px/b.py`).

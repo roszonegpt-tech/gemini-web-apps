@@ -6,9 +6,10 @@ const KEY = 'crown_of_dust_save_v1', SET = 'crown_of_dust_settings_v1', LAB = 'c
 const S = CD.Save = {KEY: KEY};
 const get = k => { try { const s = localStorage.getItem(k); return s ? JSON.parse(s) : null; } catch (e) { return null; } };
 const put = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch (e) { return false; } };
-S.load = () => { const s = get(KEY); return s && s.v === 1 ? s : null; };
-S.store = st => put(KEY, Object.assign({v: 1, at: Date.now()}, st));
-S.wipe = () => { try { localStorage.removeItem(KEY); } catch (e) { /* storage unavailable */ } };
+S.mem = null;                                 // the last save, kept in memory too, so Continue still works when browser storage is blocked
+S.load = () => { const s = get(KEY) || S.mem; return s && s.v === 1 ? s : null; };
+S.store = st => { const o = Object.assign({v: 1, at: Date.now()}, st); S.mem = o; return put(KEY, o); };
+S.wipe = () => { S.mem = null; try { localStorage.removeItem(KEY); } catch (e) { /* storage unavailable */ } };
 S.settings = Object.assign({sound: true, shake: true}, get(SET) || {});
 S.saveSettings = () => put(SET, S.settings);
 /* the look last edited in the Chunk Lab (same origin), validated against the lab schema so a bad value can never reach the painter */
