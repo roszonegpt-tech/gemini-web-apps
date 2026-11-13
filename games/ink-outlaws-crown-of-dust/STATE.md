@@ -23,7 +23,13 @@ The published Artifact page with both cuts: https://claude.ai/artifact/VLgGKAcKC
 
 ## Guide video
 Narration: run `build/make_vo.py` (Piper and the norman voice, set up outside the repo), then `node tests/render_trailer.cjs yt|tt --film guide`.
-The YouTube render takes 25–40 min (it screenshots every frame); TikTok takes about 10 min. Outputs go to `build/guide/` (git-ignored).
+The YouTube render takes about 13 min (it screenshots every frame); TikTok takes about 3 min. Then run `python3 build/finish_guide.py`, which sets −14 LUFS and makes the web previews.
+Outputs go to `build/guide/` (git-ignored).
+Last render (2026-11-13):
+- YouTube: 3:50, 13 chapters, 77 subtitle cues, 70 MB.
+- TikTok: 0:56, 25 cues, 16.6 MB.
+- Both at −14.2 LUFS, with no errors.
+Both are published on the Artifact page above.
 
 ## Recently fixed (in case something similar comes back)
 - A line comment in `src/systems/combat.js` swallowed the rest of the shot update, so bullets never expired. **Keep code and `//` comments on separate lines.**
