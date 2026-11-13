@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#161214">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Crown of Dust Guide</title>
+<!-- Crown of Dust guide ("Story and How to Play"): the game filmed by trailer/guide.js with narration from build/guide/vo (build/make_vo.py).
+     Crown of Dust trailer engine notes: #yt = 1920x1080, #tt = 1080x1920; add "render" for offline frame-by-frame rendering (tests/render_trailer.cjs).
+     Math.random is seeded so both formats play out the same action.
+     Ink Outlaws: Crown of Dust. Action-adventure strategy game drawn entirely by the Chunk Lab ink painter.
+     Static site: open index.html directly or serve the folder. Scripts are classic (no modules) so file:// works.
+     build/build.py inlines everything into one HTML file. See README.md, STATE.md and notes/. -->
+<link rel="stylesheet" href="../assets/css/game.css">
+<style>
+/* guide overlay: captions, keycaps, pointer ring, chapter tag (drawn over the game, captured in every frame) */
+#film{position:fixed;inset:0;pointer-events:none;z-index:60;font-family:Inter,"DejaVu Sans",Arial,sans-serif}
+#fCap{position:absolute;left:50%;bottom:92px;transform:translateX(-50%);width:max-content;max-width:84vw;text-align:center}
+#fCap span{display:inline;background:rgba(22,18,20,.88);color:#f4eedf;font:600 25px/1.45 Inter,"DejaVu Sans",sans-serif;padding:4px 14px;border-radius:6px;-webkit-box-decoration-break:clone;box-decoration-break:clone;box-shadow:0 0 0 2px rgba(22,18,20,.88)}
+#fKeys{position:absolute;left:50%;top:92px;transform:translateX(-50%);display:flex;gap:8px;align-items:center}
+#fKeys kbd{min-width:52px;text-align:center;padding:8px 13px;border:3px solid #161214;border-radius:8px;background:#e9e2d0;color:#161214;font:700 22px/1 "DejaVu Serif",Georgia,serif;box-shadow:3px 4px 0 #161214}
+#fKeys i{font:italic 600 18px/1 Inter,sans-serif;color:#f4eedf;text-shadow:0 0 4px #161214,0 0 2px #161214}
+#fRing{position:absolute;border:4px solid #d9a520;border-radius:12px;box-shadow:0 0 0 3px #161214,inset 0 0 0 2px #161214}
+#fRing b{position:absolute;left:50%;top:calc(100% + 10px);transform:translateX(-50%);white-space:nowrap;background:#d9a520;color:#161214;border:3px solid #161214;border-radius:6px;padding:4px 10px;font:700 18px/1 "DejaVu Serif",Georgia,serif;letter-spacing:.04em;text-transform:uppercase}
+#fRing b.up{top:auto;bottom:calc(100% + 10px)}
+#fChap{position:absolute;left:50%;top:52px;transform:translateX(-50%);background:#a8474a;color:#f4eedf;border:3px solid #161214;border-radius:6px;padding:6px 16px;font:700 20px/1 "DejaVu Serif",Georgia,serif;letter-spacing:.12em;text-transform:uppercase;box-shadow:3px 3px 0 #161214}
+body.noobj #hObj{visibility:hidden}
+body.touchsim #fCap{bottom:236px}body.touchsim #hBuild{bottom:318px}body.touchsim #fCap span{font-size:21px}body.touchsim #fKeys{top:118px}body.touchsim #fChap{top:70px;font-size:16px}
+@media (max-width:640px){#fCap{max-width:92vw}#fCap span{font-size:21px}#fRing b{font-size:15px}}
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+<div id="hud"></div>
+<div id="ui"></div>
+<script>(function () { let a = 20251112; Math.random = function () { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; })();</script>
+<script src="../assets/js/ink.js"></script>
+<script src="../src/core/util.js"></script>
+<script src="../src/core/audio.js"></script>
+<script src="../src/core/save.js"></script>
+<script src="../src/core/input.js"></script>
+<script src="../src/art/sprites.js"></script>
+<script src="../src/art/inkkit.js"></script>
+<script src="../src/art/fx.js"></script>
+<script src="../src/config/weapons.js"></script>
+<script src="../src/config/units.js"></script>
+<script src="../src/config/buildings.js"></script>
+<script src="../levels/territories.js"></script>
+<script src="../src/entities/unit.js"></script>
+<script src="../src/systems/combat.js"></script>
+<script src="../src/systems/world.js"></script>
+<script src="../src/systems/ai.js"></script>
+<script src="../src/scenes/mission.js"></script>
+<script src="../src/ui/hud.js"></script>
+<script src="../src/systems/campaign.js"></script>
+<script src="../src/scenes/map.js"></script>
+<script src="../src/ui/menus.js"></script>
+<script src="../src/core/boot.js"></script>
+<script src="director.js"></script>
+<script src="guide.js"></script>
+</body>
+</html>

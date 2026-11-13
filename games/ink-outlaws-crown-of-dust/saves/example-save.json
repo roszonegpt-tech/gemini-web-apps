@@ -1,0 +1,11 @@
+{
+  "v": 1,
+  "at": 1794500000000,
+  "G": {
+    "day": 6, "gold": 142, "seed": 123456789, "hero": "harrow", "weapons": ["rifle", "revolver"],
+    "armory": {"fists": 1, "revolver": 1, "rifle": 1}, "mount": "horse", "roster": ["kit", "pike", "wade"], "posse": ["kit", "wade", "pike"], "freed": {"wade": 1},
+    "bld": {"saloon": 1, "smithy": 1, "doc": 0, "tower": 1, "powder": 0, "stable": 1},
+    "own": {"gulch": "outlaw", "ford": "outlaw", "mudhook": "corsair", "croak": "outlaw", "wreck": "corsair", "rise": "hollow", "fen": "hollow", "chapel": "hollow", "pale": "hollow", "toll": "outlaw", "farms": "crown", "garrison": "crown", "gilt": "crown"},
+    "at": "toll", "log": ["Day 5. Tollgate Bridge taken from The Gilded Crown. +80 gold."], "won": false, "kills": 140, "missions": 5, "tut": 1, "seen": {}
+  }
+}

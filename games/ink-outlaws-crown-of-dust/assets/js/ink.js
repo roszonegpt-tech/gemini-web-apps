@@ -1,0 +1,1573 @@
+/* Chunk Lab: Ink Outlaws painter (src/ink.js)
+   Every sprite is drawn by code. One fixed-length 3D skeleton is posed per frame, turned to the view angle and
+   projected; body parts are flat-shaded angular solids and limb ribbons inked with variable-width strokes.
+   Local axes: +x = the character's left, +y = up, +z = the way the character faces. Units = 1/80 of the cell. */
+(function () {
+'use strict';
+const D2R = Math.PI / 180, K = 0.17;            // K = how much the camera looks down (depth -> screen y)
+const CELL = 80, AX = 40, AY = 75;
+const DIRS = ['S', 'SE', 'E', 'NE', 'N', 'NW', 'W', 'SW'];
+const YAW = {S: 0, SE: 40, E: 40, NE: 140, N: 180, NW: -140, W: -40, SW: -40};   // E and W use the three-quarter angle
+const ACTS = ['idle', 'walk', 'run', 'jump', 'attack', 'shoot', 'combo1', 'combo2', 'combo3', 'dance1', 'dance2', 'dance3'];
+const COUNT = {idle: 4, walk: 8, run: 8, jump: 3, attack: 8, shoot: 4, combo1: 6, combo2: 6, combo3: 8, dance1: 8, dance2: 8, dance3: 8};
+const FPS = {idle: 5, walk: 10, run: 13, jump: 8, attack: 14, shoot: 12, combo1: 14, combo2: 14, combo3: 14, dance1: 10, dance2: 10, dance3: 10};
+const LABEL = {idle: 'Idle', walk: 'Walk', run: 'Run', jump: 'Jump', attack: 'Big swing', shoot: 'Shoot / thrust', combo1: 'Combo 1 (jab)',
+  combo2: 'Combo 2 (cross)', combo3: 'Combo 3 (slam)', dance1: 'Dance: Hoedown', dance2: 'Dance: Spin', dance3: 'Dance: Sway'};
+const WEAPONS = [['fists', 'Fists'], ['revolver', 'Revolver'], ['twin', 'Twin revolvers'], ['rifle', 'Rifle'], ['shotgun', 'Shotgun'], ['sawedoff', 'Sawed-off'], ['katana', 'Katana'], ['pitchfork', 'Pitchfork'],
+  ['saber', 'Cutlass'], ['sword', 'Broadsword'], ['dagger', 'Glow dagger'], ['lance', 'Lance'], ['magic', 'Spell hands'], ['tome', 'Spell book'], ['spear', 'Spear'], ['greatsword', 'Greatsword'], ['scythe', 'Scythe'], ['hammer', 'War hammer'], ['cleavers', 'Twin cleavers'], ['axe', 'Hand axe'], ['flintlock', 'Flintlock'], ['bow', 'Bow']];
+const KIND = {fists: 'melee', revolver: 'gun', twin: 'gun', rifle: 'gun', shotgun: 'gun', sawedoff: 'gun', katana: 'melee', pitchfork: 'melee', saber: 'melee', sword: 'melee', dagger: 'melee', lance: 'melee', magic: 'gun', tome: 'gun', spear: 'melee', greatsword: 'melee', scythe: 'melee', hammer: 'melee', cleavers: 'melee', axe: 'melee', flintlock: 'gun', bow: 'gun'};
+const STICK = {katana: 1, pitchfork: 1, saber: 1, sword: 1, dagger: 1, lance: 1, spear: 1, greatsword: 1, scythe: 1, hammer: 1, cleavers: 1, axe: 1}, POLE = {pitchfork: 1, lance: 1, spear: 1, scythe: 1}, CAST = {magic: 1, tome: 1};
+const TWOH = {pitchfork: 5.6, lance: 5.6, scythe: 5.6, greatsword: 3.4};   // two-handed weapons: how far up the shaft from the lead hand the second hand closes
+const DUAL = {twin: 1, cleavers: 1};                    // one weapon in each hand
+const LG = 1.45, PS = 1.2;                              // long guns and pistols are drawn big, to match the chunky hands
+const EXPRS = [['calm', 'Calm'], ['angry', 'Angry'], ['shout', 'Shout'], ['grin', 'Grin']];
+const INKC = '#17131a';
+
+/* ---------- vectors ---------- */
+const add = (a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
+const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+const mul = (a, s) => [a[0] * s, a[1] * s, a[2] * s];
+const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+const vlen = a => Math.hypot(a[0], a[1], a[2]);
+const norm = a => { const l = vlen(a) || 1; return [a[0] / l, a[1] / l, a[2] / l]; };
+const lerp = (a, b, t) => a + (b - a) * t;
+const lerp2 = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+const lerp3 = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
+const RX = a => { const c = Math.cos(a), s = Math.sin(a); return [1, 0, 0, 0, c, -s, 0, s, c]; };
+const RY = a => { const c = Math.cos(a), s = Math.sin(a); return [c, 0, s, 0, 1, 0, -s, 0, c]; };
+const RZ = a => { const c = Math.cos(a), s = Math.sin(a); return [c, -s, 0, s, c, 0, 0, 0, 1]; };
+const MM = (A, B) => { const o = []; for (let r = 0; r < 3; r++) for (let c = 0; c < 3; c++) o.push(A[r * 3] * B[c] + A[r * 3 + 1] * B[3 + c] + A[r * 3 + 2] * B[6 + c]); return o; };
+const MV = (M, v) => [M[0] * v[0] + M[1] * v[1] + M[2] * v[2], M[3] * v[0] + M[4] * v[1] + M[5] * v[2], M[6] * v[0] + M[7] * v[1] + M[8] * v[2]];
+const FP = (F, x, y, z) => add(F.o, MV(F.m, [x, y, z]));        // frame-local point -> character space
+/* limb direction from pitch (forward +) and abduction (outward +), both in degrees; side = +1 left, -1 right */
+const limbDir = (p, ab, side) => { p *= D2R; ab *= D2R; return [side * Math.sin(ab), -Math.cos(ab) * Math.cos(p), Math.cos(ab) * Math.sin(p)]; };
+
+/* ---------- seeded wobble: the same seed always gives the same stroke, so lines do not shimmer ---------- */
+function rnd(seed, i) { const n = Math.sin(seed * 12.9898 + i * 78.233 + 0.37) * 43758.5453; return n - Math.floor(n); }
+
+/* ---------- colour ---------- */
+function hex(c) { const n = parseInt(c.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; }
+function mix(a, b, t) { const A = hex(a), B = hex(b); return '#' + [0, 1, 2].map(i => Math.round(A[i] + (B[i] - A[i]) * t).toString(16).padStart(2, '0')).join(''); }
+const matCache = {};
+/* material = base, shade, deep (solid ink when spot is set), highlight */
+function mat(c, spot, tb) {
+  const k = c + (spot ? 1 : 0) + (tb == null ? 'd' : tb);
+  return matCache[k] || (matCache[k] = {b: c, s: mix(c, '#3b2531', 0.38), d: spot ? INKC : mix(c, '#24161f', 0.62), h: mix(c, '#fff2d2', 0.24), tb: tb == null ? (spot ? 0.22 : 0) : tb});
+}
+
+/* ---------- ink strokes ---------- */
+function inkSeg(ctx, a, b, w, seed) {            // one hand-inked edge: uneven width, slight overshoot at the corners
+  let dx = b[0] - a[0], dy = b[1] - a[1]; const L = Math.hypot(dx, dy); if (L < 0.04) return;
+  dx /= L; dy /= L; const nx = -dy, ny = dx, o = w * 0.4;
+  const wa = w * (0.36 + 0.26 * rnd(seed, 1)), wb = w * (0.36 + 0.26 * rnd(seed, 2)), wm = w * (0.4 + 0.24 * rnd(seed, 3));
+  const ax = a[0] - dx * o, ay = a[1] - dy * o, bx = b[0] + dx * o, by = b[1] + dy * o;
+  const k = (rnd(seed, 4) - 0.5) * Math.min(0.5, L * 0.05), mx = (a[0] + b[0]) / 2 + nx * k, my = (a[1] + b[1]) / 2 + ny * k;
+  ctx.beginPath(); ctx.moveTo(ax + nx * wa, ay + ny * wa); ctx.lineTo(mx + nx * wm, my + ny * wm); ctx.lineTo(bx + nx * wb, by + ny * wb);
+  ctx.lineTo(bx - nx * wb, by - ny * wb); ctx.lineTo(mx - nx * wm, my - ny * wm); ctx.lineTo(ax - nx * wa, ay - ny * wa); ctx.closePath(); ctx.fill();
+}
+function tick(ctx, a, b, w, col) {               // tapered hatch stroke
+  let dx = b[0] - a[0], dy = b[1] - a[1]; const L = Math.hypot(dx, dy); if (L < 0.04) return; dx /= L; dy /= L;
+  const nx = -dy * w / 2, ny = dx * w / 2; ctx.fillStyle = col || INKC;
+  ctx.beginPath(); ctx.moveTo(a[0] + nx, a[1] + ny); ctx.lineTo(b[0] + nx * 0.25, b[1] + ny * 0.25); ctx.lineTo(b[0] - nx * 0.25, b[1] - ny * 0.25); ctx.lineTo(a[0] - nx, a[1] - ny); ctx.closePath(); ctx.fill();
+}
+function line(ctx, pts, w, seed, col) { ctx.fillStyle = col || INKC; for (let i = 0; i < pts.length - 1; i++) inkSeg(ctx, pts[i], pts[i + 1], w, seed + i * 3.1); }
+function outline(ctx, pts, w, seed, col) { ctx.fillStyle = col || INKC; for (let i = 0; i < pts.length; i++) inkSeg(ctx, pts[i], pts[(i + 1) % pts.length], w, seed + i * 3.1); }
+function fillp(ctx, pts, col) { ctx.fillStyle = col; ctx.strokeStyle = col; ctx.lineWidth = 0.16; ctx.lineJoin = 'round'; ctx.beginPath(); ctx.moveTo(pts[0][0], pts[0][1]); for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]); ctx.closePath(); ctx.fill(); ctx.stroke(); }
+function area2(p) { let a = 0; for (let i = 0; i < p.length; i++) { const q = p[(i + 1) % p.length]; a += p[i][0] * q[1] - q[0] * p[i][1]; } return a / 2; }
+
+/* ---------- builds: every length here is fixed for the life of the character ---------- */
+const BUILD = {
+  regular: {thigh: 4.3, shin: 4.3, hipX: 4.0, legW: 0.85, pelW: 7.6, pelD: 5.2, waistW: 8.8, chestW: 10.0, shW: 10.2, dep: 6.0, tH: 21.0, upper: 6.6, fore: 6.2, armW: 2.9, hand: 4.3, head: 1.12, sink: 2.2, hem: 5.4, hemW: 12.4, hunch: 0, headZ: 0.4},
+  slim:    {thigh: 5.4, shin: 5.4, hipX: 3.0, legW: 0.72, pelW: 5.6, pelD: 4.2, waistW: 5.6, chestW: 6.8, shW: 7.3, dep: 4.5, tH: 16.0, upper: 5.8, fore: 5.6, armW: 2.1, hand: 3.5, head: 1.16, sink: 2.0, hem: 7.8, hemW: 9.4, hunch: 0, headZ: 0.3},
+  stocky:  {thigh: 3.9, shin: 3.9, hipX: 4.8, legW: 0.95, pelW: 9.8, pelD: 6.6, waistW: 11.6, chestW: 11.8, shW: 11.2, dep: 7.6, tH: 19.5, upper: 6.3, fore: 5.9, armW: 3.1, hand: 4.5, head: 1.14, sink: 2.6, hem: 4.8, hemW: 14.4, hunch: 2, headZ: 0.6},
+  brute:   {thigh: 4.4, shin: 4.4, hipX: 5.8, legW: 1.05, pelW: 10.6, pelD: 7.2, waistW: 12.6, chestW: 15.4, shW: 15.6, dep: 8.4, tH: 24.0, upper: 9.4, fore: 9.0, armW: 4.2, hand: 6.2, head: 1.12, sink: 7.0, hem: 5.6, hemW: 15.6, hunch: 7, headZ: 2.6},
+  tall:    {thigh: 7.4, shin: 7.4, hipX: 3.6, legW: 1.2, pelW: 6.8, pelD: 5.0, waistW: 7.6, chestW: 9.6, shW: 10.2, dep: 5.8, tH: 19.0, upper: 7.6, fore: 7.2, armW: 2.7, hand: 4.3, head: 1.04, sink: 1.8, hem: 8.0, hemW: 11.8, hunch: 0, headZ: 0.4},
+  small:   {thigh: 3.2, shin: 3.2, hipX: 3.0, legW: 0.8, pelW: 5.8, pelD: 4.6, waistW: 6.4, chestW: 7.0, shW: 7.0, dep: 4.8, tH: 11.5, upper: 4.6, fore: 4.4, armW: 2.0, hand: 3.3, head: 1.12, sink: 1.8, hem: 3.6, hemW: 9.0, hunch: 0, headZ: 0.3},
+  centaur: {thigh: 5.6, shin: 5.6, hipX: 3.6, legW: 1.2, pelW: 6.4, pelD: 4.6, waistW: 6.4, chestW: 8.0, shW: 8.6, dep: 5.0, tH: 16.0, upper: 6.4, fore: 6.0, armW: 2.8, hand: 4.3, head: 1.08, sink: 2.2, hem: 5.0, hemW: 11.0, hunch: 0, headZ: 0.4, cen: {L: 21.0, W: 5.4, H: 5.0}},
+  stilt:   {thigh: 10.0, shin: 10.5, hipX: 2.6, legW: 0.75, pelW: 4.6, pelD: 4.0, waistW: 5.0, chestW: 6.0, shW: 6.4, dep: 4.2, tH: 15.0, upper: 6.0, fore: 6.0, armW: 1.6, hand: 2.8, head: 0.82, sink: 0.5, hem: 12.0, hemW: 10.0, hunch: 0, headZ: 0.2}
+};
+const ANKLE = 1.0, FOOT = 3.6;
+
+const FEMB = {};
+function buildOf(look) {                                   // women get narrower shoulders and arms, a nipped waist and fuller hips; lengths are untouched
+  const b = BUILD[look.build] || BUILD.regular; if (look.sex !== 'f') return b; const k = look.build || 'regular';
+  return FEMB[k] || (FEMB[k] = Object.assign({}, b, {shW: b.shW * 0.84, chestW: b.chestW * 0.86, armW: b.armW * 0.82, hand: b.hand * 0.9, pelW: b.pelW * 1.12, dep: b.dep * 0.92, legW: b.legW * 0.9, hunch: b.hunch * 0.4}));
+}
+
+/* ---------- poses: degrees, written for role A = the hand nearest the camera, B = the other; mirrored automatically ---------- */
+function basePose() {
+  return {aA: [3, 10, 20, 6], aB: [3, 10, 20, 6], lA: [0, 7, 0], lB: [0, 7, 0], lean: 0, tw: 0, roll: 0, sway: 0, slide: 0, lift: 0,
+    nod: 0, turn: 0, cs: 0, fl: 0, spin: 0, hatY: 0, fire: false, hit: false, hide: false, two: false, aimP: 0, kick: 0, grip: [25, 0]};
+}
+const KEYS = {
+  jump: [
+    {lean: 18, lA: [42, 10, 84], lB: [42, 10, 84], aA: [-42, 16, -12, 8], aB: [-42, 16, -12, 8], nod: 6, fl: 0.4},
+    {lean: -5, lift: 1.5, lA: [28, 8, 58], lB: [-8, 8, 42], aA: [122, 30, 142, 12], aB: [108, 30, 128, 12], fl: -0.7, hatY: 0.5, nod: -6},
+    {lean: 7, lift: 0.6, lA: [14, 13, 26], lB: [5, 13, 20], aA: [38, 58, 30, 68], aB: [38, 58, 30, 68], fl: 1, hatY: 1.3, nod: 4}],
+  attack: [
+    {tw: -18, lean: -4, aA: [-52, 18, -12, 10], aB: [36, 10, 82, 0], lB: [14, 8, 10]},
+    {tw: -40, lean: -11, roll: -4, aA: [-116, 28, -64, 22], aB: [56, 8, 96, 0], lB: [60, 6, 78], slide: -1.2, hatY: 0.4, nod: -4},
+    {tw: -10, lean: 6, aA: [-40, 30, 42, 20], aB: [30, 14, 70, 0], lB: [38, 6, 20], lA: [-18, 8, 8], slide: 1.2},
+    {tw: 44, lean: 20, aA: [92, 4, 92, 0], aB: [-30, 16, 10, 8], lB: [30, 6, 34], lA: [-34, 8, 6], slide: 4, hit: true, cs: -1, nod: 6},
+    {tw: 64, lean: 28, roll: 5, aA: [80, -38, 70, -50], aB: [-48, 20, -10, 10], lB: [26, 6, 40], lA: [-20, 10, 52], slide: 4.6, cs: 1, fl: 0.8, hatY: 0.5, nod: 8},
+    {tw: 50, lean: 22, aA: [50, -30, 60, -40], aB: [-30, 18, 10, 8], lB: [20, 6, 28], lA: [-12, 9, 30], slide: 3.6, cs: 0.5},
+    {tw: 18, lean: 8, aA: [14, 6, 50, 0], aB: [0, 12, 40, 4], lB: [8, 7, 10], lA: [-4, 8, 10], slide: 1.6},
+    {tw: 4, lean: 2, slide: 0.4}],
+  combo1: [
+    {tw: -8, lean: 6, aA: [40, 12, 122, -10], aB: [45, 12, 126, -10], lA: [-8, 8, 8], lB: [12, 8, 10]},
+    {tw: -24, lean: 8, aA: [36, 14, 124, -10], aB: [68, 6, 104, 0], lA: [-10, 8, 8], lB: [16, 8, 12], slide: 0.8},
+    {tw: -40, lean: 14, aA: [30, 14, 126, -10], aB: [90, 2, 90, 0], lA: [-16, 8, 6], lB: [22, 8, 20], slide: 2.2, hit: true, cs: -0.6},
+    {tw: -36, lean: 13, aA: [30, 14, 126, -10], aB: [86, -8, 84, -12], lA: [-16, 8, 6], lB: [22, 8, 20], slide: 2.4},
+    {tw: -14, lean: 8, aA: [38, 12, 124, -10], aB: [60, 10, 116, -6], lA: [-10, 8, 8], lB: [14, 8, 12], slide: 1.2},
+    {tw: -8, lean: 6, aA: [40, 12, 122, -10], aB: [45, 12, 126, -10], lA: [-8, 8, 8], lB: [12, 8, 10], slide: 0.4}],
+  combo2: [
+    {tw: -12, lean: 6, aA: [34, 14, 120, -8], aB: [45, 12, 126, -10], lA: [-8, 8, 8], lB: [12, 8, 10]},
+    {tw: 10, lean: 10, aA: [60, 8, 108, 0], aB: [40, 14, 128, -10], lA: [-14, 8, 6], lB: [18, 8, 14], slide: 1},
+    {tw: 46, lean: 18, aA: [92, 0, 92, 0], aB: [28, 16, 128, -10], lA: [-26, 8, 4], lB: [26, 8, 26], slide: 3, hit: true, cs: -0.8, nod: 5},
+    {tw: 50, lean: 19, roll: 3, aA: [88, -12, 84, -16], aB: [28, 16, 128, -10], lA: [-26, 8, 10], lB: [26, 8, 26], slide: 3.2},
+    {tw: 22, lean: 10, aA: [56, 10, 112, -6], aB: [38, 14, 126, -10], lA: [-14, 8, 8], lB: [16, 8, 14], slide: 1.6},
+    {tw: -6, lean: 6, aA: [40, 12, 122, -10], aB: [45, 12, 126, -10], lA: [-8, 8, 8], lB: [12, 8, 10], slide: 0.5}],
+  combo3: [
+    {lean: 16, aA: [-42, 20, -22, 10], aB: [-42, 20, -22, 10], lA: [32, 10, 64], lB: [32, 10, 64], nod: 8},
+    {lift: 3.5, lean: -6, aA: [150, 14, 165, 6], aB: [150, 14, 165, 6], lA: [10, 8, 30], lB: [-10, 8, 50], fl: -0.6, hatY: 0.5, slide: 0.6},
+    {lift: 6, lean: -15, aA: [172, 8, 178, 0], aB: [172, 8, 178, 0], lA: [30, 10, 70], lB: [-20, 8, 60], slide: 1.6, fl: -0.3, hatY: 0.9, nod: -8},
+    {lift: 1.6, lean: 26, aA: [70, 2, 78, -8], aB: [70, 2, 78, -8], lA: [40, 10, 50], lB: [-16, 8, 30], slide: 3.5, hit: true, fl: 1, hatY: 1.4, nod: 8},
+    {lean: 36, aA: [42, 4, 48, -6], aB: [42, 4, 48, -6], lA: [46, 12, 84], lB: [22, 12, 74], slide: 4, hit: true, fl: 0.9, nod: 12},
+    {lean: 33, aA: [40, 6, 50, -4], aB: [40, 6, 50, -4], lA: [44, 12, 80], lB: [20, 12, 70], slide: 4, fl: 0.4, nod: 10},
+    {lean: 16, aA: [20, 8, 40, 0], aB: [20, 8, 40, 0], lA: [20, 9, 36], lB: [10, 9, 30], slide: 2.4},
+    {lean: 4, slide: 0.8}],
+  shoot: [
+    {aA: [62, 6, 84, 0], tw: 10, lean: 2, aimP: -18},
+    {aA: [88, 2, 90, 0], tw: 16, fire: true, aimP: 0},
+    {aA: [92, 2, 128, 0], tw: 12, lean: -7, hatY: 0.7, slide: -0.7, aimP: 15, kick: 1.4, nod: -5},
+    {aA: [60, 6, 80, 0], tw: 6, aimP: -8}]
+};
+function poseOf(act, f, weapon, off) {
+  const P = basePose(), n = COUNT[act], ph = (f % n) / n * 2 * Math.PI, S = Math.sin, C = Math.cos;
+  const gun = KIND[weapon] === 'gun', stick = !!STICK[weapon], longGun = weapon === 'rifle' || weapon === 'shotgun', twin = weapon === 'twin' || weapon === 'magic';
+  if (KEYS[act]) Object.assign(P, KEYS[act][f % n]);
+  if (act === 'idle') {
+    const b = (1 - C(ph)) / 2, t = 3 + 4 * b;                       // breathing: knees give, shoulders rise
+    P.lA = [t, 8, 2 * t]; P.lB = [t, 8, 2 * t]; P.aA = [2, 10 + 2 * b, 20, 6]; P.aB = [2, 10 + 2 * b, 20, 6]; P.nod = 1.5 * b; P.hatY = 0.25 * b; P.fl = 0.15 * b;
+  } else if (act === 'walk' || act === 'run') {
+    const r = act === 'run', A = r ? 50 : 33, kn = r ? 74 : 42;
+    P.lA = [A * S(ph) + (r ? 8 : 0), 5, 6 + kn * Math.max(0, C(ph))]; P.lB = [-A * S(ph) + (r ? 8 : 0), 5, 6 + kn * Math.max(0, -C(ph))];
+    const sw = r ? 46 : 26, el = r ? 78 : 22;
+    P.aA = [-sw * S(ph), 9, -sw * S(ph) + el, 4]; P.aB = [sw * S(ph), 9, sw * S(ph) + el, 4];
+    P.tw = (r ? 12 : 7) * S(ph); P.lean = r ? 15 : 4; P.roll = (r ? 2.5 : 1.5) * C(ph); P.cs = -S(ph + 0.9) * (r ? 1 : 0.6);
+    P.fl = r ? 0.6 : 0.15; P.hatY = (r ? 0.5 : 0.25) * (0.5 + 0.5 * C(2 * ph + 1)); P.nod = (r ? 3 : 1.5) * C(2 * ph);
+    P.lift = r ? 0.9 * Math.max(0, C(2 * ph)) : 0;
+  } else if (act === 'shoot') {
+    if (twin) P.aB = P.aA.slice();
+    else if (!longGun) P.aB = [-6, 16, 34, 6];
+    if (longGun) { const k = f % n; P.two = true; P.tw = -80 + (k === 2 ? 6 : 0); P.turn = 34; P.lA = [-12, 9, 8]; P.lB = [16, 8, 14]; P.lean = k === 2 ? -4 : 3; }   // bladed stance, front shoulder to the target
+  } else if (act === 'dance1') {                                     // hoedown: knee lifts with hands on the hips
+    const k = f % 4, up = k === 0 ? 'lA' : k === 2 ? 'lB' : null, s = (f % 8) < 4 ? 1 : -1;
+    P.aA = [10, 46, 34, -56]; P.aB = [10, 46, 34, -56];
+    if (up) { P[up] = [72, 10, 88]; P.lift = 0.9; P.roll = (up === 'lA' ? 5 : -5); P.tw = up === 'lA' ? -9 : 9; P.hatY = 0.3; }
+    else { P.lA = [10, 9, 22]; P.lB = [10, 9, 22]; P.hatY = 0.9; P.fl = 0.7; }
+    P.nod = up ? -3 : 5; P.sway = 0.6 * s; P.hide = true;
+  } else if (act === 'dance2') {                                     // spin: a full turn, arms flung out
+    P.spin = 360 * f / n; const b = (f % 2) ? 1 : 0;
+    P.aA = [0, 56 + 8 * b, 0, 104 - 10 * b]; P.aB = [0, 56 - 8 * b, 0, 104 + 10 * b];
+    P.lA = [6 + 6 * b, 10, 14 + 12 * b]; P.lB = [24 - 10 * b, 12, 40 - 14 * b]; P.fl = 1.2; P.lift = 0.5 * b; P.hatY = 0.5; P.hide = true;
+  } else if (act === 'dance3') {                                     // sway: side to side with one arm waving overhead
+    P.sway = 2.4 * S(ph); P.roll = 7 * S(ph); P.tw = 6 * C(ph);
+    P.aA = [168, 16 + 16 * S(2 * ph), 176, 22 * S(2 * ph)]; P.aB = [10, 46, 34, -56];
+    P.lA = [Math.max(0, 22 * S(ph)), 9, Math.max(0, 38 * S(ph)) + 6]; P.lB = [Math.max(0, -22 * S(ph)), 9, Math.max(0, -38 * S(ph)) + 6];
+    P.cs = 0; P.fl = 0.5 + 0.4 * Math.abs(C(ph)); P.nod = 3 * C(2 * ph); P.hatY = 0.4 * Math.abs(S(ph)); P.hide = true;
+  }
+  if (act === 'combo1' || act === 'combo2' || act === 'combo3') P.hide = true;
+  if (gun && (act === 'idle' || act === 'walk' || act === 'run' || act === 'jump')) {   // the gun hand carries instead of swinging
+    const s0 = P.aA[0] * 0.3;
+    P.aA = longGun ? [s0 + 8, 8, s0 + 54, 2] : [s0 + 6, 9, s0 + 36, 4];
+    if (twin) P.aB = [-s0 + 6, 9, -s0 + 36, 4];
+  }
+  /* blades and poles. grip = [angle of the shaft from square-to-the-knuckles toward the forearm line, forearm roll] */
+  if (stick) {
+    const pole = !!POLE[weapon];
+    if (act === 'attack') P.grip = [[-10, 120], [-25, 180], [0, 90], [58, 0], [78, -30], [60, -20], [35, 0], [25, 0]][f % n];
+    else if (act === 'shoot') {                                       // thrust
+      Object.assign(P, [{aA: [-28, 14, 44, 0], tw: -14, lean: -3, lA: [-6, 8, 6], lB: [10, 8, 8]}, {aA: [78, 4, 88, 0], tw: 30, lean: 14, slide: 3.2, hit: true, lA: [-24, 8, 4], lB: [24, 8, 22], cs: -0.8},
+        {aA: [80, 2, 90, 0], tw: 32, lean: 15, slide: 3.5, lA: [-24, 8, 6], lB: [24, 8, 22]}, {aA: [40, 8, 70, 0], tw: 10, lean: 5, slide: 1.2}][f % n]);
+      P.fire = false; P.aimP = 0; P.kick = 0; P.hatY = 0; P.grip = [86, 0]; P.aB = [20, 10, 60, -10];
+    } else if (act === 'combo1' || act === 'combo2' || act === 'combo3') { P.hide = false; P.grip = [P.hit ? 66 : 18, 0]; }
+    else if (act === 'idle' || act === 'walk' || act === 'run' || act === 'jump') { const s0 = P.aA[0] * 0.25; P.aA = pole ? [s0 + 12, 6, s0 + 84, -4] : [s0 + 4, 10, s0 + 30, 4]; P.grip = pole ? [0, 0] : [38, 12]; }
+  }
+  /* casters: open stance with the hands up; a spell book rides in the off hand */
+  if (CAST[weapon] && !P.hide) {
+    if (act === 'idle' || act === 'walk' || act === 'run' || act === 'jump') { const s0 = P.aB[0] * 0.2; P.aA = [-s0 + 10, 26, -s0 + 66, 36]; P.aB = [s0 + 10, 26, s0 + 66, 36]; }
+    if (weapon === 'tome') P.aB = [36, 4, 98, -18];
+  }
+  /* bow: the bow hand pushes out, the string hand draws back to the cheek */
+  if (weapon === 'bow' && act === 'shoot') { const k = f % n; P.aB = [[44, 10, 110, -6], [72, 8, 166, -4], [58, 18, 172, 14], [40, 10, 100, -4]][k]; P.aA = k === 0 ? [70, 6, 80, 0] : [86, 2, 88, 0]; P.tw = 50; P.turn = -34; P.kick = 0; P.aimP = 0; P.lean = 1; }
+  /* twin cleavers: the off hand carries its blade too */
+  if (weapon === 'cleavers' && (act === 'idle' || act === 'walk' || act === 'run' || act === 'jump')) { const s0 = P.aB[0] * 0.25; P.aB = [s0 + 4, 10, s0 + 30, 4]; }
+  /* off hand: a shield is held up across the body, a bag hangs from the fist */
+  if (off === 'bag' && !P.hide && !DUAL[weapon] && !CAST[weapon] && !(TWOH[weapon] && !(act === 'idle' || act === 'walk' || act === 'run' || act === 'jump'))) { const s0 = (act === 'walk' || act === 'run') ? P.aB[0] * 0.2 : 0; P.aB = [s0 + 8, 12, s0 + 92, -6]; }   // the bag is held up to show it off
+  if (off === 'shield' || off === 'tower') {
+    const carry = act === 'idle' || act === 'walk' || act === 'run' || act === 'jump', s0 = carry ? P.aB[0] * 0.2 : 0;
+    if (!P.hide && !(CAST[weapon] || DUAL[weapon] || TWOH[weapon] && !carry || weapon === 'bow' && act === 'shoot')) P.aB = act === 'attack' || act === 'shoot' ? [34, 16, 96, -14] : [s0 + 18, 14, s0 + 82, -10];
+  }
+  return P;
+}
+
+/* ---------- two-bone IK with fixed lengths (support hand on a long gun) ---------- */
+function ik2(S, T, l1, l2, hint) {
+  let d = sub(T, S), D = vlen(d); const mx = (l1 + l2) * 0.999, mn = Math.abs(l1 - l2) + 0.05;
+  if (D > mx) { d = mul(d, mx / D); D = mx; } else if (D < mn) { d = mul(norm(D ? d : [0, -1, 0]), mn); D = mn; }
+  const u = mul(d, 1 / D), a = (l1 * l1 - l2 * l2 + D * D) / (2 * D), h = Math.sqrt(Math.max(0, l1 * l1 - a * a));
+  const pp = norm(sub(hint, mul(u, dot(hint, u))));
+  const E = add(add(S, mul(u, a)), mul(pp, h));
+  return {E: E, W: add(E, mul(norm(sub(add(S, d), E)), l2))};
+}
+
+/* ---------- skeleton: forward kinematics, then feet planted on the ground ---------- */
+function skeleton(look, act, f, yaw, seat, seatW) {
+  const B = buildOf(look), P = poseOf(act, f, look.weapon, look.offhand), cen = B.cen;
+  if (seat) {                                               // in the saddle: thighs forward and out round the mount's back, shins hanging, no spinning
+    const out = Math.max(16, Math.min(62, Math.asin(Math.min(1, Math.max(0, (seatW + 1.2 - B.hipX) / B.thigh))) / D2R));
+    P.lA = [68, out, 64]; P.lB = [68, out, 64]; P.spin = 0; P.lift = 0; P.slide = 0; P.sway = 0;
+  }
+  const mir = yaw < 0 ? -1 : 1, sA = -mir, sB = mir;       // role A = camera-side hand: right hand when facing right or straight on
+  const tw = P.tw * mir, roll = P.roll * mir, sway = P.sway * mir, turn = P.turn * mir;
+  const J = {B: B, P: P, mir: mir, sA: sA, sB: sB};
+  const hip = B.thigh + B.shin + ANKLE;
+  const legs = {};
+  let low = 1e9;
+  [['A', sA, P.lA], ['B', sB, P.lB]].forEach(([r, s, l]) => {
+    const h = [s * B.hipX, 0, 0], kd = limbDir(l[0], l[1], s), sd = limbDir(l[0] - l[2], l[1] * 0.5, s);
+    const k = add(h, mul(kd, B.thigh)), a = add(k, mul(sd, B.shin));
+    legs[r] = {h: h, k: k, a: a, s: s}; low = Math.min(low, a[1]);
+  });
+  const rlegs = {};                                         // centaur: hind legs on the opposite beat (a diagonal trot)
+  if (cen) [['A', sA, P.lB], ['B', sB, P.lA]].forEach(([r, s, l]) => {
+    const h = [s * B.hipX, 0, 4.4 - cen.L], kd = limbDir(l[0], l[1], s), sd = limbDir(l[0] - l[2], l[1] * 0.5, s);
+    const k = add(h, mul(kd, B.thigh)), a = add(k, mul(sd, B.shin)); rlegs[r] = {h: h, k: k, a: a, s: s}; low = Math.min(low, a[1]); });
+  const rootY = ANKLE - low + P.lift;                      // lowest ankle sits at ankle height: feet never sink or float
+  const root = {o: seat ? add(seat, [0, -1.4, 0]) : [sway, rootY, P.slide], m: RY(0)};
+  ['A', 'B'].forEach(r => { const L = legs[r]; L.h = add(root.o, L.h); L.k = add(root.o, L.k); L.a = add(root.o, L.a); L.air = L.a[1] - ANKLE; });
+  if (cen) ['A', 'B'].forEach(r => { const L = rlegs[r]; L.h = add(root.o, L.h); L.k = add(root.o, L.k); L.a = add(root.o, L.a); L.air = L.a[1] - ANKLE; });
+  J.legs = legs; J.root = root; J.hipY = hip; J.rlegs = cen ? rlegs : null; J.seat = seat || null;
+  const lean = (P.lean + B.hunch) * D2R;
+  const T = {o: add(root.o, cen ? [0, cen.H + 0.5, 0.6] : [0, 1.0, 0]), m: MM(RZ(roll * D2R), MM(RX(lean), RY(tw * D2R)))};
+  J.cR = cen ? {o: add(T.o, [0, -1, 0]), m: root.m} : null;  // where the clothes hang from on a centaur
+  J.T = T;
+  const arms = {};
+  [['A', sA, P.aA], ['B', sB, P.aB]].forEach(([r, s, a]) => {
+    const sh = FP(T, s * (B.shW - 0.5), B.tH - 2.0, 0);
+    const e = add(sh, mul(MV(T.m, limbDir(a[0], a[1], s)), B.upper)), w = add(e, mul(MV(T.m, limbDir(a[2], a[3], s)), B.fore));
+    arms[r] = {s: sh, e: e, w: w, side: s};
+  });
+  J.arms = arms;
+  /* long gun in both hands: the gun is placed first, then both arms are solved to reach the grip and the fore-end */
+  const W = look.weapon, longGun = W === 'rifle' || W === 'shotgun', carry = act === 'idle' || act === 'walk' || act === 'run' || act === 'jump';
+  const xT = MV(T.m, [1, 0, 0]);
+  if (longGun && !P.hide && (P.two || carry)) {
+    const reach = (B.upper + B.fore) * 0.95, SEP = 7.6 * LG;      // SEP = distance along the gun from the grip to the middle of the fore-end
+    let aim, HA;
+    if (P.two) { const ap = P.aimP * D2R; aim = [0, Math.sin(ap), Math.cos(ap)]; }                         // shouldered: the body turns side-on so the front hand can reach
+    else aim = norm(MV(T.m, [sB * 0.95, 0.25, 0.16]));                                                      // port arms: across the chest, muzzle a little up, out past the far arm
+    const top = norm(sub([0, 1, 0], mul(aim, aim[1])));
+    if (P.two) HA = add(add(FP(T, sA * (B.shW - 0.8), B.tH - 5, B.dep * 0.2), [0, -P.kick * 0.3, -P.kick]), add(mul(aim, 5.4 * LG), mul(top, -1.5 * LG)));   // stock in the shoulder pocket
+    else HA = FP(T, sA * B.shW * 0.62, B.tH * 0.5, B.dep * 0.9 + 1.2);
+    let HB = add(HA, add(mul(aim, SEP), mul(top, 0.5 * LG)));
+    for (let k = 0; k < 10 && vlen(sub(HB, arms.B.s)) > reach; k++) { const sh = mul(xT, sB * 0.6); HA = add(HA, sh); HB = add(HB, sh); }   // slide the gun toward the front hand's shoulder until it reaches
+    const solve = (A, hc, hint) => { let r = ik2(A.s, hc, B.upper, B.fore, hint); const fd = norm(sub(r.W, r.E)); r = ik2(A.s, sub(hc, mul(fd, B.hand * 0.5)), B.upper, B.fore, hint); A.e = r.E; A.w = r.W; };
+    solve(arms.A, HA, MV(T.m, [sA * 1, -0.6, -0.7])); solve(arms.B, HB, MV(T.m, [sB * 1, -0.8, -0.2]));     // elbows out and down
+    J.gunLine = {butt: add(HA, add(mul(aim, -5.4 * LG), mul(top, 1.5 * LG))), aim: aim, top: top};
+  }
+  /* hand frames: forearm line, thumb side, centre of the fist */
+  const frameHand = (A, roll) => {
+    A.f = norm(sub(A.w, A.e)); let t0 = cross(A.f, xT); t0 = vlen(t0) < 0.25 ? [0, 1, 0] : norm(t0);
+    if (roll) { const r = roll * D2R; t0 = norm(add(mul(t0, Math.cos(r)), mul(cross(A.f, t0), Math.sin(r)))); }
+    A.top = t0; A.hc = add(A.w, mul(A.f, B.hand * 0.5));
+    const g = P.grip[0] * D2R; A.axis = norm(add(mul(t0, Math.cos(g)), mul(A.f, Math.sin(g))));
+  };
+  const pc = KIND[W] === 'gun' && !longGun && carry ? 16 * mir : 0;     // carried pistols turn a little outward so the barrel shows
+  frameHand(arms.A, STICK[W] ? P.grip[1] * mir : pc); frameHand(arms.B, W === 'twin' ? -pc : W === 'cleavers' ? -P.grip[1] * mir : 0);
+  if (TWOH[W] && !P.hide && !carry) {           // second hand closes on the shaft when it can reach
+    const tg = sub(arms.A.hc, mul(arms.A.axis, TWOH[W]));
+    if (vlen(sub(tg, arms.B.s)) < (B.upper + B.fore) * 0.97) { const a2 = ik2(arms.B.s, sub(tg, mul(norm(sub(tg, arms.B.s)), B.hand * 0.4)), B.upper, B.fore, [sB * 0.6, -1, -0.2]); arms.B.e = a2.E; arms.B.w = a2.W; frameHand(arms.B, 0); J.grip2 = true; }
+  }
+  /* head: follows the shoulders but stays mostly upright */
+  const hm = MM(RZ(roll * 0.45 * D2R), MM(RX((P.lean * 0.3 + P.nod) * D2R), RY((tw * 0.45 + turn) * D2R)));
+  J.H = {o: FP(T, 0, B.tH - B.sink, B.headZ), m: hm};
+  return J;
+}
+
+/* ---------- geometry builders ---------- */
+function ring8(F, y, hw, hd, c, cx, cz) {       // chamfered rectangle, counter-clockwise seen from above; index 7->0 is the front face
+  cx = cx || 0; cz = cz || 0; c = Math.min(c, hw * 0.95, hd * 0.95);
+  return [[hw - c, hd], [hw, hd - c], [hw, -(hd - c)], [hw - c, -hd], [-(hw - c), -hd], [-hw, -(hd - c)], [-hw, hd - c], [-(hw - c), hd]].map(p => FP(F, p[0] + cx, y, p[1] + cz));
+}
+const SIDES_FRONT = i => i === 7;
+
+function Scene(yawDeg, boil) {
+  const a = yawDeg * D2R; this.c = Math.cos(a); this.s = Math.sin(a); this.yaw = yawDeg; this.boil = boil || 0; this.parts = [];
+  this.bb = [1e9, 1e9, -1e9, -1e9];
+}
+Scene.prototype.P = function (p) { const cam = -p[0] * this.s + p[2] * this.c; return [p[0] * this.c + p[2] * this.s, -p[1] + K * cam, cam]; };
+Scene.prototype.N = function (n) { return [n[0] * this.c + n[2] * this.s, n[1], -n[0] * this.s + n[2] * this.c]; };
+Scene.prototype.jit = function (q, seed, amt) { const b = this.boil * 17.3; return [q[0] + (rnd(seed, 1 + b) - 0.5) * amt, q[1] + (rnd(seed, 2 + b) - 0.5) * amt, q[2]]; };
+Scene.prototype.add = function (part) { this.parts.push(part); return part; };
+const LIGHT = norm([-0.62, 0.62, 0.48]);
+function toneOf(m, t) { t -= m.tb; return t > 0.16 ? m.b : t > -0.3 ? m.s : m.d; }
+
+/* a stack of rings -> flat-shaded faces. Back faces of an open solid become its inked inside. */
+function prism(G, rings, o) {
+  const n = rings[0].length, JIT = o.jit == null ? 0.34 : o.jit;
+  const P = rings.map((r, j) => r.map((p, i) => G.jit(G.P(p), o.seed * 97 + j * 31 + i, JIT)));
+  let C = [0, 0, 0], cnt = 0; rings.forEach(r => r.forEach(p => { C = add(C, p); cnt++; })); C = mul(C, 1 / cnt);
+  const front = [], back = [];
+  const face = (q3, q2, i, j, m, poly) => {
+    let nn = cross(sub(q3[2], q3[0]), sub(q3[3 % q3.length], q3[1]));
+    let ctr = [0, 0, 0]; q3.forEach(p => { ctr = add(ctr, p); }); ctr = mul(ctr, 1 / q3.length);
+    if (dot(nn, sub(ctr, C)) < 0) nn = mul(nn, -1);
+    const nv = G.N(norm(nn)), vis = nv[1] * K + nv[2] > 0.001;
+    let z = 0; q2.forEach(p => { z += p[2]; }); z /= q2.length;
+    const tv = o.flatY ? norm([nv[0], 0, nv[2]]) : nv, t = (o.flatY && i < 0) ? 0.6 : dot(tv, LIGHT), F = {p: poly || q2, q: q2, f: toneOf(m, t), z: z, i: i, j: j, t: t, m: m, nv: nv};
+    (vis ? front : back).push(F);
+  };
+  for (let j = 0; j < rings.length - 1; j++) for (let i = 0; i < n; i++) {
+    if (o.skip && o.skip(i, j)) continue;
+    const i2 = (i + 1) % n, q3 = [rings[j][i], rings[j][i2], rings[j + 1][i2], rings[j + 1][i]], q2 = [P[j][i], P[j][i2], P[j + 1][i2], P[j + 1][i]];
+    let poly = null; const teeth = o.jag ? o.jag(i, j) : 0;
+    if (teeth) {                                           // torn hem: zigzag the lower edge
+      poly = [q2[3], q2[2], q2[1]]; const jd = o.jd || 0.22;
+      for (let k = 1; k < teeth * 2; k++) {
+        const t = 1 - k / (teeth * 2), b = lerp2(q2[0], q2[1], t), u = lerp2(q2[3], q2[2], t), sd = o.seed * 53 + i * 11 + k;
+        poly.push((k % 2) ? lerp2(b, u, jd * (0.55 + 0.9 * rnd(sd, 5))) : lerp2(b, u, -0.03 * rnd(sd, 6)));
+      }
+      poly.push(q2[0]);
+    }
+    face(q3, q2, i, j, typeof o.col === 'function' ? o.col(i, j) : o.col, poly);
+  }
+  if (o.top) { const j = rings.length - 1; face(rings[j], P[j], -1, j, o.top === true ? (typeof o.col === 'function' ? o.col(-1, j) : o.col) : o.top); }
+  if (o.bot) face(rings[0].slice().reverse(), P[0].slice().reverse(), -2, 0, typeof o.col === 'function' ? o.col(-2, 0) : o.col);
+  front.sort((a, b) => a.z - b.z);
+  const part = {key: o.key, seed: o.seed, w: o.w, polys: front, post: []};
+  if (front.length) G.add(part);
+  if (o.inside && back.length) G.add({key: o.inside.key, seed: o.seed + 0.5, w: o.w, polys: back.map(F => ({p: F.p, q: F.q, f: o.inside.f || INKC, z: F.z})), post: []});
+  if (o.hatch && front.length) part.post.push(ctx => {      // scratchy cloth ticks, fixed to each face so they travel with it
+    front.forEach(F => {
+      if (F.i < 0 || F.f === INKC) return; const q = F.q, A = Math.abs(area2(q)); const cnt2 = Math.min(7, Math.floor(A * o.hatch));
+      for (let k = 0; k < cnt2; k++) {
+        const sd = o.seed * 71 + F.i * 13 + F.j * 29 + k * 3, a = 0.14 + 0.72 * rnd(sd, 1), b = 0.12 + 0.7 * rnd(sd, 2);
+        const p0 = lerp2(lerp2(q[0], q[1], a), lerp2(q[3], q[2], a), b), p1 = lerp2(lerp2(q[0], q[1], a + 0.03), lerp2(q[3], q[2], a + 0.03), b + 0.1 + 0.07 * rnd(sd, 3));
+        tick(ctx, p1, p0, 0.42, F.f === F.m.b ? mix(F.m.s, INKC, 0.45) : INKC);
+      }
+    });
+  });
+  part.front = front; part.backFaces = back;
+  return part;
+}
+
+/* limb segment as an inked ribbon between two projected joints */
+function ribbon(a, b, wa, wb) {
+  let dx = b[0] - a[0], dy = b[1] - a[1], L = Math.hypot(dx, dy);
+  if (L < 0.3) { dx = 0; dy = 1; L = 1; a = [a[0], a[1] - 0.2]; b = [b[0], b[1] + 0.2]; } else { dx /= L; dy /= L; }
+  const nx = -dy, ny = dx;
+  return [[a[0] + nx * wa, a[1] + ny * wa], [b[0] + nx * wb, b[1] + ny * wb], [b[0] - nx * wb, b[1] - ny * wb], [a[0] - nx * wa, a[1] - ny * wa]];
+}
+const LS = [-0.707, -0.707];                               // screen-space light, from the upper left
+function shadeStrip(q, frac) {                            // the half of a ribbon that turns away from the light
+  const nx = q[0][0] - q[3][0], ny = q[0][1] - q[3][1], lit = nx * LS[0] + ny * LS[1] > 0;
+  return lit ? [lerp2(q[3], q[0], frac), lerp2(q[2], q[1], frac), q[2], q[3]] : [q[0], q[1], lerp2(q[1], q[2], frac), lerp2(q[0], q[3], frac)];
+}
+
+/* ---------- the painter ---------- */
+function compose(look, act, f, dir, boil) {
+  if (BEAST[look.build]) return composeBeast(look, act, f, dir, boil);
+  if (BLOB[look.build]) return composeBlob(look, act, f, dir, boil);
+  const yaw0 = YAW[dir] == null ? 0 : YAW[dir];
+  const mk = look.mount && look.mount !== 'none' && MOUNT[look.mount] && !(BUILD[look.build] || {}).cen ? look.mount : null;
+  const M = mk ? composeBeast(MOUNT[mk], (act === 'walk' || act === 'run' || act === 'jump' || act === 'idle') ? act : 'idle', f, dir, boil, {rider: true}) : null;
+  const ract = M && (act === 'walk' || act === 'run' || act === 'jump') ? 'idle' : act;   // the mount does the walking
+  if (M) act = ract;
+  const J = skeleton(look, act, f, yaw0, M ? M.seat : null, M ? ridden(mk).W : 0), B = J.B, P = J.P;
+  const G = new Scene(yaw0 + P.spin * J.mir, boil);
+  const col = {
+    skin: mat(look.skin, false, -0.34), hair: mat(look.hairc, true), hat: mat(look.hatc, true), coat: mat(look.coat, true), shirt: mat(look.shirt, false),
+    scarf: mat(look.scarf, false), pants: mat(look.pants, true), accent: mat(look.accent, false), leather: mat('#4a362b', true), steel: mat('#6f7480', true),
+    wood: mat('#7a5236', false), bone: mat('#e6dcc3', false)
+  };
+  const T = J.T, R = J.cR || J.root, tH = B.tH, fem = look.sex === 'f', cen = B.cen;
+  const camT = G.P(FP(T, 0, tH * 0.5, 0))[2];
+  const outer = look.outer, dress = outer === 'dress', plate = outer === 'armor' || outer === 'tabard', scale = outer === 'scale', quilt = outer === 'quilted' || scale, wraps = outer === 'wraps', fleece = outer === 'fleece', overalls = outer === 'overalls';
+  const sleeve = (outer === 'duster' || outer === 'furcoat' || dress || quilt || wraps || fleece) ? col.coat : outer === 'bare' ? col.skin : col.shirt;
+  const bare = outer === 'bare';
+  const ss = G.c >= 0 ? 1 : -1;                            // which local side falls on the screen right = the shadow side
+  const anchors = {muzzle: null, muzzle2: null, fire: !!P.fire, hit: !!P.hit};
+  const cell = q => [Math.round((AX + q[0]) * 100) / 100, Math.round((AY + q[1]) * 100) / 100];
+
+  /* ----- legs: thin ink sticks with small wedge boots ----- */
+  const st0 = col.steel;
+  if (cen) {                                                // centaur: a horse's body from the waist down, four legs, hooves and a tail
+    const hide = mat(look.pants, false), hoof = mix(look.pants, INKC, 0.65), R0 = J.root, half = cen.L / 2;
+    const Bc = {o: add(R0.o, [0, 0.9, 2.6 - half]), m: R0.m}, Sz = {o: Bc.o, m: MM(R0.m, RX(90 * D2R))}, bDep = G.P(Bc.o)[2];
+    const bKey = camT + Math.max(-5, Math.min(3.2, bDep - camT));
+    const bd = prism(G, [[-half, cen.W * 0.66, cen.H * 0.72], [-half * 0.55, cen.W, cen.H], [half * 0.45, cen.W * 1.04, cen.H * 1.04], [half * 0.92, cen.W * 0.86, cen.H * 0.9]].map(r => ring8(Sz, r[0], r[1], r[2], r[1] * 0.36)),
+      {seed: 141, key: bKey, col: hide, top: hide, bot: true, hatch: 0.07});
+    bd.post.push(ctx => bd.front.forEach(F => { if (F.i < 0 || F.f === INKC) return; const q = F.q; [0.35, 0.62].forEach((t, k) => line(ctx, [lerp2(q[0], q[3], t), lerp2(q[1], q[2], t + 0.08)], 0.9, 142 + F.i * 2 + k, col.accent.b)); }));   // painted bands
+    const legsAll = [['A', J.legs.A], ['B', J.legs.B], ['C', J.rlegs.A], ['D', J.rlegs.B]];
+    legsAll.forEach(([r, L], i) => { const h = G.P(L.h), k = G.P(L.k), a = G.P(L.a), w = B.legW, up = L.air > 0.9, g = G.P(add(L.a, [0, -ANKLE + (up ? 0.6 : 0), 0]));
+      const hf = [[a[0] - w * 1.05, a[1]], [a[0] + w * 1.05, a[1]], [g[0] + w * 1.25, g[1]], [g[0] - w * 1.25, g[1]]];
+      const upR = ribbon(h, k, w * 1.9, w * 1.15), loR = ribbon(k, a, w * 1.1, w * 0.9);
+      G.add({key: bKey + (G.P(L.k)[2] > bDep ? 0.6 : -0.6) + i * 0.01, seed: 145 + i, w: 0.8, polys: [{p: upR, f: hide.b}, {p: loR, f: hide.b}, {p: hf, f: hoof}],
+        post: [ctx => { fillp(ctx, shadeStrip(upR, 0.45), hide.s); fillp(ctx, shadeStrip(loR, 0.45), hide.s); line(ctx, [lerp2(loR[0], loR[1], 0.35), lerp2(loR[3], loR[2], 0.35)], 0.8, 150 + i, col.accent.b); tick(ctx, lerp2(hf[0], hf[3], 0.5), lerp2(hf[1], hf[2], 0.5), 0.3); }]}); });
+    const t0 = FP(Bc, 0, cen.H * 0.6, -half - 0.4), t1 = FP(Bc, -P.cs * 0.8, -cen.H * 0.4, -half - 3.6 - P.fl), t2 = FP(Bc, -P.cs * 1.6 + 1.2, -cen.H * 1.5, -half - 2.6 - P.fl * 1.4), tq = [t0, t1, t2].map(p => G.P(p));
+    G.add({key: bKey + (tq[1][2] > bDep ? 0.7 : -0.7), seed: 153, w: 0.8, polys: [{p: ribbon(tq[0], tq[1], 1.3, 2.2), f: col.hair.b}, {p: ribbon(tq[1], tq[2], 2.2, 0.6), f: col.hair.s}], post: [ctx => [0.3, 0.6].forEach(t => tick(ctx, lerp2(tq[0], tq[1], t), lerp2(tq[1], tq[2], t), 0.3))]});
+  } else ['A', 'B'].forEach((r, ri) => {
+    const L = J.legs[r], h = G.P(L.h), k = G.P(L.k), a = G.P(L.a), w = B.legW;
+    const out = 26 * D2R * L.s, fd = [Math.sin(out), 0, Math.cos(out)], up = L.air > 0.9;
+    const toe = add(L.a, [fd[0] * FOOT, up ? -ANKLE - 1.1 : -ANKLE + 0.15, fd[2] * FOOT]), heel = add(L.a, [-fd[0] * 0.9, -ANKLE + (up ? 0.5 : 0), -fd[2] * 0.9]);
+    const tq = G.P(toe), hq = G.P(heel), at = G.P(add(L.a, [0, 0.5, 0])), ti = G.P(add(toe, [0, 0.75, 0]));
+    const boot = [[at[0] - w * 1.1, at[1]], [at[0] + w * 1.1, at[1]], ti, tq, hq].map((p, i) => G.jit([p[0], p[1], 0], 900 + ri * 9 + i, 0.2));
+    if (area2(boot) < 0) boot.reverse();
+    const bootc = mix(look.pants, '#7d7468', 0.55);
+    if (look.peg && L.s > 0) {                              // wooden peg below the knee: a tapered post with an iron cap
+      const g = G.P(add(L.a, [0, -ANKLE + (up ? 0.6 : 0.15), 0])), kb = lerp2(k, g, 0.16);
+      G.add({key: k[2] - 3.5 + (L.air > 2 ? 2 : 0), seed: 40 + ri, w: 0.7, far: J.seat ? G.P(L.k)[2] < G.P(J.seat)[2] : false, polys: [{p: ribbon(h, k, w * 1.25, w * 1.1), f: col.pants.b === INKC ? '#221c22' : col.pants.s}, {p: ribbon(kb, g, w * 1.05, w * 0.55), f: col.wood.b}, {p: ribbon(k, kb, w * 1.35, w * 1.2), f: col.leather.b}],
+        post: [ctx => { fillp(ctx, shadeStrip(ribbon(kb, g, w * 1.05, w * 0.55), 0.45), col.wood.s); fillp(ctx, ribbon(lerp2(kb, g, 0.86), g, w * 0.65, w * 0.6), st0.s); tick(ctx, lerp2(kb, g, 0.3), lerp2(kb, g, 0.6), 0.3); }]});
+      return;
+    }
+    const part = {key: k[2] - 3.5 + (L.air > 2 ? 2 : 0), seed: 40 + ri, w: 0.7, far: J.seat ? G.P(L.k)[2] < G.P(J.seat)[2] : false, polys: [
+      {p: ribbon(h, k, w * 1.25, w), f: col.pants.b === INKC ? '#221c22' : col.pants.s}, {p: ribbon(k, a, w, w * 0.85), f: col.pants.s},
+      {p: boot, f: bootc}], post: []};
+    part.post.push(ctx => { tick(ctx, lerp2(k, a, 0.55), lerp2(lerp2(k, a, 0.55), [a[0] + 1.2, a[1]], 0.9), 0.3, mix(bootc, '#ffffff', 0.25)); });
+    G.add(part);
+  });
+
+  /* ----- pelvis ----- */
+  if (!cen) prism(G, [ring8(R, -2.6, B.pelW * 0.8, B.pelD * 0.9, B.pelW * 0.3), ring8(R, 1.4, (fem ? 1.04 : 0.96) * B.waistW, B.dep, B.waistW * 0.3)], {seed: 3, key: camT - 0.6, col: col.pants, bot: true, flatY: true});
+
+  /* ----- torso ----- */
+  const wW = B.waistW * (fem ? 0.86 : 1), vest = outer === 'vest';
+  const torso = prism(G, [ring8(T, 0.4, wW, B.dep, wW * 0.3), ring8(T, tH * 0.55, B.chestW, B.dep * 1.05, B.chestW * 0.3), ring8(T, tH - 2.6, B.shW * 0.97, B.dep * 0.94, B.shW * 0.32), ring8(T, tH - 0.5, B.shW * 0.84, B.dep * 0.86, B.shW * 0.32), ring8(T, tH + 0.8, B.shW * 0.58, B.dep * 0.68, B.shW * 0.24)],
+    {seed: 5, key: camT, col: (i) => bare ? col.skin : (dress || plate || quilt || wraps) ? col.coat : (vest && i !== 7 && i >= 0) ? col.coat : col.shirt, top: true, hatch: bare ? 0 : 0.03, flatY: true});
+  torso.post.push(ctx => {                                  // shirt front: placket and buttons
+    const fr = torso.front.filter(F => F.i === 7); if (!fr.length) return;
+    const pt = (x, y) => { const q = G.P(FP(T, x, y, B.dep * 1.02 + 0.15)); return [q[0], q[1]]; };
+    if (bare) {                                            // bare chest: pecs, belly line and an inked mark on the shoulder
+      line(ctx, [pt(-B.chestW * 0.66, tH * 0.6), pt(-1.2, tH * 0.53), pt(0, tH * 0.58), pt(1.2, tH * 0.53), pt(B.chestW * 0.66, tH * 0.6)], 0.5, 64); line(ctx, [pt(0, tH * 0.53), pt(0.3, tH * 0.26)], 0.4, 65);
+      tick(ctx, pt(-2, tH * 0.3), pt(2, tH * 0.28), 0.34); const tx = B.chestW * 0.5, ty = tH * 0.76, tc = mix(look.accent, look.skin, 0.25);
+      fillp(ctx, [pt(tx, ty + 2), pt(tx + 1.6, ty), pt(tx, ty - 2), pt(tx - 1.6, ty)], tc); [[0, 3.4], [2.9, 0], [0, -3.4], [-2.9, 0], [2.2, 2.4], [-2.2, 2.4]].forEach(v => tick(ctx, pt(tx + v[0] * 0.75, ty + v[1] * 0.75), pt(tx + v[0], ty + v[1]), 0.5, tc));
+      return;
+    }
+    if (plate) {                                           // breastplate: seam, rivets and a round badge
+      line(ctx, [pt(-B.chestW * 0.72, tH * 0.5), pt(0, tH * 0.44), pt(B.chestW * 0.72, tH * 0.5)], 0.5, 66); line(ctx, [pt(-wW * 0.7, 5.6), pt(wW * 0.7, 5.6)], 0.4, 67);
+      [[-0.6, 0.86], [0.6, 0.86], [-0.66, 0.6], [0.66, 0.6], [-0.5, 0.34], [0.5, 0.34]].forEach(v => { const c0 = pt(v[0] * B.chestW, tH * v[1]); ctx.fillStyle = INKC; ctx.beginPath(); ctx.arc(c0[0], c0[1], 0.36, 0, 7); ctx.fill(); });
+      if (outer === 'armor') { const bd = []; for (let i = 0; i < 8; i++) { const a = i / 8 * 6.283; bd.push(pt(Math.cos(a) * 2.1, tH * 0.7 + Math.sin(a) * 2.1)); } outline(ctx, bd, 1.0, 68); fillp(ctx, bd, col.accent.b); fillp(ctx, bd.map(q => lerp2(pt(0, tH * 0.7), q, 0.5)), col.accent.s); }
+      return;
+    }
+    if (scale) {                                           // scale mail: overlapping rows of little arcs, a darker lower lip on each
+      for (let row = 0; row < 7; row++) { const y = tH - 2.2 - row * (tH - 4.6) / 6, off = row % 2 ? 0.9 : 0, hw2 = lerp(B.shW * 0.92, wW, row / 6);
+        for (let x = -hw2 + 0.6 + off; x < hw2 - 0.4; x += 1.8) { const a = pt(x - 0.85, y), b = pt(x, y - 1.15), c = pt(x + 0.85, y); line(ctx, [a, b, c], 0.32, 600 + row * 20 + Math.round(x * 3), INKC); fillp(ctx, [a, b, c, pt(x, y - 0.55)], col.coat.s); } }
+      return;
+    }
+    if (quilt) {                                           // gambeson: diamond quilting, laced up the front
+      for (let k = -3; k <= 3; k++) { const x0 = k * 2.8; line(ctx, [pt(x0 - 4, 4.2), pt(x0 + 4, tH - 1.8)], 0.32, 600 + k); line(ctx, [pt(x0 + 4, 4.2), pt(x0 - 4, tH - 1.8)], 0.32, 610 + k); }
+      line(ctx, [pt(0.2, tH - 1.5), pt(0.2, 4.0)], 0.6, 619); for (let k = 0; k < 4; k++) tick(ctx, pt(-0.9, tH * (0.8 - k * 0.15)), pt(0.9, tH * (0.74 - k * 0.15)), 0.4, col.accent.b); return;
+    }
+    if (wraps) { for (let k = 0; k < 6; k++) { const y = 4.6 + k * (tH - 6) / 5, d = (k % 2 ? 1 : -1) * 0.8; line(ctx, [pt(-B.chestW, y + d), pt(B.chestW, y - d)], 0.36, 620 + k); } return; }   // bandage wrappings
+    if (overalls) {                                        // bib and braces over the shirt
+      const bib = [pt(-B.chestW * 0.5, tH * 0.7), pt(B.chestW * 0.5, tH * 0.7), pt(wW * 0.6, 2.6), pt(-wW * 0.6, 2.6)]; outline(ctx, bib, 1.1, 625); fillp(ctx, bib, col.coat.b); fillp(ctx, [lerp2(bib[0], bib[1], 0.6), bib[1], bib[2], lerp2(bib[3], bib[2], 0.6)], col.coat.s);
+      const pk = [pt(-2.0, tH * 0.58), pt(2.0, tH * 0.58), pt(1.8, tH * 0.36), pt(-1.8, tH * 0.36)]; line(ctx, pk.concat([pk[0]]), 0.32, 626); [-1, 1].forEach(e => { line(ctx, [pt(e * B.chestW * 0.42, tH * 0.7), pt(e * B.shW * 0.5, tH + 0.4)], 1.5, 627 + e, col.coat.b); const c0 = pt(e * B.chestW * 0.4, tH * 0.66); ctx.fillStyle = col.accent.b; ctx.beginPath(); ctx.arc(c0[0], c0[1], 0.5, 0, 7); ctx.fill(); });
+      return;
+    }
+    line(ctx, [pt(0.3, tH - 2.5), pt(0.1, tH * 0.55), pt(0.3, 4.2)], 0.4, 61);
+    for (let k = 0; k < 3; k++) { const b = pt(1.2, tH * (0.72 - k * 0.17)); ctx.fillStyle = INKC; ctx.beginPath(); ctx.arc(b[0], b[1], 0.32, 0, 7); ctx.fill(); }
+    if (vest) { fillp(ctx, [pt(-wW * 0.7, 4.4), pt(-B.chestW * 0.7, tH - 2), pt(-2.4, tH * 0.5), pt(-1.6, 4.4)], col.coat.b); fillp(ctx, [pt(wW * 0.7, 4.4), pt(B.chestW * 0.7, tH - 2), pt(2.4, tH * 0.5), pt(1.6, 4.4)], col.coat.s);
+      line(ctx, [pt(-B.chestW * 0.7, tH - 2), pt(-2.4, tH * 0.5), pt(-1.6, 4.4)], 0.5, 62); line(ctx, [pt(B.chestW * 0.7, tH - 2), pt(2.4, tH * 0.5), pt(1.6, 4.4)], 0.5, 63); }
+  });
+
+  /* ----- gun belt: cartridges all the way round, square buckle in front ----- */
+  const belt = prism(G, [ring8(T, 1.0, wW + 0.55, B.dep + 0.55, wW * 0.3), ring8(T, 3.7, wW + 0.6, B.dep + 0.6, wW * 0.3)], {seed: 7, key: camT + 0.3, col: col.leather, w: 0.6, jit: 0.2});
+  belt.post.push(ctx => {
+    belt.front.forEach(F => { const q = F.q, wd = Math.hypot(q[1][0] - q[0][0], q[1][1] - q[0][1]), nb = Math.max(0, Math.round(wd / 1.45));
+      for (let k = 0; k < nb; k++) { const t = (k + 0.5) / nb; if (F.i === 7 && Math.abs(t - 0.5) < 0.2) continue;
+        const b = lerp2(lerp2(q[0], q[1], t), lerp2(q[3], q[2], t), 0.2), u = lerp2(lerp2(q[0], q[1], t), lerp2(q[3], q[2], t), 0.8);
+        tick(ctx, b, u, 0.7, INKC); tick(ctx, lerp2(b, u, 0.08), lerp2(b, u, 0.9), 0.42, F.f === INKC ? col.accent.s : col.accent.b); } });
+    const fr = belt.front.filter(F => F.i === 7); if (!fr.length) return;
+    const pt = (x, y) => { const q = G.P(FP(T, x, y, B.dep + 0.9)); return [q[0], q[1]]; };
+    const bk = [pt(-1.7, 0.7), pt(1.7, 0.7), pt(1.7, 4.0), pt(-1.7, 4.0)];
+    outline(ctx, bk, 1.3, 71); fillp(ctx, bk, col.accent.b); fillp(ctx, [pt(0.5, 0.7), pt(1.7, 0.7), pt(1.7, 4.0), pt(1.0, 4.0)], col.accent.s);
+    fillp(ctx, [pt(-0.7, 2.35), pt(0, 3.1), pt(0.7, 2.35), pt(0, 1.6)], INKC);
+  });
+
+  /* ----- outerwear ----- */
+  const sat = !!J.seat, hemY = cen || sat ? -4.0 : B.hem - R.o[1], cs = P.cs, fl = P.fl;
+  const hemF = {o: add(R.o, [-P.sway * J.mir * 0.4, 0, -cs * 1.5 - P.lean * 0.05]), m: RY(P.tw * J.mir * 0.5 * D2R)};
+  const coatHatch = 0.05;
+  if (outer === 'duster' || outer === 'furcoat' || fleece) {
+    const hw = B.hemW + fl * 1.6, c = x => x * 0.5;
+    const rings = [ring8(hemF, hemY + fl * 0.8, hw, B.dep + 3.2 + fl, c(hw)), ring8(T, tH * 0.36, B.chestW + 1.5, B.dep + 1.5, c(B.chestW + 1.5)), ring8(T, tH - 2.4, B.shW + 1.0, B.dep + 1.1, c(B.shW + 1.0)), ring8(T, tH - 0.2, B.shW * 0.86 + 1, B.dep * 0.9 + 1, c(B.shW * 0.86 + 1)), ring8(T, tH + 1.2, B.shW * 0.6 + 1, B.dep * 0.7 + 1, c(B.shW * 0.6 + 1))];
+    const coat = prism(G, rings, {seed: 11, key: camT + 1, col: col.coat, skip: SIDES_FRONT, inside: {key: camT - 6}, hatch: fleece ? 0.22 : coatHatch, jag: (i, j) => fleece ? (j === 0 ? 3 : 1) : j === 0 ? 1 : 0, jd: fleece ? 0.6 : 0.05, flatY: true});
+    coat.post.push(ctx => {                                // lapel edges and a frayed hem
+      coat.front.forEach(F => { if (F.j !== 0) return; const q = F.q; for (let k = 0; k < 3; k++) { const t = 0.15 + 0.3 * k + 0.1 * rnd(F.i * 7 + k, 3), b = lerp2(q[0], q[1], t); tick(ctx, b, lerp2(b, lerp2(q[3], q[2], t), 0.1), 0.4, F.f === INKC ? col.coat.s : INKC); } });
+    });
+    if (outer === 'duster') prism(G, [ring8(T, tH - 0.6, B.shW * 0.62, B.dep * 0.8 + 0.6, 2.2), ring8(T, tH + 2.6, B.shW * 0.5 + 1.6, B.dep * 0.6 + 1.9, 2.2)], {seed: 13, key: camT + 1.6, col: col.coat, skip: SIDES_FRONT, inside: {key: camT - 5.5}, w: 0.7});
+    else prism(G, [ring8(T, tH - (fleece ? 6.0 : 4.4), B.shW + (fleece ? 3.6 : 2.4), B.dep + (fleece ? 3.4 : 2.6), 4), ring8(T, tH - 0.6, B.shW * 0.9 + (fleece ? 2.8 : 1.8), B.dep + (fleece ? 2.8 : 2.0), 3.6), ring8(T, tH + 2.4, 4.6, 4.2, 1.8)],
+      {seed: 13, key: camT + 1.7, col: fleece ? col.coat : mat(look.accent, false), jag: (i, j) => j === 0 ? 3 : fleece ? 1 : 0, jd: fleece ? 0.7 : 0.5, hatch: 0.16});
+  } else if (outer === 'poncho') {
+    const hw = B.shW + 4.4 + fl;
+    const pon = prism(G, [ring8(hemF, tH * 0.42 + 1.0 + fl * 0.8, hw, B.dep + 3.6 + fl, hw * 0.4), ring8(T, tH - 2.2, B.shW + 2.8, B.dep + 2.0, (B.shW + 2.8) * 0.4), ring8(T, tH + 1.3, 4.8, 4.2, 1.8)],
+      {seed: 11, key: camT + 2.6, col: col.coat, jag: (i, j) => j === 0 ? 2 : 0, jd: 0.3, hatch: coatHatch, inside: {key: camT - 6}});
+    pon.post.push(ctx => {                                 // woven band across the poncho
+      pon.front.forEach(F => { if (F.j !== 0 || F.f === INKC) return; const q = F.q, a0 = lerp2(q[0], q[3], 0.46), a1 = lerp2(q[1], q[2], 0.46), b0 = lerp2(q[0], q[3], 0.62), b1 = lerp2(q[1], q[2], 0.62);
+        fillp(ctx, [a0, a1, b1, b0], F.f === col.coat.b ? col.accent.b : col.accent.s); line(ctx, [a0, a1], 0.36, 81 + F.i); line(ctx, [b0, b1], 0.36, 85 + F.i); });
+    });
+  } else if (outer === 'cloak') {
+    const hw = B.hemW + 0.6 + fl * 1.8;
+    prism(G, [ring8(hemF, hemY - 1.2 + fl, hw, B.dep + 3.4 + fl, hw * 0.4), ring8(T, tH * 0.5, B.chestW + 1.8, B.dep + 1.6, 4), ring8(T, tH - 1.8, B.shW + 1.2, B.dep + 1.2, 4), ring8(T, tH + 0.3, B.shW * 0.84 + 1.2, B.dep + 1.0, 4), ring8(T, tH + 1.6, 5.2, 4.6, 2)],
+      {seed: 11, key: camT + 1, col: col.coat, skip: i => i === 7 || i === 0 || i === 6, inside: {key: camT - 6}, jag: (i, j) => j === 0 ? 2 : 0, jd: 0.2, hatch: coatHatch, flatY: true});
+  } else if (quilt && cen) {                                 // on a centaur the coat stops at the waist; a cloth panel hangs over the horse's chest
+  } else if (quilt) {                                        // padded skirts to mid-thigh
+    const hw = wW + 1.8 + fl;
+    prism(G, [ring8(hemF, -B.thigh * 0.55 + fl * 0.4, hw, B.dep + 2.0 + fl * 0.5, hw * 0.34), ring8(T, 3.0, wW + 0.8, B.dep + 0.8, wW * 0.32)], {seed: 11, key: camT + 0.9, col: col.coat, jag: (i, j) => j === 0 ? 1 : 0, jd: 0.15, hatch: 0.08, flatY: true, bot: true});
+  } else if (wraps) {                                        // long ragged robe of wrappings
+    const hw = B.hemW * 0.96 + fl * 1.4;
+    const rb = prism(G, [ring8(hemF, (cen || sat ? -4.5 : 2.2 - R.o[1]) + fl * 0.5, hw, B.dep + 3.2 + fl, hw * 0.4), ring8(T, 3.2, wW + 0.5, B.dep + 0.5, wW * 0.32)], {seed: 11, key: camT + 0.9, col: col.coat, jag: (i, j) => j === 0 ? 3 : 0, jd: 0.5, hatch: 0.12, flatY: true, bot: true});
+    rb.post.push(ctx => rb.front.forEach(F => { if (F.i < 0 || F.f === INKC) return; const q = F.q; [0.3, 0.55, 0.8].forEach((t, k) => line(ctx, [lerp2(q[0], q[3], t), lerp2(q[1], q[2], t + (k % 2 ? 0.06 : -0.06))], 0.32, 630 + F.i * 3 + k)); }));
+  } else if (dress) {                                        // long skirt to the ankles with a stitched wave near the hem
+    const hw = B.hemW * 0.98 + fl * 1.4;
+    const sk = prism(G, [ring8(hemF, (cen || sat ? -4.5 : 1.3 - R.o[1]) + fl * 0.5, hw, B.dep + 3.6 + fl, hw * 0.4), ring8(T, 3.2, wW + 0.5, B.dep + 0.5, wW * 0.32)], {seed: 11, key: camT + 0.9, col: col.coat, hatch: coatHatch, flatY: true, bot: true});
+    sk.post.push(ctx => sk.front.forEach(F => { if (F.i < 0 || F.f === INKC) return; const q = F.q, pts = []; for (let k = 0; k <= 6; k++) { const t = k / 6; pts.push(lerp2(lerp2(q[0], q[1], t), lerp2(q[3], q[2], t), k % 2 ? 0.2 : 0.11)); } line(ctx, pts, 0.34, 88 + F.i, col.accent.b); }));
+  } else if (outer === 'feather') {                        // three tiers of ragged feathers
+    for (let k = 2; k >= 0; k--) { const topY = tH + 1.4 - k * 5.2, botY = tH - 6.5 - k * 6.4, hw = B.shW + 3.2 + k * 2.0 + (k === 2 ? fl : 0);
+      prism(G, [k === 2 ? ring8(hemF, botY + 1, hw, B.dep + 3 + k, hw * 0.4) : ring8(T, botY, hw, B.dep + 3 + k, hw * 0.4), ring8(T, topY, 4.8 + k * 2.6, 4.2 + k * 2.2, 2 + k)],
+        {seed: 11 + k, key: camT + 2.6 + (2 - k) * 0.3, col: col.coat, jag: () => 3, jd: 0.5, hatch: 0.1, inside: k === 2 ? {key: camT - 6} : null}); }
+  }
+
+  if (look.cape) {                                           // cape: hangs from the shoulders behind, open at the front
+    const hw = B.hemW + 0.6 + fl * 1.8;
+    prism(G, [ring8(hemF, (cen ? -3 : hemY + 1.2) + fl, hw, B.dep + 3.4 + fl, hw * 0.4), ring8(T, tH * 0.5, B.chestW + 2.2, B.dep + 2.0, 4), ring8(T, tH - 1.6, B.shW + 1.6, B.dep + 1.6, 4), ring8(T, tH + 0.6, B.shW * 0.84 + 1.5, B.dep + 1.3, 4), ring8(T, tH + 1.9, 5.4, 4.8, 2)],
+      {seed: 12, key: camT + 1.15, col: col.scarf, skip: i => i === 7 || i === 0 || i === 6 || i === 1 || i === 5, inside: {key: camT - 6.2}, jag: (i, j) => j === 0 ? 2 : 0, jd: 0.25, hatch: 0.06, flatY: true});
+  }
+
+  /* ----- sash across the chest or waist ----- */
+  const fwdT = G.N(MV(T.m, [0, 0, 1]))[2], sash = look.sash || 'none';
+  if ((outer === 'tabard' || (cen && quilt)) && Math.abs(fwdT) > 0.15) {        // cloth panel over the plate, front and back, cinched by the belt
+    const fr = fwdT > 0, zz = (fr ? 1 : -1) * (B.dep * 1.04 + 0.5), pt = (x, y) => { const q = G.P(FP(T, x, y, zz)); return [q[0], q[1]]; };
+    const pT = outer === 'tabard' ? tH - 1.0 : 2.6, pan = [pt(-wW * 0.62, pT), pt(wW * 0.62, pT), pt(wW * 0.7, Math.min(4, pT)), pt(wW * 0.56, -5.4 + fl), pt(0, -3.8), pt(-wW * 0.56, -5.4 + fl), pt(-wW * 0.7, Math.min(4, pT))];
+    const pm = outer === 'tabard' ? col.scarf : col.shirt; G.add({key: camT + 0.25, seed: 73, w: 0.8, polys: [{p: pan, f: pm.b}], post: [ctx => { fillp(ctx, [pt(ss * wW * 0.2, pT), pt(ss * wW * 0.62, pT), pt(ss * wW * 0.7, Math.min(4, pT)), pt(ss * wW * 0.56, -5.4 + fl), pt(ss * wW * 0.1, -4.2)], pm.s);
+      if (fr && outer === 'tabard') { const cy = tH * 0.62, dm = [pt(0, cy + 2.6), pt(1.9, cy), pt(0, cy - 2.6), pt(-1.9, cy)]; outline(ctx, dm, 1.0, 731); fillp(ctx, dm, col.accent.b); [[0, 4.2], [3.2, 0], [0, -4.2], [-3.2, 0]].forEach(v => tick(ctx, pt(v[0] * 0.72, cy + v[1] * 0.72), pt(v[0], cy + v[1]), 0.6, col.accent.b)); }
+      [-0.4, 0, 0.4].forEach((t, i) => tick(ctx, pt(t * wW, -1.2), pt(t * wW + 0.5, -3.2), 0.4)); }]});
+  }
+  if (sash === 'waist') {
+    const ws = prism(G, [ring8(T, 0.5, wW + 0.95, B.dep + 0.95, wW * 0.3), ring8(T, 4.8, wW + 1.0, B.dep + 1.0, wW * 0.3)], {seed: 19, key: camT + 0.5, col: col.accent, w: 0.7, hatch: 0.12});
+    if (fwdT > 0.15) ws.post.push(ctx => { const pt = (x, y, z) => { const q = G.P(FP(T, x, y, B.dep + 1 + z)); return [q[0], q[1]]; };
+      const kn = [pt(2.2, 3.6, 0.3), pt(4.4, 3.4, 0.3), pt(5.4, -3.6 - cs, 0.6), pt(3.9, -2.4, 0.6), pt(2.6, -4.2 - cs, 0.6)]; outline(ctx, kn, 1.3, 97); fillp(ctx, kn, col.accent.b); fillp(ctx, [kn[1], kn[2], kn[3], pt(3.6, 3.4, 0.3)], col.accent.s); });
+  } else if (sash === 'chains') {                          // two heavy chains crossed over the chest and back
+    const zz = (fwdT >= 0 ? 1 : -1) * (B.dep * 1.02 + 0.8), pt = (x, y) => { const q = G.P(FP(T, x, y, zz)); return [q[0], q[1]]; };
+    G.add({key: camT + (fwdT >= 0 ? 2.2 : -0.4), seed: 21, w: 0, polys: [], post: [ctx => [1, -1].forEach(e => { const a0 = [e * B.shW * 0.66, tH + 0.2], a1 = [-e * wW * 0.8, 4.0], n = 9;
+      for (let k = 0; k < n; k++) { const t0 = k / n, t1 = (k + 1.15) / n, m0 = [lerp(a0[0], a1[0], t0), lerp(a0[1], a1[1], t0)], m1 = [lerp(a0[0], a1[0], t1), lerp(a0[1], a1[1], t1)], wv = k % 2 ? 0.45 : 1.0;
+        const dx = m1[0] - m0[0], dy = m1[1] - m0[1], dl = Math.hypot(dx, dy), nx = -dy / dl * wv, ny = dx / dl * wv, lk = [pt(m0[0] + nx, m0[1] + ny), pt(m1[0] + nx, m1[1] + ny), pt(m1[0] - nx, m1[1] - ny), pt(m0[0] - nx, m0[1] - ny)];
+        outline(ctx, lk, 0.8, 640 + k + e * 20); fillp(ctx, lk, k % 2 ? col.steel.s : col.steel.b); if (!(k % 2)) fillp(ctx, [lerp2(lk[0], lk[2], 0.35), lerp2(lk[1], lk[3], 0.35), lerp2(lk[0], lk[2], 0.65), lerp2(lk[1], lk[3], 0.65)], INKC); } })]});
+  } else if (sash !== 'none' && fwdT > 0.15) {
+    const wide = sash === 'wrap', pt = (x, y, z) => { const q = G.P(FP(T, x, y, B.dep * (wide ? 1.12 : 0.98) + z)); return [q[0], q[1]]; }, sx = B.shW, wd2 = wide ? 2.3 : 1.15;
+    const a0 = [sx * 0.62, tH - 1.0], a1 = [-wW * 0.88, 5.2], dx = a1[0] - a0[0], dy = a1[1] - a0[1], dl = Math.hypot(dx, dy), nx = -dy / dl * wd2, ny = dx / dl * wd2;
+    const band = [pt(a0[0] + nx, a0[1] + ny, 0.7), pt(a1[0] + nx, a1[1] + ny, 0.9), pt(a1[0] - nx, a1[1] - ny, 0.9), pt(a0[0] - nx, a0[1] - ny, 0.7)], bm = wide ? col.scarf : col.leather;
+    G.add({key: camT + (wide ? 2.3 : 0.6), seed: 19, w: 0.8, polys: [{p: band, f: bm.b}], post: [ctx => {
+      fillp(ctx, [lerp2(band[0], band[3], 0.6), lerp2(band[1], band[2], 0.6), band[2], band[3]], bm.s);
+      for (let k = 1; k < (wide ? 5 : 8); k++) { const t = k / (wide ? 5 : 8), b0 = lerp2(lerp2(band[0], band[1], t), lerp2(band[3], band[2], t), 0.22), b1 = lerp2(lerp2(band[0], band[1], t), lerp2(band[3], band[2], t), 0.8);
+        if (wide) tick(ctx, b0, lerp2(b0, b1, 0.5), 0.36); else if (sash !== 'satchel') { tick(ctx, b0, b1, 0.72, INKC); tick(ctx, lerp2(b0, b1, 0.1), lerp2(b0, b1, 0.9), 0.44, col.accent.b); } }
+    }]});
+  }
+
+  if (sash === 'satchel') {                                 // mail bag on the hip
+    const bx = -(wW + 2.6), bg = prism(G, [ring8(T, -1.6, 3.4, 2.5, 0.9, bx, 1.2), ring8(T, 4.6, 3.4, 2.5, 0.9, bx, 1.2)], {seed: 75, key: G.P(FP(T, bx, 0, 1.2))[2] * 1.5 + 2.6, col: col.leather, top: col.leather, bot: true, w: 0.8});
+    bg.post.push(ctx => bg.front.forEach(F => { if (F.i < 0) return; const q = F.q; line(ctx, [lerp2(q[0], q[3], 0.6), lerp2(q[1], q[2], 0.6)], 0.4, 760 + F.i); if (F.i === 7 || F.i === 1 || F.i === 5) { const c0 = lerp2(lerp2(q[0], q[1], 0.5), lerp2(q[3], q[2], 0.5), 0.52); fillp(ctx, [[c0[0] - 0.7, c0[1] - 0.6], [c0[0] + 0.7, c0[1] - 0.6], [c0[0] + 0.7, c0[1] + 0.6], [c0[0] - 0.7, c0[1] + 0.6]], col.accent.b); } }));
+  }
+
+  /* ----- pack on the back ----- */
+  const back = look.back || 'none';
+  if (back !== 'none') {
+    const bz = -(B.dep + 6.4), pc = G.P(FP(T, 0, tH * 0.6, bz))[2], pk = pc > camT ? camT + Math.max(9.6, (pc - camT) * 1.5 + 2.6) : camT - 7.5;   // nearer than the body: over head, hat and arms; otherwise behind everything
+    const roll = (y, r, half, m, cap, sd, z) => prism(G, [-1, 1].map(e => ring8({o: FP(T, 0, y, z == null ? bz : z), m: MM(T.m, RZ(90 * D2R))}, e * half, r, r, r * 0.42)), {seed: sd, key: pk + 0.2, col: m, top: cap, bot: true, hatch: 0.05, w: 0.8});
+    if (back === 'trunk') {
+      const gm = mat('#6d8683', true);
+      const tr = prism(G, [ring8(T, tH * 0.36, 7.6, 3.7, 1.1, 0, bz), ring8(T, tH + 2.4, 7.6, 3.7, 1.1, 0, bz)], {seed: 61, key: pk, col: gm, top: gm, bot: true, hatch: 0.03});
+      tr.post.push(ctx => tr.front.forEach(F => { if (F.i !== 3 && F.i !== 7) return; const q = F.q; [0.3, 0.68].forEach((t, i) => line(ctx, [lerp2(q[0], q[3], t), lerp2(q[1], q[2], t)], 0.4, 610 + i)); const c0 = lerp2(lerp2(q[0], q[1], 0.5), lerp2(q[3], q[2], 0.5), 0.49); fillp(ctx, [[c0[0] - 1, c0[1] - 1], [c0[0] + 1, c0[1] - 1], [c0[0] + 1, c0[1] + 1], [c0[0] - 1, c0[1] + 1]], col.accent.b); }));
+      roll(tH + 4.5, 2.1, 7.2, col.scarf, col.scarf, 63);
+    } else if (back === 'scrolls') {
+      roll(tH + 3.6, 2.9, 11.0, col.bone, col.wood, 63, bz + 0.9); roll(tH - 1.6, 2.2, 8.4, mat('#b9a98a', false), col.wood, 65, bz + 1.4); roll(tH - 6.2, 2.2, 7.6, col.bone, col.wood, 67, bz + 1.4);
+    } else if (back === 'gun' || back === 'sword') {       // slung across the back
+      const z2 = -(B.dep + 2.8), P3 = (x, y) => G.P(FP(T, x, y, z2));
+      if (back === 'gun') { const a = P3(6.5, tH * 0.08), b = P3(1.2, tH * 0.62), c = P3(-5.8, tH + 7.8); G.add({key: pk, seed: 77, w: 0.9, polys: [{p: ribbon(b, c, 0.95, 0.75), f: col.steel.s}, {p: ribbon(a, b, 2.1, 1.4), f: col.wood.b}], post: []}); }
+      else { const a = P3(6.5, tH * 0.04), b = P3(-3.2, tH + 2.2), c = P3(-5.6, tH + 7.4), g1 = P3(-5.4, tH + 1.0), g2 = P3(-1.0, tH + 3.4); G.add({key: pk, seed: 77, w: 0.9, polys: [{p: ribbon(a, b, 1.3, 1.6), f: col.leather.b}, {p: ribbon(b, c, 0.75, 0.75), f: '#3a3038'}, {p: ribbon(g1, g2, 0.75, 0.75), f: col.accent.b}], post: []}); }
+    } else if (back === 'horn') {                           // music box with a big brass horn
+      const bm = mat(look.accent, true), Hn = {o: FP(T, 3.5, tH + 0.4, -(B.dep + 3.6)), m: MM(T.m, MM(RZ(-34 * D2R), RX(-20 * D2R)))};
+      prism(G, [ring8(T, tH * 0.22, 5.8, 2.9, 0.9, 0, -(B.dep + 3.8)), ring8(T, tH * 0.88, 5.8, 2.9, 0.9, 0, -(B.dep + 3.8))], {seed: 61, key: pk, col: col.wood, top: col.wood, bot: true, hatch: 0.05});
+      prism(G, [[0, 1.4], [6, 2.5], [11.5, 5.4], [15.5, 9.8]].map(l => ring8(Hn, l[0], l[1], l[1], l[1] * 0.42)), {seed: 63, key: pk + 0.3, col: bm, top: mat(mix(look.accent, INKC, 0.55), true), hatch: 0.04});
+    } else if (back === 'quiver') {                         // quiver of arrows slung at an angle, fletchings showing over the shoulder
+      const Qf = {o: FP(T, 2.4, tH * 0.18, -(B.dep + 2.2)), m: MM(T.m, RZ(24 * D2R))};
+      prism(G, [ring8(Qf, 0, 1.9, 1.6, 0.6), ring8(Qf, tH * 0.82, 2.2, 1.8, 0.7)], {seed: 61, key: pk, col: col.leather, top: mat('#2b242a', true), bot: true, hatch: 0.04, w: 0.8});
+      [-1.0, 0, 1.0].forEach((x, i) => { const a = G.P(FP(Qf, x, tH * 0.82, 0)), b = G.P(FP(Qf, x * 1.6, tH * 0.82 + 5.4, 0)); G.add({key: pk + 0.1 + i * 0.01, seed: 655 + i, w: 0.7, polys: [{p: ribbon(a, lerp2(a, b, 0.4), 0.35, 0.35), f: '#8a6a4a'}, {p: ribbon(lerp2(a, b, 0.38), b, 1.3, 0.6), f: i === 1 ? col.scarf.s : col.scarf.b}], post: []}); });
+    } else if (back === 'maw') {                            // a hungry pack: a sack with a toothed mouth and one eye
+      const mm = mat('#4a4448', true), bz2 = bz - 0.6;
+      const mw = prism(G, [ring8(T, tH * 0.05, 7.4, 4.6, 3.0, 0, bz2), ring8(T, tH * 0.55, 9.6, 6.0, 4.0, 0, bz2), ring8(T, tH + 2.4, 8.6, 5.4, 3.6, 0, bz2), ring8(T, tH + 5.2, 5.6, 3.6, 2.4, 0, bz2)], {seed: 61, key: pk, col: mm, top: mm, bot: true, hatch: 0.08});
+      mw.post.push(ctx => mw.front.forEach(F => { if (F.j !== 1 || F.i < 0 || F.f === INKC) return; const q = F.q, a = lerp2(q[0], q[3], 0.3), b = lerp2(q[1], q[2], 0.3), n = 4;
+        line(ctx, [a, b], 0.8, 660 + F.i); for (let k = 0; k < n; k++) { const t0 = k / n, t1 = (k + 1) / n, m0 = lerp2(a, b, t0), m1 = lerp2(a, b, t1), mid = lerp2(m0, m1, 0.5); fillp(ctx, [m0, m1, [mid[0], mid[1] + 1.4]], '#f1ead8'); fillp(ctx, [m0, m1, [mid[0], mid[1] - 1.1]], '#f1ead8'); }
+        if (F.i === 3 || F.i === 2 || F.i === 4) { const c0 = lerp2(lerp2(q[0], q[1], 0.5), lerp2(q[3], q[2], 0.5), 0.75); outline(ctx, [[c0[0] - 1.1, c0[1]], [c0[0], c0[1] - 0.9], [c0[0] + 1.1, c0[1]], [c0[0], c0[1] + 0.9]], 0.6, 670); fillp(ctx, [[c0[0] - 1.0, c0[1]], [c0[0], c0[1] - 0.8], [c0[0] + 1.0, c0[1]], [c0[0], c0[1] + 0.8]], '#e0d03a'); } }));
+    } else roll(tH - 1.5, 2.5, 8.0, col.scarf, col.scarf, 63, -(B.dep + 4.6));
+    if (fwdT > 0.15 && !bare && back !== 'gun' && back !== 'sword' && back !== 'quiver') {   // shoulder straps on the chest
+      const pt = (x, y) => { const q = G.P(FP(T, x, y, B.dep * 1.0 + (y > tH - 2 ? 0.2 : 1.2))); return [q[0], q[1]]; }, sp = [];
+      [1, -1].forEach(e => sp.push({p: [pt(e * B.shW * 0.42, tH + 0.5), pt(e * B.shW * 0.56, tH + 0.5), pt(e * B.chestW * 0.74, tH * 0.44), pt(e * B.chestW * 0.6, tH * 0.44)], f: e > 0 ? col.leather.s : col.leather.b}));
+      G.add({key: camT + (outer === 'vest' || outer === 'dress' ? 0.2 : 1.2), seed: 69, w: 0.6, polys: sp, post: [ctx => sp.forEach(q => { const c0 = lerp2(lerp2(q.p[0], q.p[1], 0.5), lerp2(q.p[3], q.p[2], 0.5), 0.62); fillp(ctx, [[c0[0] - 0.7, c0[1] - 0.5], [c0[0] + 0.7, c0[1] - 0.5], [c0[0] + 0.7, c0[1] + 0.5], [c0[0] - 0.7, c0[1] + 0.5]], col.accent.b); })]});
+    }
+  }
+
+  /* ----- neckwear ----- */
+  if (look.neck === 'fur') {                                 // heavy fur ruff over the shoulders
+    prism(G, [ring8(T, tH - 3.6, B.shW + 2.6, B.dep + 2.6, 4), ring8(T, tH + 0.2, B.shW * 0.82 + 2.2, B.dep + 2.2, 3.6), ring8(T, tH + 3.4, 5.2, 4.8, 2)], {seed: 17, key: camT + 2.0, col: col.scarf, top: col.scarf, jag: (i, j) => j === 0 ? 3 : 1, jd: 0.7, hatch: 0.2});
+  } else if (look.neck !== 'none') {
+    const nm = look.neck === 'tie' ? col.shirt : col.scarf, big = look.neck === 'scarf';
+    const nk = prism(G, [ring8(T, tH - (big ? 1.2 : 0.4), big ? 6.0 : 5.0, big ? 5.4 : 4.5, 2), ring8(T, tH + (big ? 2.9 : 2.0), big ? 5.6 : 4.6, big ? 5.0 : 4.1, 2)], {seed: 17, key: camT + (outer === 'poncho' ? 3.0 : 2.0), col: nm, w: 0.7, hatch: big ? 0.1 : 0});
+    const fwd = G.N(MV(T.m, [0, 0, 1]));
+    if (fwd[2] > 0.15) nk.post.push(ctx => {
+      const pt = (x, y, z) => { const q = G.P(FP(T, x, y, B.dep * 0.9 + z)); return [q[0], q[1]]; };
+      if (look.neck === 'bandana') { const tri = [pt(-4.9, tH + 0.4, 0.2), pt(4.9, tH + 0.4, 0.2), pt(1.2, tH - 5.2, 1.1), pt(0.2, tH - 7.4, 1.3), pt(-1.0, tH - 5.0, 1.1)];
+        outline(ctx, tri, 1.5, 91); fillp(ctx, tri, col.scarf.b); fillp(ctx, [tri[1], tri[2], tri[3], pt(1.4, tH + 0.4, 0.2)], col.scarf.s); line(ctx, [pt(-2.8, tH - 0.6, 0.6), pt(-0.8, tH - 3.4, 1)], 0.36, 92); line(ctx, [pt(-0.6, tH - 0.4, 0.6), pt(0.2, tH - 2.2, 1)], 0.36, 93); }
+      else if (look.neck === 'scarf') { const tl = [pt(-3.6, tH - 0.8, 0.8), pt(-0.6, tH - 0.8, 0.8), pt(-1.0, tH - 8.2 - cs, 1.5), pt(-2.0, tH - 7.0, 1.5), pt(-2.9, tH - 8.8 - cs, 1.5), pt(-4.2, tH - 7.4, 1.5)];
+        outline(ctx, tl, 1.5, 94); fillp(ctx, tl, col.scarf.b); fillp(ctx, [tl[1], tl[2], tl[3], pt(-1.6, tH - 0.8, 0.8)], col.scarf.s); line(ctx, [pt(-2.4, tH - 2, 1), pt(-2.6, tH - 5.6, 1.3)], 0.36, 95); }
+      else { const tie = [pt(-0.9, tH - 1.0, 0.5), pt(0.9, tH - 1.0, 0.5), pt(1.2, tH - 6.6, 0.7), pt(0, tH - 8.2, 0.7), pt(-1.2, tH - 6.6, 0.7)]; outline(ctx, tie, 1.1, 96); fillp(ctx, tie, col.accent.b); fillp(ctx, [tie[1], tie[2], tie[3], pt(0.2, tH - 1, 0.5)], col.accent.s); }
+    });
+  }
+
+  /* ----- arms: sleeve ribbons, cuff, fist with fingers and thumb, and the weapon seated in the grip ----- */
+  const W0 = look.weapon, wpn = W0 === 'fists' ? 'revolver' : W0, stickW = !!STICK[wpn], longGun = wpn === 'rifle' || wpn === 'shotgun';
+  const armed = r => !P.hide && (W0 === 'fists' ? (act === 'shoot' && r === 'A') : (r === 'A' || !!DUAL[W0] || !!CAST[W0]));
+  const carry = act === 'idle' || act === 'walk' || act === 'run' || act === 'jump';
+  const gloveC = look.gloves ? mat(look.glove, false) : col.skin, st = col.steel, wd = col.wood;
+  const shape = (ctx, pts, fill, sd, w) => { outline(ctx, pts, w || 1.2, sd); fillp(ctx, pts, fill); };
+  /* off-hand items: round shield, tower shield, money bag */
+  const offh = look.offhand || 'none', shS = B.upper / 6.6;
+  const shieldN = A => norm(MV(T.m, [A.side * 0.42, 0.08, 1]));
+  function offDraw(ctx, A, ri) {
+    if (offh === 'bag') {                                  // tied sack hanging from the fist
+      const c0 = G.P(add(A.hc, [0, -(B.hand * 0.55 + 3.4) * shS, 0])), r0 = 3.1 * shS, bg = []; for (let i = 0; i < 10; i++) { const a = i / 10 * 6.2832; bg.push([c0[0] + Math.cos(a) * r0 * (1 + 0.08 * Math.sin(a * 3)), c0[1] + Math.sin(a) * r0 * 1.08 + (Math.sin(a) > 0 ? 0.6 : 0)]); }
+      const nk = G.P(A.hc), bm = mat('#a07a50', false); outline(ctx, bg, 1.3, 960 + ri); fillp(ctx, bg, bm.b); fillp(ctx, bg.filter((p, i) => i >= 8 || i <= 3).concat([c0]), bm.s);
+      const tie = [[nk[0] - 0.9, nk[1] + 0.4], [nk[0] + 0.9, nk[1] + 0.4], [c0[0] + 1.0, c0[1] - r0 * 0.8], [c0[0] - 1.0, c0[1] - r0 * 0.8]]; outline(ctx, tie, 0.9, 962 + ri); fillp(ctx, tie, bm.s); line(ctx, [[c0[0] - 1.2, c0[1] - r0 * 0.7], [c0[0] + 1.2, c0[1] - r0 * 0.7]], 0.5, 964, col.accent.b);
+      [[-1.1, 0.4], [0.6, 1.2], [1.4, -0.6]].forEach((v, i) => tick(ctx, [c0[0] + v[0], c0[1] + v[1]], [c0[0] + v[0] + 0.7, c0[1] + v[1] + 0.9], 0.34)); return;
+    }
+    const n = shieldN(A), u1 = norm(cross([0, 1, 0], n)), u2 = cross(n, u1), c3 = add(lerp3(A.e, A.w, 0.62), mul(n, 1.3 * shS)), tw = offh === 'tower';
+    const pt = (x, y, z) => { const q = G.P(add(add(add(c3, mul(u1, x * shS)), mul(u2, y * shS)), mul(n, (z || 0) * shS))); return [q[0], q[1]]; };
+    const ring = (rx, ry, k) => { const o = []; for (let i = 0; i < 16; i++) { const a = i / 16 * 6.2832; if (tw) { const cx = Math.cos(a), cy = Math.sin(a), sq = (v) => Math.sign(v) * Math.min(1, Math.abs(v) * 1.35); o.push(pt(sq(cx) * rx, sq(cy) * ry - (cy < 0 ? (1 - Math.abs(cx)) * ry * 0.18 : 0), k)); } else o.push(pt(Math.cos(a) * rx, Math.sin(a) * ry, k)); } return o; };
+    const R0 = tw ? [4.6, 7.0] : [5.6, 5.6], face = G.N(n), front = face[1] * K + face[2] > 0;
+    const edge = ring(R0[0], R0[1], -0.6), out = ring(R0[0], R0[1], 0); outline(ctx, edge, 1.4, 970 + ri); fillp(ctx, edge, st.d); outline(ctx, out, 1.4, 972 + ri);
+    const fm = tw ? col.scarf : col.wood;
+    if (!front) { fillp(ctx, out, fm.s); [-0.4, 0.4].forEach(t => line(ctx, [pt(t * R0[0] * 1.6, R0[1] * 0.9), pt(t * R0[0] * 1.6, -R0[1] * 0.9)], 0.36, 974)); line(ctx, [pt(-R0[0] * 0.6, 0.2), pt(R0[0] * 0.6, 0.2)], 1.4, 975, col.leather.b); return; }
+    fillp(ctx, out, st.b); const inn = ring(R0[0] - 0.9, R0[1] - 0.9, 0.02); fillp(ctx, inn, fm.b);
+    fillp(ctx, inn.filter((p, i) => i <= 7).concat([pt(0, 0, 0.02)]), fm.s);                              // the half turned from the light
+    for (let k = 0; k < 5; k++) { const a = rnd(k, 31) * 6.28, rr = (0.3 + 0.5 * rnd(k, 32)); tick(ctx, pt(Math.cos(a) * rr * R0[0], Math.sin(a) * rr * R0[1], 0.02), pt(Math.cos(a) * rr * R0[0] + 0.8, Math.sin(a) * rr * R0[1] - 0.5, 0.02), 0.3); }
+    if (tw) { [[-2.2, 3.4, 2.2, 1.8], [-0.7, 0.6, 0.7, -4.8]].forEach((b, i) => { const pl = [pt(b[0], b[1], 0.04), pt(b[2], b[1], 0.04), pt(b[2], b[3], 0.04), pt(b[0], b[3], 0.04)]; outline(ctx, pl, 0.8, 976 + i); fillp(ctx, pl, col.accent.b); }); }
+    else { const stp = []; for (let i = 0; i < 10; i++) { const a = -1.5708 + i * 0.6283, rr = i % 2 ? 1.1 : 2.6; stp.push(pt(Math.cos(a) * rr, -Math.sin(a) * rr, 0.06)); } outline(ctx, stp, 0.8, 978); fillp(ctx, stp, col.accent.b);
+      [0, 1, 2, 3, 4, 5].forEach(i => { const a = i / 6 * 6.2832 + 0.3, c0 = pt(Math.cos(a) * (R0[0] - 0.45), Math.sin(a) * (R0[1] - 0.45), 0.04); ctx.fillStyle = INKC; ctx.beginPath(); ctx.arc(c0[0], c0[1], 0.3, 0, 7); ctx.fill(); }); }
+  }
+  const armKey = {}, hands = [], backView = dir === 'N' || dir === 'NE' || dir === 'NW';   // seen from behind, a two-hand hold sits on the far side of the body: the back covers the arms, hands and gun
+  const Q = (o, ax, up) => (a, u) => { const p = G.P(add(add(o, mul(ax, a)), mul(up, u))); return [p[0], p[1]]; };
+  ['A', 'B'].forEach((r, ri) => {
+    const A = J.arms[r], s = G.P(A.s), e = G.P(A.e), w = G.P(A.w), aw = B.armW;
+    let d = [w[0] - e[0], w[1] - e[1]], dl = Math.hypot(d[0], d[1]);
+    if (dl < 0.5) d = [0, 1]; else d = [d[0] / dl, d[1] / dl];
+    const nrm = [-d[1], d[0]], hl = B.hand, hh = B.hand * 0.52;
+    const jq = (pts, sd) => pts.map((p, i) => { const q = G.jit([p[0], p[1], 0], sd + i, 0.26); return [q[0], q[1]]; });
+    /* shoulder: the upper arm hangs from a rounded cap tucked into the top of the torso, not a square block on its corner */
+    const tc = G.P(FP(T, 0, tH - 2.0, 0)), sl0 = Math.hypot(e[0] - s[0], e[1] - s[1]) || 1, ud = [(e[0] - s[0]) / sl0, (e[1] - s[1]) / sl0], capR = aw * 1.02;
+    const tin = Math.hypot(tc[0] - s[0], tc[1] - s[1]) || 1, sIn = [s[0] + (tc[0] - s[0]) / tin * aw * 0.45, s[1] + (tc[1] - s[1]) / tin * aw * 0.45 + aw * 0.25];
+    const s2 = [sIn[0] + ud[0] * Math.min(capR * 0.55, sl0 * 0.35), sIn[1] + ud[1] * Math.min(capR * 0.55, sl0 * 0.35)];
+    const up = jq(ribbon(s2, e, aw * 1.02, aw * 1.06), 200 + ri * 40), un = [-ud[1], ud[0]];
+    const upR = [up[1], up[2]].concat([0, 1, 2, 3, 4, 5, 6].map(i => { const a = i / 6 * Math.PI, c = Math.cos(a), sn = Math.sin(a), rr = capR * (i === 0 || i === 6 ? 1.02 : 0.98);   // half-round cap from the -n edge, over the top, to the +n edge
+      return [s2[0] - un[0] * c * rr - ud[0] * sn * rr * 0.8, s2[1] - un[1] * c * rr - ud[1] * sn * rr * 0.8]; }));
+    const fo = jq(ribbon(e, w, aw * 1.08, bare ? aw * 1.0 : aw * 1.3), 210 + ri * 40);
+    const cuff = jq(ribbon([w[0] - d[0] * 1.5, w[1] - d[1] * 1.5], [w[0] + d[0] * 0.2, w[1] + d[1] * 0.2], aw * (bare ? 1.12 : 1.36), aw * (bare ? 1.12 : 1.4)), 220 + ri * 40);
+    const hp = (a, b) => [w[0] + d[0] * a + nrm[0] * b, w[1] + d[1] * a + nrm[1] * b];
+    const hand = jq([hp(0, hh * 0.85), hp(hl * 0.62, hh), hp(hl, hh * 0.62), hp(hl, -hh * 0.62), hp(hl * 0.62, -hh), hp(0, -hh * 0.85)], 230 + ri * 40);
+    const hc2 = G.P(A.hc), tp2 = G.P(add(A.hc, A.top)), ts = ((tp2[0] - hc2[0]) * nrm[0] + (tp2[1] - hc2[1]) * nrm[1]) >= 0 ? 1 : -1;   // which edge of the fist is the thumb side
+    const camArm = (s[2] + e[2] + w[2] * 2) / 4;
+    const raised = A.w[1] > A.s[1] - 2 || Math.abs(w[2] - s[2]) > 3.5, pon = outer === 'poncho' || outer === 'feather', under = pon && A.e[1] < A.s[1] - 1.5;   // under a poncho only the forearm shows
+    const key0 = camArm * 1.5 + 2 + (pon && camArm > -2 ? 1.4 : 0) + (raised && w[2] > s[2] ? 6 : 0);
+    const far2 = J.gunLine && w[2] < camT - 1 + (backView ? 3.5 : 0), key = far2 ? camT - 2.6 + ri * 0.05 : key0; armKey[r] = key; if (J.gunLine && r === 'A') A.trig = Q(J.gunLine.butt, J.gunLine.aim, J.gunLine.top)(7.4 * LG, -1.7 * LG);
+    const part = {key: key, seed: 50 + ri, w: 0.9, polys: [], post: []};
+    const sm = sleeve, lit = sm.b, sh = sm.s;
+    /* an arm hanging at the side seen from the front: the upper arm sits behind the edge of the torso, so the shoulder reads as part of the body instead of a block stuck on its front corner */
+    const tuck = !under && !far2 && s[2] < camT + 3 && e[2] < s[2] + 3 && e[1] > s[1] + 1;   // shoulder on the silhouette edge (not the camera-side face), elbow hanging below it
+    const upDraw = ctx => { fillp(ctx, shadeStrip(up, 0.42), sh); const el = lerp2(up[1], up[2], 0.5); tick(ctx, lerp2(up[1], up[2], 0.1), lerp2(el, lerp2(up[0], up[3], 0.5), 0.12), 0.4); };
+    if (tuck) G.add({key: camT - 0.45 + ri * 0.01, seed: 48 + ri, w: 0.9, polys: [{p: upR, f: lit}], post: [upDraw]});
+    const segs = under ? [{p: fo, f: lit}] : tuck ? [{p: fo, f: lit}] : [{p: upR, f: lit}, {p: fo, f: lit}];
+    if (!tuck && e[2] > w[2] + 1.5) segs.reverse();                // forearm pointing away: draw it first
+    segs.forEach(q => part.polys.push(q));
+    part.post.push(ctx => {
+      if (!under && !tuck) upDraw(ctx);
+      fillp(ctx, shadeStrip(fo, 0.42), sh);
+      tick(ctx, lerp2(fo[0], fo[3], 0.85), lerp2(lerp2(fo[0], fo[3], 0.5), lerp2(fo[1], fo[2], 0.5), 0.2), 0.4);
+      const m1 = lerp2(lerp2(fo[0], fo[1], 0.55), lerp2(fo[3], fo[2], 0.55), 0.2), m2 = lerp2(lerp2(fo[0], fo[1], 0.6), lerp2(fo[3], fo[2], 0.6), 0.62); tick(ctx, m1, m2, 0.36);
+    });
+    const offOn = r === 'B' && offh !== 'none' && !P.hide && !armed('B') && !J.grip2 && !(wpn === 'bow' && act === 'shoot');
+    const shFront = offOn && (offh === 'shield' || offh === 'tower') && (() => { const n = G.N(shieldN(A)); return n[1] * K + n[2] > 0; })();
+    const handDraw = ctx => {
+      if (offOn && !shFront) offDraw(ctx, A, ri);           // back of the shield or a hanging bag: the fist closes over it
+      const has = armed(r), over = has && !stickW && !(J.gunLine && r === 'A') && G.N(A.top)[2] > 0.45;   // gun between the fist and the camera: it goes on top
+      if (has && !over && !J.gunLine) weapon(ctx, r, A);                  // otherwise the grip goes in first and the fist closes over it
+      outline(ctx, cuff, 1.5, 300 + ri); fillp(ctx, cuff, bare ? col.accent.b : sm === col.coat ? mix(look.coat, '#ffffff', 0.08) : col.shirt.b); fillp(ctx, shadeStrip(cuff, 0.4), bare ? col.accent.s : sm === col.coat ? sm.s : col.shirt.s);
+      outline(ctx, hand, 1.6, 310 + ri); fillp(ctx, hand, gloveC.b); fillp(ctx, shadeStrip([hand[0], hand[2], hand[3], hand[5]], 0.36), gloveC.s);
+      /* four fingers curled across the grip, knuckle line, thumb locked over the top */
+      [0.4, 0, -0.42].forEach((b, i) => tick(ctx, hp(hl * 1.0, hh * b), hp(hl * (0.46 + 0.05 * i), hh * b * 1.05), 0.46));
+      line(ctx, [hp(hl * 0.5, hh * 0.72), hp(hl * 0.56, -hh * 0.72)], 0.34, 330 + ri);
+      const th = [hp(hl * 0.1, ts * hh * 0.62), hp(hl * 0.58, ts * hh * 0.86), hp(hl * 0.84, ts * hh * 1.36), hp(hl * 0.42, ts * hh * 1.42), hp(hl * 0.06, ts * hh * 1.08)];
+      outline(ctx, th, 1.2, 340 + ri); fillp(ctx, th, gloveC.b); fillp(ctx, [th[2], th[3], lerp2(th[3], th[0], 0.4), lerp2(th[2], th[1], 0.5)], gloveC.s);
+      if (has && !stickW && A.trig) { const tf = [hp(hl * 0.72, ts * hh * 0.5), hp(hl * 0.98, ts * hh * 0.5), A.trig, lerp2(A.trig, hp(hl * 0.72, ts * hh * 0.5), 0.25)]; outline(ctx, tf, 0.9, 350 + ri); fillp(ctx, tf, gloveC.b); }   // index finger on the trigger
+      if (over) weapon(ctx, r, A);
+      if (shFront) offDraw(ctx, A, ri);                     // face of the shield toward the camera: it covers the fist
+    };
+    if (J.gunLine) hands.push(handDraw); else part.post.push(handDraw);
+    G.add(part);
+    anchors['hand' + r] = cell(G.P(A.hc));
+  });
+  if (plate) ['A', 'B'].forEach((r, i) => {                // shoulder plates
+    const A = J.arms[r], pw = B.armW * 1.7, Pf = {o: add(A.s, MV(T.m, [A.side * 0.7, -3.4, 0])), m: T.m};
+    const pp = prism(G, [ring8(Pf, 0, pw, pw, pw * 0.3), ring8(Pf, 4.4, pw * 1.1, pw * 1.06, pw * 0.36), ring8(Pf, 6.2, pw * 0.66, pw * 0.66, pw * 0.3)], {seed: 71 + i, key: G.P(A.s)[2] * 1.5 + 2.4 + (J.gunLine ? 0 : 0), col: col.coat, top: col.coat, w: 0.85});
+    pp.post.push(ctx => pp.front.forEach(F => { if (F.j !== 0 || F.i < 0) return; const q = F.q; fillp(ctx, [q[0], q[1], lerp2(q[1], q[2], 0.22), lerp2(q[0], q[3], 0.22)], F.f === INKC ? col.accent.s : col.accent.b); line(ctx, [lerp2(q[0], q[3], 0.22), lerp2(q[1], q[2], 0.22)], 0.36, 710 + F.i); }));
+  });
+  if (J.gunLine) G.add({key: (G.P(J.arms.A.hc)[2] + G.P(J.arms.B.hc)[2]) / 2 < camT - 1 ? camT - 2.4 : Math.max(armKey.A, armKey.B) + 0.05, seed: 58, w: 0, polys: [], post: [ctx => { weapon(ctx, 'A', J.arms.A); hands.forEach(h => h(ctx)); }]});   // the gun lies over both sleeves, both fists close over the gun
+
+  function weapon(ctx, r, A) {
+    const sd = r === 'A' ? 400 : 460;
+    if (J.gunLine && r === 'A') {                         // long gun in both hands: rear hand on the wrist of the stock, front hand under the fore-end
+      const g = J.gunLine, q0 = Q(g.butt, g.aim, g.top), q = (a, u) => q0(a * LG, u * LG), sg = wpn === 'shotgun', len = sg ? 18.6 : 21.2;
+      const stock = [q(-0.2, 0.3), q(4.4, 0.9), q(6.6, 0.5), q(5.8, -1.9), q(4.6, -1.2), q(-0.2, -2.8)], rec = [q(4.4, 1.0), q(9.6, 1.0), q(9.6, -0.9), q(5.9, -1.1)];
+      const barrel = sg ? [q(9.4, 1.25), q(len, 1.25), q(len, -0.15), q(9.4, -0.15)] : [q(9.4, 1.0), q(len, 0.95), q(len, 0.25), q(9.4, 0.2)];
+      const fore = sg ? [q(10, -0.1), q(14.8, -0.05), q(14.8, -1.35), q(10, -1.4)] : [q(9.4, 0.2), q(14.6, 0.3), q(14.6, -0.95), q(9.4, -1.0)];
+      shape(ctx, barrel, st.s, sd); if (!sg) shape(ctx, [q(14.4, 0.2), q(19.2, 0.2), q(19.2, -0.45), q(14.4, -0.5)], '#3f3d48', sd + 3, 0.9);
+      shape(ctx, stock, wd.b, sd + 5); fillp(ctx, [stock[0], stock[1], q(4.6, 0.1), q(-0.2, -0.9)], wd.h);
+      shape(ctx, rec, st.b, sd + 9); fillp(ctx, [rec[0], rec[1], q(9.6, 0.35), q(4.6, 0.35)], st.h); shape(ctx, fore, wd.s, sd + 13);
+      line(ctx, [q(6.2, -1.1), q(6.7, -2.5), q(8.5, -2.4), q(8.7, -1.0)], 0.5, sd + 17);
+      if (sg) line(ctx, [q(9.6, 0.55), q(len, 0.55)], 0.32, sd + 19); tick(ctx, q(len - 0.7, sg ? 1.25 : 0.95), q(len - 0.5, sg ? 2.0 : 1.7), 0.5);
+      anchors.muzzle = cell(G.P(add(add(g.butt, mul(g.aim, (len + 0.7) * LG)), mul(g.top, 0.6 * LG))));
+    } else if (CAST[wpn]) {
+      if (wpn === 'tome' && r === 'B') {                    // open book resting on the off hand
+        const sd3 = norm(cross(A.top, A.f)), q = Q(A.hc, sd3, A.top), cv = [q(-4.6, 0.2), q(4.6, 0.2), q(4.2, 3.9), q(-4.2, 3.9)];
+        shape(ctx, cv, col.accent.b, sd); [-1, 1].forEach(m => { const pg = [q(m * 0.15, 0.6), q(m * 4.1, 0.8), q(m * 3.8, 3.7), q(m * 0.15, 3.4)]; fillp(ctx, pg, m * ss > 0 ? '#d8cfb8' : '#efe8d6'); [1.3, 1.9, 2.5, 3.1].forEach(u => tick(ctx, q(m * 0.8, u), q(m * 3.3, u + 0.05), 0.26)); }); line(ctx, [q(0, 0.4), q(0, 3.6)], 0.4, sd + 3);
+      } else {                                              // loose curls of light around the hand, no ink
+        const c0 = G.P(A.hc), big = P.fire ? 1.6 : 1, gc = look.eyes, ph0 = f * 0.9 + (r === 'B' ? 2 : 0);
+        for (let k = 0; k < 3; k++) { const pts = [], r0 = (2.6 + k * 1.3) * big; for (let i = 0; i <= 7; i++) { const a = ph0 + k * 2.1 + i * 0.52, rr = r0 * (0.8 + 0.4 * rnd(k * 9 + i, 5 + f)); pts.push([c0[0] + Math.cos(a) * rr, c0[1] + Math.sin(a) * rr * 0.9]); } line(ctx, pts, 0.5, sd + k * 9 + f, gc); }
+        fillp(ctx, [[c0[0] - 0.9 * big, c0[1]], [c0[0], c0[1] - 0.9 * big], [c0[0] + 0.9 * big, c0[1]], [c0[0], c0[1] + 0.9 * big]], mix(gc, '#ffffff', 0.6));
+        anchors[r === 'A' ? 'muzzle' : 'muzzle2'] = cell(G.P(add(A.hc, mul(A.f, 4.5))));
+      }
+    } else if (stickW) {                                   // hammer grip: the shaft crosses the fist at right angles to the knuckles
+      const ax = A.axis, e0 = sub(A.f, mul(ax, dot(A.f, ax))), ed = vlen(e0) > 0.2 ? norm(e0) : norm(cross(ax, [0.3, 0.2, 1])), q = Q(A.hc, ax, ed);
+      if (wpn === 'katana') {
+        const hd = [q(-3.6, 0.55), q(1.7, 0.5), q(1.7, -0.5), q(-3.6, -0.55)], gd = [q(1.6, 1.55), q(2.35, 1.55), q(2.35, -1.55), q(1.6, -1.55)];
+        const bl = [q(2.3, 0.8), q(9, 0.65), q(16, 0.8), q(21.6, 0.55), q(16.6, -0.95), q(9, -1.25), q(2.3, -1.0)];
+        shape(ctx, bl, '#a9cfc6', sd); fillp(ctx, [q(2.3, 0.8), q(9, 0.65), q(16, 0.8), q(21.6, 0.55), q(16.4, 0), q(12.5, -0.3), q(9, 0.05), q(6, -0.3), q(2.3, 0)], '#e3efe6'); line(ctx, [q(2.4, -0.05), q(6, -0.32), q(9, 0.02), q(12.5, -0.32), q(16.4, -0.03)], 0.26, sd + 2);
+        shape(ctx, hd, '#3a3038', sd + 5); [-2.6, -1.2, 0.2].forEach(a => fillp(ctx, [q(a, 0), q(a + 0.55, 0.4), q(a + 1.1, 0), q(a + 0.55, -0.4)], col.accent.b)); shape(ctx, gd, col.accent.b, sd + 9, 1.0); shape(ctx, [q(-4.3, 0.7), q(-3.5, 0.7), q(-3.5, -0.7), q(-4.3, -0.7)], col.accent.s, sd + 11, 0.9);
+      } else if (wpn === 'saber') {
+        const bl = [q(2.3, 1.3), q(10, 1.9), q(17, 1.7), q(23.5, -0.4), q(22.2, -2.7), q(16, -1.9), q(9, -1.5), q(2.3, -1.2)];
+        shape(ctx, bl, '#dfe3dd', sd); fillp(ctx, [q(2.3, -1.2), q(9, -1.5), q(16, -1.9), q(22.2, -2.7), q(23.5, -0.4), q(17, -0.5), q(9, -0.3), q(2.3, -0.2)], '#a9b3b4'); line(ctx, [q(3, 0.7), q(15, 1.0)], 0.26, sd + 2);
+        shape(ctx, [q(-3.2, 0.6), q(1.4, 0.55), q(1.4, -0.55), q(-3.2, -0.6)], '#3a3038', sd + 5); shape(ctx, [q(-2.8, -0.5), q(1.9, -0.5), q(2.9, -1.3), q(1.7, -3.3), q(-1.7, -3.5), q(-3.2, -1.7)], col.accent.b, sd + 9, 1.1); fillp(ctx, [q(1.7, -3.3), q(-1.7, -3.5), q(-3.2, -1.7), q(-2.0, -2.2), q(1.2, -2.3)], col.accent.s); shape(ctx, [q(1.4, 1.9), q(2.3, 1.9), q(2.3, -0.9), q(1.4, -0.9)], col.accent.b, sd + 13, 1.0);
+      } else if (wpn === 'sword') {
+        const bl = [q(2.5, 1.3), q(18.6, 1.1), q(21.8, 0), q(18.6, -1.1), q(2.5, -1.3)];
+        shape(ctx, bl, '#d2d8d3', sd); fillp(ctx, [q(2.5, 0), q(21.8, 0), q(18.6, -1.1), q(2.5, -1.3)], '#9fabad'); line(ctx, [q(3, 0), q(17.5, 0)], 0.3, sd + 2); [6, 9, 12, 15].forEach(a => tick(ctx, q(a, 0.9), q(a + 0.8, 0.3), 0.26));
+        shape(ctx, [q(-3.4, 0.55), q(1.6, 0.5), q(1.6, -0.5), q(-3.4, -0.55)], col.leather.b, sd + 5); shape(ctx, [q(1.5, 2.7), q(2.5, 2.7), q(2.5, -2.7), q(1.5, -2.7)], col.accent.b, sd + 9, 1.0); shape(ctx, [q(-4.7, 0.95), q(-3.4, 0.95), q(-3.4, -0.95), q(-4.7, -0.95)], col.accent.s, sd + 13, 0.9);
+      } else if (wpn === 'dagger') {
+        const gc = look.eyes; ctx.globalAlpha = 0.45; fillp(ctx, [q(1.6, 1.9), q(7.4, 2.4), q(12.4, 0), q(7.4, -2.4), q(1.6, -1.9)], mix(gc, '#ffffff', 0.35)); ctx.globalAlpha = 1;
+        const bl = [q(1.8, 0.9), q(7, 1.05), q(10.6, 0), q(7, -1.05), q(1.8, -0.9)]; shape(ctx, bl, gc, sd, 0.9); fillp(ctx, [q(2.2, 0.3), q(7, 0.35), q(9.4, 0), q(7, -0.35), q(2.2, -0.3)], '#fff1ec');
+        shape(ctx, [q(-2.6, 0.5), q(1.2, 0.5), q(1.2, -0.5), q(-2.6, -0.5)], wd.b, sd + 5); shape(ctx, [q(1.1, 1.4), q(1.85, 1.4), q(1.85, -1.4), q(1.1, -1.4)], col.accent.b, sd + 9, 0.9);
+      } else if (wpn === 'lance') {
+        shape(ctx, [q(-15, 0.45), q(8.2, 0.45), q(8.2, -0.45), q(-15, -0.45)], wd.b, sd); fillp(ctx, [q(-15, 0), q(8.2, 0), q(8.2, -0.45), q(-15, -0.45)], wd.s);
+        shape(ctx, [q(8, 0.95), q(26.5, 0.12), q(26.5, -0.12), q(8, -0.95)], st.b, sd + 5, 1.0); fillp(ctx, [q(8, 0), q(26.5, 0), q(26.5, -0.12), q(8, -0.95)], st.s); shape(ctx, [q(9, 0.9), q(13.4, 3.8), q(12.6, 0.8)], col.accent.b, sd + 9, 0.9);
+        shape(ctx, [q(1.8, 0.6), q(4.8, 2.4), q(5.4, 2.4), q(5.4, -2.4), q(4.8, -2.4), q(1.8, -0.6)], st.b, sd + 13, 1.0); fillp(ctx, [q(1.8, 0), q(5.4, 0), q(5.4, -2.4), q(4.8, -2.4), q(1.8, -0.6)], st.s);
+      } else if (wpn === 'spear') {                         // ash shaft with bound wraps and a leaf blade
+        shape(ctx, [q(-13, 0.42), q(16, 0.42), q(16, -0.42), q(-13, -0.42)], wd.b, sd); fillp(ctx, [q(-13, 0), q(16, 0), q(16, -0.42), q(-13, -0.42)], wd.s);
+        [-10, 6.4, 13.4].forEach((a, i) => shape(ctx, [q(a, 0.66), q(a + 1.3, 0.66), q(a + 1.3, -0.66), q(a, -0.66)], i === 1 ? '#7fb2c9' : col.accent.b, sd + 3 + i, 0.8));
+        shape(ctx, [q(15.4, 0.75), q(18.6, 1.75), q(23.8, 0), q(18.6, -1.75), q(15.4, -0.75)], '#d8dcd6', sd + 9, 1.0); fillp(ctx, [q(15.4, 0), q(23.8, 0), q(18.6, -1.75), q(15.4, -0.75)], '#9fabad'); line(ctx, [q(16, 0), q(22.4, 0)], 0.3, sd + 11);
+      } else if (wpn === 'greatsword') {                    // a slab of a blade, long two-hand grip, wide cross
+        const bl = [q(2.8, 1.85), q(23.6, 1.6), q(26.6, 0), q(23.6, -1.6), q(2.8, -1.85)];
+        shape(ctx, bl, '#cfe3dc', sd, 1.3); fillp(ctx, [q(2.8, 0), q(26.6, 0), q(23.6, -1.6), q(2.8, -1.85)], '#94b8b0'); line(ctx, [q(4, 0), q(21.5, 0)], 0.34, sd + 2); [8, 13, 18].forEach(a => tick(ctx, q(a, 1.3), q(a + 1.1, 0.5), 0.28));
+        shape(ctx, [q(-5.4, 0.62), q(1.8, 0.56), q(1.8, -0.56), q(-5.4, -0.62)], col.leather.b, sd + 5); [-4.4, -2.6, -0.8].forEach(a => tick(ctx, q(a, 0.55), q(a + 0.9, -0.55), 0.3));
+        shape(ctx, [q(1.7, 3.7), q(2.9, 3.7), q(2.9, -3.7), q(1.7, -3.7)], col.accent.b, sd + 9, 1.0); shape(ctx, [q(-6.8, 1.0), q(-5.4, 1.0), q(-5.4, -1.0), q(-6.8, -1.0)], col.accent.s, sd + 13, 0.9);
+      } else if (wpn === 'scythe') {                        // long snath with a peg grip and a hooked blade
+        shape(ctx, [q(-14, 0.42), q(14.6, 0.42), q(14.6, -0.42), q(-14, -0.42)], wd.b, sd); fillp(ctx, [q(-14, 0), q(14.6, 0), q(14.6, -0.42), q(-14, -0.42)], wd.s);
+        shape(ctx, [q(4.4, 0.4), q(4.6, 2.8), q(5.6, 2.8), q(5.6, 0.4)], wd.s, sd + 3, 0.8);
+        const bl = [q(12.8, 0.6), q(14.8, 0.5), q(14.4, -3.6), q(12.8, -7.6), q(10.0, -11.0), q(6.2, -12.8), q(9.8, -8.8), q(11.6, -5.0), q(12.2, -1.4)];
+        shape(ctx, bl, '#c9cfc9', sd + 5, 1.0); fillp(ctx, [q(14.4, -3.6), q(12.8, -7.6), q(10.0, -11.0), q(6.2, -12.8), q(10.6, -9.6), q(12.6, -6.0), q(13.6, -2.4)], '#8f9a9c'); tick(ctx, q(13.2, -1.6), q(11.2, -7.2), 0.3);
+      } else if (wpn === 'hammer') {                        // maul: iron head with bands and a spike, leather-wrapped haft
+        shape(ctx, [q(-6, 0.52), q(12.6, 0.52), q(12.6, -0.52), q(-6, -0.52)], wd.b, sd); fillp(ctx, [q(-6, 0), q(12.6, 0), q(12.6, -0.52), q(-6, -0.52)], wd.s); [-4.6, -3.2, -1.8].forEach(a => tick(ctx, q(a, 0.6), q(a + 0.9, -0.6), 0.34));
+        const hd = [q(11.0, 3.5), q(16.4, 3.7), q(16.4, -3.7), q(11.0, -3.5)]; shape(ctx, hd, st.b, sd + 5, 1.3); fillp(ctx, [q(11.0, 0), q(16.4, 0), q(16.4, -3.7), q(11.0, -3.5)], st.s);
+        [[11.0, 12.0], [15.4, 16.4]].forEach((b, i) => shape(ctx, [q(b[0], 3.8), q(b[1], 3.9), q(b[1], -3.9), q(b[0], -3.8)], col.accent.b, sd + 7 + i, 0.8)); shape(ctx, [q(16.3, 1.0), q(19.0, 0), q(16.3, -1.0)], st.s, sd + 9, 0.9);
+      } else if (wpn === 'axe' || wpn === 'cleavers') {     // hand axe, or a heavy cleaver in each hand
+        const k = wpn === 'cleavers' ? 0.9 : 1;
+        shape(ctx, [q(-4 * k, 0.48), q(9.6 * k, 0.48), q(9.6 * k, -0.48), q(-4 * k, -0.48)], wd.b, sd); fillp(ctx, [q(-4 * k, 0), q(9.6 * k, 0), q(9.6 * k, -0.48), q(-4 * k, -0.48)], wd.s);
+        const bl = wpn === 'axe' ? [q(5.6, 0.5), q(9.8, 0.6), q(11.0, 4.6), q(8.2, 6.6), q(5.2, 5.0), q(6.4, 2.2)] : [q(4.6 * k, 0.5), q(10.6 * k, 0.6), q(11.0 * k, 5.6 * k), q(4.0 * k, 6.0 * k), q(4.4 * k, 2.6 * k)];
+        shape(ctx, bl, '#c4cbc6', sd + 5, 1.1); fillp(ctx, wpn === 'axe' ? [q(11.0, 4.6), q(8.2, 6.6), q(7.8, 5.6), q(10.2, 4.0)] : [q(4.0 * k, 6.0 * k), q(11.0 * k, 5.6 * k), q(10.9 * k, 4.5 * k), q(4.1 * k, 4.9 * k)], '#eef2ee');
+        if (wpn === 'cleavers') { const h0 = q(9.0 * k, 1.6 * k); ctx.fillStyle = INKC; ctx.beginPath(); ctx.arc(h0[0], h0[1], 0.5, 0, 7); ctx.fill(); } else line(ctx, [q(6.4, 2.2), q(9.6, 1.4)], 0.3, sd + 7);
+      } else {
+        const sh = [q(-17, 0.42), q(11, 0.42), q(11, -0.42), q(-17, -0.42)], so = [q(10.2, 0.85), q(12.5, 0.85), q(12.5, -0.85), q(10.2, -0.85)];
+        shape(ctx, sh, wd.b, sd); fillp(ctx, [q(-17, 0), q(11, 0), q(11, -0.42), q(-17, -0.42)], wd.s);
+        [1, -1].forEach((m, i) => shape(ctx, [q(12.2, m * 0.8), q(13.3, m * 3.0), q(19.8, m * 2.55), q(19.4, m * 2.2), q(13.9, m * 2.25), q(13.1, m * 0.8)], i ? st.s : st.b, sd + 5 + i * 4, 1.0));
+        shape(ctx, [q(12.4, 0.4), q(20.4, 0.08), q(12.4, -0.4)], st.b, sd + 13, 1.0); shape(ctx, so, st.s, sd + 17, 1.0); [-9, -3, 5].forEach(a => tick(ctx, q(a, 0.35), q(a + 1.6, 0.1), 0.3));
+      }
+    } else {                                               // one-handed gun: the frame sits on top of the fist, the grip runs down through the palm
+      const wc = (carry ? 14 : 0) * D2R, aim = norm(add(mul(A.f, Math.cos(wc)), mul(A.top, Math.sin(wc)))), gt = norm(sub(mul(A.top, Math.cos(wc)), mul(A.f, Math.sin(wc))));
+      const o3 = add(A.hc, mul(gt, 1.7)), q0 = Q(o3, aim, gt), q = (a, u) => q0(a * PS, u * PS); let mz;
+      if (longGun) {
+        const stock = [q(-6.4, 0.9), q(-1.2, 1.2), q(0.8, 0.6), q(0, -1.6), q(-1.2, -0.9), q(-6.4, -2.2)], rec = [q(-1.2, 1.3), q(4, 1.3), q(4, -0.6), q(0.2, -0.8)], barrel = [q(3.8, 1.3), q(15, 1.25), q(15, 0.45), q(3.8, 0.4)];
+        shape(ctx, barrel, st.s, sd); shape(ctx, stock, wd.b, sd + 5); shape(ctx, rec, st.b, sd + 9); mz = [15.7, 0.85]; A.trig = q(2.2, -1.5);
+      } else if (wpn === 'sawedoff') {
+        const grip = [q(-1.2, 0.3), q(0.9, 0.3), q(-0.3, -3.7), q(-2.7, -3.1)], body = [q(-0.7, 1.7), q(3.5, 1.7), q(3.5, -0.6), q(-0.7, -0.4)], barrel = [q(3.3, 1.8), q(9.6, 1.8), q(9.6, -0.25), q(3.3, -0.45)], fore = [q(3.5, -0.45), q(6.8, -0.3), q(6.6, -1.3), q(3.5, -1.4)];
+        shape(ctx, grip, wd.b, sd); shape(ctx, barrel, st.s, sd + 5); fillp(ctx, [q(3.3, 1.8), q(9.6, 1.8), q(9.6, 0.8), q(3.3, 0.7)], st.b); line(ctx, [q(3.4, 0.75), q(9.6, 0.8)], 0.34, sd + 7);
+        shape(ctx, fore, wd.s, sd + 9, 1.0); shape(ctx, body, st.b, sd + 13); fillp(ctx, [body[0], body[1], q(3.5, 1.0), q(-0.7, 1.0)], st.h); shape(ctx, [q(-1.1, 1.5), q(-0.2, 2.5), q(0.3, 1.6)], st.s, sd + 17, 0.9);
+        line(ctx, [q(0.9, -0.5), q(1.1, -1.7), q(2.6, -1.7), q(2.8, -0.5)], 0.42, sd + 19); mz = [10.3, 0.75]; A.trig = q(1.9, -1.15);
+      } else if (wpn === 'flintlock') {                     // long brass-bound pistol with a flared muzzle and a curled butt
+        const grip = [q(-0.8, 0.5), q(1.0, 0.5), q(-0.6, -2.6), q(-2.4, -4.0), q(-3.4, -3.0), q(-1.8, -1.4)], stock = [q(-0.8, 1.5), q(7.4, 1.2), q(7.4, 0.2), q(-0.8, 0.2)];
+        const barrel = [q(0.6, 1.75), q(10.6, 1.55), q(10.6, 0.75), q(0.6, 0.85)], bell = [q(10.3, 2.35), q(12.0, 2.7), q(12.0, -0.45), q(10.3, -0.1)];
+        shape(ctx, grip, wd.b, sd); fillp(ctx, [q(-2.4, -4.0), q(-3.4, -3.0), q(-2.9, -2.7), q(-2.0, -3.5)], col.accent.b); shape(ctx, stock, wd.s, sd + 3); shape(ctx, barrel, col.accent.s, sd + 5); fillp(ctx, [q(0.6, 1.75), q(10.6, 1.55), q(10.6, 1.25), q(0.6, 1.4)], col.accent.b);
+        shape(ctx, bell, col.accent.b, sd + 9, 1.0); fillp(ctx, [q(11.5, 2.4), q(12.0, 2.7), q(12.0, -0.45), q(11.5, -0.1)], col.accent.s); shape(ctx, [q(-0.4, 1.1), q(2.4, 1.1), q(2.4, -0.1), q(-0.4, -0.1)], col.accent.b, sd + 11, 0.8);
+        shape(ctx, [q(-0.6, 1.3), q(-1.7, 2.8), q(-0.6, 3.1), q(0.3, 1.5)], st.s, sd + 13, 0.8); line(ctx, [q(0.8, -0.3), q(1.0, -1.5), q(2.4, -1.5), q(2.6, -0.3)], 0.42, sd + 17); mz = [12.7, 1.1]; A.trig = q(1.7, -1.1);
+      } else if (wpn === 'bow') {                           // recurve bow held upright in the fist; the string comes back to the drawing hand
+        const sv = norm(cross(aim, gt)), gtc = norm(add(mul(gt, 0.87), mul(sv, 0.5 * (r === 'A' ? -1 : 1) * J.mir))), qb = Q(A.hc, aim, gtc), lim = [];   // canted a little so the curve of the limbs reads
+        for (let i = 0; i <= 10; i++) { const u = -11 + i * 2.2, a = 3.2 * (1 - (u / 11) * (u / 11)) - 0.8 - (Math.abs(u) > 9 ? (Math.abs(u) - 9) * 1.0 : 0); lim.push(qb(a, u)); }
+        const tT = lim[10], tB = lim[0], dr = act === 'shoot' && (f % 4 === 0 || f % 4 === 1), nock = dr ? (() => { const b = G.P(J.arms.B.hc); return [b[0], b[1]]; })() : qb(-0.8, 0);
+        line(ctx, [tT, nock, tB], 0.4, sd + 1, '#ece4cf'); line(ctx, lim, 2.4, sd + 3); line(ctx, lim, 1.25, sd + 4, wd.b); line(ctx, lim.slice(0, 5), 0.6, sd + 5, wd.s); [lim[2], lim[8]].forEach((c0, i) => tick(ctx, [c0[0] - 0.6, c0[1]], [c0[0] + 0.6, c0[1]], 0.5, col.accent.b));
+        if (dr || carry) { const tip = qb(dr ? 9 : 1.8, 0), tail = dr ? nock : qb(-6.5, -0.4); line(ctx, [tail, tip], 0.5, sd + 7, '#8a6a4a'); const d2 = [tip[0] - tail[0], tip[1] - tail[1]], dl = Math.hypot(d2[0], d2[1]) || 1, ux = d2[0] / dl, uy = d2[1] / dl;
+          const hd = [[tip[0] + ux * 1.6, tip[1] + uy * 1.6], [tip[0] - uy * 0.8, tip[1] + ux * 0.8], [tip[0] + uy * 0.8, tip[1] - ux * 0.8]]; outline(ctx, hd, 0.6, sd + 8); fillp(ctx, hd, st.b);
+          [[-0.9, 0.9], [-0.9, -0.9]].forEach((v, i) => fillp(ctx, [tail, [tail[0] + ux * 2.2 - uy * v[1], tail[1] + uy * 2.2 + ux * v[1]], [tail[0] + ux * 2.6, tail[1] + uy * 2.6]], i ? col.scarf.s : col.scarf.b)); }
+        mz = [7.6, -1.42];
+      } else {
+        const grip = [q(-0.9, 0.2), q(0.9, 0.2), q(0.1, -3.5), q(-2.0, -3.1)], cyl = [q(-0.4, 1.55), q(3.2, 1.55), q(3.2, -0.5), q(-0.4, -0.5)], barrel = [q(3.0, 1.4), q(8.4, 1.4), q(8.4, 0.38), q(3.0, 0.22)], ham = [q(-0.9, 1.35), q(-0.1, 2.3), q(0.35, 1.45)];
+        shape(ctx, grip, wd.b, sd); shape(ctx, barrel, st.s, sd + 5); shape(ctx, cyl, st.b, sd + 9); fillp(ctx, [cyl[0], cyl[1], q(3.2, 0.85), q(-0.4, 0.85)], st.h); line(ctx, [q(1.4, 1.4), q(1.4, -0.4)], 0.3, sd + 11);
+        shape(ctx, ham, st.s, sd + 13, 0.9); tick(ctx, q(8.0, 1.4), q(8.1, 2.0), 0.42); line(ctx, [q(0.8, -0.5), q(1.0, -1.6), q(2.4, -1.6), q(2.6, -0.5)], 0.42, sd + 17); mz = [9.1, 0.9]; A.trig = q(1.8, -1.05);
+      }
+      anchors[r === 'A' ? 'muzzle' : 'muzzle2'] = cell(G.P(add(add(o3, mul(aim, mz[0] * PS)), mul(gt, mz[1] * PS))));
+    }
+  }
+  const showGun = KIND[W0] === 'gun' ? !P.hide : (W0 === 'fists' && act === 'shoot');
+
+  /* ----- head ----- */
+  const hkind = look.head || 'human', hsc = B.head;
+  if (hkind === 'dog3') {                                  // three heads share one collar: the outer two turn outward
+    [-1, 1].forEach(sd => headParts(G, J, look, col, camT, {o: FP(J.H, sd * 7.8 * hsc, -1.0 * hsc, -1.4 * hsc), m: MM(J.H.m, MM(RY(sd * 28 * D2R), RZ(-sd * 9 * D2R)))}, hsc * 0.8, G.P(FP(J.H, sd * 7.8 * hsc, 0, 0))[2] > G.P(J.H.o)[2] ? 0.5 : -2.4, 'dog', true));
+    headParts(G, J, look, col, camT, J.H, hsc * 0.94, 0, 'dog', false);
+  } else headParts(G, J, look, col, camT, J.H, hsc, 0, hkind, false);
+  if (look.gunner) {                                        // a little furry sharpshooter on the other shoulder, rifle resting forward
+    const sy = tH + 1.4 + (plate ? 2.4 : 0) + (look.neck === 'fur' ? 2.0 : 0), sx = -(B.shW + 0.4), S0 = FP(T, sx, sy, -0.4), s0 = G.P(S0);
+    const fz = G.N(MV(T.m, [0, 0, 1])), seen = fz[1] * K + fz[2] > -0.15, gk = s0[2] > camT - 0.5 ? camT + 9.2 : camT + 5.5, gm = mat('#9a7a5a', false);
+    const butt = G.P(FP(T, sx - 0.4, sy + 2.2, -4.2)), mz = G.P(FP(T, sx - 0.6, sy + 3.6, 10.5)), scp = [G.P(FP(T, sx - 0.4, sy + 4.2, 1.5)), G.P(FP(T, sx - 0.5, sy + 4.5, 5.5))];
+    G.add({key: gk, seed: 81, w: 0, polys: [], post: [ctx => {
+      const body = [], hd = [], c1 = [s0[0], s0[1] - 2.9], c2 = [s0[0], s0[1] - 6.6];
+      for (let i = 0; i < 9; i++) { const a = i / 9 * 6.2832; body.push([c1[0] + Math.cos(a) * 3.0, c1[1] + Math.sin(a) * 2.9]); hd.push([c2[0] + Math.cos(a) * 2.6, c2[1] + Math.sin(a) * 2.3]); }
+      const ears = [-1, 1].map(e => [[c2[0] + e * 1.0, c2[1] - 1.6], [c2[0] + e * 1.9, c2[1] - 3.4], [c2[0] + e * 2.2, c2[1] - 1.2]]);
+      ears.forEach((ea, i) => { outline(ctx, ea, 0.8, 811 + i); fillp(ctx, ea, gm.s); });
+      outline(ctx, body, 1.1, 813); fillp(ctx, body, gm.b); fillp(ctx, body.slice(0, 5).concat([c1]), gm.s); outline(ctx, hd, 1.1, 815); fillp(ctx, hd, gm.b);
+      const brim = [[c2[0] - 3.2, c2[1] - 1.6], [c2[0] + 3.2, c2[1] - 1.8], [c2[0] + 2.6, c2[1] - 2.5], [c2[0] - 2.6, c2[1] - 2.4]], crn = [[c2[0] - 1.5, c2[1] - 2.4], [c2[0] + 1.5, c2[1] - 2.5], [c2[0] + 1.2, c2[1] - 4.3], [c2[0] - 1.2, c2[1] - 4.2]];
+      outline(ctx, crn, 0.9, 817); fillp(ctx, crn, '#5f6a3a'); outline(ctx, brim, 0.9, 819); fillp(ctx, brim, '#6f7a44');
+      if (seen) { [-1, 1].forEach(e => { const g = [c2[0] + e * 0.9, c2[1] - 0.6]; ctx.fillStyle = INKC; ctx.beginPath(); ctx.arc(g[0], g[1], 0.75, 0, 7); ctx.fill(); ctx.fillStyle = '#e0a63c'; ctx.beginPath(); ctx.arc(g[0], g[1], 0.45, 0, 7); ctx.fill(); }); fillp(ctx, [[c2[0] - 0.4, c2[1] + 0.6], [c2[0] + 0.4, c2[1] + 0.6], [c2[0], c2[1] + 1.1]], INKC); }
+      line(ctx, [butt, mz], 2.0, 821); line(ctx, [butt, mz], 0.9, 822, '#8a6a4a'); line(ctx, [lerp2(butt, mz, 0.55), mz], 0.6, 823, '#5a5a62'); line(ctx, scp, 1.6, 824); line(ctx, scp, 0.7, 825, '#c9a14a');
+      const paw = lerp2(butt, mz, 0.42); ctx.fillStyle = INKC; ctx.beginPath(); ctx.arc(paw[0], paw[1], 1.0, 0, 7); ctx.fill(); ctx.fillStyle = gm.b; ctx.beginPath(); ctx.arc(paw[0], paw[1], 0.65, 0, 7); ctx.fill(); }]});
+  }
+  if (look.crow) {                                          // a crow riding the shoulder
+    const c0 = G.P(FP(T, B.shW - 0.4, tH + 2.6 + (plate ? 2.6 : 0), -0.5)), fx = G.s >= -0.01 ? 1 : -1, M = v => [c0[0] + v[0] * fx, c0[1] + v[1]], ck = '#26222a';
+    const body = [[-2.8, 0.2], [-1.4, -2.4], [1.2, -2.8], [2.6, -1.2], [1.8, 0.6], [-0.6, 0.9]].map(M), head = [[1.0, -2.6], [1.8, -4.4], [3.4, -4.4], [3.9, -3.0], [2.8, -1.8]].map(M), tail = [[-2.6, -0.2], [-5.6, 0.8], [-2.4, 1.0]].map(M);
+    [body, head, tail].forEach(pl => { if (area2(pl) < 0) pl.reverse(); });
+    G.add({key: camT + 7.2, seed: 79, w: 0.75, polys: [{p: tail, f: ck}, {p: body, f: ck}, {p: head, f: ck}], post: [ctx => { const bk = [[3.7, -3.7], [5.6, -3.1], [3.7, -2.7]].map(M); outline(ctx, bk, 0.8, 791); fillp(ctx, bk, '#d9a520'); ctx.fillStyle = '#f4efe2'; const e2 = M([2.7, -3.5]); ctx.beginPath(); ctx.arc(e2[0], e2[1], 0.36, 0, 7); ctx.fill(); tick(ctx, M([-0.6, 0.9]), M([-0.5, 2.2]), 0.4); tick(ctx, M([0.8, 0.8]), M([0.9, 2.2]), 0.4); line(ctx, [M([-1.6, -1.2]), M([0.4, -0.2])], 0.3, 793, '#4a4450'); }]});
+  }
+  const hc = G.P(FP(J.H, 0, 6.5 * B.head, 0)); anchors.head = cell(hc);
+  const cd = {S: [0, 1], SE: [0.707, 0.707], E: [1, 0], NE: [0.707, -0.707], N: [0, -1], NW: [-0.707, -0.707], W: [-1, 0], SW: [-0.707, 0.707]};
+  anchors.aim = cd[dir] || [0, 1]; anchors.back = anchors.aim[1] < 0; anchors.showGun = showGun;   // back: the unit faces away, so whatever leaves the muzzle is on the far side of the body
+  G.parts.sort((a, b) => a.key - b.key);
+  if (M) {                                                  // the far leg goes behind the mount; the mount's head and neck come over the rider when they are nearer the camera
+    const isHead = p => p.seed === 101 || p.seed === 102 || (p.seed >= 111 && p.seed <= 118) || (p.seed >= 129 && p.seed <= 139);
+    const over = M.G.parts.filter(p => isHead(p) && p.key / 1.5 > camT + 0.5), under = M.G.parts.filter(p => over.indexOf(p) < 0);
+    G.parts = G.parts.filter(p => p.far).concat(under, G.parts.filter(p => !p.far), over);
+  }
+  return {G: G, J: J, anchors: anchors};
+}
+
+/* ---------- beasts: a four-legged rig built from the same solids, ribbons and ink ---------- */
+const BEAST = {
+  lizard: {L: 15.0, W: 8.6, H: 6.8, up: 5.4, lo: 5.4, legW: 1.8, splay: 30, hl: 14.5, hw: 9.2, hh: 7.8, tail: 15, saddle: true, spikes: true, hatch: 0.05},
+  pup:    {L: 6.0, W: 3.7, H: 2.9, up: 2.2, lo: 2.2, legW: 0.9, splay: 28, hl: 7.2, hw: 4.1, hh: 3.7, tail: 6.5, spikes: true, hatch: 0.06},
+  tree:   {L: 9.0, W: 5.4, H: 5.4, up: 8.4, lo: 8.4, legW: 1.7, splay: 6, hl: 10.5, hw: 6.8, hh: 7.6, tail: 0, tree: true, hatch: 0.3},
+  cat:    {L: 7.0, W: 3.7, H: 3.6, up: 3.7, lo: 3.7, legW: 1.0, splay: 5, hl: 4.6, hw: 4.6, hh: 6.0, tail: 11, cat: true, hatch: 0.04},
+  yak:    {L: 11.5, W: 9.6, H: 9.4, up: 3.2, lo: 3.0, legW: 1.5, splay: 4, hl: 7.4, hw: 6.2, hh: 7.4, tail: 4, yak: true, saddle: true, hatch: 0.16, seat: [1.4, -0.08]},
+  /* long-necked mounts: neck = [length, rise in degrees], seat = [height above the back, place along the body] */
+  horse:  {L: 10.4, W: 4.7, H: 5.4, up: 7.0, lo: 7.0, legW: 1.2, splay: 3, hl: 8.2, hw: 2.9, hh: 3.6, tail: 10, horse: true, neck: [9.6, 64], hoof: true, plain: true, hatch: 0.05, seat: [0.9, 0.0]},
+  camel:  {L: 9.6, W: 4.9, H: 5.2, up: 6.6, lo: 6.4, legW: 1.15, splay: 3, hl: 6.6, hw: 3.2, hh: 3.7, tail: 4.5, camel: true, neck: [9.4, 34], hoof: true, plain: true, hump: 3.4, saddle: true, hatch: 0.14, seat: [3.6, -0.06]},
+  /* the king's dinosaur: walks on its hind legs, little arms held up front, tail out behind as a counterweight */
+  rex:    {L: 12.0, W: 7.2, H: 9.6, up: 14.0, lo: 13.0, fup: 4.0, flo: 3.6, armZ: 0.8, hipZ: 0.1, legW: 2.0, splay: 8, hl: 13.5, hw: 6.6, hh: 8.6, tail: 19, rex: true, hatch: 0.08}
+};
+const MOUNT = {                                            // the animal under a rider: its own colours, independent of the rider's look
+  horse: {build: 'horse', skin: '#6a4a3a', coat: '#8a6a52', accent: '#a8474a', eyes: '#2a2228', back: 'none', weapon: 'fists'},
+  camel: {build: 'camel', skin: '#b8703c', coat: '#d9a070', accent: '#4f6a5a', eyes: '#2a2228', back: 'gun', weapon: 'fists'},
+  yak: {build: 'yak', skin: '#8a5a3a', coat: '#a8784e', accent: '#6a5a4a', eyes: '#d0322c', back: 'none', weapon: 'fists'},
+  lizard: {build: 'lizard', skin: '#7f9a5a', coat: '#c9c08a', accent: '#a8474a', eyes: '#e8c95a', back: 'none', weapon: 'fists'}
+};
+const RIDDEN = {}, RSCALE = {horse: 1.18, camel: 1.22, yak: 1.0, lizard: 1.0};
+function ridden(b) {                                         // a mount is drawn bigger than the animal on its own, so the rider fits on it
+  if (RIDDEN[b]) return RIDDEN[b]; const D = BEAST[b], k = RSCALE[b] || 1, o = Object.assign({}, D);
+  ['L', 'W', 'H', 'up', 'lo', 'legW', 'hl', 'hw', 'hh', 'tail', 'hump'].forEach(n => { if (o[n]) o[n] = D[n] * k; }); if (D.neck) o.neck = [D.neck[0] * k, D.neck[1]];
+  return (RIDDEN[b] = o);
+}
+function beastPose(act, f) {
+  const n = COUNT[act], ph = (f % n) / n * 6.2832, S = Math.sin, C = Math.cos;
+  const P = {amp: 0, kn: 0, ph: ph, crouch: 0, lift: 0, slide: 0, nod: 0, jaw: 4, tw: 0, roll: 0, rear: 0, sway: 0, spin: 0, tail: S(ph) * 0.6, hit: false};
+  if (act === 'idle') { const b = (1 - C(ph)) / 2; P.crouch = 6 * b; P.jaw = 3 + 5 * b; P.nod = 2 * b; }
+  else if (act === 'walk') { P.amp = 24; P.kn = 30; P.nod = 2 * C(2 * ph); P.roll = 2 * S(ph); }
+  else if (act === 'run') { P.amp = 38; P.kn = 50; P.lift = 1.2 * Math.max(0, C(2 * ph)); P.nod = 4 * C(2 * ph); P.jaw = 10; P.rear = 3 * S(2 * ph); P.tail = S(ph) * 1.1; }
+  else if (act === 'jump') Object.assign(P, [{crouch: 34, nod: 8}, {lift: 2, crouch: 20, rear: 12, jaw: 14, nod: -6}, {lift: 0.6, crouch: 8, rear: -8, nod: 6}][f % n]);
+  else if (act === 'attack') Object.assign(P, [{nod: -10, jaw: 16, slide: -1, crouch: 14}, {nod: -22, jaw: 38, slide: -1.6, crouch: 22, rear: 8}, {nod: -14, jaw: 46, slide: 2.5, rear: 4}, {nod: 10, jaw: 0, slide: 6, hit: true, crouch: 8},
+    {nod: 14, jaw: 0, slide: 6.4, crouch: 12}, {nod: 6, jaw: 6, slide: 4.4}, {nod: 2, jaw: 6, slide: 2}, {slide: 0.6}][f % n]);
+  else if (act === 'shoot') Object.assign(P, [{nod: -8, jaw: 22, crouch: 10}, {nod: -16, jaw: 48, hit: true, rear: 6}, {nod: -14, jaw: 44, rear: 6}, {nod: -4, jaw: 14}][f % n]);   // roar
+  else if (act === 'combo1' || act === 'combo2') { const s = act === 'combo1' ? -1 : 1; Object.assign(P, [{tw: -10 * s, jaw: 20}, {tw: -24 * s, jaw: 40, nod: -8}, {tw: 26 * s, jaw: 0, slide: 2.4, hit: true, nod: 6}, {tw: 30 * s, jaw: 0, slide: 2.6}, {tw: 12 * s, jaw: 8, slide: 1.2}, {tw: 0}][f % n]); }
+  else if (act === 'combo3') Object.assign(P, [{crouch: 24, nod: 8}, {rear: 26, lift: 1, jaw: 30, nod: -12}, {rear: 36, lift: 2.5, jaw: 44, nod: -16}, {rear: 6, jaw: 10, slide: 3, hit: true, nod: 10},
+    {rear: -6, crouch: 26, jaw: 0, slide: 4, hit: true, nod: 14}, {crouch: 22, slide: 4, nod: 10}, {crouch: 10, slide: 2}, {slide: 0.6}][f % n]);
+  else if (act === 'dance1') { const k = f % 2; P.lift = k ? 2.2 : 0; P.crouch = k ? 4 : 22; P.jaw = k ? 26 : 4; P.nod = k ? -8 : 6; P.roll = (f % 4 < 2 ? 5 : -5); }
+  else if (act === 'dance2') { P.spin = 360 * f / n; P.lift = (f % 2) * 1.2; P.jaw = 16; P.tail = 1.2; }
+  else if (act === 'dance3') { P.sway = 2.2 * S(ph); P.roll = 8 * S(ph); P.nod = 6 * C(2 * ph); P.jaw = 8 + 8 * Math.abs(S(ph)); P.tw = 8 * C(ph); }
+  return P;
+}
+function composeBeast(look, act, f, dir, boil, mo) {
+  mo = mo || {};                                            // mo.rider: someone sits on the back; mo.centaur: the front is a person's torso (no neck or head)
+  const yaw0 = YAW[dir] == null ? 0 : YAW[dir], mir = yaw0 < 0 ? -1 : 1, D = mo.rider ? ridden(look.build) : BEAST[look.build], P = beastPose(act, f);
+  const G = new Scene(yaw0 + P.spin * mir, boil);
+  const hide = mat(look.skin, true), belly = mat(look.coat, false), sad = mat(look.accent, false), leather = mat('#5a4234', true), toothC = '#f1ead8', col2 = {leather: '#4a362b'};
+  const m = MM(RZ(P.roll * mir * D2R), MM(RX(-P.rear * D2R), RY(P.tw * mir * D2R)));
+  const legs = [[1, 1], [-1, 1], [1, -1], [-1, -1]].map((v, i) => {
+    const sx = v[0], sz = v[1], front = sz > 0, ph = P.ph + ((i === 0 || i === 3) ? 0 : Math.PI), base = front ? 12 : 20, tuck = front ? P.rear * 1.3 : 0, arm = front && !!D.fup;
+    const U = arm ? D.fup : D.up, Lo = arm ? D.flo : D.lo, bipe = !!D.fup;
+    const p1 = arm ? 38 + 10 * Math.sin(ph) * (P.amp ? 1 : 0.3) + P.rear * 0.6 : (bipe ? 34 : base) + P.crouch + P.amp * Math.sin(ph) * (bipe ? 1.15 : 1) + tuck, kn = arm ? 96 : 2 * ((bipe ? 34 : base) + P.crouch) + P.kn * Math.max(0, Math.cos(ph)) + tuck * 1.2;
+    const hz = front ? (D.armZ || 0.62) : -(D.hipZ == null ? 0.62 : D.hipZ), hy = arm ? -D.H * 0.15 : -D.H * 0.35;
+    const h = MV(m, [sx * D.W * (arm ? 0.7 : 0.92), hy, hz * D.L]), k = add(h, mul(limbDir(p1, D.splay, sx), U)), a = add(k, mul(limbDir(p1 - kn, D.splay * 0.15, sx), Lo));
+    return {h: h, k: k, a: a, sx: sx, front: front, arm: arm};
+  });
+  let low = 1e9; legs.forEach(l => { if (!l.arm) low = Math.min(low, l.a[1]); });
+  const o = [P.sway * mir, ANKLE - low + P.lift, P.slide];
+  legs.forEach(l => { l.h = add(o, l.h); l.k = add(o, l.k); l.a = add(o, l.a); });
+  const Bf = {o: o, m: m}, camB = G.P(o)[2] * 1.5, cell = q => [Math.round((AX + q[0]) * 100) / 100, Math.round((AY + q[1]) * 100) / 100];
+  const along = (F, a) => ({o: F.o, m: MM(F.m, RX(a * D2R))});             // frame whose rings stack along the body instead of upward
+  /* legs */
+  legs.forEach((l, i) => { const h = G.P(l.h), k = G.P(l.k), a = G.P(l.a), w = l.arm ? D.legW * 0.55 : D.legW, air = l.arm || l.a[1] - ANKLE > 0.9;
+    const fd = [Math.sin(18 * D2R * l.sx), 0, Math.cos(18 * D2R * l.sx)], fl = w * 2.8, toe = G.P(add(l.a, [fd[0] * fl, air ? -ANKLE - 0.8 : -ANKLE + 0.15, fd[2] * fl])), heel = G.P(add(l.a, [-fd[0] * w, -ANKLE, -fd[2] * w])), at = G.P(add(l.a, [0, 0.6, 0])), ti = G.P(add(l.a, [fd[0] * fl, (air ? -ANKLE - 0.8 : -ANKLE) + w * 0.9, fd[2] * fl]));
+    const foot = l.arm ? [[at[0] - w, at[1]], [at[0] + w, at[1]], ti, toe] : [[at[0] - w, at[1]], [at[0] + w, at[1]], ti, toe, heel]; if (area2(foot) < 0) foot.reverse();
+    const up = ribbon(h, k, w * 1.5, w * 1.1), lo = ribbon(k, a, w * 1.1, w * 0.9);
+    G.add({key: k[2] * 1.5 + (k[2] > G.P(o)[2] ? 0.9 : -0.9), seed: 140 + i, w: 0.85, polys: [{p: up, f: hide.b}, {p: lo, f: hide.b}, {p: foot, f: D.hoof ? '#2b242a' : l.arm ? '#efe6d0' : hide.s}], post: [ctx => { fillp(ctx, shadeStrip(up, 0.42), hide.s); fillp(ctx, shadeStrip(lo, 0.42), hide.s);
+      [0.3, 0.6, 0.9].forEach(t => tick(ctx, lerp2(foot[2], foot[3], 0.5), lerp2(lerp2(foot[0], foot[1], t), lerp2(foot[2], foot[3], 0.5), 0.55), 0.3)); if (D.tree) tick(ctx, lerp2(up[0], up[1], 0.3), lerp2(up[3], up[2], 0.6), 0.4); }]}); });
+  /* body, underside lighter */
+  const Sz = along(Bf, 90), bc = (i) => (i === 7 || i === 0 || i === 6) ? belly : hide;
+  const bodyR = D.rex ? [[-D.L, D.W * 0.62, D.H * 0.66], [-D.L * 0.35, D.W, D.H], [D.L * 0.4, D.W * 0.92, D.H * 0.95], [D.L, D.W * 0.6, D.H * 0.62]] : [[-D.L, D.W * 0.55, D.H * 0.6], [-D.L * 0.45, D.W, D.H], [D.L * 0.45, D.W * 1.02, D.H * 1.05], [D.L, D.W * 0.8, D.H * 0.82]];
+  const body = prism(G, bodyR.map(r => ring8(Sz, r[0], r[1], r[2], r[1] * 0.34)), {seed: 103, key: camB, col: bc, top: hide, bot: true, hatch: D.hatch, jag: D.yak ? (i, j) => (j === 0 || j === 2 ? 3 : 2) : undefined, jd: D.yak ? 0.8 : 0});
+  if (D.spikes) [-0.8, -0.55, 0.62, 0.84].forEach((t, i) => { const z = t * D.L, pl = [FP(Bf, 0, D.H * 0.86, z - 1.1), FP(Bf, 0, D.H * 0.86, z + 1.1), FP(Bf, 0, D.H * 0.86 + D.H * 0.36, z - 0.2)].map(p => G.P(p)); if (area2(pl) < 0) pl.reverse(); G.add({key: camB + 0.2, seed: 110 + i, w: 0.7, polys: [{p: pl, f: hide.s}], post: []}); });
+  if (D.camel && look.back === 'gun') {                     // a brass swivel gun strapped along the near flank
+    const Cf = {o: FP(Bf, D.W + 1.3, D.H * 0.62, D.L * 0.1), m: MM(Bf.m, RX(90 * D2R))}, br = mat('#c9a14a', false);
+    const cn = prism(G, [ring8(Cf, -6.2, 1.5, 1.5, 0.6), ring8(Cf, -1.0, 1.6, 1.6, 0.6), ring8(Cf, 4.6, 1.1, 1.1, 0.45), ring8(Cf, 6.4, 1.6, 1.6, 0.6)], {seed: 106, key: G.P(Cf.o)[2] * 1.5 + 0.8, col: br, top: mat('#2b242a', true), bot: true, w: 0.85});
+    cn.post.push(ctx => cn.front.forEach(F => { if (F.j !== 1 || F.i < 0) return; const q = F.q; line(ctx, [lerp2(q[0], q[3], 0.5), lerp2(q[1], q[2], 0.5)], 0.4, 107, '#6a5232'); }));
+  }
+  if (D.hump) {                                             // the camel's hump, shaggy at the top
+    prism(G, [ring8(Bf, D.H * 0.8, D.W * 0.62, D.L * 0.42, D.W * 0.3, 0, -D.L * 0.05), ring8(Bf, D.H + D.hump * 0.6, D.W * 0.48, D.L * 0.3, D.W * 0.24, 0, -D.L * 0.05), ring8(Bf, D.H + D.hump, D.W * 0.26, D.L * 0.16, D.W * 0.12, 0, -D.L * 0.05)], {seed: 104, key: camB + 0.15, col: hide, top: hide, jag: (i, j) => j === 2 ? 2 : 0, jd: 0.4, hatch: D.hatch});
+  }
+  if (D.saddle || mo.rider) {                               // blanket and bedroll
+    if (D.camel) prism(G, [ring8(Bf, D.H * 0.35, D.W + 0.45, D.L * 0.5, D.W * 0.34, 0, -D.L * 0.05), ring8(Bf, D.H + D.hump * 0.75, D.W * 0.62, D.L * 0.36, D.W * 0.26, 0, -D.L * 0.05)], {seed: 105, key: camB + 0.3, col: sad, bot: true, jag: (i, j) => j === 0 ? 2 : 0, jd: 0.3, hatch: 0.08, w: 0.8});
+    else prism(G, [ring8(Sz, -D.L * 0.34, D.W + 0.5, D.H + 0.5, D.W * 0.34), ring8(Sz, D.L * 0.26, D.W * 1.02 + 0.5, D.H * 1.05 + 0.5, D.W * 0.34)], {seed: 105, key: camB + 0.3, col: sad, skip: i => i === 7 || i === 0 || i === 6, hatch: 0.08, w: 0.8});
+    const Rf = {o: FP(Bf, 0, D.H + 2.3, -D.L * 0.1), m: MM(Bf.m, RZ(90 * D2R))}; if (!D.yak && !mo.rider && !D.camel) prism(G, [ring8(Rf, -D.W * 0.95, 2.0, 2.0, 0.8), ring8(Rf, D.W * 0.95, 2.0, 2.0, 0.8)], {seed: 107, key: camB + 0.5, col: leather, top: leather, bot: true, w: 0.8});
+  }
+  /* tail */
+  if (D.tail) { const St = {o: FP(Bf, 0, D.horse ? D.H * 0.55 : D.H * 0.05, -D.L + 0.5), m: MM(Bf.m, RX((D.horse ? -150 : D.rex ? -100 : -90) * D2R))}, sw = P.tail * mir * D.tail * (D.rex ? 0.35 : 1);
+    const mid = G.P(FP(St, sw * 0.2, D.tail * 0.5, 0))[2];
+    const tu = D.cat ? -1 : 1;
+    if (D.horse) { const a = G.P(FP(St, 0, 0, 0)), b = G.P(FP(St, sw * 0.3, D.tail * 0.55, D.tail * 0.2)), c = G.P(FP(St, sw * 0.7, D.tail, D.tail * 0.72)), tm = mat(mix(look.skin, '#2a2228', 0.45), true);
+      G.add({key: mid * 1.5 - 0.3, seed: 109, w: 0.8, polys: [{p: ribbon(a, b, 1.3, 2.2), f: tm.b}, {p: ribbon(b, c, 2.2, 0.6), f: tm.s}], post: [ctx => [0.3, 0.55, 0.8].forEach(t => tick(ctx, lerp2(a, c, t), lerp2(lerp2(a, c, t), b, 0.3), 0.36))]}); }
+    else prism(G, D.cat ? [ring8(St, 0, 0.9, 0.9, 0.35), ring8(St, D.tail * 0.45, 0.8, 0.8, 0.3, sw * 0.16, D.tail * 0.3), ring8(St, D.tail * 0.7, 0.6, 0.6, 0.25, sw * 0.4, D.tail * 0.75)] : [ring8(St, 0, D.W * 0.55, D.H * 0.55, D.W * 0.2), ring8(St, D.tail * 0.5, D.W * 0.3, D.H * 0.3, D.W * 0.1, sw * 0.16, -D.H * 0.25), ring8(St, D.tail, 0.5, 0.4, 0.15, sw * 0.42, -D.H * 0.5)], {seed: 109, key: mid * 1.5 - 0.3, col: hide, top: hide, hatch: D.hatch}); }
+  let headPt = FP(Bf, 0, D.H, D.L);
+  if (!mo.centaur) {
+  /* head: two jaws hinged at the back, teeth along both, eyes riding on top */
+  let Hf = {o: FP(Bf, 0, D.cat ? D.H * 1.0 : D.H * 0.2, D.L - (D.cat ? 1.6 : 0.6)), m: MM(Bf.m, RX(P.nod * D2R))};
+  if (D.neck) {                                             // long neck rising from the chest, head at the top tipped forward
+    const nl = D.neck[0], Nf = {o: FP(Bf, 0, D.H * 0.35, D.L * 0.8), m: MM(Bf.m, RX((90 - D.neck[1] + P.nod * 0.6) * D2R))}, nw = D.W * 0.5, nd = D.H * 0.42;
+    const nk = prism(G, [ring8(Nf, -1.0, nw * 1.25, nd * 1.3, nw * 0.4), ring8(Nf, nl * 0.55, nw, nd, nw * 0.36), ring8(Nf, nl + 0.6, nw * 0.86, nd * 0.95, nw * 0.34)], {seed: 101, key: G.P(FP(Nf, 0, nl * 0.5, 0))[2] * 1.5, col: (i) => (i === 7 || i === 0 || i === 6) ? belly : hide, top: hide, bot: true, hatch: D.hatch, jag: D.camel ? (i, j) => j === 0 ? 2 : 0 : undefined, jd: 0.4});
+    if (D.horse) { const a = G.P(FP(Nf, 0, 0.6, -nd * 1.05)), b = G.P(FP(Nf, 0, nl * 0.6, -nd * 1.1)), c = G.P(FP(Nf, 0, nl + 1.6, -nd * 0.7)), mm = mat(mix(look.skin, '#2a2228', 0.45), true);   // mane down the back of the neck
+      G.add({key: G.P(FP(Nf, 0, nl * 0.5, -nd))[2] * 1.5 + 0.2, seed: 102, w: 0.75, polys: [{p: ribbon(a, b, 1.2, 1.5), f: mm.b}, {p: ribbon(b, c, 1.5, 0.9), f: mm.s}], post: [ctx => [0.25, 0.5, 0.75].forEach(t => tick(ctx, lerp2(a, c, t), [lerp2(a, c, t)[0] + 0.9, lerp2(a, c, t)[1] + 1.3], 0.34))]}); }
+    Hf = {o: FP(Nf, 0, nl, nd * 0.2), m: MM(Bf.m, RX((P.nod + (D.camel ? 14 : 34)) * D2R))};
+  }
+  const hl = D.hl, hw = D.hw, hh = D.hh, c = hw * 0.3;
+  headPt = FP(Hf, 0, 0, hl * 0.6);
+  const hcam = G.P(FP(Hf, 0, 0, hl * 0.5))[2], hk = hcam * 1.5 + (hcam > G.P(o)[2] ? 1.2 : -1.2), Su = along(Hf, 90);
+  const jawOpen = D.plain ? P.jaw * 0.3 + 2 : P.jaw + (D.tree ? 9 : 0), Lf = {o: FP(Hf, 0, -hh * 0.1, 0), m: MM(MM(Hf.m, RX(jawOpen * D2R)), RX(90 * D2R))};
+  prism(G, [ring8(Su, 0.6, hw * 0.78, hh * 0.05, c * 0.5, 0, hh * 0.12), ring8(Su, hl * 0.9, hw * 0.7, hh * 0.05, c * 0.5, 0, hh * 0.1)], {seed: 111, key: hk - 0.2, col: mat('#7a2a30', true), top: mat('#7a2a30', true), bot: true, w: 0.5});
+  const dn = (() => { const a = G.P(Hf.o), b = G.P(FP(Hf, 0, -1, 0)); return [b[0] - a[0], b[1] - a[1]]; })();
+  const teeth = (ctx, e0, e1, sgn, len) => { const n = Math.max(2, Math.round(Math.hypot(e1[0] - e0[0], e1[1] - e0[1]) / (hw * 0.24))); for (let k = 0; k < n; k++) { const a = lerp2(e0, e1, k / n), b = lerp2(e0, e1, (k + 0.82) / n), mid2 = lerp2(a, b, 0.5); fillp(ctx, [a, b, [mid2[0] + dn[0] * len * sgn, mid2[1] + dn[1] * len * sgn]], toothC); } };
+  const lj = prism(G, [ring8(Lf, 0, hw * 0.86, hh * 0.22, c, 0, hh * 0.2), ring8(Lf, hl * 0.96, hw * 0.76, hh * 0.16, c, 0, hh * 0.14)], {seed: 113, key: hk - 0.1, col: belly, top: belly, bot: true, hatch: D.hatch});
+  lj.post.push(ctx => !D.cat && !D.yak && !D.plain && lj.front.forEach(F => { const q = F.q; if (F.i === 1) teeth(ctx, q[1], q[2], -1, hh * 0.2); else if (F.i === 5) teeth(ctx, q[0], q[3], -1, hh * 0.2); else if (F.i === -1) teeth(ctx, q[2], q[5], -1, hh * 0.2); }));
+  const uj = prism(G, [ring8(Su, 0, hw * 0.92, hh * 0.5, c, 0, -hh * 0.32), ring8(Su, hl * 0.55, hw, hh * 0.48, c, 0, -hh * 0.3), ring8(Su, hl, hw * 0.84, hh * 0.34, c, 0, -hh * 0.18)], {seed: 115, key: hk, col: hide, top: hide, bot: true, hatch: D.hatch});
+  uj.post.push(ctx => !D.cat && !D.yak && !D.plain && uj.front.forEach(F => { const q = F.q; if (F.i === 1) teeth(ctx, q[0], q[3], 1, hh * 0.24); else if (F.i === 5) teeth(ctx, q[1], q[2], 1, hh * 0.24); else if (F.i === -1) { teeth(ctx, q[7], q[0], 1, hh * 0.24); [0.3, 0.7].forEach(t => { const c0 = lerp2(lerp2(q[3], q[4], t), lerp2(q[0], q[7], t), 0.35); ctx.fillStyle = INKC; ctx.beginPath(); ctx.arc(c0[0], c0[1], hw * 0.06, 0, 7); ctx.fill(); }); } }));
+  [1, -1].forEach(sd => { const e3 = FP(Hf, sd * hw * 0.62, hh * 0.56, hl * 0.2), e = G.P(e3), r = hh * (D.tree ? 0.2 : 0.27), nv = G.N(MV(Hf.m, norm([sd * 0.6, 0.3, 0.7]))), see = nv[1] * K + nv[2] > 0;
+    const blob = []; for (let i = 0; i < 7; i++) { const a = i / 7 * 6.283 + 0.3; blob.push(D.tree ? [e[0] + (i % 2 ? 1 : 0.8) * Math.cos(a) * r, e[1] + Math.sin(a) * r] : [e[0] + Math.cos(a) * r, e[1] + Math.sin(a) * r * 0.9]); }
+    G.add({key: hk + (e[2] > hcam ? 0.4 : -0.4), seed: 117 + sd, w: 0.75, polys: [{p: blob, f: D.tree ? (see ? look.eyes : hide.s) : hide.b}], post: [ctx => { if (!see || D.tree) return; const in2 = blob.map(p => lerp2([e[0], e[1]], p, 0.66)); outline(ctx, in2, 0.5, 880 + sd); fillp(ctx, in2, look.eyes); tick(ctx, [e[0], e[1] - r * 0.5], [e[0], e[1] + r * 0.5], 0.5); }]}); });
+  if (D.horse || D.camel) {                                 // ears, nostrils
+    [1, -1].forEach(sd => { const pl = (D.horse ? [[0.3, 0.42, 0.06], [0.55, 1.05, -0.05], [0.8, 0.4, 0.04]] : [[0.62, 0.4, 0.04], [1.02, 0.62, 0.0], [0.86, 0.3, -0.02]]).map(v => G.P(FP(Hf, sd * hw * v[0], hh * v[1], hl * v[2]))); if (area2(pl) < 0) pl.reverse();
+      G.add({key: hk + (pl[1][2] > hcam ? 0.45 : -0.45), seed: 131 + sd, w: 0.7, polys: [{p: pl, f: hide.b}], post: [ctx => fillp(ctx, [pl[0], pl[1], lerp2(pl[0], pl[2], 0.5)], hide.s)]}); });
+    uj.post.push(ctx => uj.front.forEach(F => { if (F.i !== -1 && F.i !== 7) return; const q = F.q; if (F.i === -1) [0.3, 0.7].forEach(t => { const c0 = lerp2(lerp2(q[3], q[4], t), lerp2(q[0], q[7], t), 0.5); ctx.fillStyle = INKC; ctx.beginPath(); ctx.ellipse(c0[0], c0[1], hw * 0.1, hw * 0.07, 0, 0, 7); ctx.fill(); }); }));
+    if (D.horse) lj.post.push(ctx => lj.front.forEach(F => { if (F.i !== 1 && F.i !== 5) return; const q = F.q; line(ctx, [lerp2(q[0], q[3], 0.5), lerp2(q[1], q[2], 0.5)], 0.4, 138, col2.leather); }));
+  }
+  if (D.cat) {                                              // ears, a patch of colour, whiskers
+    [1, -1].forEach(sd => { const pl = [FP(Hf, sd * hw * 0.28, hh * 0.1, hl * 0.3), FP(Hf, sd * hw * 0.62, hh * 0.52, hl * 0.2), FP(Hf, sd * hw * 0.9, hh * 0.06, hl * 0.3)].map(p => G.P(p)); if (area2(pl) < 0) pl.reverse(); G.add({key: hk + 0.45, seed: 130 + sd, w: 0.7, polys: [{p: pl, f: sd > 0 ? sad.b : hide.b}], post: []}); });
+    prism(G, [ring8(Sz, -D.L * 0.5, D.W + 0.25, D.H + 0.25, D.W * 0.34), ring8(Sz, D.L * 0.1, D.W * 1.02 + 0.25, D.H * 1.05 + 0.25, D.W * 0.34)], {seed: 105, key: camB + 0.3, col: sad, skip: i => i === 7 || i === 0 || i === 6, w: 0.5});
+  }
+  if (D.yak) {                                              // long shag hanging almost to the ground all round
+    const gy = -o[1] + ANKLE * 0.9 + 0.6;
+    prism(G, [ring8(Bf, gy, D.W * 1.1, D.L * 1.0, D.W * 0.42), ring8(Bf, D.H * 0.2, D.W * 1.06, D.L * 0.96, D.W * 0.42), ring8(Bf, D.H * 0.95, D.W * 0.9, D.L * 0.8, D.W * 0.36)], {seed: 139, key: camB + 0.12, col: hide, top: hide, jag: (i, j) => j === 0 ? 3 : 1, jd: 0.7, hatch: 0.22});
+  }
+  if (D.yak) {                                              // horns sweeping out and up, a fringe over the eyes, a nose ring of hide
+    [1, -1].forEach(sd => { const a = G.P(FP(Hf, sd * hw * 0.78, hh * 0.32, hl * 0.25)), b = G.P(FP(Hf, sd * hw * 1.75, hh * 0.4, hl * 0.4)), c = G.P(FP(Hf, sd * hw * 2.0, hh * 1.25, hl * 0.66));
+      G.add({key: hk + (a[2] > hcam ? 0.6 : -0.6), seed: 133 + sd, w: 0.8, polys: [{p: ribbon(a, b, 1.9, 1.5), f: '#e6dcc3'}, {p: ribbon(b, c, 1.5, 0.35), f: '#c9bfa6'}], post: []}); });
+    uj.post.push(ctx => uj.front.forEach(F => { if (F.i !== -1) return; const q = F.q; [0.3, 0.7].forEach(t => { const c0 = lerp2(lerp2(q[3], q[4], t), lerp2(q[0], q[7], t), 0.55); ctx.fillStyle = INKC; ctx.beginPath(); ctx.ellipse(c0[0], c0[1], hw * 0.09, hw * 0.06, 0, 0, 7); ctx.fill(); }); line(ctx, [lerp2(q[1], q[6], 0.5), lerp2(q[2], q[5], 0.5)], 0.4, 137); }));   // broad nose with two nostrils
+  }
+  if (D.tree) {                                             // dead branches off the crown and spine
+    [[Hf, 0.5, 0.4, 0.3], [Hf, -0.6, 0.4, 0.2], [Hf, 0.1, 0.42, 0.55], [Bf, 0.5, 0.95, 0.3], [Bf, -0.5, 0.95, -0.2], [Bf, 0.2, 0.95, -0.7], [Bf, -0.3, 0.9, 0.7]].forEach((b, i) => {
+      const F = b[0], sc = F === Hf ? [hw, hh, hl] : [D.W, D.H, D.L], p0 = FP(F, b[1] * sc[0], b[2] * sc[1], b[3] * sc[2]), r1 = rnd(i, 21) - 0.5, r2 = rnd(i, 22) - 0.5;
+      const p1 = add(p0, MV(F.m, [b[1] * 5 + r1 * 3, 5.5 + r2 * 2, r1 * 4 - 1])), p2 = add(p1, MV(F.m, [r2 * 6 + b[1] * 3, 4.5 + r1 * 2, r2 * 4 - 2])), p3 = add(p1, MV(F.m, [-b[1] * 4 - r1 * 3, 3.2, 2 + r2 * 3]));
+      const a = G.P(p0), bb = G.P(p1), cc = G.P(p2), dd = G.P(p3);
+      G.add({key: (F === Hf ? hk : camB) + 0.5 + i * 0.01, seed: 120 + i, w: 0.7, polys: [{p: ribbon(a, bb, 1.2, 0.8), f: hide.s}, {p: ribbon(bb, cc, 0.8, 0.2), f: hide.s}, {p: ribbon(bb, dd, 0.6, 0.15), f: hide.b}], post: []}); });
+  }
+  }
+  const J = {B: {upper: D.fup || D.up, fore: D.flo || D.lo, thigh: D.up, shin: D.lo}, P: P, mir: mir, arms: {A: {s: legs[1].h, e: legs[1].k, w: legs[1].a}, B: {s: legs[0].h, e: legs[0].k, w: legs[0].a}}, legs: {A: {h: legs[3].h, k: legs[3].k, a: legs[3].a}, B: {h: legs[2].h, k: legs[2].k, a: legs[2].a}}};
+  const cd = {S: [0, 1], SE: [0.707, 0.707], E: [1, 0], NE: [0.707, -0.707], N: [0, -1], NW: [-0.707, -0.707], W: [-1, 0], SW: [-0.707, 0.707]};
+  const anchors = {muzzle: null, muzzle2: null, fire: false, hit: !!P.hit, handA: cell(G.P(legs[1].a)), handB: cell(G.P(legs[0].a)), head: cell(G.P(headPt)), aim: cd[dir] || [0, 1], back: (cd[dir] || [0, 1])[1] < 0, showGun: false};
+  G.parts.sort((a, b) => a.key - b.key);
+  const seat = mo.centaur ? FP(Bf, 0, D.H * 0.5, D.L * 0.72) : FP(Bf, 0, D.H + (D.hump ? D.hump * 0.35 : 0) + 0.6, (D.seat ? D.seat[1] : 0) * D.L);   // on top of the back (the saddle sits just behind a camel's hump)
+  return {G: G, J: J, anchors: anchors, seat: seat, legsB: legs};
+}
+
+/* ---------- blobs: boneless hoppers (slime, mimic chest) that squash and stretch ---------- */
+const BLOB = {slime: {R: 9.4, H: 12}, mimic: {W: 8, D: 5.4, H: 6.5}};
+function blobPose(act, f) {
+  const n = COUNT[act], ph = (f % n) / n * 6.2832, S = Math.sin, C = Math.cos;
+  const P = {sq: 1, lift: 0, slide: 0, open: 6, tw: 0, roll: 0, sway: 0, spin: 0, lean: 0, hit: false};
+  if (act === 'idle') { const b = (1 - C(ph)) / 2; P.sq = 1 - 0.07 * b; P.open = 4 + 6 * b; }
+  else if (act === 'walk' || act === 'run') { const r = act === 'run', k = f % 4; P.sq = [0.78, 1.18, 1.1, 0.92][k]; P.lift = [0, 1.6, 3.2, 1][k] * (r ? 1.6 : 1); P.open = [4, 14, 20, 8][k]; P.lean = r ? 10 : 4; }
+  else if (act === 'jump') Object.assign(P, [{sq: 0.68}, {sq: 1.3, lift: 2, open: 20}, {sq: 0.95, lift: 0.5, open: 10}][f % n]);
+  else if (act === 'attack') Object.assign(P, [{sq: 0.8, slide: -1}, {sq: 0.68, slide: -1.6, open: 20}, {sq: 1.25, slide: 2.5, lift: 2, open: 58, lean: 14}, {sq: 0.95, slide: 6, open: 0, hit: true, lean: 20},
+    {sq: 0.8, slide: 6.4, open: 0, lean: 12}, {sq: 1.05, slide: 4.4, open: 8}, {slide: 2}, {slide: 0.6}][f % n]);
+  else if (act === 'shoot') Object.assign(P, [{sq: 0.85, open: 24}, {sq: 1.12, open: 62, hit: true, lean: 8}, {sq: 1.1, open: 56, lean: 8}, {open: 16}][f % n]);
+  else if (act === 'combo1' || act === 'combo2') { const s = act === 'combo1' ? -1 : 1; Object.assign(P, [{tw: -10 * s, sq: 0.85, open: 20}, {tw: -22 * s, sq: 0.75, open: 44}, {tw: 24 * s, sq: 1.15, slide: 2.4, open: 0, hit: true}, {tw: 28 * s, slide: 2.6, open: 0}, {tw: 12 * s, slide: 1.2, open: 8}, {}][f % n]); }
+  else if (act === 'combo3') Object.assign(P, [{sq: 0.66}, {sq: 1.3, lift: 4, open: 30}, {sq: 1.2, lift: 7.5, open: 50, slide: 1.5}, {sq: 1.1, lift: 2, slide: 3, open: 20, hit: true}, {sq: 0.58, slide: 4, open: 0, hit: true}, {sq: 0.7, slide: 4}, {sq: 1.08, slide: 2}, {slide: 0.6}][f % n]);
+  else if (act === 'dance1') { const k = f % 2; P.sq = k ? 1.22 : 0.74; P.lift = k ? 2.6 : 0; P.open = k ? 30 : 4; P.roll = f % 4 < 2 ? 6 : -6; }
+  else if (act === 'dance2') { P.spin = 360 * f / n; P.sq = (f % 2) ? 1.12 : 0.9; P.lift = (f % 2) * 1.4; P.open = 18; }
+  else if (act === 'dance3') { P.sway = 2.4 * S(ph); P.roll = 10 * S(ph); P.sq = 1 + 0.1 * C(2 * ph); P.open = 10 + 10 * Math.abs(S(ph)); }
+  return P;
+}
+function composeBlob(look, act, f, dir, boil) {
+  const yaw0 = YAW[dir] == null ? 0 : YAW[dir], mir = yaw0 < 0 ? -1 : 1, D = BLOB[look.build], P = blobPose(act, f), slime = look.build === 'slime';
+  const G = new Scene(yaw0 + P.spin * mir, boil), cell = q => [Math.round((AX + q[0]) * 100) / 100, Math.round((AY + q[1]) * 100) / 100];
+  const Bf = {o: [P.sway * mir, P.lift, P.slide], m: MM(RZ(P.roll * mir * D2R), MM(RX(P.lean * D2R), RY(P.tw * mir * D2R)))};
+  const facing = G.N(MV(Bf.m, [0, 0, 1]))[2] > 0.1, upv = (() => { const a = G.P(Bf.o), b = G.P(FP(Bf, 0, 1, 0)); return [b[0] - a[0], b[1] - a[1]]; })();
+  const teeth = (ctx, e0, e1, sgn, len) => { const n = Math.max(2, Math.round(Math.hypot(e1[0] - e0[0], e1[1] - e0[1]) / 1.7)); for (let k = 0; k < n; k++) { const a = lerp2(e0, e1, (k + 0.08) / n), b = lerp2(e0, e1, (k + 0.92) / n), m2 = lerp2(a, b, 0.5); fillp(ctx, [a, b, [m2[0] + upv[0] * len * sgn, m2[1] + upv[1] * len * sgn]], '#f1ead8'); } };
+  let top3;
+  if (slime) {
+    const m = mat(look.skin, false, -0.25), h = D.H * P.sq, R = D.R / Math.sqrt(P.sq);
+    const body = prism(G, [[0, 0.82], [0.22, 1.0], [0.58, 0.93], [0.86, 0.62], [1, 0.24]].map(l => ring8(Bf, l[0] * h, l[1] * R, l[1] * R * 0.9, l[1] * R * 0.42)), {seed: 151, key: 0, col: m, top: m, bot: true, jit: 0.5});
+    body.post.push(ctx => { const c0 = G.P(FP(Bf, 0, h * 0.72, 0)), hl = look.coat;       // wet highlights stay toward the light
+      fillp(ctx, [[-R * 0.52, -1.2], [-R * 0.3, -2.6], [-R * 0.12, -1.6], [-R * 0.26, 0.6], [-R * 0.46, 0.4]].map(v => [c0[0] + v[0], c0[1] + v[1]]), hl); fillp(ctx, [[-R * 0.62, 2.6], [-R * 0.5, 1.8], [-R * 0.42, 2.8], [-R * 0.54, 3.6]].map(v => [c0[0] + v[0], c0[1] + v[1]]), hl);
+      if (facing) { const lf = (u, v) => { const q = G.P(FP(Bf, u, v * h, R * 0.86)); return [q[0], q[1]]; }, ec = look.eyes;
+        [-1, 1].forEach(e => line(ctx, [lf(e * 4.2, 0.62), lf(e * 1.9, 0.54)], 0.9, 152 + e, ec)); line(ctx, [lf(-2.2, 0.36), lf(-0.8, 0.3), lf(0.8, 0.3), lf(2.2, 0.36)], 0.6, 155, ec); } });
+    [[-1, 0.9], [1, 0.6]].forEach((v, i) => { const c1 = G.P(FP(Bf, v[0] * (R + 2.2), 0, 1.5)); G.add({key: 0.2, seed: 157 + i, w: 0.7, polys: [{p: [[c1[0] - 1.5 * v[1], c1[1]], [c1[0], c1[1] - 1.3 * v[1]], [c1[0] + 1.5 * v[1], c1[1]], [c1[0], c1[1] + 0.5]], f: m.b}], post: []}); });
+    top3 = FP(Bf, 0, h, 0);
+  } else {
+    const wood = mat(look.skin, true), metal = mat(look.accent, true), gul = mat(look.coat, true), h = D.H * P.sq, W = D.W * (1 + (1 - P.sq) * 0.3), dd = D.D;
+    const bands = (part, lidPart) => part.post.push(ctx => part.front.forEach(F => { if (F.i < 0) return; const q = F.q; [0.14, 0.78].forEach(t => fillp(ctx, [lerp2(q[0], q[1], t), lerp2(q[0], q[1], t + 0.08), lerp2(q[3], q[2], t + 0.08), lerp2(q[3], q[2], t)], F.f === INKC ? metal.s : metal.b));
+      line(ctx, [lerp2(q[0], q[3], 0.5), lerp2(q[1], q[2], 0.5)], 0.34, 160 + F.i + (lidPart ? 20 : 0));
+      if (lidPart) { if (F.j === 0 && (F.i === 7 || F.i === 1 || F.i === 5 || F.i === 0 || F.i === 6)) teeth(ctx, q[0], q[1], -1, 1.5); }
+      else { if (F.i === 7 || F.i === 1 || F.i === 5 || F.i === 0 || F.i === 6) teeth(ctx, q[3], q[2], 1, 1.3); if (F.i === 7) { const c0 = lerp2(lerp2(q[0], q[1], 0.5), lerp2(q[3], q[2], 0.5), 0.62); fillp(ctx, [[c0[0] - 1.2, c0[1] - 1], [c0[0] + 1.2, c0[1] - 1], [c0[0] + 1.2, c0[1] + 1], [c0[0] - 1.2, c0[1] + 1]], metal.b); fillp(ctx, [[c0[0] - 0.3, c0[1] - 0.4], [c0[0] + 0.3, c0[1] - 0.4], [c0[0] + 0.3, c0[1] + 0.5], [c0[0] - 0.3, c0[1] + 0.5]], INKC); } } }));
+    bands(prism(G, [ring8(Bf, 0, W, dd, 0.9), ring8(Bf, h, W, dd, 0.9)], {seed: 161, key: 0, col: wood, top: gul, bot: true, hatch: 0.05}), false);
+    const Lf = {o: FP(Bf, 0, h, -dd), m: MM(Bf.m, RX(-P.open * D2R))};
+    bands(prism(G, [ring8(Lf, 0, W + 0.3, dd + 0.2, 0.9, 0, dd), ring8(Lf, 2.6, W + 0.3, dd + 0.2, 1.4, 0, dd), ring8(Lf, 4.3, W * 0.8, dd * 0.7, 1.6, 0, dd)], {seed: 163, key: 0.6, col: wood, top: wood, bot: true, hatch: 0.05, inside: null}), true);
+    if (P.open > 26) { const a = G.P(FP(Bf, 0, h - 0.4, dd * 0.2)), b = G.P(FP(Bf, 1.2, h + 0.8, dd + 3.2)), c = G.P(FP(Bf, 2.6, h - 2.6, dd + 6.8)); G.add({key: 0.3, seed: 165, w: 0.8, polys: [{p: ribbon(a, b, 2.2, 1.9), f: '#d86a78'}, {p: ribbon(b, c, 1.9, 0.9), f: '#b9505e'}], post: []}); }
+    top3 = FP(Lf, 0, 4, dd);
+  }
+  const o = Bf.o, J = {B: {upper: 0, fore: 0, thigh: 0, shin: 0}, P: P, mir: mir, arms: {A: {s: o, e: o, w: o}, B: {s: o, e: o, w: o}}, legs: {A: {h: o, k: o, a: o}, B: {h: o, k: o, a: o}}};
+  const cd = {S: [0, 1], SE: [0.707, 0.707], E: [1, 0], NE: [0.707, -0.707], N: [0, -1], NW: [-0.707, -0.707], W: [-1, 0], SW: [-0.707, 0.707]};
+  const anchors = {muzzle: null, muzzle2: null, fire: false, hit: !!P.hit, handA: cell(G.P(o)), handB: cell(G.P(o)), head: cell(G.P(top3)), aim: cd[dir] || [0, 1], back: (cd[dir] || [0, 1])[1] < 0, showGun: false};
+  G.parts.sort((a, b) => a.key - b.key);
+  return {G: G, J: J, anchors: anchors};
+}
+
+/* ---------- head, face, hair, hats ---------- */
+function headParts(G, J, look, col, camT0, H, s, ko, kind, noHat) {
+  const B = J.B, fem = look.sex === 'f', P = J.P, camT = camT0 + ko;
+  const LV = fem ? [[0, 3.9, 4.4], [3.0, 6.6, 5.8], [5.8, 7.35, 6.0], [9.4, 7.45, 6.1], [13.0, 6.2, 5.2]] : [[0, 5.5, 4.6], [3.2, 7.7, 6.0], [5.8, 7.75, 6.1], [9.4, 7.8, 6.2], [13.2, 6.5, 5.3]];
+  const hwAt = v => { v = Math.max(0, Math.min(13.2, v)); for (let i = 0; i < LV.length - 1; i++) if (v <= LV[i + 1][0]) { const t = (v - LV[i][0]) / (LV[i + 1][0] - LV[i][0]); return [lerp(LV[i][1], LV[i + 1][1], t), lerp(LV[i][2], LV[i + 1][2], t)]; } return [LV[4][1], LV[4][2]]; };
+  const CH = 0.36;
+  const animal = kind === 'dog' || kind === 'hippo' || kind === 'wolf', skull = kind === 'skull', cov = animal ? 'none' : look.cover, mask = cov === 'mask', ninja = cov === 'ninja', lucha = cov === 'lucha', oni = cov === 'oni';
+  if (skull) col = Object.assign({}, col, {skin: mat('#e9dfc6', false, -0.34)});
+  const plain = mask || ninja || oni || animal || skull;             // no bare nose, mouth or whiskers to draw
+  const hk = camT + 6, hat = noHat ? 'none' : look.hat; let yo = 0;
+  const gob = kind === 'goblin', imp = kind === 'imp', humanoid = kind === 'human' || gob || imp;
+  const hz = G.P(H.o)[2], ahead = p3 => G.P(p3)[2] > hz + 0.2;   // is a point on the near side of the head? features sticking out the front go under the head when the head turns away
+  if (kind === 'lantern') {                                // a lamp for a head: riveted box, torn skirt, keyhole eye
+    const lm = mat(look.accent, true), lv = [[0, 5.4, 4.8], [2.6, 6.7, 5.9], [10.4, 6.7, 5.9], [12.8, 4.8, 4.2]];
+    const lp = prism(G, lv.map(l => ring8(H, l[0] * s, l[1] * s, l[2] * s, l[1] * s * 0.3)), {seed: 23, key: hk, col: lm, top: lm, jag: (i, j) => j === 0 ? 2 : 0, jd: 0.5, hatch: 0.05});
+    const lf = (u, v) => { const q = G.P(FP(H, u * s, v * s, 6.0 * s)); return [q[0], q[1]]; };
+    lp.post.push(ctx => { if (!lp.front.some(F => F.i === 7 && F.j === 1)) return;
+      const kh = []; for (let i = 0; i < 8; i++) { const a = -0.6 + i / 7 * 4.34; kh.push(lf(0.6 + Math.cos(a) * 2.5, 7.2 + Math.sin(a) * 2.5)); } kh.push(lf(-0.9, 3.4), lf(2.3, 3.4));
+      outline(ctx, kh, 0.9, 801); fillp(ctx, kh, INKC); const ey = []; for (let i = 0; i < 7; i++) { const a = i / 7 * 6.283; ey.push(lf(0.7 + Math.cos(a) * 1.25, 7.3 + Math.sin(a) * 1.25)); } fillp(ctx, ey, look.eyes); fillp(ctx, ey.map(p => lerp2(lf(0.7, 7.3), p, 0.42)), '#fff3c4');
+      [[-5.4, 9.6], [5.4, 9.6], [-5.4, 3.4], [5.4, 3.4]].forEach(v => { const c0 = lf(v[0], v[1]); ctx.fillStyle = INKC; ctx.beginPath(); ctx.arc(c0[0], c0[1], 0.34, 0, 7); ctx.fill(); }); line(ctx, [lf(-6.2, 10.6), lf(6.2, 10.6)], 0.4, 805); });
+    const hp3 = [[-4.2, 12.6], [-3.4, 16.4], [3.4, 16.4], [4.2, 12.6]].map(v => G.P(FP(H, v[0] * s, v[1] * s, 0)));
+    G.add({key: hk + 0.3, seed: 25, w: 0.7, polys: [0, 1, 2].map(i => ({p: ribbon(hp3[i], hp3[i + 1], 0.7, 0.7), f: lm.s})), post: []});
+    return;
+  }
+  if (kind === 'dome' || kind === 'tin') {                 // machine heads: riveted shell, visor or single lens
+    const tin = kind === 'tin', mm = mat(look.coat, true), lv = tin ? [[0, 5.9, 5.3], [2.4, 7.0, 6.2], [9.8, 7.1, 6.3], [13.2, 5.6, 4.9]] : [[0, 5.2, 4.8], [2.6, 6.6, 5.8], [8.2, 6.4, 5.6], [10.8, 4.4, 3.9]];
+    const rp = prism(G, lv.map(l => ring8(H, l[0] * s, l[1] * s, l[2] * s, l[1] * s * 0.34)), {seed: 23, key: hk, col: mm, top: mm, bot: true, hatch: 0.03});
+    const zf = tin ? 6.42 : 5.92, lf = (u, v) => { const q = G.P(FP(H, u * s, v * s, zf * s)); return [q[0], q[1]]; }, dot = (u, v, r) => { const c0 = lf(u, v); ctx2.fillStyle = INKC; ctx2.beginPath(); ctx2.arc(c0[0], c0[1], r, 0, 7); ctx2.fill(); }; let ctx2 = null;
+    rp.post.push(ctx => { ctx2 = ctx; if (!rp.front.some(F => F.i === 7 && F.j === 1)) return;
+      if (tin) { const vz = [lf(-4.5, 8.8), lf(4.5, 8.8), lf(4.2, 6.0), lf(-4.2, 6.0)]; outline(ctx, vz, 0.9, 881); fillp(ctx, vz, INKC); [-1, 1].forEach(e => fillp(ctx, [lf(e * 1.1, 8.1), lf(e * 3.5, 8.1), lf(e * 3.3, 6.7), lf(e * 1.2, 6.7)], look.eyes));
+        [-2.4, -1.2, 0, 1.2, 2.4].forEach(u => tick(ctx, lf(u, 4.6), lf(u, 1.8), 0.5)); line(ctx, [lf(-4.4, 5.2), lf(4.4, 5.2)], 0.4, 883); [[-3.8, 10.6], [3.8, 10.6], [-3.6, 1.2], [3.6, 1.2]].forEach(v => dot(v[0], v[1], 0.34)); }
+      else { const rg = [], in1 = [], in2 = []; for (let i = 0; i < 8; i++) { const a = i / 8 * 6.283; rg.push(lf(Math.cos(a) * 3.0, 5.6 + Math.sin(a) * 3.0)); in1.push(lf(Math.cos(a) * 2.0, 5.6 + Math.sin(a) * 2.0)); in2.push(lf(Math.cos(a) * 0.9, 5.6 + Math.sin(a) * 0.9)); }
+        outline(ctx, rg, 1.0, 885); fillp(ctx, rg, col.accent.b); outline(ctx, in1, 0.6, 887); fillp(ctx, in1, INKC); fillp(ctx, in2, look.eyes); [[-3.2, 9.2], [3.2, 9.2]].forEach(v => dot(v[0], v[1], 0.4)); line(ctx, [lf(-4.2, 2.2), lf(4.2, 2.2)], 0.4, 889); } });
+    if (tin) { const fin = [[0, 12.6, 3.4], [0, 16.6, 1.2], [0, 16.2, -3.6], [0, 12.8, -4.4]].map(v => G.P(FP(H, 0.01, v[1] * s, v[2] * s))), fw = [[1.1, 12.6, 3.4], [1.1, 12.8, -4.4]].map(v => G.P(FP(H, v[0] * s, v[1] * s, v[2] * s)));
+      const fp2 = [fin[0], fin[1], fin[2], fin[3], fw[1], fw[0]]; G.add({key: hk + 0.3, seed: 24, w: 0.7, polys: [{p: fp2, f: col.accent.b}], post: []}); }
+    else { prism(G, [ring8(H, 10.2 * s, 5.0 * s, 4.4 * s, 2 * s), ring8(H, 12.8 * s, 3.0 * s, 2.6 * s, 1.2 * s)], {seed: 25, key: hk + 0.3, col: mat('#6f9a4e', false), top: mat('#6f9a4e', false), jag: (i, j) => 2, jd: 0.7, hatch: 0.2, w: 0.8});
+      if (look.hair !== 'bald' && look.hair !== 'short') [[1, 5.4, -1], [-1, 5.4, -1], [1, 3.2, 3.2], [-1, 3.4, 3.0], [1, 2, -4], [-1, 2.2, -4]].forEach((v, i) => { const a = G.P(FP(H, v[0] * v[1] * s, 9.4 * s, v[2] * s)), b2 = G.P(FP(H, v[0] * (v[1] + 2.2) * s - P.cs, 3.5 * s, (v[2] - 0.6) * s)), c = G.P(FP(H, v[0] * (v[1] + 1.2) * s - P.cs * 1.5, (-2.5 - (i % 2) * 2) * s, v[2] * s));
+        G.add({key: hk + (a[2] > G.P(H.o)[2] ? 0.5 : -0.4), seed: 26 + i, w: 0.7, polys: [{p: ribbon(a, b2, 1.0, 0.9), f: col.hair.b}, {p: ribbon(b2, c, 0.9, 0.3), f: col.hair.s}], post: []}); }); }
+    return;
+  }
+  if (kind === 'shroud') {                                 // tall feathered hood with a window of small lights for a face
+    const lv = [[-2, 6.4, 5.8], [6, 5.3, 4.9], [14, 3.7, 3.5], [20.4, 2.9, 2.8]];
+    const sp = prism(G, lv.map(l => ring8(H, l[0] * s, l[1] * s, l[2] * s, l[1] * s * 0.34)), {seed: 23, key: hk, col: col.coat, top: col.coat, jag: (i, j) => j < 2 ? 3 : 0, jd: 0.4, hatch: 0.12});
+    const lf = (u, v) => { const q = G.P(FP(H, u * s, v * s, 3.75 * s)); return [q[0], q[1]]; };
+    sp.post.push(ctx => { if (!sp.front.some(F => F.i === 7 && F.j === 2)) return; const wn = [lf(-2.9, 18.6), lf(2.9, 18.6), lf(3.1, 14.6), lf(-3.1, 14.6)]; outline(ctx, wn, 0.8, 811); fillp(ctx, wn, INKC);
+      [[-1.5, 17.4], [1.5, 17.4], [0, 16.5], [-1.5, 15.6], [1.5, 15.6]].forEach(v => { const c0 = lf(v[0], v[1]); ctx.fillStyle = look.eyes; ctx.beginPath(); ctx.arc(c0[0], c0[1], 0.5 * s, 0, 7); ctx.fill(); }); });
+    yo = 10.4;
+  }
+  const rings = LV.map(l => ring8(H, l[0] * s, l[1] * s, l[2] * s, l[1] * s * CH));
+  const head = kind === 'shroud' ? null : prism(G, rings, {seed: 23, key: hk, col: (i, j) => ninja ? col.coat : (mask && j < 2 && i >= 0) ? col.scarf : (lucha && (j >= 2 || i < 0)) ? col.scarf : col.skin, top: ninja ? col.coat : lucha ? col.scarf : col.skin, bot: true, w: 0.9});
+  const fwd = G.N(MV(H.m, [0, 0, 1])), side = G.N(MV(H.m, [1, 0, 0]));
+  const hs = side[0] >= 0 ? 1 : -1;                        // head-local side that lands on the screen right (shadow side)
+  /* face point: u across, v up from the chin, wrapped onto the chamfered head so features turn with it */
+  const fp = (u, v, lift) => { const hh = hwAt(v), hw = hh[0], hd = hh[1], c = hw * CH; if (lift == null || lift < 0.45) u = Math.max(-hw, Math.min(hw, u)); const au = Math.abs(u); const z = au <= hw - c ? hd : hd - (au - (hw - c));
+    const q = G.P(FP(H, u * s, v * s, (z + (lift == null ? 0.06 : lift)) * s)); return [q[0], q[1]]; };
+  const visU = u => { const hw = 7.8, c = hw * CH, n = Math.abs(u) <= hw - c ? [0, 0, 1] : [Math.sign(u) * 0.707, 0, 0.707]; const nv = G.N(MV(H.m, n)); return nv[1] * K + nv[2] > 0.05; };
+  const poly = uv => uv.map(p => fp(p[0], p[1], p[2]));
+  const disc = (u, v, rx, ry, n, lift) => { const o = []; for (let i = 0; i < n; i++) { const a = i / n * 6.2832 + 0.4; o.push(fp(u + Math.cos(a) * rx, v + Math.sin(a) * ry, lift)); } return o; };
+  const HATS = {kasa: {rx: 15.8, rz: 14.2, curl: -1.8, cb: 10.6, ct: 0.5, ch: 5.6, pinch: 0, yb: 10.0, star: 1, noband: 1}, helm: {rx: 11.4, rz: 10.6, curl: 0.5, cb: 8.5, ct: 6, ch: 6.8, pinch: 0, yb: 9.6, dome: 1, noband: 1, rivet: 1},
+    flat: {rx: 15.6, rz: 13.4, curl: 0.7, cb: 8.0, ct: 6.3, ch: 8.4, pinch: 1.5, yb: 9.7}, tall: {rx: 13.4, rz: 11.8, curl: 2.6, cb: 8.0, ct: 7.1, ch: 11.6, pinch: 2.1, yb: 9.7}, bowler: {rx: 10.6, rz: 9.6, curl: 1.1, cb: 7.9, ct: 5.6, ch: 7.8, pinch: 0, yb: 9.9},
+    star: {rx: 15.2, rz: 13.2, curl: 0.4, cb: 8.0, ct: 3.4, ch: 12.8, pinch: 0, yb: 9.7, star: 1}, witch: {rx: 16.0, rz: 13.8, curl: 0.2, cb: 7.8, ct: 1.3, ch: 15.5, pinch: 0, yb: 9.7, bend: 4.2}, fedora: {rx: 10.9, rz: 9.8, curl: 0.9, cb: 8.0, ct: 6.7, ch: 6.4, pinch: 1.0, yb: 9.8},
+    straw: {rx: 20.5, rz: 17.5, curl: 0, cb: 4.4, ct: 3.2, ch: 9.6, pinch: 1.8, yb: 9.6}, wide: {rx: 19.6, rz: 16.6, curl: 0, cb: 8.0, ct: 6.5, ch: 8.8, pinch: 1.7, yb: 9.7},
+    kepi: {rx: 8.6, rz: 7.6, curl: 0, cb: 8.1, ct: 8.4, ch: 6.0, pinch: 0, yb: 10.3, zoff: 4.4, badge: 1}, tricorn: {rx: 15.0, rz: 13.6, curl: 3.8, cb: 7.9, ct: 6.6, ch: 5.4, pinch: 0.8, yb: 9.9, tri: 1, plume: 1, badge: 1}};
+  const brimHat = !!HATS[hat], helm = hat === 'galea', hoodHat = hat === 'pelt' || hat === 'hood' || hat === 'skullhelm' || helm, browShade = brimHat || hoodHat;
+
+  /* --- hair shell (behind and around the skull) --- */
+  if (look.hair !== 'bald' && kind !== 'shroud' && !ninja && !lucha && !skull) {
+    const hb = {short: 4.4, topknot: 4.8, tail: 4.2, shaggy: 2.2, long: -5.5, mane: -7.0}[look.hair], hm = animal ? mat(look.skin, true) : col.hair, sleek = look.hair === 'short' || look.hair === 'topknot', mane = look.hair === 'mane';
+    const lv = mane ? (fem ? [[hb, 9.6, 8.0], [-1.0, 10.4, 8.4], [5.0, 10.0, 8.2], [10.6, 9.4, 7.6], [14.6, 6.4, 5.4]] : [[hb, 11.4, 8.8], [1.5, 10.8, 8.6], [9.9, 10.0, 8.0], [14.4, 8.0, 6.6]]) : look.hair === 'long' ? [[hb, 9.6, 7.4], [1.5, 8.7, 7.0], [9.9, 8.4, 6.8], [13.9, 6.9, 5.8]] : [[hb, 8.3, 6.7], [9.9, 8.4, 6.8], [13.9, 6.9, 5.8]];
+    const top = lv.length - 2;
+    prism(G, lv.map(l => ring8(H, l[0] * s, l[1] * s, l[2] * s, l[1] * s * (mane && fem ? 0.5 : CH), 0, -0.3 * s)), {seed: 29, key: hk + 0.2, col: hm, top: hm, skip: (i, j) => j < top && (i === 7 || i === 0 || i === 6),
+      jag: (i, j) => (j === 0 || (j === top && (i === 7 || i === 0 || i === 6))) ? (sleek ? 1 : mane ? 3 : 2) : 0, jd: sleek ? 0.25 : mane ? 0.5 : 0.3, inside: {key: hk - 0.5, f: (mane || look.hair === 'long') ? mix(animal ? look.skin : look.hairc, INKC, 0.45) : hm.d}, hatch: mane ? 0.14 : 0.07});
+    if (look.hair === 'tail') { const a = G.P(FP(H, 0, 9 * s, -6.6 * s)), b = G.P(FP(H, -0.6 * P.cs, 2.5 * s, -9.4 * s - P.fl)), c = G.P(FP(H, -1.2 * P.cs, -3.5 * s, -8.2 * s - P.fl * 1.5));
+      G.add({key: hk + (a[2] > 0 ? 0.6 : -0.6), seed: 31, w: 0.8, polys: [{p: ribbon(a, b, 1.6, 2.0), f: hm.b}, {p: ribbon(b, c, 2.0, 0.5), f: hm.s}], post: []}); }
+  }
+
+  if (look.hair === 'topknot' && humanoid && !ninja && !lucha && !hoodHat) { const Hb = {o: FP(H, 0, 12.0 * s, -6.9 * s), m: H.m}; prism(G, [ring8(Hb, 0, 2.7 * s, 2.5 * s, 1.0 * s), ring8(Hb, 3.0 * s, 2.3 * s, 2.1 * s, 0.9 * s)], {seed: 30, key: hk + 0.25, col: col.hair, top: col.hair, bot: true, w: 0.8}); }
+  if ((look.horns || imp) && humanoid && hat !== 'hood' && hat !== 'pelt') [1, -1].forEach(sd => {   // horns; the imp's and the big-haired sweep up and out
+    const big = imp || look.hair === 'mane', hm2 = big ? mat(mix(look.skin, '#e0436a', 0.35), true) : col.bone;
+    const a = G.P(FP(H, sd * (big ? 5.2 : 3.6) * s, (big ? 11.4 : 12.2) * s, 3.2 * s)), b = G.P(FP(H, sd * (big ? 9.0 : 5.4) * s, (big ? 14.6 : 14.6) * s, 2.6 * s)), c = G.P(FP(H, sd * (big ? 8.6 : 5.0) * s, (big ? 19.6 : 17.0) * s, 1.4 * s));
+    G.add({key: hk + 0.5, seed: 35 + sd, w: 0.7, polys: [{p: ribbon(a, b, big ? 1.7 : 1.3, big ? 1.3 : 1.0), f: hm2.b}, {p: ribbon(b, c, big ? 1.3 : 1.0, 0.25), f: hm2.s}], post: []}); });
+  /* --- ears --- */
+  const earS = kind === 'dog' ? [[6.4, 12.6, -1], [10.6, 11.4, -1.6], [11.0, 5.4, -1.2], [8.4, 4.2, -0.8], [7.2, 8.6, -0.6]] : kind === 'hippo' ? [[4.4, 12.4, -1], [6.2, 14.6, -1.2], [7.8, 13.0, -1.2], [6.8, 11.4, -1]] : kind === 'wolf' ? [[4.2, 12.6, -1], [6.4, 18.4, -1.6], [8.8, 12.4, -1.2], [7.4, 10.4, -1]] : gob ? [[7.5, 4.6, -0.6], [17.6, 9.4, -2.6], [15.4, 10.4, -2.2], [7.5, 9.2, -0.6]] : (look.ears === 'pointed' || imp) ? [[7.5, 4.9, -0.6], [13.4, 9.2, -1.8], [9.6, 9.0, -1.2], [7.5, 8.5, -0.6]] : [[7.5, 4.9, -0.6], [9.3, 5.6, -1.2], [9.5, 7.7, -1.2], [7.5, 8.5, -0.6]];
+  if (kind !== 'shroud' && !ninja && !skull && !(hoodHat && !gob)) [1, -1].forEach(sd => { const e = earS.map(p => { const q = G.P(FP(H, sd * p[0] * s, p[1] * s, p[2] * s)); return [q[0], q[1], q[2]]; });
+    G.add({key: hk + (e[1][2] > 0 ? 0.3 : -0.3), seed: 33 + sd, w: 0.7, polys: [{p: e, f: lucha ? col.scarf.s : sd === hs ? col.skin.s : col.skin.b}], post: [ctx => tick(ctx, lerp2(e[0], e[3], 0.3), lerp2(e[1], e[2], 0.5), 0.34)]}); });
+
+  if (animal) {                                            // muzzle: a real box sticking out of the face, dark nose on the end
+    const hip = kind === 'hippo', S = {o: FP(H, 0, (hip ? 2.0 : 2.5) * s, 5.4 * s), m: MM(H.m, RX(90 * D2R))}, sn = hip ? [[0, 6.7, 3.0], [3.0, 7.1, 3.3], [5.6, 6.3, 2.8]] : [[0, 4.0, 2.7], [3.3, 3.5, 2.4], [5.9, 2.7, 1.9]];
+    const snF = ahead(FP(S, 0, 3 * s, 0)), sm = col.skin, mz = prism(G, sn.map(l => ring8(S, l[0] * s, l[1] * s, l[2] * s, l[1] * s * 0.34)), {seed: 27, key: snF ? hk + 1.3 : hk - 1.2, col: sm, top: hip ? sm : mat('#2b242a', true), w: 0.85});
+    mz.post.push(ctx => { mz.front.forEach(F => { const q = F.q; if (F.i === 1) line(ctx, [lerp2(q[0], q[1], 0.25), lerp2(q[3], q[2], 0.25)], 0.5, 821); else if (F.i === 5) line(ctx, [lerp2(q[1], q[0], 0.25), lerp2(q[2], q[3], 0.25)], 0.5, 823);
+        else if (F.i === -1) { if (hip) [0.3, 0.7].forEach(t => { const c0 = lerp2(lerp2(q[5], q[6], t), lerp2(q[4], q[7], t), 0.5); ctx.fillStyle = INKC; ctx.beginPath(); ctx.arc(c0[0], c0[1], 0.5, 0, 7); ctx.fill(); }); } }); });
+    if (kind === 'wolf') [1, -1].forEach(sd => { const a = G.P(FP(S, sd * 2.0 * s, 5.0 * s, 1.6 * s)), b = G.P(FP(S, sd * 2.1 * s, 5.2 * s, 4.4 * s)); G.add({key: snF ? hk + 1.5 : hk - 1.1, seed: 28 + sd, w: 0.6, polys: [{p: ribbon(a, b, 0.8, 0.2), f: col.bone.b}], post: []}); });
+    if (hip) [1, -1].forEach(sd => { const a = G.P(FP(S, sd * 4.4 * s, 4.6 * s, 3.2 * s)), b = G.P(FP(S, sd * 4.6 * s, 4.9 * s, 5.4 * s)); G.add({key: snF ? hk + 1.5 : hk - 1.1, seed: 28 + sd, w: 0.6, polys: [{p: ribbon(a, b, 0.9, 0.25), f: col.bone.b}], post: []}); });
+  }
+  /* --- face --- */
+  if (kind !== 'shroud' && fwd[1] * K + fwd[2] > -0.12) G.add({key: hk + 1, seed: 37, w: 0, polys: [], post: [ctx => {
+    const ex = look.expr || 'calm', sk = col.skin;
+    /* planes of shade: far cheek, jaw underside, temple */
+    if (skull) {                                           // bare bone: hollow sockets with a point of light, nose hole, a row of teeth
+      fillp(ctx, poly([[hs * 7.6, 6.0], [hs * 4.8, 4.6], [hs * 5.6, 2.0], [hs * 7.3, 3.0]]), sk.s); fillp(ctx, poly([[-hs * 6.8, 4.4], [-hs * 5.2, 3.4], [-hs * 5.6, 1.8]]), sk.s);
+      [-1, 1].forEach(e => { if (!visU(e * 4.4)) return; const so = poly([[e * 1.1, 8.7, 0.1], [e * 5.3, 9.0, 0.1], [e * 5.7, 6.0, 0.1], [e * 3.4, 4.9, 0.1], [e * 1.2, 5.9, 0.1]]); outline(ctx, so, 0.8, 890 + e); fillp(ctx, so, INKC); fillp(ctx, disc(e * 3.3, 7.0, 0.95, 0.95, 6, 0.14), look.eyes); fillp(ctx, disc(e * 3.3, 7.0, 0.4, 0.4, 5, 0.16), '#f3ffe9'); });
+      fillp(ctx, poly([[0, 5.7, 0.2], [-1.05, 3.8, 0.2], [0, 4.3, 0.2], [1.05, 3.8, 0.2]]), INKC);
+      const tb = poly([[-3.7, 3.1, 0.1], [3.7, 3.1, 0.1], [3.3, 0.9, 0.1], [-3.3, 0.9, 0.1]]); outline(ctx, tb, 0.9, 893); fillp(ctx, tb, '#f4efe2'); line(ctx, [fp(-3.5, 2.0, 0.12), fp(3.5, 2.0, 0.12)], 0.36, 895); [-2.4, -1.2, 0, 1.2, 2.4].forEach(u => tick(ctx, fp(u, 3.0, 0.12), fp(u, 1.0, 0.12), 0.32));
+      tick(ctx, fp(-4.6, 11.4, 0.1), fp(-3.2, 9.6, 0.1), 0.34); tick(ctx, fp(-3.2, 9.6, 0.1), fp(-3.8, 9.0, 0.1), 0.3);
+    }
+    if (ninja) { fillp(ctx, poly([[-7.75, 8.9], [-7.75, 5.9], [-2, 5.5], [2, 5.5], [7.75, 5.9], [7.75, 8.9]]), sk.b); fillp(ctx, poly([[hs * 3.6, 8.9], [hs * 4.6, 5.7], [hs * 7.75, 5.9], [hs * 7.75, 8.9]]), sk.s); line(ctx, [fp(-7.7, 5.9, 0.1), fp(-2, 5.5, 0.1), fp(2, 5.5, 0.1), fp(7.7, 5.9, 0.1)], 0.5, 831); line(ctx, [fp(-7.7, 8.9, 0.1), fp(7.7, 8.9, 0.1)], 0.5, 833); tick(ctx, fp(-3.4, 3.6, 0.1), fp(-1.0, 2.4, 0.1), 0.36); tick(ctx, fp(2.2, 4.2, 0.1), fp(4.4, 3.0, 0.1), 0.36); }
+    if (!plain) { fillp(ctx, poly([[hs * 7.7, 8.2], [hs * 4.3, 6.3], [hs * 5.2, 3.4], [hs * 2.6, 0.5], [hs * 1.2, 0], [hs * 5.4, 0], [hs * 7.6, 3.2]]), sk.s);
+      fillp(ctx, poly([[-hs * 3.6, 0.9], [hs * 2.6, 0.5], [hs * 1.2, 0], [-hs * 4.6, 0]]), sk.s); }
+    if (look.facial === 'stubble' && !plain) { const sb = mix(look.skin, '#4c4850', 0.42);
+      fillp(ctx, poly([[-6.6, 4.6], [-3.4, 3.9], [-3.0, 1.6], [3.0, 1.6], [3.4, 3.9], [6.6, 4.6], [6.0, 1.2], [4.2, 0], [-4.2, 0], [-6.0, 1.2]]), sb);
+      fillp(ctx, poly([[hs * 3.4, 3.9], [hs * 6.6, 4.6], [hs * 6.0, 1.2], [hs * 4.2, 0], [hs * 2.0, 0], [hs * 3.0, 1.6]]), mix(sb, INKC, 0.3)); }
+    /* hat brim throws a hard shadow over the brow; without a brim the brow ridge is shaded instead */
+    const band = [[-7.75, 10.4], [-7.75, 8.5], [-4.7, 7.9], [-1.3, 8.45], [1.3, 8.45], [4.7, 7.9], [7.75, 8.5], [7.75, 10.4]];
+    if (browShade && !oni) fillp(ctx, poly(band), INKC);
+    else if (!ninja && !oni && !lucha && !skull) fillp(ctx, poly([[-7.0, 9.3], [-6.6, 8.2], [-4.4, 7.7], [-1.2, 8.1], [1.2, 8.1], [4.4, 7.7], [6.6, 8.2], [7.0, 9.3], [4.4, 8.9], [-4.4, 8.9]]), sk.s);
+    /* eyes */
+    [-1, 1].forEach(e => {
+      if (!visU(e * 4.4) || oni || skull) return;
+      if (lucha) { const lx = e * 3.05; fillp(ctx, poly([[lx - e * 2.9, 5.2, 0.08], [lx + e * 2.6, 4.9, 0.08], [lx + e * 3.4, 9.6, 0.08], [lx, 8.6, 0.08], [lx - e * 3.2, 10.2, 0.08]]), col.accent.b); }
+      if (look.cover === 'patch' && e === 1) { const pp = poly([[1.0, 8.9], [5.3, 9.1], [5.6, 5.5], [3.1, 4.7], [1.0, 5.7]]); outline(ctx, pp, 0.9, 500); fillp(ctx, pp, INKC); fillp(ctx, poly([[1.6, 8.3], [3.0, 8.4], [2.2, 6.4]]), '#3a3440');
+        line(ctx, [fp(1.0, 8.6), fp(-7.7, 11.0)], 0.6, 503); line(ctx, [fp(5.3, 8.8), fp(7.7, 10.2)], 0.6, 505); return; }
+      const cx = e * 3.05, cy = 6.95, rx = 1.6, ry = fem ? 1.85 : (ex === 'shout' ? 1.75 : 1.55);
+      const eye = disc(cx, cy, rx, ry, 7, 0.1); outline(ctx, eye, 1.15, 510 + e); fillp(ctx, eye, '#f4efe2');
+      const lk = 0.3 * J.mir * 0;
+      if (animal || imp) { fillp(ctx, eye, look.eyes); fillp(ctx, disc(cx, cy - 0.1, 0.55, 0.6, 5, 0.14), INKC); }
+      else if (fem) { fillp(ctx, disc(cx + 0.15, cy - 0.1, 1.0, 1.15, 6, 0.12), look.eyes || '#6f93a8'); fillp(ctx, disc(cx + 0.15, cy - 0.1, 0.5, 0.6, 5, 0.14), INKC); fillp(ctx, disc(cx - 0.3, cy + 0.5, 0.26, 0.26, 4, 0.15), '#ffffff'); }
+      else fillp(ctx, disc(cx + lk, cy - 0.15, ex === 'shout' ? 0.36 : 0.5, ex === 'shout' ? 0.36 : 0.55, 5, 0.14), INKC);
+      /* lids: the heavier the lid, the meaner the look */
+      const in_ = -e;                                       // direction toward the nose
+      if (ex === 'angry') fillp(ctx, poly([[cx - e * 2.0, cy + 2.2, 0.16], [cx + in_ * 2.0, cy + 2.2, 0.16], [cx + in_ * 1.9, cy - 0.1, 0.16], [cx - in_ * 1.9, cy + 1.25, 0.16]]), INKC);
+      else if (ex === 'calm' || ex === 'grin') fillp(ctx, poly([[cx - 1.9, cy + 2.1, 0.16], [cx + 1.9, cy + 2.1, 0.16], [cx + 1.9, cy + (fem ? 1.35 : 0.75), 0.16], [cx - 1.9, cy + (fem ? 1.35 : 0.75), 0.16]]), INKC);
+      if (!browShade && !ninja && !lucha) { const br = ex === 'angry' ? [[cx - in_ * 2.3, cy + 2.9], [cx + in_ * 2.0, cy + 1.7]] : ex === 'shout' ? [[cx - in_ * 2.2, cy + 2.9], [cx + in_ * 1.8, cy + 3.3]] : [[cx - in_ * 2.3, cy + 2.4], [cx + in_ * 1.9, cy + 2.5]];
+        line(ctx, [fp(br[0][0], br[0][1], 0.2), fp(br[1][0], br[1][1], 0.2)], fem ? 0.6 : 1.1, 520 + e); }
+      if (fem) { line(ctx, [fp(cx + in_ * 1.6, cy + 1.45, 0.2), fp(cx, cy + 1.9, 0.2), fp(cx - in_ * 1.7, cy + 1.5, 0.2)], 0.75, 525 + e); [[1.5, 1.2, 2.9, 2.3], [1.9, 0.6, 3.2, 1.2], [1.0, 1.7, 1.9, 2.9]].forEach(l => tick(ctx, fp(cx - in_ * l[0], cy + l[1], 0.2), fp(cx - in_ * l[2], cy + l[3], 0.2), 0.62));   // lashes sweeping out at the corner
+        fillp(ctx, disc(cx - in_ * 0.6, cy - 2.7, 1.3, 0.7, 6, 0.08), mix(look.skin, '#e0566a', 0.35)); }
+      else { line(ctx, [fp(cx - 1.3, cy - 2.0), fp(cx + 1.2, cy - 2.25 + (e === hs ? 0.2 : 0))], 0.36, 530 + e); }   // eye bag
+    });
+    if (cov === 'specs') {                                 // round tinted glasses
+      [-1, 1].forEach(e => { if (!visU(e * 4.4)) return; const rm = disc(e * 3.05, 6.9, 2.5, 2.4, 8, 0.5), ln = disc(e * 3.05, 6.9, 1.85, 1.75, 8, 0.55); outline(ctx, rm, 1.0, 896 + e); fillp(ctx, rm, col.accent.b); fillp(ctx, ln, look.eyes); fillp(ctx, disc(e * 3.05 - 0.6, 7.5, 0.5, 0.4, 5, 0.6), '#ffffff'); });
+      line(ctx, [fp(-0.7, 7.3, 0.6), fp(0.7, 7.3, 0.6)], 0.5, 899);
+    }
+    if (look.scar && visU(-5)) { line(ctx, [fp(-5.4, 6.3, 0.1), fp(-3.9, 2.9, 0.1)], 0.45, 540); [0.25, 0.5, 0.75].forEach((t, i) => { const m = [lerp(-5.4, -3.9, t), lerp(6.3, 2.9, t)]; tick(ctx, fp(m[0] - 0.7, m[1] - 0.25, 0.1), fp(m[0] + 0.7, m[1] + 0.25, 0.1), 0.34); }); }
+    /* cheek hatching on the lit side, under-eye scratch on the shaded side */
+    if (!plain) { for (let k = 0; k < 3; k++) if (visU(-hs * 5.8)) tick(ctx, fp(-hs * (5.0 + k * 0.75), 5.5 - k * 0.25), fp(-hs * (5.9 + k * 0.75), 4.3 - k * 0.2), 0.36);
+      for (let k = 0; k < 2; k++) if (visU(hs * 5.4)) tick(ctx, fp(hs * (4.9 + k * 0.8), 5.6), fp(hs * (5.5 + k * 0.8), 4.6), 0.36, mix(look.skin, INKC, 0.75)); }
+    /* nose: a wedge that really sticks out, so it turns with the head */
+    if (!plain && imp) {                                   // hooked beak
+      const br = fp(0, 8.2, 0.05), tip = fp(0, 4.4, 5.2), hook = fp(0, 2.0, 3.6), bl = fp(-hs * 1.8, 5.0, 0.1), bs = fp(hs * 1.8, 5.0, 0.1), un = fp(0, 3.4, 1.4);
+      fillp(ctx, [br, tip, bl], sk.h); fillp(ctx, [br, bs, tip], sk.s); fillp(ctx, [tip, hook, un, bl], sk.b); fillp(ctx, [tip, bs, un, hook], sk.d); line(ctx, [br, tip, hook, un], 0.6, 551); line(ctx, [bl, un, bs], 0.45, 552);
+    } else if (!plain) { const nz = gob ? 4.6 : fem ? 1.3 : 2.3, nw = gob ? 1.2 : fem ? 0.85 : 1.3; const br = fp(0, 7.5, 0.05), tip = fp(0, gob ? 3.9 : 4.95, nz), bl = fp(-hs * nw, 4.6, 0.05), bs = fp(hs * nw, 4.6, 0.05), mid = fp(0, 4.5, 0.3);
+      fillp(ctx, [br, tip, bl], sk.h); fillp(ctx, [br, bs, tip], sk.s); fillp(ctx, [tip, bs, mid, bl], sk.d);
+      line(ctx, [br, tip, bs, mid], fem ? 0.4 : 0.55, 550); if (!fem) tick(ctx, bl, lerp2(bl, tip, 0.7), 0.4); }
+    /* mouth */
+    if (!plain) {
+      if (ex === 'angry') { const mb = poly([[-2.5, 3.4, 0.1], [2.5, 3.4, 0.1], [2.2, 1.8, 0.1], [-2.2, 1.8, 0.1]]); outline(ctx, mb, 1.0, 560); fillp(ctx, mb, '#efe8d6'); line(ctx, [fp(-2.4, 2.6, 0.12), fp(2.4, 2.6, 0.12)], 0.36, 563); [-1.2, 0, 1.2].forEach((u, i) => tick(ctx, fp(u, 3.3, 0.12), fp(u, 1.9, 0.12), 0.32)); }
+      else if (ex === 'shout') { const mb = poly([[-2.4, 3.7, 0.1], [2.4, 3.7, 0.1], [1.9, 0.8, 0.1], [-1.9, 0.8, 0.1]]); outline(ctx, mb, 1.0, 565); fillp(ctx, mb, INKC); fillp(ctx, poly([[-2.1, 3.6, 0.12], [2.1, 3.6, 0.12], [2.0, 2.9, 0.12], [-2.0, 2.9, 0.12]]), '#efe8d6'); fillp(ctx, poly([[-1.3, 1.9, 0.12], [1.3, 1.9, 0.12], [1.5, 1.0, 0.12], [-1.5, 1.0, 0.12]]), '#a8474a'); }
+      else if (ex === 'grin' && fem) {                       // a sly smile: narrow, lips coloured, a row of small sharp teeth
+        const lc = mix(look.skin, '#7a1f34', 0.6), mb = poly([[-2.7, 3.3, 0.1], [-1.2, 2.85, 0.1], [1.2, 2.85, 0.1], [2.9, 3.5, 0.1], [2.0, 2.0, 0.1], [0, 1.55, 0.1], [-2.0, 2.0, 0.1]]);
+        outline(ctx, mb, 0.8, 567); fillp(ctx, mb, lc); fillp(ctx, poly([[-2.3, 3.15, 0.12], [-1.1, 2.8, 0.12], [1.1, 2.8, 0.12], [2.5, 3.3, 0.12], [1.9, 2.55, 0.12], [-1.8, 2.55, 0.12]]), '#f4efe2');
+        for (let k = 0; k < 5; k++) { const u0 = -2.0 + k * 0.85; fillp(ctx, poly([[u0, 2.55, 0.13], [u0 + 0.6, 2.55, 0.13], [u0 + 0.3, 2.05, 0.13]]), '#f4efe2'); } tick(ctx, fp(2.9, 3.5, 0.1), fp(3.5, 4.2, 0.1), 0.4); }
+      else if (ex === 'grin') {                              // wide grin: a crescent full of teeth
+        const mb = poly([[-4.9, 3.9, 0.1], [-2.2, 2.9, 0.1], [2.2, 2.9, 0.1], [4.9, 3.9, 0.1], [3.8, 1.5, 0.1], [0, 0.5, 0.1], [-3.8, 1.5, 0.1]]); outline(ctx, mb, 1.1, 566); fillp(ctx, mb, INKC);
+        const tt = poly([[-4.4, 3.6, 0.12], [-2.2, 2.75, 0.12], [2.2, 2.75, 0.12], [4.4, 3.6, 0.12], [3.7, 2.2, 0.12], [0, 1.4, 0.12], [-3.7, 2.2, 0.12]]); fillp(ctx, tt, '#efe8d6');
+        [-3, -1.5, 0, 1.5, 3].forEach(u => tick(ctx, fp(u, 3.2 - Math.abs(u) * -0.12, 0.13), fp(u * 0.92, 1.9 + Math.abs(u) * 0.12, 0.13), 0.3)); tick(ctx, fp(-4.9, 3.9, 0.1), fp(-5.6, 4.6, 0.1), 0.4); tick(ctx, fp(4.9, 3.9, 0.1), fp(5.6, 4.6, 0.1), 0.4); }
+      else if (fem) { const lp = poly([[-1.5, 2.9, 0.1], [0, 3.2, 0.1], [1.5, 2.9, 0.1], [0, 2.2, 0.1]]); fillp(ctx, lp, mix(look.skin, '#8a2f3a', 0.55)); line(ctx, [fp(-1.7, 2.8, 0.12), fp(1.7, 2.8, 0.12)], 0.4, 568); }
+      else { line(ctx, [fp(-2.5, 2.3, 0.1), fp(-2.0, 2.75, 0.1), fp(2.0, 2.75, 0.1), fp(2.5, 2.3, 0.1)], 0.55, 569); tick(ctx, fp(-1.0, 1.7), fp(1.0, 1.7), 0.34); }
+    }
+    /* facial hair */
+    const hm = col.hair, fh = look.facial;
+    if (!plain && fh === 'huge') { const bd = poly([[-7.2, 6.1, 0.5], [-5.0, 4.5, 0.6], [-3.3, 3.6, 0.7], [-2.8, 1.5, 0.7], [2.8, 1.5, 0.7], [3.3, 3.6, 0.7], [5.0, 4.5, 0.6], [7.2, 6.1, 0.5], [8.0, 1.0, 0.6], [7.2, -5.6, 1.2], [4.0, -11.4, 1.6], [1.4, -9.6, 1.6], [-0.8, -13.0, 1.6], [-3.8, -10.2, 1.6], [-7.0, -6.2, 1.2], [-8.0, 1.0, 0.6]]);
+      outline(ctx, bd, 1.6, 572); fillp(ctx, bd, hm.b); fillp(ctx, poly([[hs * 3.3, 3.6, 0.7], [hs * 5.0, 4.5, 0.6], [hs * 7.2, 6.1, 0.5], [hs * 8.0, 1.0, 0.6], [hs * 7.2, -5.6, 1.2], [hs * 4.0, -11.4, 1.6], [hs * 2.0, -4, 1.6], [hs * 2.8, 1.5, 0.7]]), hm.s);
+      [[-5, 1], [-2.4, -2.4], [0.6, -1], [2.8, -3.4], [5, 0.6], [-4.4, -5.6], [-1.2, -7.4], [2.2, -7.8], [5.2, -4.6], [-5.8, 3.4], [0.4, -10.4]].forEach((v, i) => tick(ctx, fp(v[0], v[1] + 1.2, 1.7), fp(v[0] + 0.3, v[1] - 0.7, 1.7), 0.4, i % 2 ? INKC : mix(look.hairc, INKC, 0.55))); }
+    if (!plain && fh === 'full') { const bd = poly([[-7.0, 6.1, 0.5], [-5.0, 4.5, 0.6], [-3.3, 3.6, 0.7], [-2.8, 1.5, 0.7], [2.8, 1.5, 0.7], [3.3, 3.6, 0.7], [5.0, 4.5, 0.6], [7.0, 6.1, 0.5], [7.2, 2.2, 0.5], [5.4, -1.8, 0.8], [2.7, -3.9, 1.0], [0.9, -2.9, 1.0], [-1.0, -4.5, 1.0], [-3.5, -2.7, 0.9], [-5.9, -0.9, 0.8], [-7.2, 2.2, 0.5]]);
+      outline(ctx, bd, 1.5, 570); fillp(ctx, bd, hm.b); fillp(ctx, poly([[hs * 3.3, 3.6, 0.7], [hs * 5.0, 4.5, 0.6], [hs * 7.0, 6.1, 0.5], [hs * 7.2, 2.2, 0.5], [hs * 5.4, -1.8, 0.8], [hs * 2.7, -3.9, 1], [hs * 1.6, -1, 1], [hs * 2.8, 1.5, 0.7]]), hm.s);
+      [[-4.6, 1.5], [-2.2, -1.2], [0.4, -0.6], [2.6, -1.6], [4.4, 1.2], [-5.6, 3.6]].forEach((p, i) => tick(ctx, fp(p[0], p[1] + 1.1, 0.9), fp(p[0] + 0.3, p[1] - 0.6, 0.9), 0.38, i % 2 ? INKC : hm.d === INKC ? mix(look.hairc, INKC, 0.6) : hm.d)); }
+    if (!plain && fh === 'goatee') { const bd = poly([[-2.3, 1.5, 0.5], [2.3, 1.5, 0.5], [1.9, -1.3, 0.7], [0, -2.9, 0.8], [-1.9, -1.3, 0.7]]); outline(ctx, bd, 1.3, 575); fillp(ctx, bd, hm.b); fillp(ctx, poly([[hs * 0.4, 1.5, 0.5], [hs * 2.3, 1.5, 0.5], [hs * 1.9, -1.3, 0.7], [0, -2.9, 0.8]]), hm.s); }
+    if (!plain && (fh === 'walrus' || fh === 'full' || fh === 'huge')) { const ms = poly([[-4.1, 2.2, 1.0], [-3.3, 3.9, 1.1], [-0.9, 4.55, 1.2], [0, 4.2, 1.2], [0.9, 4.55, 1.2], [3.3, 3.9, 1.1], [4.1, 2.2, 1.0], [2.6, 2.9, 1.1], [0, 3.3, 1.2], [-2.6, 2.9, 1.1]]);
+      outline(ctx, ms, 1.3, 580); fillp(ctx, ms, hm.b); fillp(ctx, poly([[hs * 0.9, 4.55, 1.2], [hs * 3.3, 3.9, 1.1], [hs * 4.1, 2.2, 1.0], [hs * 2.6, 2.9, 1.1], [0, 3.3, 1.2], [0, 4.2, 1.2]]), hm.s); tick(ctx, fp(-2.2, 4.0, 1.2), fp(-2.6, 3.1, 1.2), 0.34); tick(ctx, fp(1.6, 4.2, 1.2), fp(1.9, 3.2, 1.2), 0.34); }
+    if (!plain && fh === 'handlebar') { const ms = poly([[-5.0, 4.9, 1.0], [-3.5, 3.1, 1.1], [-0.9, 4.3, 1.2], [0, 3.95, 1.2], [0.9, 4.3, 1.2], [3.5, 3.1, 1.1], [5.0, 4.9, 1.0], [3.5, 2.4, 1.1], [0, 3.2, 1.2], [-3.5, 2.4, 1.1]]);
+      outline(ctx, ms, 1.2, 585); fillp(ctx, ms, hm.b); fillp(ctx, poly([[hs * 0.9, 4.3, 1.2], [hs * 3.5, 3.1, 1.1], [hs * 5.0, 4.9, 1.0], [hs * 3.5, 2.4, 1.1], [0, 3.2, 1.2], [0, 3.95, 1.2]]), hm.s); }
+    /* bandana mask over nose and mouth */
+    if (mask) { const mk = poly([[-7.7, 6.2, 0.3], [-2.2, 6.6, 0.9], [0, 7.2, 2.0], [2.2, 6.6, 0.9], [7.7, 6.2, 0.3], [6.4, 1.8, 0.6], [4.3, -1.6, 1.2], [1.1, -5.6, 1.6], [-0.8, -3.6, 1.6], [-3.7, -1.2, 1.2], [-6.4, 1.8, 0.6]]);
+      outline(ctx, mk, 1.5, 590); fillp(ctx, mk, col.scarf.b); fillp(ctx, poly([[hs * 0.3, 7.1, 2.0], [hs * 2.2, 6.6, 0.9], [hs * 7.7, 6.2, 0.3], [hs * 6.4, 1.8, 0.6], [hs * 4.3, -1.6, 1.2], [hs * 1.6, -3.2, 1.6], [hs * 1.2, 2.8, 1.6]]), col.scarf.s);
+      line(ctx, [fp(0, 7.1, 2.0), fp(0.2, 4.6, 2.3), fp(-0.4, 2.2, 1.6)], 0.4, 592); tick(ctx, fp(-4.6, 4.4, 0.8), fp(-2.4, 3.6, 1.2), 0.38); tick(ctx, fp(-3.6, 1.8, 0.9), fp(-1.6, 0.6, 1.3), 0.38); tick(ctx, fp(3.2, 3.4, 1), fp(4.8, 4.3, 0.8), 0.38); }
+    /* hard shadow the head throws on the neck */
+    if (oni) {                                             // carved mask: slit eyes, wide grin of teeth, tusks at the corners
+      const om = col.accent, mk = poly([[-7.0, 10.8, 0.6], [7.0, 10.8, 0.6], [7.4, 5.0, 0.7], [5.6, 0.8, 0.9], [0, -0.9, 1.0], [-5.6, 0.8, 0.9], [-7.4, 5.0, 0.7]]);
+      outline(ctx, mk, 1.6, 840); fillp(ctx, mk, om.b); fillp(ctx, poly([[hs * 1.0, 10.8, 0.6], [hs * 7.0, 10.8, 0.6], [hs * 7.4, 5.0, 0.7], [hs * 5.6, 0.8, 0.9], [hs * 2.2, -0.2, 1.0], [hs * 3.4, 6, 0.9]]), om.s);
+      fillp(ctx, poly([[-6.6, 9.6, 0.8], [-1.0, 8.2, 0.9], [1.0, 8.2, 0.9], [6.6, 9.6, 0.8], [5.6, 7.9, 0.8], [1.4, 7.2, 0.9], [-1.4, 7.2, 0.9], [-5.6, 7.9, 0.8]]), INKC);
+      [-1, 1].forEach(e => { const ey = poly([[e * 1.5, 6.6, 0.9], [e * 5.4, 7.7, 0.85], [e * 5.0, 6.0, 0.85], [e * 1.9, 5.6, 0.9]]); outline(ctx, ey, 0.9, 842 + e); fillp(ctx, ey, '#f4efe2'); });
+      const nb = fp(0, 6.6, 1.0), nt = fp(0, 4.9, 2.4), nl = fp(-1.3, 4.6, 1.0), nr = fp(1.3, 4.6, 1.0); fillp(ctx, [nb, nt, nl], om.h); fillp(ctx, [nb, nr, nt], om.s); line(ctx, [nb, nt, hs > 0 ? nr : nl], 0.5, 845);
+      const mo = poly([[-5.4, 4.0, 0.95], [5.4, 4.0, 0.95], [4.3, 0.9, 1.0], [-4.3, 0.9, 1.0]]); outline(ctx, mo, 1.1, 847); fillp(ctx, mo, INKC);
+      for (let k = 0; k < 7; k++) { const u0 = -4.9 + k * 1.4; fillp(ctx, poly([[u0, 3.9, 1.0], [u0 + 1.3, 3.9, 1.0], [u0 + 0.65, 2.5, 1.0]]), '#f1ead8'); if (k < 6) fillp(ctx, poly([[u0 + 0.7, 1.0, 1.0], [u0 + 2.0, 1.0, 1.0], [u0 + 1.35, 2.3, 1.0]]), '#f1ead8'); }
+      [-1, 1].forEach(e => { const tk = poly([[e * 4.4, 1.6, 1.3], [e * 6.0, 2.0, 1.3], [e * 5.9, 5.0, 1.5]]); outline(ctx, tk, 0.9, 850 + e); fillp(ctx, tk, '#f1ead8'); });
+      [-2, 0, 2].forEach(u => { const c0 = fp(u, 9.9, 0.9); ctx.fillStyle = INKC; ctx.beginPath(); ctx.arc(c0[0], c0[1], 0.3, 0, 7); ctx.fill(); });
+    }
+    if (look.smoke && !plain && !lucha && visU(-3)) {       // hand-rolled smoke at the corner of the mouth
+      const c0 = fp(-2.3, 2.5, 0.4), c1 = fp(-5.6, 2.0, 2.6); line(ctx, [c0, c1], 1.5, 860); line(ctx, [lerp2(c0, c1, 0.06), lerp2(c0, c1, 0.9)], 0.8, 861, '#efe8d6'); tick(ctx, lerp2(c0, c1, 0.86), c1, 0.9, '#d0562b');
+      const pf = [[0, 0], [-1.6, -2.2], [-0.4, -4.2], [-2.6, -6.4], [-1.0, -9.4], [1.6, -8.6], [1.0, -6.2], [2.6, -4.2], [0.8, -2.4]].map(v => [c1[0] + (v[0] - 2.2 + v[1] * 0.25) * 0.5, c1[1] + v[1] * 0.55]); fillp(ctx, pf, '#b4ad9b'); line(ctx, [pf[1], pf[2], pf[3]], 0.3, 863, '#8b8576');
+    }
+    if (!plain && fh !== 'full' && fh !== 'huge') fillp(ctx, poly([[-4.4, 0.2, -0.6], [4.4, 0.2, -0.6], [3.4, -1.3, -1.4], [-3.4, -1.3, -1.4]]), INKC);
+  }]});
+
+  if (cov === 'collar') {                                  // tall stiff collar that hides the mouth
+    const cl = prism(G, [ring8(H, -2.4 * s, 8.5 * s, 7.0 * s, 3.0 * s, 0, -0.2 * s), ring8(H, 5.0 * s, 9.1 * s, 7.6 * s, 3.2 * s, 0, -0.2 * s)], {seed: 34, key: hk + 1.45, col: col.coat, w: 0.85, hatch: 0.05, inside: {key: hk - 0.6}});
+    cl.post.push(ctx => { const fr = cl.front.filter(F => F.i === 7)[0]; if (!fr) return; const q = fr.q; line(ctx, [lerp2(q[0], q[1], 0.5), lerp2(q[3], q[2], 0.5)], 0.45, 897); const c0 = lerp2(lerp2(q[0], q[1], 0.5), lerp2(q[3], q[2], 0.5), 0.45); fillp(ctx, [[c0[0] - 1.1, c0[1] - 0.6], [c0[0] + 1.1, c0[1] - 0.6], [c0[0] + 1.1, c0[1] + 0.6], [c0[0] - 1.1, c0[1] + 0.6]], col.accent.b); });
+  }
+  if (oni) [1, -1].forEach(sd => { const hm2 = mat('#a8474a', false), a = G.P(FP(H, sd * 4.4 * s, 10.2 * s, 5.2 * s)), b = G.P(FP(H, sd * 7.4 * s, 13.4 * s, 4.6 * s)), c = G.P(FP(H, sd * 6.4 * s, 17.2 * s, 3.8 * s));
+    G.add({key: ahead(FP(H, sd * 6 * s, 13 * s, 4.6 * s)) ? hk + 1.6 : hk - 0.8, seed: 36 + sd, w: 0.8, polys: [{p: ribbon(a, b, 1.7, 1.3), f: hm2.b}, {p: ribbon(b, c, 1.3, 0.3), f: hm2.s}], post: [ctx => { tick(ctx, lerp2(a, b, 0.4), lerp2(lerp2(a, b, 0.4), [b[0] + 1.5, b[1]], 0.5), 0.34); }]}); });
+  /* --- women with long hair or a mane: two locks fall forward over the shoulders --- */
+  if (fem && (look.hair === 'mane' || look.hair === 'long') && humanoid && !ninja && hat !== 'hood' && hat !== 'pelt' && !helm) {
+    const big = look.hair === 'mane'; [1, -1].forEach(sd => {
+      const pts = [[7.4, 8.0, 2.2], [8.3, 4.6, 2.8], [7.4, 1.0, 3.4], [8.4, -2.6, 3.8], [7.2, -6.0, 3.9], [8.0, -9.0 - P.cs * sd * 0.3, 3.6], [6.8, -11.4 - P.cs * sd * 0.4, 3.2]].map((v, i) => G.P(FP(H, sd * (v[0] + (big ? 0.9 : 0)) * s, v[1] * s, v[2] * s)));
+      const front = ahead(FP(H, sd * 8.0 * s, -3 * s, 3.6 * s)), polys = []; for (let i = 0; i < pts.length - 1; i++) polys.push({p: ribbon(pts[i], pts[i + 1], (big ? 1.9 : 1.5) - i * 0.16, (big ? 1.8 : 1.4) - i * 0.18), f: i % 2 ? col.hair.s : col.hair.b});
+      G.add({key: front ? hk + 0.6 : camT - 1.2, seed: 290 + sd, w: 0.8, polys: polys, post: [ctx => { for (let i = 0; i < pts.length - 1; i++) tick(ctx, lerp2(pts[i], pts[i + 1], 0.2), lerp2(pts[i], pts[i + 1], 0.75), 0.32); }]}); });
+  }
+  /* --- headgear --- */
+  const hy = P.hatY * 0.6, hc = col.hat, faceSeen = fwd[1] * K + fwd[2] > -0.12;   // hoods and caps only open their face hole on the side the face is seen from
+  const HF = {o: FP(H, 0, hy * s, 0), m: MM(H.m, RX(-3 * D2R))};
+  if (brimHat) {
+    const cfg = Object.assign({}, HATS[hat]); cfg.yb += yo;
+    const N = 16, ring = [];
+    for (let i = 0; i < N; i++) { const a = i / N * 6.2832, x = Math.cos(a) * cfg.rx, z = Math.sin(a) * cfg.rz; ring.push(FP(HF, x * s, (cfg.yb + cfg.curl * (x / cfg.rx) * (x / cfg.rx) - 0.5 * Math.max(0, z / cfg.rz) + (cfg.tri ? 2.8 * Math.max(0, -z / cfg.rz) - 1.0 * Math.max(0, z / cfg.rz) : 0)) * s, (z + (cfg.zoff || 0)) * s)); }
+    const rp = ring.map((p, i) => G.jit(G.P(p), 700 + i, 0.3));
+    const under = ring.map((p, i) => { const q = G.P(add(p, [0, -0.45 * s, 0])); return [q[0], q[1], q[2]]; });
+    const cx = G.P(FP(HF, 0, cfg.yb * s, 0))[0];
+    let st = 0; for (let i = 0; i < N; i++) if (rp[i][0] <= cx && rp[(i + 1) % N][0] > cx) st = (i + 1) % N;
+    const shade = []; for (let k = 0; k < N; k++) { const p = rp[(st + k) % N]; if (p[0] > cx - 0.01) shade.push(p); }
+    const brim = G.add({key: camT + 8, seed: 41, w: 0.95, polys: [{p: under, f: INKC}, {p: rp, f: hc.b}], post: []});
+    brim.post.push(ctx => { if (shade.length > 2) fillp(ctx, shade.map(p => lerp2(p, [cx + 2, G.P(FP(HF, 0, cfg.yb * s, 0))[1]], 0.06)), hc.s);
+      for (let k = 0; k < 5; k++) { const i = Math.floor(rnd(k, 9) * N), a = rp[i], c0 = [cx, a[1]]; tick(ctx, lerp2(a, c0, 0.12), lerp2(a, c0, 0.22), 0.36); } });
+    const crown = [], ys = (hat === 'bowler' || cfg.dome) ? [[0, 1], [0.55, 0.97], [0.85, 0.84], [1, 0.62]] : [[0, 1], [0.5, lerp(1, cfg.ct / cfg.cb, 0.5)], [1, cfg.ct / cfg.cb]];
+    ys.forEach((l, j) => { const hw = cfg.cb * l[1] * s, r = ring8(HF, (cfg.yb + cfg.ch * l[0]) * s, hw, hw * 0.86, hw * 0.4);
+      if (cfg.bend && j > 0) { const sv = MV(HF.m, [1, 0, 0]), k3 = cfg.bend * s * l[0] * l[0]; r.forEach(p => { p[0] += sv[0] * k3; p[1] += sv[1] * k3 - (j === ys.length - 1 ? 2.2 * s : 0); p[2] += sv[2] * k3; }); }
+      if (j === ys.length - 1 && cfg.pinch) r.forEach(p => { const lx = MV([HF.m[0], HF.m[3], HF.m[6], HF.m[1], HF.m[4], HF.m[7], HF.m[2], HF.m[5], HF.m[8]], sub(p, HF.o)); const k2 = (Math.abs(lx[0]) / hw * 1.9 - 0.75) * cfg.pinch * s; const upv = MV(HF.m, [0, 1, 0]); p[0] += upv[0] * k2; p[1] += upv[1] * k2; p[2] += upv[2] * k2; });
+      crown.push(r); });
+    const cr = prism(G, crown, {seed: 43, key: camT + 8.4, col: hc, top: hc, hatch: 0.05});
+    if (cfg.rivet) cr.post.push(ctx => cr.front.forEach(F => { if (F.j !== 0 || F.i < 0 || F.f === INKC) return; const q = F.q, c0 = lerp2(lerp2(q[0], q[1], 0.5), lerp2(q[3], q[2], 0.5), 0.2); ctx.fillStyle = INKC; ctx.beginPath(); ctx.arc(c0[0], c0[1], 0.32, 0, 7); ctx.fill(); }));
+    const bd = cfg.noband ? null : prism(G, [ring8(HF, (cfg.yb + 0.25) * s, (cfg.cb + 0.2) * s, (cfg.cb + 0.2) * 0.86 * s, cfg.cb * 0.4 * s), ring8(HF, (cfg.yb + 2.3) * s, (cfg.cb * lerp(1, ys[1][1], 0.42) + 0.2) * s, (cfg.cb * lerp(1, ys[1][1], 0.42) + 0.2) * 0.86 * s, cfg.cb * 0.4 * s)], {seed: 45, key: camT + 8.6, col: col.accent, w: 0.55, jit: 0.15});
+    if (bd) bd.post.push(ctx => { const fr = bd.front.filter(F => F.i === 7)[0]; if (!fr) return; const q = fr.q, c0 = lerp2(lerp2(q[0], q[1], 0.5), lerp2(q[3], q[2], 0.5), 0.5); const sq = [[c0[0] - 1, c0[1] - 0.95], [c0[0] + 1, c0[1] - 0.95], [c0[0] + 1, c0[1] + 0.95], [c0[0] - 1, c0[1] + 0.95]]; outline(ctx, sq, 0.9, 720); fillp(ctx, sq, col.bone.b); });
+    if (cfg.badge) cr.post.push(ctx => { const fr = cr.front.filter(F => F.i === 7 && F.j === 0)[0]; if (!fr) return; const q = fr.q, c0 = lerp2(lerp2(q[0], q[1], 0.5), lerp2(q[3], q[2], 0.5), 0.8), bd = []; for (let i = 0; i < 7; i++) { const a = i / 7 * 6.283; bd.push([c0[0] + Math.cos(a) * 1.5 * s, c0[1] + Math.sin(a) * 1.5 * s]); } outline(ctx, bd, 0.8, 726); fillp(ctx, bd, look.eyes); });
+    if (cfg.plume) { const a = G.P(FP(HF, 6.4 * s, (cfg.yb + 2.2) * s, -1.5 * s)), b = G.P(FP(HF, 9.6 * s - P.cs, (cfg.yb + 8.2) * s, -5.5 * s)), c = G.P(FP(HF, 6.0 * s - P.cs * 1.6, (cfg.yb + 10.6) * s, -11.5 * s - P.fl));
+      G.add({key: camT + (a[2] > G.P(HF.o)[2] ? 8.8 : 7.6), seed: 46, w: 0.8, polys: [{p: ribbon(a, b, 1.6, 3.2), f: col.scarf.b}, {p: ribbon(b, c, 3.2, 1.2), f: col.scarf.s}], post: [ctx => { [0.3, 0.6].forEach(t => tick(ctx, lerp2(a, b, t), [lerp2(a, b, t)[0] + 1.6, lerp2(a, b, t)[1] - 1.2], 0.34)); }]}); }
+    if (cfg.star) cr.post.push(ctx => { const fr = cr.front.filter(F => F.i === 7 && F.j === 0)[0]; if (!fr) return; const q = fr.q, c0 = lerp2(lerp2(q[0], q[1], 0.5), lerp2(q[3], q[2], 0.5), 0.72), st2 = []; for (let i = 0; i < 10; i++) { const a = -1.5708 + i * 0.6283, r2 = (i % 2 ? 0.95 : 2.3) * s; st2.push([c0[0] + Math.cos(a) * r2, c0[1] + Math.sin(a) * r2]); } outline(ctx, st2, 0.8, 725); fillp(ctx, st2, col.accent.b); });
+  } else if (helm) {                                        // closed bronze helm: T-shaped slit for eyes and mouth, curled horns at the temples
+    const hm = mat(look.hatc, false), lv = [[0.2, 6.4, 6.0], [3.2, 8.1, 6.8], [9.4, 8.3, 6.9], [13.4, 7.0, 5.9], [14.8, 4.6, 4.0]];
+    prism(G, lv.map(l => ring8(H, (l[0] + hy) * s, l[1] * s, l[2] * s, l[1] * s * 0.4)), {seed: 47, key: camT + 8, col: hm, top: hm, bot: true, hatch: 0.04});
+    const zf = 6.95, lf = (u, v) => { const q = G.P(FP(H, u * s, (v + hy) * s, zf * s)); return [q[0], q[1]]; };
+    if (faceSeen) G.add({key: camT + 8.2, seed: 48, w: 0, polys: [], post: [ctx => {
+      const sl = [lf(-5.6, 8.2), lf(-1.0, 7.6), lf(-0.9, 1.0), lf(-1.6, -1.2), lf(1.6, -1.2), lf(0.9, 1.0), lf(1.0, 7.6), lf(5.6, 8.2), lf(5.0, 6.0), lf(1.4, 5.4), lf(-1.4, 5.4), lf(-5.0, 6.0)];
+      outline(ctx, sl, 0.8, 931); fillp(ctx, sl, INKC); [-1, 1].forEach(e => { const c0 = lf(e * 3.1, 6.9); ctx.fillStyle = '#f4efe2'; ctx.beginPath(); ctx.arc(c0[0], c0[1], 0.55 * s, 0, 7); ctx.fill(); ctx.fillStyle = INKC; ctx.beginPath(); ctx.arc(c0[0], c0[1], 0.28 * s, 0, 7); ctx.fill();
+        line(ctx, [lf(e * 2.4, 4.8), lf(e * 2.8, 2.6)], 0.7, 933 + e, '#b8432c'); });
+      fillp(ctx, [lf(-0.5, 12.6), lf(0.5, 12.6), lf(0, 11.4)], INKC); line(ctx, [lf(-6.4, 10.6), lf(-1.8, 10.0)], 0.4, 936); line(ctx, [lf(1.8, 10.0), lf(6.4, 10.6)], 0.4, 937); }]});
+    [1, -1].forEach(sd => { const c3 = FP(H, sd * 8.9 * s, (9.6 + hy) * s, 0.6 * s), c0 = G.P(c3), sp = []; for (let i = 0; i < 12; i++) { const a = i * 0.62, rr = (2.7 - i * 0.2) * s; sp.push([c0[0] + Math.cos(a) * rr * (G.c >= 0 ? 1 : -1) * 0.8, c0[1] - Math.sin(a) * rr]); }
+      G.add({key: ahead(c3) || G.P(c3)[2] > hz - 1 ? camT + 8.4 : camT + 7.4, seed: 938 + sd, w: 0, polys: [], post: [ctx => { line(ctx, sp, 1.9, 939 + sd); line(ctx, sp, 1.0, 940 + sd, hm.s); }]}); });
+  } else if (hat === 'crown') {                             // gold crown: a band with five points and a red stone
+    const gm = mat('#d9a520', false), cb = 8.3, yb = 9.8 + hy;
+    const cr = prism(G, [ring8(H, yb * s, cb * s, cb * 0.85 * s, cb * 0.36 * s), ring8(H, (yb + 2.4) * s, cb * 1.03 * s, cb * 0.88 * s, cb * 0.37 * s)], {seed: 47, key: camT + 8, col: gm, w: 0.8, jit: 0.1});
+    const pts = [[0, 1], [0.6, 0.86], [-0.6, 0.86], [1, 0], [-1, 0], [0.55, -0.85], [-0.55, -0.85]];
+    pts.forEach((v, i) => { const x = v[0] * cb * 1.03, z = v[1] * cb * 0.88, b0 = FP(H, (x - 1.3 * Math.abs(v[1])) * s, (yb + 2.3) * s, (z + (v[0] ? 1.3 * Math.sign(v[0]) * 0 : 0)) * s), tip = FP(H, x * s, (yb + (i === 0 ? 6.4 : 4.8)) * s, z * s), b1 = FP(H, (x + 1.3 * Math.abs(v[1])) * s, (yb + 2.3) * s, z * s);
+      const tq = [b0, tip, b1].map(p => G.P(p)); if (area2(tq) < 0) tq.reverse(); G.add({key: camT + (G.P(tip)[2] > hz ? 8.3 : 7.7), seed: 942 + i, w: 0.75, polys: [{p: tq, f: i % 2 ? gm.s : gm.b}], post: []}); });
+    if (faceSeen) cr.post.push(ctx => { const c0 = G.P(FP(H, 0, (yb + 1.2) * s, cb * 0.9 * s)), g = []; for (let i = 0; i < 6; i++) { const a = i / 6 * 6.2832; g.push([c0[0] + Math.cos(a) * 1.0, c0[1] + Math.sin(a) * 1.15]); } outline(ctx, g, 0.7, 950); fillp(ctx, g, '#b8323a'); fillp(ctx, [[c0[0] - 0.3, c0[1] - 0.5], [c0[0] + 0.1, c0[1] - 0.5], [c0[0] - 0.1, c0[1]]], '#ffd0c8'); });
+  } else if (hat === 'hood') {                              // pointed hood with a short mantle over the shoulders
+    const hm = mat(look.hatc, false), lv = [[-3.8, 11.0, 8.6, 0], [3.0, 9.6, 8.0, 0], [8.6, 9.8, 8.2, -0.2], [12.8, 8.4, 7.0, -0.8], [15.8, 5.2, 4.6, -2.4], [18.0, 1.6, 1.4, -4.6]];
+    prism(G, lv.map(l => ring8(H, (l[0] + hy) * s, l[1] * s, l[2] * s, l[1] * s * 0.36, 0, l[3] * s)), {seed: 47, key: camT + 8, col: hm, top: hm, skip: (i, j) => faceSeen && (j === 1 || j === 2) && (i === 7 || i === 0 || i === 6), jag: (i, j) => j === 0 ? 2 : 0, jd: 0.3, hatch: 0.1, inside: {key: hk - 0.6, f: hm.d}});
+  } else if (hat === 'pelt' || hat === 'skullhelm') {     // a wolf's head worn as a hood, or an animal skull worn as a helm
+    const pelt = hat === 'pelt', hm = pelt ? mat(look.hatc, false) : col.bone;
+    if (pelt) prism(G, [[3.0, 9.4, 8.0], [9.0, 9.8, 8.2], [12.6, 9.0, 7.6], [15.0, 6.6, 5.6]].map(l => ring8(H, (l[0] + hy) * s, l[1] * s, l[2] * s, l[1] * s * 0.36, 0, -0.4 * s)), {seed: 47, key: camT + 8, col: hm, top: hm, skip: (i, j) => faceSeen && j === 0 && (i === 7 || i === 0 || i === 6), jag: (i, j) => j === 0 ? 3 : 0, jd: 0.45, hatch: 0.16, inside: {key: hk - 0.6, f: hm.d}});
+    else prism(G, [ring8(H, (9.6 + hy) * s, 8.2 * s, 6.9 * s, 3 * s), ring8(H, (13.2 + hy) * s, 7.2 * s, 6.0 * s, 2.6 * s)], {seed: 47, key: camT + 8, col: hm, top: hm, hatch: 0.04});
+    const S = {o: FP(H, 0, (12.6 + hy) * s, (pelt ? 4.6 : 3.8) * s), m: MM(H.m, RX(90 * D2R))}, sn = pelt ? [[0, 4.4, 2.8], [3.4, 3.4, 2.3], [6.0, 2.4, 1.6]] : [[0, 4.6, 2.6], [3.8, 3.6, 2.2], [7.2, 2.4, 1.5]];
+    const mz = prism(G, sn.map(l => ring8(S, l[0] * s, l[1] * s, l[2] * s, l[1] * s * 0.34, 0, 0)), {seed: 48, key: ahead(FP(S, 0, 3 * s, 0)) ? camT + 8.5 : camT + 7.6, col: hm, top: pelt ? mat('#2b242a', true) : hm, w: 0.85, hatch: pelt ? 0.12 : 0.03});
+    const sp = (x, y, z) => { const q = G.P(FP(S, x * s, y * s, z * s)); return [q[0], q[1]]; };
+    mz.post.push(ctx => { const up = G.N(MV(H.m, [0, 1, 0.3])); if (up[1] * K + up[2] < -0.2) return;
+      [-1, 1].forEach(e => { const c0 = sp(e * 2.4, 1.4, -2.4); if (pelt) { ctx.fillStyle = INKC; ctx.beginPath(); ctx.arc(c0[0], c0[1], 0.9 * s, 0, 7); ctx.fill(); ctx.fillStyle = '#e0b63c'; ctx.beginPath(); ctx.arc(c0[0], c0[1], 0.5 * s, 0, 7); ctx.fill(); }
+        else { const so = [sp(e * 1.0, 0.8, -2.3), sp(e * 3.4, 0.6, -2.1), sp(e * 3.4, 3.0, -2.0), sp(e * 1.2, 3.2, -2.2)]; outline(ctx, so, 0.7, 941 + e); fillp(ctx, so, INKC); } });
+      const ty = pelt ? 5.6 : 6.6, tw0 = pelt ? 1.9 : 1.6; for (let k = 0; k < 4; k++) { const x0 = -tw0 + k * tw0 * 2 / 4, x1 = x0 + tw0 * 2 / 4; fillp(ctx, [sp(x0, ty, 1.2), sp(x1, ty, 1.2), sp((x0 + x1) / 2, ty - 0.2, 2.6)], '#f1ead8'); }
+      [-1, 1].forEach(e => { for (let k = 0; k < 3; k++) { const y0 = ty - 1.2 - k * 1.4; fillp(ctx, [sp(e * 2.0, y0, 1.3), sp(e * 2.0, y0 - 1.1, 1.3), sp(e * 2.1, y0 - 0.55, 2.4)], '#f1ead8'); } });
+      if (!pelt) [-1, 1].forEach(e => { const c0 = sp(e * 0.7, 6.9, -0.6); ctx.fillStyle = INKC; ctx.beginPath(); ctx.arc(c0[0], c0[1], 0.4, 0, 7); ctx.fill(); }); });
+    [1, -1].forEach(sd => { if (pelt) { const pl = [FP(H, sd * 3.6 * s, (14.2 + hy) * s, 0.4 * s), FP(H, sd * 6.4 * s, (19.0 + hy) * s, -0.6 * s), FP(H, sd * 7.6 * s, (14.0 + hy) * s, -0.4 * s)].map(p => G.P(p)); if (area2(pl) < 0) pl.reverse(); G.add({key: camT + 8.3, seed: 949 + sd, w: 0.75, polys: [{p: pl, f: hm.b}], post: [ctx => fillp(ctx, [pl[0], pl[1], lerp2(pl[0], pl[2], 0.5)], hm.d)]}); }
+      else { const a = G.P(FP(H, sd * 4.4 * s, (13.0 + hy) * s, 1.6 * s)), b = G.P(FP(H, sd * 7.4 * s, (17.4 + hy) * s, -1.8 * s)), c = G.P(FP(H, sd * 5.6 * s, (22.4 + hy) * s, -4.4 * s)); G.add({key: camT + 8.3, seed: 949 + sd, w: 0.75, polys: [{p: ribbon(a, b, 1.5, 1.2), f: col.bone.b}, {p: ribbon(b, c, 1.2, 0.3), f: col.bone.s}], post: []}); } });
+    if (pelt) [1, -1].forEach(sd => { const a = G.P(FP(H, sd * 6.0 * s, (6.0 + hy) * s, -3.0 * s)), b = G.P(FP(H, sd * 8.8 * s - P.cs, (-3.0 + hy) * s, -2.0 * s)); G.add({key: camT + (a[2] > G.P(H.o)[2] ? 8.1 : 5.1), seed: 953 + sd, w: 0.75, polys: [{p: ribbon(a, b, 3.0 * s, 1.6 * s), f: sd > 0 ? hm.b : hm.s}], post: []}); });
+  } else if (hat === 'cap') {                               // fur trapper cap with ear flaps and a ringed tail
+    const fm = mat(look.hatc, false);                       // soft shadow: a solid black side would read as the face hole seen from behind
+    prism(G, [ring8(H, (3.6 + hy) * s, 8.9 * s, 7.2 * s, 3.2 * s, 0, -0.2 * s), ring8(H, (8.6 + hy) * s, 9.1 * s, 7.4 * s, 3.3 * s, 0, -0.1 * s), ring8(H, (11.6 + hy) * s, 8.8 * s, 7.2 * s, 3.2 * s), ring8(H, (14.9 + hy) * s, 7.0 * s, 5.8 * s, 2.6 * s)],
+      {seed: 47, key: camT + 8, col: fm, top: fm, skip: (i, j) => faceSeen && j === 0 && (i === 7 || i === 0 || i === 6), jag: (i, j) => (j === 0 || (j === 1 && (i === 7 || i === 0 || i === 6))) ? 2 : 0, jd: 0.3, hatch: 0.16, inside: {key: camT + 5.4, f: fm.d}});
+    const a = G.P(FP(H, -3 * s, (11 + hy) * s, -7.2 * s)), b = G.P(FP(H, -4.6 * s - P.cs, (5 + hy) * s, -9.8 * s - P.fl)), c = G.P(FP(H, -5.4 * s - P.cs * 1.6, (-0.5 + hy) * s, -9.2 * s - P.fl * 1.6));
+    const t1 = ribbon(a, b, 1.5, 1.9), t2 = ribbon(b, c, 1.9, 0.7);
+    G.add({key: camT + (a[2] > 0 ? 8.8 : 5.2), seed: 49, w: 0.8, polys: [{p: t1, f: fm.b}, {p: t2, f: fm.s}], post: [ctx => { [0.3, 0.7].forEach(t => fillp(ctx, [lerp2(t1[0], t1[1], t), lerp2(t1[0], t1[1], t + 0.16), lerp2(t1[3], t1[2], t + 0.16), lerp2(t1[3], t1[2], t)], INKC)); fillp(ctx, [lerp2(t2[0], t2[1], 0.3), lerp2(t2[0], t2[1], 0.55), lerp2(t2[3], t2[2], 0.55), lerp2(t2[3], t2[2], 0.3)], INKC); }]});
+  } else if (hat === 'goggles') {                           // goggles pushed up on the forehead
+    prism(G, [ring8(H, (9.9 + hy) * s, 8.7 * s, 7.1 * s, 3.2 * s, 0, -0.25 * s), ring8(H, (11.5 + hy) * s, 8.5 * s, 6.95 * s, 3.1 * s, 0, -0.25 * s)], {seed: 47, key: camT + 8, col: col.leather, w: 0.6, jit: 0.18});
+    if (fwd[1] * K + fwd[2] > 0.05) G.add({key: camT + 8.3, seed: 48, w: 0, polys: [], post: [ctx => [-1, 1].forEach(e => { const rim = disc(e * 3.3, 10.8 + hy, 2.5, 2.3, 8, 1.0), gl = disc(e * 3.3, 10.8 + hy, 1.7, 1.55, 8, 1.1); outline(ctx, rim, 1.3, 870 + e); fillp(ctx, rim, col.accent.b); outline(ctx, gl, 0.6, 874 + e); fillp(ctx, gl, '#e09a36'); fillp(ctx, disc(e * 3.3 - 0.5, 11.3 + hy, 0.5, 0.45, 5, 1.15), '#fff0c4'); })]});
+  } else if (hat === 'band') {                              // tied headband, tails flying behind
+    prism(G, [ring8(H, (9.3 + hy) * s, 8.75 * s, 7.15 * s, 3.2 * s, 0, -0.25 * s), ring8(H, (11.5 + hy) * s, 8.5 * s, 6.95 * s, 3.1 * s, 0, -0.25 * s)], {seed: 47, key: camT + 8, col: col.scarf, w: 0.6, jit: 0.18});
+    const a = G.P(FP(H, 4 * s, 10.4 * s, -6.8 * s)), b = G.P(FP(H, 6.4 * s - P.cs, 7.5 * s, -10 * s - P.fl * 1.5)), c = G.P(FP(H, 3.6 * s - P.cs, 5.2 * s, -9.4 * s - P.fl));
+    G.add({key: camT + (a[2] > 0 ? 8.6 : 5.2), seed: 49, w: 0.7, polys: [{p: ribbon(a, b, 0.9, 1.3), f: col.scarf.b}, {p: ribbon(a, c, 0.9, 1.1), f: col.scarf.s}], post: []});
+  }
+  /* --- halo: a flat disc standing behind the head; seen from behind it is in front of the head --- */
+  const halo = look.halo || 'none';
+  if (halo !== 'none' && !noHat) {
+    const r0 = 10.5 * s, c3 = FP(H, 0, 9.6 * s + hy, -5.6 * s), ring = [], inner = []; for (let i = 0; i < 20; i++) { const a = i / 20 * 6.2832; ring.push(G.P(add(c3, MV(H.m, [Math.cos(a) * r0, Math.sin(a) * r0, 0])))); inner.push(G.P(add(c3, MV(H.m, [Math.cos(a) * r0 * 0.84, Math.sin(a) * r0 * 0.84, 0])))); }
+    const gold = halo === 'gold', hcol = gold ? '#f0c24a' : col.scarf.b, fr = G.P(c3)[2] > hz;
+    G.add({key: fr ? camT + 9.6 : camT - 0.9, seed: 955, w: 0, polys: [], post: [ctx => {
+      if (gold) { ctx.globalAlpha = 0.55; fillp(ctx, ring, '#f8dc7a'); ctx.globalAlpha = 1; line(ctx, ring.concat([ring[0]]), 0.9, 956, '#c9952c'); line(ctx, inner.concat([inner[0]]), 0.5, 957, '#c9952c'); }
+      else { line(ctx, ring.concat([ring[0]]), 0.7, 958, hcol); [2, 7, 12, 17].forEach(i => { const p0 = ring[i], d = [p0[0] - G.P(c3)[0], p0[1] - G.P(c3)[1]], l = Math.hypot(d[0], d[1]) || 1; tick(ctx, p0, [p0[0] + d[0] / l * 1.6, p0[1] + d[1] / l * 1.6], 0.5, hcol); }); } }]});
+  }
+}
+
+/* ---------- drawing ---------- */
+function drawPart(ctx, p, boil) {
+  const w = p.w == null ? 0.9 : p.w;
+  if (w > 0) { ctx.fillStyle = INKC; p.polys.forEach((q, qi) => { const pts = q.p, n = pts.length; for (let i = 0; i < n; i++) inkSeg(ctx, pts[i], pts[(i + 1) % n], w * 2, p.seed * 31 + qi * 17 + i + boil * 5.3); }); }
+  p.polys.forEach(q => fillp(ctx, q.p, q.f));
+  for (let i = 0; i < p.post.length; i++) p.post[i](ctx);
+}
+function flash(ctx, m, aim, seed) {                       // muzzle flash: jagged star with an ink edge
+  const pts = [], n = 9, ang = Math.atan2(aim[1], aim[0]);
+  for (let i = 0; i < n * 2; i++) { const a = ang + i / (n * 2) * 6.2832, fw = Math.max(0, Math.cos(a - ang)), r = (i % 2 ? 1.1 : 2.6 + 4.2 * fw * fw) * (0.8 + 0.4 * rnd(seed, i)); pts.push([m[0] + Math.cos(a) * r + aim[0] * 2, m[1] + Math.sin(a) * r + aim[1] * 2]); }
+  outline(ctx, pts, 1.4, seed); fillp(ctx, pts, '#e8b93a'); fillp(ctx, pts.map(p => lerp2([m[0] + aim[0] * 2, m[1] + aim[1] * 2], p, 0.5)), '#fff6d8');
+}
+function draw(ctx, look, act, f, dir, opt) {
+  opt = opt || {}; const sc = opt.scale || 1, R = compose(look, act, f, dir, opt.boil || 0);
+  ctx.save(); ctx.translate(opt.x || 0, opt.y || 0); ctx.scale(sc, sc); ctx.lineCap = 'round';
+  if (opt.ground) { ctx.fillStyle = INKC; inkSeg(ctx, [-9, 0.5], [3, 0.6], 0.7, 3); inkSeg(ctx, [4.5, 0.6], [9.5, 0.5], 0.6, 4); }
+  const fxDraw = an => { if (!(opt.fx && an.fire) || look.weapon === 'bow') return;   /* a bow looses an arrow, no flash */ const g = R.G, a2 = [g.s, K * g.c], l = Math.hypot(a2[0], a2[1]) || 1, av = [a2[0] / l, a2[1] / l];
+    ['muzzle', 'muzzle2'].forEach((k, i) => { const m = an[k]; if (m) flash(ctx, [m[0] - AX, m[1] - AY], av, 11 + i + f); }); };
+  if (opt.fx && R.anchors.back) fxDraw(anchorsOf(look, act, f, dir));   // facing away: the flash is beyond the body, so it goes down first and the body covers it (the muzzle is only known once the gun is drawn, hence the cached lookup)
+  R.G.parts.forEach(p => drawPart(ctx, p, opt.boil || 0));
+  if (!R.anchors.back) fxDraw(R.anchors);
+  ctx.restore();
+  return R;
+}
+
+/* ---------- cache ---------- */
+let cache = new Map(), keyOf = new WeakMap();
+function lookKey(look) { let k = keyOf.get(look); if (!k) { k = JSON.stringify(look); keyOf.set(look, k); } return k; }
+function frame(look, act, f, dir, scale) {
+  scale = scale || 1; const k = lookKey(look) + '|' + act + '|' + f + '|' + dir + '|' + scale;
+  let c = cache.get(k);
+  if (!c) { c = document.createElement('canvas'); c.width = c.height = Math.round(CELL * scale); const ctx = c.getContext('2d'); draw(ctx, look, act, f, dir, {x: AX * scale, y: AY * scale, scale: scale}); if (cache.size > 2600) cache.clear(); cache.set(k, c); }
+  return c;
+}
+function clearCache() { cache = new Map(); acache = new Map(); keyOf = new WeakMap(); }
+let acache = new Map(), scratch = null;
+function anchorsOf(look, act, f, dir) {
+  const k = lookKey(look) + '|' + act + '|' + f + '|' + dir; let a = acache.get(k);
+  if (!a) { if (!scratch) { scratch = document.createElement('canvas'); scratch.width = scratch.height = 2; } a = draw(scratch.getContext('2d'), look, act, f, dir, {scale: 0.01}).anchors; if (!a.showGun) { a.muzzle = null; a.muzzle2 = null; a.fire = false; } delete a.showGun; if (acache.size > 4000) acache.clear(); acache.set(k, a); }
+  return a;
+}
+
+/* ---------- audit: bone lengths must match the build on every frame of every direction ---------- */
+function audit(look) {
+  let frames = 0, drift = 0, bb = [1e9, 1e9, -1e9, -1e9];
+  ACTS.forEach(act => { for (let f = 0; f < COUNT[act]; f++) DIRS.forEach(dir => {
+    const R = compose(look, act, f, dir, 0), J = R.J, want = J.B; frames++;
+    ['A', 'B'].forEach(r => { const a = J.arms[r], l = J.legs[r];
+      drift = Math.max(drift, Math.abs(vlen(sub(a.e, a.s)) - want.upper), Math.abs(vlen(sub(a.w, a.e)) - want.fore), Math.abs(vlen(sub(l.k, l.h)) - want.thigh), Math.abs(vlen(sub(l.a, l.k)) - want.shin)); });
+    R.G.parts.forEach(p => p.polys.forEach(q => q.p.forEach(pt => { bb[0] = Math.min(bb[0], pt[0]); bb[1] = Math.min(bb[1], pt[1]); bb[2] = Math.max(bb[2], pt[0]); bb[3] = Math.max(bb[3], pt[1]); })));
+  }); });
+  return {frames: frames, maxDrift: drift, bounds: {left: AX + bb[0], top: AY + bb[1], right: AX + bb[2], bottom: AY + bb[3]}};
+}
+
+/* ---------- customization schema and the original cast ---------- */
+const SCHEMA = [
+  {key: 'build', label: 'Build', group: 'Body', type: 'choice', options: [['regular', 'Regular'], ['slim', 'Slim'], ['stocky', 'Stocky'], ['brute', 'Brute'], ['tall', 'Tall'], ['small', 'Small'], ['stilt', 'Stilt legs'], ['centaur', 'Centaur'], ['lizard', 'Beast: giant lizard'], ['pup', 'Beast: croc pup'], ['tree', 'Beast: gallows tree'], ['cat', 'Beast: cat'], ['yak', 'Beast: yak'], ['horse', 'Beast: horse'], ['camel', 'Beast: camel'], ['rex', 'Beast: tyrant lizard'], ['slime', 'Blob: slime'], ['mimic', 'Blob: mimic chest']]},
+  {key: 'sex', label: 'Face and frame', group: 'Body', type: 'choice', options: [['m', 'Male'], ['f', 'Female']]},
+  {key: 'head', label: 'Head', group: 'Head', type: 'choice', options: [['human', 'Human'], ['hippo', 'Hippo'], ['dog', 'Hound'], ['dog3', 'Three hounds'], ['lantern', 'Lantern'], ['shroud', 'Feather hood'], ['wolf', 'Wolf'], ['skull', 'Skull'], ['dome', 'Machine: lens'], ['tin', 'Machine: visor'], ['goblin', 'Goblin'], ['imp', 'Beaked imp']]},
+  {key: 'hat', label: 'Headgear', group: 'Head', type: 'choice', options: [['flat', 'Flat brim'], ['tall', 'Tall crown'], ['bowler', 'Bowler'], ['fedora', 'Fedora'], ['star', 'Star peak'], ['witch', 'Witch hat'], ['straw', 'Wide straw'], ['wide', 'Wide flat brim'], ['kepi', 'Kepi'], ['tricorn', 'Tricorn'], ['cap', 'Fur cap'], ['band', 'Headband'], ['goggles', 'Goggles'], ['kasa', 'Conical straw'], ['helm', 'Kettle helm'], ['hood', 'Hood'], ['pelt', 'Wolf pelt'], ['skullhelm', 'Horned skull'], ['galea', 'Closed helm'], ['crown', 'Crown'], ['none', 'None']]},
+  {key: 'hair', label: 'Hair', group: 'Head', type: 'choice', options: [['short', 'Short'], ['shaggy', 'Shaggy'], ['long', 'Long'], ['tail', 'Ponytail'], ['topknot', 'Topknot'], ['mane', 'Big mane'], ['bald', 'Bald']]},
+  {key: 'ears', label: 'Ears', group: 'Head', type: 'choice', options: [['round', 'Round'], ['pointed', 'Pointed']]},
+  {key: 'horns', label: 'Horns', group: 'Head', type: 'toggle'},
+  {key: 'facial', label: 'Facial hair', group: 'Face', type: 'choice', options: [['none', 'None'], ['stubble', 'Stubble'], ['walrus', 'Walrus'], ['handlebar', 'Handlebar'], ['goatee', 'Goatee'], ['full', 'Full beard'], ['huge', 'Huge beard']]},
+  {key: 'cover', label: 'Face cover', group: 'Face', type: 'choice', options: [['none', 'None'], ['patch', 'Eyepatch'], ['mask', 'Bandana mask'], ['ninja', 'Ninja hood'], ['lucha', 'Wrestler mask'], ['oni', 'Demon mask'], ['collar', 'High collar'], ['specs', 'Round glasses']]},
+  {key: 'scar', label: 'Scar', group: 'Face', type: 'toggle'},
+  {key: 'smoke', label: 'Smoke', group: 'Face', type: 'toggle'},
+  {key: 'outer', label: 'Outerwear', group: 'Outfit', type: 'choice', options: [['duster', 'Duster'], ['furcoat', 'Fur collar coat'], ['poncho', 'Poncho'], ['cloak', 'Torn cloak'], ['feather', 'Feather cloak'], ['dress', 'Long dress'], ['vest', 'Vest'], ['bare', 'Bare chest'], ['armor', 'Plate armour'], ['tabard', 'Tabard over plate'], ['quilted', 'Quilted coat'], ['overalls', 'Overalls'], ['wraps', 'Wrappings'], ['fleece', 'Fleece coat'], ['scale', 'Scale mail']]},
+  {key: 'neck', label: 'Neckwear', group: 'Outfit', type: 'choice', options: [['bandana', 'Bandana'], ['scarf', 'Scarf'], ['tie', 'Tie'], ['fur', 'Fur ruff'], ['none', 'None']]},
+  {key: 'sash', label: 'Sash', group: 'Outfit', type: 'choice', options: [['none', 'None'], ['bandolier', 'Bandolier'], ['wrap', 'Big wrap'], ['waist', 'Waist sash'], ['satchel', 'Satchel'], ['chains', 'Crossed chains']]},
+  {key: 'back', label: 'Pack', group: 'Outfit', type: 'choice', options: [['none', 'None'], ['trunk', 'Trunk and bedroll'], ['scrolls', 'Scroll pack'], ['roll', 'Bedroll'], ['gun', 'Slung rifle'], ['sword', 'Slung sword'], ['horn', 'Music box and horn'], ['quiver', 'Quiver'], ['maw', 'Hungry pack']]},
+  {key: 'offhand', label: 'Off hand', group: 'Outfit', type: 'choice', options: [['none', 'Empty'], ['shield', 'Round shield'], ['tower', 'Tower shield'], ['bag', 'Money bag']]},
+  {key: 'peg', label: 'Peg leg', group: 'Body', type: 'toggle'},
+  {key: 'mount', label: 'Riding', group: 'Body', type: 'choice', options: [['none', 'On foot'], ['horse', 'Horse'], ['camel', 'Camel'], ['yak', 'Yak'], ['lizard', 'Giant lizard']]},
+  {key: 'halo', label: 'Halo', group: 'Head', type: 'choice', options: [['none', 'None'], ['gold', 'Gold'], ['ring', 'Ring']]},
+  {key: 'cape', label: 'Cape', group: 'Outfit', type: 'toggle'},
+  {key: 'gunner', label: 'Shoulder gunner', group: 'Outfit', type: 'toggle'},
+  {key: 'gloves', label: 'Gloves', group: 'Outfit', type: 'toggle'},
+  {key: 'crow', label: 'Shoulder crow', group: 'Outfit', type: 'toggle'},
+  {key: 'skin', label: 'Skin / hide', group: 'Colours', type: 'color'},
+  {key: 'hairc', label: 'Hair', group: 'Colours', type: 'color'}, {key: 'eyes', label: 'Eyes', group: 'Colours', type: 'color'}, {key: 'hatc', label: 'Hat', group: 'Colours', type: 'color'},
+  {key: 'coat', label: 'Coat', group: 'Colours', type: 'color'}, {key: 'shirt', label: 'Shirt', group: 'Colours', type: 'color'}, {key: 'scarf', label: 'Scarf', group: 'Colours', type: 'color'},
+  {key: 'pants', label: 'Trousers', group: 'Colours', type: 'color'}, {key: 'accent', label: 'Trim', group: 'Colours', type: 'color'}, {key: 'glove', label: 'Gloves', group: 'Colours', type: 'color'}
+];
+const L = (o) => Object.assign({build: 'regular', sex: 'm', head: 'human', hat: 'flat', hair: 'short', ears: 'round', horns: false, facial: 'none', cover: 'none', scar: false, smoke: false, outer: 'duster', neck: 'bandana', sash: 'none', back: 'none', offhand: 'none', peg: false, mount: 'none', halo: 'none', cape: false, gunner: false, gloves: false, crow: false,
+  skin: '#e2a08f', hairc: '#6b5a4c', eyes: '#6f93a8', hatc: '#4b3d3f', coat: '#8c7a58', shirt: '#d9d0bb', scarf: '#a8474a', pants: '#1d181d', accent: '#d9a520', glove: '#4a3f44', weapon: 'revolver', expr: 'calm'}, o);
+const PRESETS = [
+  {id: 'harrow', name: 'Clay Harrow', look: L({hat: 'tall', hatc: '#b9a888', facial: 'handlebar', hairc: '#8a5a34', coat: '#5d6b58', scarf: '#c9952c', accent: '#a8474a', scar: true, weapon: 'revolver'})},
+  {id: 'wren', name: 'Wren Tolliver', look: L({build: 'slim', sex: 'f', hat: 'flat', hatc: '#3c3340', hair: 'tail', hairc: '#2a2530', outer: 'poncho', coat: '#3f6f70', neck: 'none', shirt: '#cfc6b0', accent: '#d9a520', skin: '#c98d72', weapon: 'rifle', expr: 'angry'})},
+  {id: 'abel', name: 'Big Abel Stroud', look: L({build: 'brute', hat: 'bowler', hatc: '#2e2a30', hair: 'bald', facial: 'full', hairc: '#b9b4a8', outer: 'vest', coat: '#6a4a3a', shirt: '#e3dccb', neck: 'tie', accent: '#a8474a', skin: '#e3a58f', weapon: 'fists', expr: 'angry'})},
+  {id: 'vane', name: 'Silas Vane', look: L({build: 'stocky', hat: 'bowler', hatc: '#d8d2c2', hair: 'short', hairc: '#c9a23a', cover: 'mask', outer: 'cloak', coat: '#7b7f88', scarf: '#8d9099', shirt: '#e6e0d0', neck: 'none', accent: '#d9a520', weapon: 'twin'})},
+  {id: 'juniper', name: 'Old Juniper', look: L({hat: 'cap', hatc: '#77797f', hair: 'shaggy', hairc: '#8f9096', facial: 'full', outer: 'furcoat', coat: '#8b6a4f', accent: '#c9a14a', scarf: '#5b6d7a', neck: 'scarf', skin: '#d99887', cover: 'patch', weapon: 'shotgun'})},
+  {id: 'kit', name: 'Kit Marlowe', look: L({build: 'slim', hat: 'band', hair: 'shaggy', hairc: '#4a4e58', outer: 'cloak', coat: '#5a4038', scarf: '#c7b98c', neck: 'scarf', shirt: '#b9b29c', accent: '#d9a520', facial: 'none', skin: '#eab9a2', weapon: 'revolver', expr: 'shout'})},
+  {id: 'reyes', name: 'Marlon Reyes', look: L({build: 'tall', hat: 'none', hair: 'topknot', hairc: '#231f26', facial: 'goatee', skin: '#7a4a36', coat: '#2f5a55', shirt: '#d6d2c0', neck: 'tie', accent: '#c9a14a', sash: 'bandolier', weapon: 'sawedoff', smoke: true, scar: true})},
+  {id: 'pike', name: 'Tobias Pike', look: L({build: 'slim', hat: 'none', hair: 'shaggy', hairc: '#d9b24a', outer: 'vest', coat: '#6f8a54', shirt: '#86a062', scarf: '#a8474a', pants: '#3f5a56', gloves: true, glove: '#4a4046', weapon: 'pitchfork', expr: 'shout', skin: '#eab9a2'})},
+  {id: 'wick', name: 'Wick', look: L({build: 'small', head: 'lantern', hat: 'none', outer: 'cloak', coat: '#8f2f2c', accent: '#b79a3c', eyes: '#f08a1c', neck: 'scarf', scarf: '#8f2f2c', shirt: '#5d6b68', skin: '#5d6b68', gloves: true, glove: '#4f5a58', weapon: 'fists'})},
+  {id: 'goro', name: 'Goro the Porter', look: L({cover: 'oni', hat: 'none', hair: 'shaggy', hairc: '#2a2530', coat: '#4a4a4c', shirt: '#5a5a5e', neck: 'none', sash: 'wrap', scarf: '#e3a9a0', back: 'trunk', gloves: true, glove: '#b8433c', accent: '#d4a63a', weapon: 'katana', skin: '#b8433c', pants: '#2e2c32'})},
+  {id: 'nori', name: 'Nori', look: L({build: 'slim', cover: 'ninja', hat: 'band', outer: 'vest', coat: '#3d3b42', shirt: '#4a484f', scarf: '#c9b98f', neck: 'none', sash: 'waist', accent: '#a8474a', back: 'scrolls', weapon: 'katana', pants: '#2a282e', gloves: true, glove: '#3d3b42', skin: '#e2b49a'})},
+  {id: 'holloway', name: 'Sheriff Bram Holloway', look: L({build: 'stocky', hat: 'star', hatc: '#3f4f5c', hair: 'long', hairc: '#6e6258', facial: 'huge', outer: 'furcoat', coat: '#3d4a55', shirt: '#b9bf7a', neck: 'none', accent: '#d9a520', weapon: 'rifle', skin: '#d99887'})},
+  {id: 'paco', name: 'Paco Ruiz', look: L({build: 'small', hat: 'tall', hatc: '#c9b287', facial: 'walrus', hairc: '#b9843a', scarf: '#b23a34', outer: 'vest', coat: '#3f5a58', shirt: '#6f7f72', back: 'roll', weapon: 'revolver'})},
+  {id: 'dunn', name: 'Mister Dunn', look: L({build: 'small', hat: 'fedora', hatc: '#55565c', hair: 'bald', outer: 'vest', coat: '#6a5a50', shirt: '#d9d2c2', neck: 'tie', accent: '#8a6a4a', weapon: 'fists', skin: '#c98d72'})},
+  {id: 'hazel', name: 'Hazel Crane', look: L({build: 'slim', sex: 'f', hat: 'witch', hatc: '#3a3a40', hair: 'long', hairc: '#d9642a', eyes: '#3fae6a', outer: 'dress', coat: '#3d3b42', shirt: '#55535a', neck: 'scarf', scarf: '#8a8f8c', sash: 'bandolier', accent: '#c9a14a', weapon: 'revolver', skin: '#f0c7b0', expr: 'angry'})},
+  {id: 'mo', name: 'Deputy Mo', look: L({build: 'stocky', sex: 'f', hat: 'none', hairc: '#4a3550', ears: 'pointed', skin: '#9a5fa6', eyes: '#e0b63c', outer: 'vest', coat: '#d6cdb6', shirt: '#d6cdb6', neck: 'none', pants: '#5a4a40', accent: '#c9a14a', weapon: 'revolver'})},
+  {id: 'fizz', name: 'Fizz', look: L({build: 'small', sex: 'f', hat: 'goggles', hair: 'shaggy', hairc: '#3a3038', ears: 'pointed', skin: '#a8684e', eyes: '#d0562b', outer: 'poncho', coat: '#8a7a5c', accent: '#c9552c', neck: 'none', weapon: 'revolver'})},
+  {id: 'trueno', name: 'El Trueno', look: L({build: 'brute', outer: 'bare', cover: 'lucha', scarf: '#d0562b', accent: '#e0a63c', hat: 'none', hair: 'bald', facial: 'huge', hairc: '#3a3336', neck: 'none', pants: '#b9a23a', skin: '#b87a5e', weapon: 'fists', expr: 'angry'})},
+  {id: 'wade', name: 'Colonel Wade', look: L({build: 'stocky', head: 'hippo', skin: '#c79a8c', eyes: '#e8c95a', hat: 'fedora', hatc: '#5d6b4a', hair: 'bald', coat: '#b9ae93', shirt: '#6f8a4a', neck: 'scarf', scarf: '#d9d2c2', weapon: 'revolver', expr: 'angry'})},
+  {id: 'grim', name: 'The Brothers Grim', look: L({build: 'stocky', head: 'dog3', skin: '#3a363c', eyes: '#c0322c', hat: 'bowler', hatc: '#4a4046', hair: 'shaggy', outer: 'vest', coat: '#8f2f2c', shirt: '#d9d2c2', neck: 'tie', accent: '#c9a14a', gloves: true, glove: '#2e2a30', weapon: 'revolver', expr: 'angry'})},
+  {id: 'crow', name: 'Old Crow', look: L({build: 'stilt', head: 'shroud', hat: 'straw', hatc: '#c9a85a', outer: 'feather', coat: '#a88f66', eyes: '#f08a1c', neck: 'none', pants: '#4a5a58', shirt: '#4a5a58', weapon: 'fists', skin: '#6f6a60'})},
+  {id: 'gila', name: 'Gila (lizard mount)', look: L({build: 'lizard', skin: '#7f9a5a', eyes: '#e8c95a', accent: '#a8474a', coat: '#c9c08a', weapon: 'fists'})},
+  {id: 'snap', name: 'Snap (croc pup)', look: L({build: 'pup', skin: '#6f8f52', eyes: '#f0d24a', accent: '#a8474a', coat: '#b9c08a', weapon: 'fists'})},
+  {id: 'oak', name: 'Gallows Oak', look: L({build: 'tree', skin: '#a8804e', eyes: '#f0c23a', accent: '#8a8f8c', coat: '#d9b06a', weapon: 'fists'})},
+  {id: 'vega', name: 'Dusty Vega', look: L({build: 'slim', sex: 'f', hat: 'wide', hatc: '#8a7462', hair: 'long', hairc: '#5a4840', skin: '#7a5440', eyes: '#c0322c', outer: 'cloak', coat: '#8a7257', shirt: '#b9ad98', neck: 'scarf', scarf: '#8a7257', sash: 'bandolier', gloves: true, glove: '#b08a4a', back: 'gun', pants: '#5a463c', accent: '#c9a14a', weapon: 'revolver', expr: 'angry'})},
+  {id: 'morrow', name: 'Captain Morrow', look: L({build: 'stocky', hat: 'tricorn', hatc: '#4a4458', ears: 'pointed', hair: 'shaggy', hairc: '#3a3a48', facial: 'huge', outer: 'furcoat', coat: '#5a4f72', shirt: '#c9c0a8', neck: 'none', accent: '#c9a14a', scarf: '#7a5a9a', eyes: '#d0562b', gloves: true, glove: '#5a4a44', pants: '#3a3a3e', weapon: 'saber', skin: '#c9a8a0', expr: 'shout'})},
+  {id: 'brasswood', name: 'Brasswood', look: L({build: 'brute', head: 'dome', hat: 'none', hair: 'long', hairc: '#a8474a', outer: 'armor', coat: '#c9a85a', shirt: '#c9a85a', accent: '#a8843a', eyes: '#f08a1c', neck: 'none', gloves: true, glove: '#5d5a58', pants: '#a88f4a', skin: '#c9a85a', weapon: 'sword'})},
+  {id: 'finch', name: 'Alder Finch', look: L({hat: 'none', hair: 'topknot', hairc: '#3a3230', facial: 'full', skin: '#b8866a', outer: 'cloak', coat: '#4f6a45', shirt: '#b9ad98', neck: 'scarf', scarf: '#4f6a45', accent: '#c9a14a', back: 'sword', pants: '#4a4a48', weapon: 'sword', expr: 'angry'})},
+  {id: 'maren', name: 'Sylph Maren', look: L({build: 'slim', sex: 'f', hat: 'none', hair: 'long', hairc: '#9fd0cf', ears: 'pointed', eyes: '#3fd0c0', skin: '#f0cdb8', outer: 'dress', coat: '#3f6a8a', shirt: '#2f4a5a', neck: 'scarf', scarf: '#2f5a6a', sash: 'satchel', accent: '#c9a14a', weapon: 'magic'})},
+  {id: 'chomp', name: 'Chomp (mimic chest)', look: L({build: 'mimic', skin: '#8a5a3a', accent: '#6f6a66', coat: '#7a2a30', eyes: '#f0d24a', weapon: 'fists'})},
+  {id: 'vesper', name: 'Vesper', look: L({build: 'slim', hat: 'none', hair: 'short', hairc: '#c9a04a', cover: 'collar', outer: 'cloak', coat: '#3a3a40', shirt: '#6a7480', neck: 'none', sash: 'waist', accent: '#8a8478', eyes: '#e0435a', pants: '#3a3d44', skin: '#e2b49a', weapon: 'dagger', expr: 'angry'})},
+  {id: 'pell', name: 'Sgt. Otis Pell', look: L({build: 'stocky', hat: 'kepi', hatc: '#2f3d4a', eyes: '#3fae7a', hair: 'short', hairc: '#c9743a', facial: 'handlebar', coat: '#3f5a70', shirt: '#3f5a70', neck: 'none', sash: 'satchel', accent: '#c9a14a', smoke: true, pants: '#2a2a30', weapon: 'shotgun', skin: '#e2a08f', gloves: true, glove: '#4a4046'})},
+  {id: 'vinyl', name: 'Pops Vinyl', look: L({build: 'small', hat: 'none', hair: 'shaggy', hairc: '#8f8f8a', facial: 'huge', cover: 'specs', eyes: '#d0463c', accent: '#c9a14a', outer: 'vest', coat: '#5a4a3a', shirt: '#6a6248', neck: 'none', back: 'horn', weapon: 'fists', skin: '#e2a890'})},
+  {id: 'bone', name: 'Mortimer Bone', look: L({build: 'tall', head: 'skull', hat: 'wide', hatc: '#2f3a36', eyes: '#4fe07a', coat: '#2f4a44', shirt: '#3a4a46', neck: 'tie', accent: '#6fb08a', gloves: true, glove: '#4a4046', pants: '#263430', weapon: 'rifle'})},
+  {id: 'tully', name: 'Red Tully', look: L({build: 'small', hat: 'tall', hatc: '#d9ccb0', hair: 'shaggy', hairc: '#b8432c', facial: 'full', coat: '#b89a70', shirt: '#6a5a48', neck: 'none', accent: '#8a6a3a', gloves: true, glove: '#4a4046', weapon: 'rifle'})},
+  {id: 'gloop', name: 'Gloop (slime)', look: L({build: 'slime', skin: '#7fcf4a', eyes: '#2f5a1e', coat: '#b9ef7a', accent: '#5aa832', weapon: 'fists'})},
+  {id: 'bulwark', name: 'Bulwark', look: L({build: 'brute', head: 'tin', hat: 'none', hair: 'bald', outer: 'armor', coat: '#5a5a60', shirt: '#3f6aa8', accent: '#d9a520', eyes: '#f0e0a0', neck: 'none', gloves: true, glove: '#a8433c', pants: '#c9c0a8', crow: true, weapon: 'fists', skin: '#5a5a60'})},
+  {id: 'fang', name: 'Fang Ronin', look: L({build: 'stocky', head: 'wolf', hat: 'none', hair: 'shaggy', skin: '#6f8a8a', eyes: '#e0322c', horns: true, outer: 'armor', coat: '#3f6a68', shirt: '#2f4a4a', accent: '#c9a14a', neck: 'none', sash: 'waist', gloves: true, glove: '#2e2a30', pants: '#2f3a3a', weapon: 'katana', expr: 'shout'})},
+  {id: 'rattle', name: 'Rattle', look: L({build: 'stilt', head: 'tin', hat: 'none', hair: 'bald', outer: 'armor', coat: '#8a9a98', shirt: '#7a8a88', accent: '#c9a14a', eyes: '#6fe0d0', neck: 'none', sash: 'satchel', gloves: true, glove: '#6a7a78', pants: '#6a7a78', weapon: 'lance', skin: '#8a9a98'})},
+  {id: 'aldous', name: 'Brother Aldous', look: L({build: 'stocky', hat: 'none', hair: 'short', hairc: '#d9d2c2', facial: 'full', cover: 'patch', outer: 'tabard', coat: '#b9b4a8', shirt: '#b9b4a8', scarf: '#a8342c', accent: '#d9a520', neck: 'none', back: 'sword', gloves: true, glove: '#8a8478', pants: '#6a5a50', weapon: 'tome', skin: '#e2a890'})},
+  {id: 'biscuit', name: 'Biscuit (cat)', look: L({build: 'cat', skin: '#efe2c8', coat: '#f6efe0', accent: '#e0943c', eyes: '#3a3038', weapon: 'fists'})},
+  {id: 'rowan', name: 'Sir Rowan Ashby', look: L({hat: 'none', hair: 'shaggy', hairc: '#5a4236', eyes: '#6fc8e0', outer: 'quilted', coat: '#3f5a5c', shirt: '#4a6064', neck: 'scarf', scarf: '#3a3a40', accent: '#c9a14a', pants: '#2f3a3c', gloves: true, glove: '#4a4046', skin: '#eab9a2', offhand: 'shield', weapon: 'spear', expr: 'angry'})},
+  {id: 'grizzle', name: 'Grizzle the Imp', look: L({build: 'stocky', head: 'imp', hat: 'none', hair: 'long', hairc: '#2a2530', skin: '#b8392c', eyes: '#c8e03a', outer: 'cloak', coat: '#4a4448', shirt: '#5a5458', neck: 'none', accent: '#6a8a4a', pants: '#c9c0a8', back: 'maw', weapon: 'tome', expr: 'grin'})},
+  {id: 'pip', name: 'Pip Haywood', look: L({build: 'small', hat: 'kasa', hatc: '#d9c49a', hair: 'shaggy', hairc: '#e8e2d6', outer: 'overalls', coat: '#4f7a7a', shirt: '#e3dccb', neck: 'bandana', scarf: '#c9552c', pants: '#4f7a7a', accent: '#d0562b', skin: '#eab9a2', weapon: 'scythe', expr: 'calm'})},
+  {id: 'jory', name: 'Jory Fenn', look: L({build: 'tall', hat: 'none', hair: 'topknot', hairc: '#6a4a34', outer: 'duster', coat: '#6a4a3a', shirt: '#9a3a34', neck: 'none', sash: 'bandolier', accent: '#c9a14a', pants: '#2e2a2c', skin: '#e2a890', weapon: 'greatsword', expr: 'grin'})},
+  {id: 'snig', name: 'Captain Snig', look: L({build: 'small', head: 'goblin', hat: 'tricorn', hatc: '#6a4a34', hair: 'bald', skin: '#6f8a3a', eyes: '#f4efe2', outer: 'duster', coat: '#9a2f2c', shirt: '#4a3a30', neck: 'bandana', scarf: '#e0782c', accent: '#e0a63c', pants: '#4a3a30', peg: true, weapon: 'flintlock', expr: 'grin'})},
+  {id: 'vex', name: 'Queen Vex', look: L({build: 'tall', sex: 'f', hat: 'none', hair: 'mane', hairc: '#2f4a3a', horns: true, halo: 'ring', scarf: '#d0343a', skin: '#c8445a', eyes: '#f0d24a', outer: 'fleece', coat: '#efe6d0', shirt: '#b8384e', neck: 'none', accent: '#d9a520', pants: '#c8445a', gloves: true, glove: '#c8445a', weapon: 'greatsword', expr: 'grin'})},
+  {id: 'grub', name: 'Grub (goblin grunt)', look: L({build: 'small', head: 'goblin', hat: 'helm', hatc: '#9a9a9a', hair: 'bald', skin: '#9ab84a', eyes: '#f4efe2', outer: 'quilted', coat: '#4a4f3a', shirt: '#5a5f48', neck: 'none', accent: '#c9a14a', pants: '#3a3a30', gloves: true, glove: '#3a3a36', weapon: 'sword', expr: 'shout'})},
+  {id: 'ulf', name: 'Ulf Wolfhood', look: L({build: 'stocky', hat: 'pelt', hatc: '#3f5a6a', hair: 'shaggy', hairc: '#c9552c', facial: 'full', eyes: '#e0b63c', outer: 'quilted', coat: '#4a4a52', shirt: '#5a5a60', neck: 'none', sash: 'waist', accent: '#8a6a4a', pants: '#2a2a30', skin: '#e2a08f', weapon: 'cleavers', expr: 'grin'})},
+  {id: 'tobias', name: 'Big Tobias', look: L({build: 'brute', hat: 'none', hair: 'bald', skin: '#5a3a2c', eyes: '#f4efe2', outer: 'vest', coat: '#5f7a4a', shirt: '#b9ad98', neck: 'none', sash: 'chains', scarf: '#6f8aa0', accent: '#e0782c', pants: '#6a6248', gloves: true, glove: '#3a3036', offhand: 'tower', weapon: 'hammer', expr: 'angry'})},
+  {id: 'hob', name: 'Hob the Archer', look: L({build: 'small', hat: 'hood', hatc: '#6a4a34', hair: 'short', hairc: '#d9b24a', cover: 'mask', scarf: '#b8432c', outer: 'cloak', coat: '#6a5a48', shirt: '#7a6a58', neck: 'none', back: 'quiver', accent: '#c9a14a', pants: '#4a3a30', weapon: 'bow', expr: 'calm'})},
+  {id: 'wrapped', name: 'The Wrapped Man', look: L({build: 'tall', hat: 'none', hair: 'long', hairc: '#4a4038', cover: 'ninja', outer: 'wraps', coat: '#8a7a62', shirt: '#8a7a62', neck: 'fur', scarf: '#c9a8a0', back: 'sword', accent: '#a8474a', crow: true, pants: '#4a4038', gloves: true, glove: '#6a5a48', skin: '#c9a890', weapon: 'sword', expr: 'angry'})},
+  {id: 'bramble', name: 'Bramble', look: L({build: 'small', sex: 'f', mount: 'yak', hat: 'none', hair: 'tail', hairc: '#c9432c', outer: 'vest', coat: '#8a3a34', shirt: '#b9ad98', neck: 'none', accent: '#c9a14a', pants: '#5a4038', skin: '#f0c7b0', weapon: 'lance', expr: 'angry'})},
+  {id: 'moss', name: 'Moss (yak)', look: L({build: 'yak', skin: '#8a5a3a', eyes: '#d0322c', accent: '#6a5a4a', coat: '#a8784e', weapon: 'fists'})},
+  {id: 'aldric', name: 'Lord Aldric Brand', look: L({build: 'stocky', hat: 'none', hair: 'short', hairc: '#c99a4a', facial: 'huge', outer: 'furcoat', coat: '#9a2f2c', shirt: '#6a3a30', neck: 'none', accent: '#6a6a70', pants: '#3a2a28', gloves: true, glove: '#4a3a34', skin: '#e2a890', weapon: 'saber', expr: 'angry'})},
+  {id: 'hagga', name: 'Old Hagga', look: L({build: 'tall', hat: 'skullhelm', hair: 'long', hairc: '#8a8f86', facial: 'huge', outer: 'cloak', coat: '#6a6a62', shirt: '#5a5a52', neck: 'none', sash: 'bandolier', accent: '#a8474a', eyes: '#9fe03a', pants: '#3a3a36', skin: '#d9a890', weapon: 'magic', expr: 'calm'})},
+  {id: 'kestor', name: 'Kestor Ironhoof', look: L({build: 'centaur', hat: 'galea', hatc: '#5f8a88', hair: 'short', hairc: '#8a8478', neck: 'fur', scarf: '#a8947a', outer: 'scale', coat: '#6fa0a8', shirt: '#d9cfb4', accent: '#c8432c', pants: '#5a4a44', skin: '#c98d72', gunner: true, weapon: 'spear', expr: 'angry'})},
+  {id: 'odo', name: 'King Odo the Gilded', look: L({build: 'stocky', hat: 'crown', halo: 'gold', hair: 'short', hairc: '#d9a84a', facial: 'huge', outer: 'scale', coat: '#7a9aa8', shirt: '#6a4a3a', cape: true, scarf: '#a8342c', neck: 'none', accent: '#c9a14a', pants: '#3a2e2c', gloves: true, glove: '#5a4038', skin: '#eab9a2', eyes: '#5a4a44', weapon: 'greatsword', expr: 'calm'})},
+  {id: 'tyrant', name: 'Tyrant (rex)', look: L({build: 'rex', skin: '#6f6a3a', coat: '#c9b88a', eyes: '#f0c23a', accent: '#4a4a30', weapon: 'fists'})},
+  {id: 'ezra', name: 'Ezra Cole', look: L({mount: 'camel', hat: 'wide', hatc: '#6a7a4a', hair: 'short', hairc: '#4a3a34', facial: 'goatee', smoke: true, outer: 'poncho', coat: '#5f7a5a', accent: '#d9cfa0', shirt: '#d9d0bb', neck: 'none', pants: '#4a5a58', skin: '#d99887', gloves: true, glove: '#4f5a48', weapon: 'revolver', expr: 'calm'})},
+  {id: 'clementine', name: 'Clementine (camel)', look: L({build: 'camel', skin: '#b8703c', coat: '#d9a070', accent: '#4f6a5a', eyes: '#2a2228', back: 'gun', weapon: 'fists'})},
+  {id: 'ash', name: 'Ash (horse)', look: L({build: 'horse', skin: '#6a4a3a', coat: '#8a6a52', accent: '#a8474a', eyes: '#2a2228', weapon: 'fists'})},
+  {id: 'brannoc', name: 'Brannoc Gearbeard', look: L({build: 'stocky', hat: 'goggles', hair: 'shaggy', hairc: '#3a3436', facial: 'full', outer: 'vest', coat: '#3f4448', shirt: '#c9b89a', neck: 'none', sash: 'bandolier', accent: '#c9a14a', pants: '#5a5f3a', gloves: true, glove: '#5a4a44', skin: '#b8866a', offhand: 'bag', weapon: 'axe', expr: 'grin'})}
+];
+const clone = o => JSON.parse(JSON.stringify(o));
+function defaultLook() { return clone(PRESETS[0].look); }
+function randomLook(rng) {
+  rng = rng || Math.random; const pick = a => a[Math.floor(rng() * a.length)], o = defaultLook();
+  SCHEMA.forEach(s => { if (s.type === 'choice') o[s.key] = pick(s.options)[0]; else if (s.type === 'toggle') o[s.key] = rng() < 0.3; });
+  const pal = {skin: ['#e2a08f', '#c98d72', '#eab9a2', '#a8755c', '#8a5a44', '#d99887'], hairc: ['#6b5a4c', '#2a2530', '#8a5a34', '#b9b4a8', '#c9a23a', '#7a3a2c', '#4a4e58'],
+    hatc: ['#4b3d3f', '#b9a888', '#2e2a30', '#d8d2c2', '#6a4a3a', '#77797f'], coat: ['#8c7a58', '#5d6b58', '#6a4a3a', '#7b7f88', '#3f6f70', '#8b6a4f', '#5a4038', '#a8474a'],
+    shirt: ['#d9d0bb', '#e3dccb', '#b9b29c', '#cfc6b0', '#9aa3a8'], scarf: ['#a8474a', '#c9952c', '#5b6d7a', '#c7b98c', '#8d9099', '#3f6f70'], pants: ['#1d181d', '#2b2630', '#3a2f2a'], accent: ['#d9a520', '#a8474a', '#c9a14a', '#e0b63c'], eyes: ['#6f93a8', '#7a9a6a', '#8a6a4a']};
+  Object.keys(pal).forEach(k => { o[k] = pick(pal[k]); });
+  if (rng() < 0.9 && (BEAST[o.build] || BLOB[o.build])) o.build = pick(['regular', 'slim', 'stocky', 'brute', 'tall', 'small']); if (rng() < 0.8) o.head = 'human'; if (rng() < 0.6) o.back = 'none'; if (rng() < 0.6) o.sash = 'none'; if (rng() < 0.6) o.offhand = 'none'; if (rng() < 0.7) o.peg = false; if (rng() < 0.85) o.mount = 'none'; if (rng() < 0.8) o.halo = 'none'; if (o.build === 'centaur') o.mount = 'none';
+  o.weapon = pick(WEAPONS)[0]; o.expr = pick(EXPRS)[0];
+  return o;
+}
+
+window.INK = {VERSION: '0.5.0', CELL: CELL, AX: AX, AY: AY, DIRS: DIRS, ACTS: ACTS, COUNT: COUNT, FPS: FPS, LABEL: LABEL, WEAPONS: WEAPONS, KIND: KIND, EXPRS: EXPRS, SCHEMA: SCHEMA, PRESETS: PRESETS,
+  defaultLook: defaultLook, randomLook: randomLook, draw: draw, frame: frame, clearCache: clearCache, anchors: anchorsOf, audit: audit, BUILD: BUILD, YAW: YAW};
+/* Crown of Dust addition (the only change to the lab painter): expose the drawing primitives so structures and props are built from the same solids and ink. */
+window.INK.kit = {K: K, D2R: D2R, INKC: INKC, LIGHT: LIGHT, Scene: Scene, prism: prism, ring8: ring8, ribbon: ribbon, shadeStrip: shadeStrip, drawPart: drawPart, flash: flash, inkSeg: inkSeg, tick: tick, line: line, outline: outline, fillp: fillp, area2: area2,
+  mat: mat, mix: mix, hex: hex, rnd: rnd, toneOf: toneOf, FP: FP, RX: RX, RY: RY, RZ: RZ, MM: MM, MV: MV, add: add, sub: sub, mul: mul, norm: norm, lerp2: lerp2, lerp3: lerp3, compose: compose, BEAST: BEAST, BLOB: BLOB, MOUNT: MOUNT};
+})();

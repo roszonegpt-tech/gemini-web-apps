@@ -1,0 +1,16 @@
+# OS and editor clutter
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+.vscode/
+.idea/
+# Node (tests only)
+node_modules/
+# Test output
+tests/out/
+*.log
+tests/out/
+build/trailer/
+build/guide/
+build/artifact/

@@ -11,6 +11,12 @@ A centralized index of all web apps built across my 4 Gemini accounts.
 | Account 3 | Gemini-3 | [/accounts/gemini-3](/accounts/gemini-3/README.md) |
 | Account 4 | Gemini-4 | [/accounts/gemini-4](/accounts/gemini-4/README.md) |
 
+## Games
+
+| Game | Folder | Status |
+|------|--------|--------|
+| Ink Outlaws: Crown of Dust (action-adventure strategy, v0.1.0) | [/games/ink-outlaws-crown-of-dust](/games/ink-outlaws-crown-of-dust/README.md) | 🟡 In Progress |
+
 ## About
 
 Each account folder contains a `README.md` listing all web apps with:
